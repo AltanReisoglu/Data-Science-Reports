@@ -5,7 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+*txt
+*.csv
 # Distribution / packaging
 .Python
 build/
@@ -15,12 +16,17 @@ downloads/
 eggs/
 .eggs/
 lib/
+.pt
+pt/
+.txt
+txt
 lib64/
 parts/
 sdist/
 var/
 wheels/
 share/python-wheels/
+catboost_info/
 *.egg-info/
 .installed.cfg
 *.egg
