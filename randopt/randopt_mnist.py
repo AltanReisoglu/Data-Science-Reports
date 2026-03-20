@@ -14,7 +14,7 @@ from collections import Counter
 # 1. PARAMETRELER VE MODEL TANIMI
 # ---------------------------------------------------------
 BATCH_SIZE = 128
-PRETRAIN_ITERS = 500  # 0-4 Eğitim döngüsü sayısı
+PRETRAIN_ITERS = 200  # Tüm 10 rakam — kasıtlı kısa ("orta halli" base model)
 N = 1000  # RandOpt Popülasyonu (Perturbasyon Sayısı)
 K = 5     # Ensemble Seçilecek Model Sayısı
 GLOBAL_SEED = 42
@@ -45,33 +45,23 @@ class MNISTNet(nn.Module):
             p.data.add_(torch.randn_like(p.data) * sigma)
 
 # ---------------------------------------------------------
-# 2. VERİ YÜKLERİ (DATASET FILTERING)
+# 2. VERİ YÜKLERİ
 # ---------------------------------------------------------
-def get_filtered_loader(train=True, digits=[0, 1, 2, 3, 4], bsz=BATCH_SIZE):
-    """Sadece belirli rakamları içeren loader döner."""
+def get_loader(train=True, bsz=BATCH_SIZE):
+    """Tüm 10 rakamı (0-9) içeren standart MNIST loader."""
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    
     dataset = datasets.MNIST(root='./data', train=train, download=True, transform=transform)
-    
-    # Rakamlara göre filtreleme
-    mask = torch.zeros(len(dataset), dtype=torch.bool)
-    for d in digits:
-        mask = mask | (dataset.targets == d)
-        
-    dataset.data = dataset.data[mask]
-    dataset.targets = dataset.targets[mask]
-    
-    loader = torch.utils.data.DataLoader(dataset, batch_size=bsz, shuffle=True if train else False)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=bsz, shuffle=train)
     return loader
 
 # ---------------------------------------------------------
 # 3. PRE-TRAINING (0-4 Digits)
 # ---------------------------------------------------------
 def pretrain_base_model(model, loader, iters=500, lr=0.001):
-    print(f"🎬 [Faza 1] Base Model Rakamlar [0-4] ile Eğitiliyor ({iters} iterasyon)...")
+    print(f"🎬 [Faza 1] Base Model Rakamlar [0-9] ile Eğitiliyor ({iters} iterasyon)...")
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
     
@@ -186,13 +176,13 @@ def evaluate_and_plot(base_model, top_k_seeds, sigma, loader, K=5):
     accuracy_ens = ensemble_correct / total_samples
     
     print("="*40)
-    print(f"🔴 Base Model [5-9 Tahmin] Başarısı  : %{accuracy_base*100:.2f}")
-    print(f"🟡 RandOpt Ensemble [5-9 Tahmin] Başarısı: %{accuracy_ens*100:.2f}")
+    print(f"🔴 Base Model [0-9 Tahmin] Başarısı  : %{accuracy_base*100:.2f}")
+    print(f"🟡 RandOpt Ensemble [0-9 Tahmin] Başarısı: %{accuracy_ens*100:.2f}")
     print("="*40)
 
     # --- Bar Chart ---
     plt.figure(figsize=(6, 5))
-    categories = ['Base (0-4 Eğitilmiş)', 'RandOpt Ensemble (5-9)']
+    categories = ['Base (0-9 Eğitilmiş)', 'RandOpt Ensemble (0-9)']
     values = [accuracy_base * 100, accuracy_ens * 100]
     
     bars = plt.bar(categories, values, color=['#E64B35', '#F39C12'])
@@ -213,28 +203,29 @@ def evaluate_and_plot(base_model, top_k_seeds, sigma, loader, K=5):
 # RUNNER
 # ---------------------------------------------------------
 def main():
-    # 1. Klasörler
     os.makedirs("data", exist_ok=True)
+    torch.manual_seed(GLOBAL_SEED)
     
-    # 2. Base Model Hazırla
+    # 1. Base Model
     model = MNISTNet().to(device)
     
-    # Filtrelenmiş Veri: 0, 1, 2, 3, 4
-    train_04_loader = get_filtered_loader(train=True, digits=[0,1,2,3,4])
+    # 2. Tüm 10 rakam — kısa pretraining (kasıtlı "orta halli")
+    train_loader = get_loader(train=True, bsz=BATCH_SIZE)
+    pretrain_base_model(model, train_loader, iters=PRETRAIN_ITERS)
     
-    # 3. Eğit (Pre-training)
-    pretrain_base_model(model, train_04_loader, iters=PRETRAIN_ITERS)
+    # 3. Kalibrasyon batch'i (makaledeki küçük D_train)
+    calib_loader = get_loader(train=True, bsz=256)
     
-    # Filtrelenmiş Veri: 5, 6, 7, 8, 9 (YENI TİPLER)
-    calibration_59_loader = get_filtered_loader(train=True, digits=[5,6,7,8,9], bsz=128) # Kalibrasyon için
-    test_59_loader = get_filtered_loader(train=False, digits=[5,6,7,8,9], bsz=256) # Test veri seti
+    # 4. Tam test seti
+    test_loader = get_loader(train=False, bsz=256)
     
-    # 4. RandOpt Arama
-    sigma = 0.005 # LLM'lerde olduğu gibi küçük bir sigma
-    top_k_seeds = randopt(model, calibration_59_loader, N=N, sigma=sigma, K=K)
+    # 5. RandOpt (sigma=0.005 — makaledeki değer)
+    sigma = 0.005
+    top_k_seeds = randopt(model, calib_loader, N=N, sigma=sigma, K=K)
     
-    # 5. Değerlendir
-    evaluate_and_plot(model, top_k_seeds, sigma, test_59_loader, K=K)
+    # 6. Değerlendirme
+    evaluate_and_plot(model, top_k_seeds, sigma, test_loader, K=K)
 
 if __name__ == "__main__":
     main()
+

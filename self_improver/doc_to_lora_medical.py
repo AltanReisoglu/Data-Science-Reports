@@ -27,26 +27,79 @@ else:
 
 # 1c) Bagimliliklari kur
 !pip uninstall -y flash-attn  # Mevcut bozuk kurulumlari temizle
+
+# Flash-attention kalıntılarını fiziksel olarak sil (Linker hatalarını önlemek için)
+import os, site
+for d in site.getsitepackages():
+    flash_path = os.path.join(d, "flash_attn")
+    if os.path.exists(flash_path):
+        !rm -rf {flash_path}
+    # .so dosyalarını da temizle
+    if os.path.exists(d):
+        for f in os.listdir(d):
+            if f.startswith("flash_attn") and f.endswith(".so"):
+                so_path = os.path.join(d, f)
+                !rm -f {so_path}
+
+# 1c-1) Sistem Bagimliliklarini Kur (libaio DeepSpeed icin gereklidir)
+!apt-get update && apt-get install -y libaio-dev
+!pip install -q einops ninja --no-build-isolation --no-cache-dir
 !pip install -q -e .
 !pip install -q huggingface_hub
 
-# [TIP] Eger hala FlashAttention hatasi aliyorsaniz:
-# "Runtime -> Restart runtime" yapip bu hucreryi tekrar calistirin.
-
 # 1c-2) T4 GPU Uyumluluk Yamasi (FlashAttention2 yerine SDPA kullanimi icin)
 # D2L'in kaynak kodunda FlashAttention2 zorunlulugunu kaldiriyoruz.
-!sed -i 's/assert self._use_flash_attention_2/pass/' /content/doc-to-lora/src/ctx_to_lora/modeling/idefics2.py
-!sed -i 's/# "eager": Idefics2PerceiverAttention/"sdpa": Idefics2PerceiverAttention/' /content/doc-to-lora/src/ctx_to_lora/modeling/idefics2.py
-# unpad_input NameError hatasi icin fallback ekle
-!sed -i 's/from flash_attn.bert_padding import unpad_input/try:\\n    from flash_attn.bert_padding import unpad_input\\nexcept ImportError:\\n    def unpad_input(tensor, mask): return tensor, None, None, None, None/' /content/doc-to-lora/src/ctx_to_lora/modeling/idefics2.py
+def patch_d2l_source():
+    import os, re
+    repo_path = "/content/doc-to-lora"
+    path = os.path.join(repo_path, "src/ctx_to_lora/modeling/idefics2.py")
+    
+    if not os.path.exists(path):
+        print(f"[HATA] Dosya bulunamadi: {path}")
+        return
 
-# Yamayi dogrula
-with open("/content/doc-to-lora/src/ctx_to_lora/modeling/idefics2.py", "r") as f:
-    content = f.read()
-    if 'pass' in content and '"sdpa": Idefics2PerceiverAttention' in content:
-        print("[OK] T4 Uyumluluk Yamasi basariyla uygulandi.")
-    else:
-        print("[HATA] Yama uygulanamadi! Lutfen dosyayi kontrol edin.")
+    # Temiz bir başlangıç için dosyayı repodaki orijinal haline döndür
+    os.system(f"cd {repo_path} && git checkout src/ctx_to_lora/modeling/idefics2.py")
+    print("[INFO] Kaynak kod orijinal haline döndürüldü (reset).")
+    
+    with open(path, "r") as f:
+        content = f.read()
+    
+    # 1. FlashAttention assertion'i kaldir
+    content = content.replace("assert self._use_flash_attention_2", "pass")
+    
+    # 2. SDPA destegi ekle
+    content = content.replace('# "eager": Idefics2PerceiverAttention', '"sdpa": Idefics2PerceiverAttention')
+    
+    # 3. unpad_input fallback ekle (Girinti uyumlu regex ile)
+    unpad_pattern = r'^(\s+)from flash_attn\.bert_padding import unpad_input'
+    unpad_replacement = r'\1try:\n\1    from flash_attn.bert_padding import unpad_input\n\1except ImportError:\n\1    def unpad_input(tensor, mask): return tensor, None, None, None, None'
+    content = re.sub(unpad_pattern, unpad_replacement, content, flags=re.MULTILINE)
+
+    # 4. Resampler içindeki Flash-only bloğunu sarmala (ValueError ve Dimension Mismatch çözümü)
+    # Bu blok sadece FlashAttention aktifse çalışmalı.
+    flash_target = """            context, _, cu_seq_lens_k, max_length_k, _ = unpad_input(
+                context, attention_mask
+            )
+            context = context.unsqueeze(0)
+            position_ids = True"""
+            
+    flash_replacement = """            cu_seq_lens_k = max_length_k = None
+            if self._use_flash_attention_2:
+                context, _, cu_seq_lens_k, max_length_k, _ = unpad_input(
+                    context, attention_mask
+                )
+                context = context.unsqueeze(0)
+                position_ids = True"""
+    
+    if flash_target in content:
+        content = content.replace(flash_target, flash_replacement)
+
+    with open(path, "w") as f:
+        f.write(content)
+    print("[OK] T4 Uyumluluk Yamasi (Indentation-Aware) basariyla uygulandi.")
+
+patch_d2l_source()
 
 # 1d) HuggingFace token ile giris yap
 # Gemma modeli gated (erisim izni gerektirir), token olmadan indirilemez.
@@ -77,8 +130,10 @@ if src_dir not in sys.path:
 os.chdir(repo_dir)
 
 # --- GLOBAL FLASH ATTENTION BYPASS (T4 GPU ICIN) ---
-# transformers kütüphanesinin FlashAttention kontrolünü tamamen susturuyoruz.
-import transformers
+# transformers kütüphanesinin FlashAttention kontrolünü en erken aşamada susturuyoruz.
+import transformers.utils.import_utils as import_utils
+import_utils.is_flash_attn_2_available = lambda: False # Kütüphane seviyesinde kapat
+
 from transformers import PreTrainedModel
 import transformers.modeling_utils
 
@@ -95,6 +150,20 @@ if hasattr(transformers.modeling_utils, "_check_and_enable_flash_attn_2"):
 import ctx_to_lora.modeling.idefics2 as idefics2_mod
 if not hasattr(idefics2_mod, "unpad_input") or idefics2_mod.unpad_input is None:
     idefics2_mod.unpad_input = lambda tensor, mask: (tensor, None, None, None, None)
+
+# --- D2L ATTENTION SIGNATURE PATCH (TypeError FIX) ---
+# Idefics2PerceiverAttention.forward metoduna is_cross_attn desteği ekliyoruz
+# ve FlashAttention'a özgü keyword'leri (cu_seq_lens vb.) temizliyoruz.
+_orig_perceiver_attn_forward = idefics2_mod.Idefics2PerceiverAttention.forward
+def _patched_perceiver_attn_forward(self, latents, is_cross_attn=True, context=None, **kwargs):
+    # FlashAttention'a özgü argümanları temizle (temel sınıf bunları kabul etmez)
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ["cu_seq_lens_q", "cu_seq_lens_k", "max_length_q", "max_length_k"]}
+    
+    if not is_cross_attn or context is None:
+        # Self-attention durumunda context olarak latents kullanılır
+        return _orig_perceiver_attn_forward(self, latents, latents, **filtered_kwargs)
+    return _orig_perceiver_attn_forward(self, latents, context, **filtered_kwargs)
+idefics2_mod.Idefics2PerceiverAttention.forward = _patched_perceiver_attn_forward
 # --------------------------------------------------
 
 import torch
