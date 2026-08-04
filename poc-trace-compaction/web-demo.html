@@ -1,0 +1,864 @@
+<style>
+  :root {
+    --ground: #0e1519;
+    --panel: #131e25;
+    --panel-2: #0b1216;
+    --line: #22303a;
+    --line-soft: #1a262e;
+    --ink: #e9eff2;
+    --ink-dim: #b7c4cc;
+    --muted: #7f929d;
+    --signal: #74b9df;
+    --signal-dim: #3d6f8c;
+    --keep: #46c08a;
+    --summary: #e0a94a;
+    --clear: #d0726c;
+    --keep-bg: rgba(70,192,138,0.13);
+    --summary-bg: rgba(224,169,74,0.13);
+    --clear-bg: rgba(208,114,108,0.13);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --radius: 10px;
+    --shadow: 0 1px 0 rgba(255,255,255,0.02), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground: #eef2f5;
+      --panel: #ffffff;
+      --panel-2: #f4f7f9;
+      --line: #d7e0e6;
+      --line-soft: #e5ebef;
+      --ink: #14212a;
+      --ink-dim: #35505f;
+      --muted: #5d6f7a;
+      --signal: #2c7fb0;
+      --signal-dim: #8fbdd6;
+      --keep: #17915f;
+      --summary: #a9781f;
+      --clear: #b64f49;
+      --keep-bg: rgba(23,145,95,0.10);
+      --summary-bg: rgba(169,120,31,0.11);
+      --clear-bg: rgba(182,79,73,0.10);
+      --shadow: 0 1px 0 rgba(0,0,0,0.02), 0 8px 22px rgba(30,50,70,0.10);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0e1519; --panel: #131e25; --panel-2: #0b1216; --line: #22303a;
+    --line-soft: #1a262e; --ink: #e9eff2; --ink-dim: #b7c4cc; --muted: #7f929d;
+    --signal: #74b9df; --signal-dim: #3d6f8c; --keep: #46c08a; --summary: #e0a94a;
+    --clear: #d0726c; --keep-bg: rgba(70,192,138,0.13); --summary-bg: rgba(224,169,74,0.13);
+    --clear-bg: rgba(208,114,108,0.13); --shadow: 0 1px 0 rgba(255,255,255,0.02), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #eef2f5; --panel: #ffffff; --panel-2: #f4f7f9; --line: #d7e0e6;
+    --line-soft: #e5ebef; --ink: #14212a; --ink-dim: #35505f; --muted: #5d6f7a;
+    --signal: #2c7fb0; --signal-dim: #8fbdd6; --keep: #17915f; --summary: #a9781f;
+    --clear: #b64f49; --keep-bg: rgba(23,145,95,0.10); --summary-bg: rgba(169,120,31,0.11);
+    --clear-bg: rgba(182,79,73,0.10); --shadow: 0 1px 0 rgba(0,0,0,0.02), 0 8px 22px rgba(30,50,70,0.10);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 60px; }
+
+  /* header */
+  header.top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 26px;
+    padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; flex-direction: column; gap: 6px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--signal); font-weight: 600; }
+  h1 { font-family: var(--mono); font-weight: 600; font-size: clamp(21px, 2.6vw, 30px);
+    margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .sub { color: var(--muted); font-size: 13.5px; max-width: 62ch; margin: 0; }
+  .task-chip { margin-left: auto; align-self: center; font-family: var(--mono); font-size: 12px;
+    color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: var(--radius); display: flex; gap: 8px; align-items: center; }
+  .task-chip b { color: var(--signal); font-weight: 600; }
+
+  /* toolbar */
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    margin: 16px 0 18px; }
+  button.btn { font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+    color: var(--ground); background: var(--signal); border: none; padding: 9px 16px;
+    border-radius: 8px; cursor: pointer; transition: transform .08s ease, opacity .15s; letter-spacing: .01em; }
+  button.btn:hover { opacity: .9; } button.btn:active { transform: translateY(1px); }
+  button.btn.ghost { background: transparent; color: var(--ink-dim);
+    border: 1px solid var(--line); }
+  button.btn.ghost:hover { border-color: var(--signal-dim); color: var(--ink); }
+  button.btn:disabled { opacity: .4; cursor: not-allowed; }
+  .slider-wrap { display: flex; align-items: center; gap: 10px; font-family: var(--mono);
+    font-size: 12px; color: var(--muted); margin-left: 4px; }
+  .slider-wrap input[type=range] { accent-color: var(--signal); width: 150px; }
+  .slider-wrap b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .scn-switch { display: inline-flex; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 3px; gap: 2px; }
+  .scn { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--muted);
+    background: transparent; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    transition: color .15s, background .15s; }
+  .scn:hover { color: var(--ink); }
+  .scn.active { color: var(--ground); background: var(--signal); }
+  .ep-badge { font-family: var(--mono); font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--signal); background: color-mix(in srgb, var(--signal) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--signal) 30%, transparent);
+    padding: 1px 6px; border-radius: 10px; }
+  .ep-badge.rapor { color: var(--summary); background: var(--summary-bg);
+    border-color: color-mix(in srgb, var(--summary) 30%, transparent); }
+  .spacer { flex: 1; }
+  .theme-toggle { font-family: var(--mono); font-size: 11px; color: var(--muted);
+    background: transparent; border: 1px solid var(--line); border-radius: 7px;
+    padding: 7px 10px; cursor: pointer; }
+
+  /* main grid */
+  .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; align-items: start; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); }
+  .card-h { display: flex; align-items: center; gap: 9px; padding: 12px 15px;
+    border-bottom: 1px solid var(--line-soft); }
+  .card-h .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .card-h .count { margin-left: auto; font-family: var(--mono); font-size: 11px;
+    color: var(--signal); }
+
+  /* chat */
+  #chat { padding: 8px 8px 8px; max-height: 560px; overflow-y: auto; scroll-behavior: smooth; }
+  #chat::-webkit-scrollbar { width: 9px; } #chat::-webkit-scrollbar-thumb {
+    background: var(--line); border-radius: 6px; }
+  .turn { padding: 7px 9px; }
+  .reason { font-size: 12.5px; color: var(--muted); font-style: italic; padding: 2px 4px 8px; display: flex; gap: 7px; }
+  .reason::before { content: "›"; color: var(--signal-dim); font-style: normal; }
+  .tool { border: 1px solid var(--line-soft); border-radius: 9px; overflow: hidden;
+    background: var(--panel-2); transition: border-color .3s; }
+  .tool.fate-keep { border-color: color-mix(in srgb, var(--keep) 45%, var(--line)); }
+  .tool.fate-summary { border-color: color-mix(in srgb, var(--summary) 45%, var(--line)); }
+  .tool.fate-clear { border-color: color-mix(in srgb, var(--clear) 40%, var(--line)); }
+  .tool-h { display: flex; align-items: center; gap: 8px; padding: 8px 11px;
+    font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  .seqn { color: var(--muted); font-size: 11px; min-width: 26px; }
+  .tname { color: var(--signal); font-weight: 600; }
+  .targs { color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; flex: 1; }
+  .fate-pill { font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 20px; font-weight: 600; opacity: 0; transition: opacity .3s; }
+  .fate-pill.show { opacity: 1; }
+  .fate-keep .fate-pill { background: var(--keep-bg); color: var(--keep); }
+  .fate-summary .fate-pill { background: var(--summary-bg); color: var(--summary); }
+  .fate-clear .fate-pill { background: var(--clear-bg); color: var(--clear); }
+  .tool-body { padding: 0 11px; max-height: 0; overflow: hidden; transition: max-height .35s ease, padding .35s ease; }
+  .tool-body.open { padding: 2px 11px 11px; max-height: 420px; }
+  .out-raw { font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+    white-space: pre-wrap; word-break: break-word; margin: 0;
+    max-height: 150px; overflow: auto; padding: 8px; background: var(--ground);
+    border-radius: 6px; border: 1px solid var(--line-soft); }
+  .out-raw.verbatim { color: var(--keep); }
+  .summ { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-family: var(--mono);
+    font-size: 11.5px; padding: 8px; background: var(--ground); border-radius: 6px; border: 1px solid var(--line-soft); }
+  .summ dt { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: .06em; padding-top: 2px; }
+  .summ dd { margin: 0; color: var(--ink); word-break: break-word; }
+  .summ dd.crit { color: var(--keep); }
+  .clearnote { font-family: var(--mono); font-size: 11.5px; color: var(--clear);
+    padding: 8px; background: var(--clear-bg); border-radius: 6px; display: flex; gap: 8px; align-items: center; }
+  .tok-badge { font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+    font-variant-numeric: tabular-nums; }
+  .tok-badge s { color: var(--clear); text-decoration: none; opacity: .6; }
+
+  /* panel */
+  .panel-col { display: flex; flex-direction: column; gap: 16px; }
+  .gauge { padding: 14px 15px; }
+  .gauge .row { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); }
+  .gauge .big { font-size: 27px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .gauge .big .unit { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .gauge .delta { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .gauge .delta.down { color: var(--keep); }
+  .track { position: relative; height: 12px; background: var(--panel-2); border-radius: 7px;
+    margin: 12px 0 6px; overflow: hidden; border: 1px solid var(--line-soft); }
+  .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    background: linear-gradient(90deg, var(--signal-dim), var(--signal));
+    border-radius: 7px; transition: width .4s ease, background .4s; }
+  .fill.over { background: linear-gradient(90deg, var(--summary), var(--clear)); }
+  .budget-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink);
+    opacity: .55; }
+  .budget-mark::after { content: "bütçe"; position: absolute; top: -15px; left: 50%;
+    transform: translateX(-50%); font-family: var(--mono); font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .gauge .foot { display: flex; justify-content: space-between; font-family: var(--mono);
+    font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  .ledger-body, .phase-body, .pb-body { padding: 10px 14px 14px; }
+  .ltab { width: 100%; font-family: var(--mono); font-size: 11.5px; border-collapse: collapse; }
+  .ltab th { text-align: left; color: var(--muted); font-weight: 500; text-transform: uppercase;
+    font-size: 10px; letter-spacing: .06em; padding: 3px 6px; border-bottom: 1px solid var(--line-soft); }
+  .ltab td { padding: 5px 6px; border-bottom: 1px solid var(--line-soft); color: var(--ink-dim);
+    font-variant-numeric: tabular-nums; }
+  .ltab td.cnt { color: var(--ink); }
+  .ltab tr.bumped td.cnt { color: var(--clear); font-weight: 600; }
+  .chip-w { color: var(--clear); font-size: 10px; }
+
+  .phase-body { display: flex; flex-direction: column; gap: 5px; min-height: 40px; }
+  .plog { font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+    display: flex; gap: 8px; align-items: baseline; opacity: 0; transform: translateX(-4px);
+    animation: slidein .3s forwards; }
+  .plog .pn { color: var(--signal); font-weight: 600; min-width: 42px; }
+  .plog .pd { color: var(--muted); }
+  @keyframes slidein { to { opacity: 1; transform: none; } }
+  .phase-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+
+  .pb-body { display: flex; flex-direction: column; gap: 8px; min-height: 30px; }
+  .bullet { display: flex; gap: 9px; font-size: 12px; color: var(--ink-dim);
+    padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line-soft);
+    border-radius: 8px; border-left: 3px solid var(--keep);
+    opacity: 0; transform: translateY(4px); animation: slideup .35s forwards; }
+  .bullet .btag { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--keep); font-weight: 600; padding-top: 1px; white-space: nowrap; }
+  .bullet.finding { border-left-color: var(--signal); }
+  .bullet.finding .btag { color: var(--signal); }
+  .bullet .x2 { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  @keyframes slideup { to { opacity: 1; transform: none; } }
+  .pb-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+
+  /* fate strip */
+  .strip-card { margin-top: 18px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 7px; padding: 13px 15px; }
+  .cell { flex: 1 1 62px; min-width: 62px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel-2); padding: 8px 7px; cursor: pointer; text-align: center;
+    transition: all .3s ease; position: relative; }
+  .cell .cseq { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .cell .cname { font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim);
+    margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell.keep { background: var(--keep-bg); border-color: color-mix(in srgb, var(--keep) 50%, var(--line)); }
+  .cell.summary { background: var(--summary-bg); border-color: color-mix(in srgb, var(--summary) 50%, var(--line)); }
+  .cell.clear { background: var(--clear-bg); border-color: color-mix(in srgb, var(--clear) 45%, var(--line)); }
+  .cell.keep .cname { color: var(--keep); } .cell.summary .cname { color: var(--summary); }
+  .cell.clear .cname { color: var(--clear); }
+  .cell.dim { opacity: .35; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 15px 14px; font-family: var(--mono); font-size: 11px; }
+  .legend span { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .li-keep { background: var(--keep); } .li-summary { background: var(--summary); } .li-clear { background: var(--clear); }
+
+  .result-line { font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim);
+    padding: 11px 15px; border-top: 1px solid var(--line-soft); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .result-line b { color: var(--keep); }
+  .result-line .muted { color: var(--muted); }
+
+  footer.note { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 20px; }
+  footer.note code { font-family: var(--mono); color: var(--ink-dim); font-size: 11px; }
+  footer.note b { color: var(--signal); font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001s !important; transition-duration: .001s !important; scroll-behavior: auto; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Tool Trace Compaction · canlı demo</span>
+      <h1>Yürütme Defteri &amp; Bağlam Sıkıştırma</h1>
+      <p class="sub">Bir kod ajanı gürültülü bir iz üretir; ledger'a sorarak her birimin
+        kaderini belirler — <b style="color:var(--keep)">korunur</b>,
+        <b style="color:var(--summary)">özetlenir</b> veya
+        <b style="color:var(--clear)">silinir</b>. Hiç LLM çağrılmaz.</p>
+    </div>
+    <div class="task-chip" id="taskChip">görev: <b>config.py PORT → 9090</b></div>
+  </header>
+
+  <div class="toolbar">
+    <div class="scn-switch" role="tablist">
+      <button class="scn active" id="scnConfig" role="tab">config.py · staleness</button>
+      <button class="scn" id="scnEquity" role="tab">XOM · araştırma (T5)</button>
+    </div>
+    <button class="btn" id="run">▷ Çalıştır</button>
+    <button class="btn ghost" id="reset">↺ Sıfırla</button>
+    <div class="slider-wrap">
+      bütçe <input type="range" id="budget" min="700" max="3400" step="100" value="1400">
+      <b id="budgetVal">1400</b> tok
+    </div>
+    <div class="spacer"></div>
+    <button class="theme-toggle" id="themeBtn">tema</button>
+  </div>
+
+  <div class="grid">
+    <!-- CHAT -->
+    <div class="card">
+      <div class="card-h">
+        <span class="lbl">Ajan sohbeti · trace</span>
+        <span class="count" id="chatCount">0 tool birimi</span>
+      </div>
+      <div id="chat"></div>
+    </div>
+
+    <!-- PANEL -->
+    <div class="panel-col">
+      <div class="card gauge">
+        <div class="row">
+          <div class="big"><span id="tokNow">0</span> <span class="unit">token</span></div>
+          <div class="delta" id="tokDelta"></div>
+        </div>
+        <div class="track">
+          <div class="fill" id="fill"></div>
+          <div class="budget-mark" id="budgetMark"></div>
+        </div>
+        <div class="foot"><span>bağlamdaki trace</span><span id="gaugeState">boşta</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="lbl">Ledger · yürütme defteri</span>
+          <span class="count" id="writeCount">0 yazma</span></div>
+        <div class="ledger-body">
+          <table class="ltab">
+            <thead><tr><th>dosya</th><th>sürüm</th><th>durum</th></tr></thead>
+            <tbody id="ledgerRows">
+              <tr><td colspan="3" style="color:var(--muted);font-style:italic">henüz gözlem yok</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="lbl">Sıkıştırma fazları</span></div>
+        <div class="phase-body" id="phaseLog">
+          <span class="phase-empty">bütçe aşılınca fazlar burada sırayla ateşlenir</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="lbl">ACE Playbook · öğrenilen</span>
+          <span class="count" id="pbCount">0 ders</span></div>
+        <div class="pb-body" id="playbook">
+          <span class="pb-empty">evict edilen hata/bulgu buraya kalıcı yazılır (collapse yok)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FATE STRIP -->
+  <div class="card strip-card">
+    <div class="card-h"><span class="lbl">Kader şeridi · 12 tool birimi</span>
+      <span class="count" id="stripHint">çalıştır →</span></div>
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><i class="li-keep"></i> korundu (koruma penceresi)</span>
+      <span><i class="li-summary"></i> özetlendi · B.12 compaction</span>
+      <span><i class="li-clear"></i> silindi · B.11 context editing</span>
+    </div>
+    <div class="result-line" id="result" style="display:none"></div>
+  </div>
+
+  <footer class="note">
+    <span><b>Not:</b> mantık POC'nin Python çekirdeğinden birebir taşındı —
+      <code>ledger.py · compactor.py · playbook.py</code>. Bütçeyi değiştir, kaderler değişsin.</span>
+    <span>Repodaki diğer yöntemler: <code>PTC</code> · <code>ToolSearch</code> ·
+      göreve-koşullu sıkıştırma · <code>CWL episode</code>.</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const sleep = (ms) => new Promise(r => setTimeout(r, reduce ? 0 : ms));
+  const est = (s) => Math.max(1, Math.floor(String(s).length / 4));
+  const $ = (id) => document.getElementById(id);
+
+  // ---- sahte dosya gövdesi (POC _big) ----
+  function big(path) {
+    let out = [];
+    for (let i = 0; i < 40; i++)
+      out.push(String(i + 1).padStart(4) + "  satır " + i + " of " + path + " .....................");
+    return out.join("\n");
+  }
+
+  const CATEGORY = { read_file: "read", list_dir: "search", grep: "search", edit_file: "write", run_tests: "test",
+    // equity senaryosu (HF dataset case 5.8) — finansal fetch'ler read, web_search search, visualize act(write)
+    get_company_info: "read", get_income_statements: "read", get_key_financial_ratios: "read",
+    get_technical_indicators: "read", get_analyst_recommendations: "read", web_search: "search",
+    visualize_data: "other" };   // sentez/act — dosya yazması değil, okumaları bayatlatmaz
+
+  // finansal veri gövdesi üreticisi (gerçek finansal JSON büyüklüğünde)
+  function fin(title, rows) {
+    const filler = [];
+    for (let i = 0; i < 28; i++)
+      filler.push("line_item_" + i + ": " + (1000 + i * 137) + " (fy" + (2019 + i % 5) + ")");
+    return title + "\n" + rows.map(r => "  " + r).join("\n") + "\n  " + filler.join("\n  ");
+  }
+
+  // ---- Ledger (ledger.py birebir) ----
+  class Ledger {
+    constructor() { this.obs = []; this.cmds = []; this.local = {}; this.global = 0; }
+    record(name, args, output, seq) {
+      const cat = CATEGORY[name] || "other";
+      const p = args.path || args.ticker || args.query || "";   // kaynak anahtarı (dosya veya ticker)
+      if (cat === "write") { this.local[p] = (this.local[p] || 0) + 1; this.global++; }
+      if (cat === "read") { this.obs.push({ path: p, lc: this.local[p] || 0, seq }); }
+      this.cmds.push({ sig: name + "(" + JSON.stringify(args) + ")", cat, seq });
+    }
+    isStale(seq) {
+      const o = this.obs.find(o => o.seq === seq);
+      if (!o) return false;
+      return o.lc < (this.local[o.path] || 0);
+    }
+    catOf(seq) { const c = this.cmds.find(c => c.seq === seq); return c ? c.cat : "other"; }
+  }
+
+  // ---- trace kurulumu (senaryolu) ----
+  let currentKW = ["config.py", "port", "9090"];
+
+  function newBuilder() {
+    let seq = 0; const events = []; const L = new Ledger();
+    function tool(name, args, out, opt = {}) {
+      const rseq = seq++; events.push({ seq: rseq, kind: "reason",
+        text: name + " çağıracağım: " + JSON.stringify(args) });
+      const tseq = seq++; const ev = { seq: tseq, kind: "tool", name, args, output: out,
+        status: opt.status || "ok", verbatim: !!opt.verbatim, intentRef: rseq,
+        episode: opt.episode || "", evicted: false, cleared: false, summary: null, clearNote: "" };
+      ev.raw = est(JSON.stringify({ name, args, output: out }));
+      events.push(ev); L.record(name, args, out, tseq); return ev;
+    }
+    return { events, L, tool };
+  }
+
+  // Senaryo 1 — config.py (staleness): yazma → bayat okuma → sil
+  function buildConfig() {
+    const { events, L, tool } = newBuilder();
+    tool("list_dir", { path: "." }, "config.py\nserver.py\nutils.py");
+    tool("grep", { pattern: "PORT" }, "config.py:6: PORT = 8080", { verbatim: true });
+    tool("read_file", { path: "config.py" }, big("config.py"));
+    tool("read_file", { path: "server.py" }, big("server.py"));
+    tool("read_file", { path: "config.py" }, big("config.py"));
+    tool("grep", { pattern: "PORT" }, "config.py:6: PORT = 8080", { verbatim: true });
+    tool("read_file", { path: "utils.py" }, big("utils.py"));
+    tool("read_file", { path: "config.py" }, big("config.py"));
+    tool("edit_file", { path: "config.py", old: "PORT=8080", new: "PORT=9090" },
+      "Hata: bulunamadı, değiştirilemedi: 'PORT=8080'", { status: "error" });
+    tool("edit_file", { path: "config.py", old: "PORT = 8080", new: "PORT = 9090" },
+      "OK: config.py güncellendi");
+    tool("read_file", { path: "config.py" }, big("config.py"));
+    tool("run_tests", {}, "TEST: health() port=9090", { verbatim: true });
+    return { events, L, task: "config.py PORT → 9090", protectN: 3,
+      kw: ["config.py", "port", "9090"], dag: "" };
+  }
+
+  // Senaryo 2 — XOM yatırım raporu (HF dataset case 5.8, T5): salt-okuma → keşif katlama + dedup
+  function buildEquity() {
+    const { events, L, tool } = newBuilder();
+    const E = "veri-toplama", R = "rapor";
+    tool("get_company_info", { ticker: "XOM" },
+      fin("XOM — Exxon Mobil Corp", ["sektör: Energy / Integrated Oil & Gas",
+        "merkez: Irving TX · çalışan: ~62,000", "piyasa değeri: $470B · beta: 0.92"]), { episode: E });
+    tool("get_income_statements", { ticker: "XOM", freq: "annual" },
+      fin("XOM gelir tablosu (yıllık)", ["revenue 2023: 344.6B · 2022: 413.7B · 2021: 285.6B",
+        "net_income 2023: 36.0B · 2022: 55.7B", "EPS 2023: 8.89 · gross_margin: 31%"]),
+      { episode: E, verbatim: true });
+    tool("get_key_financial_ratios", { ticker: "XOM" },
+      fin("XOM temel oranlar", ["P/E: 13.2 · P/B: 1.9 · ROE: 17.6%",
+        "debt/equity: 0.20 · current_ratio: 1.48", "dividend_yield: 3.4%"]),
+      { episode: E, verbatim: true });
+    tool("get_key_financial_ratios", { ticker: "XOM" },  // DUP — ajan tekrar çekti
+      fin("XOM temel oranlar", ["P/E: 13.2 · P/B: 1.9 · ROE: 17.6%",
+        "debt/equity: 0.20 · current_ratio: 1.48", "dividend_yield: 3.4%"]), { episode: E });
+    tool("get_technical_indicators", { ticker: "XOM" },
+      fin("XOM teknik göstergeler", ["RSI(14): 54.2 · MACD: +0.8 (bullish)",
+        "SMA50: 108.4 · SMA200: 104.1", "52w: 95.8–120.7"]), { episode: E });
+    tool("get_analyst_recommendations", { ticker: "XOM" },
+      fin("XOM analist görüşü", ["Buy: 12 · Hold: 8 · Sell: 1",
+        "consensus: Moderate Buy", "avg_target: $128.5"]), { episode: E, verbatim: true });
+    tool("web_search", { query: "ExxonMobil XOM energy transition strategy recent news" },
+      fin("XOM enerji dönüşümü (haber)", ["düşük-karbon: 2027'ye $17B",
+        "CCS projeleri · Arkansas lityum girişimi", "Q3 kâr beklentiyi aştı · Guyana ramp"]), { episode: E });
+    tool("visualize_data", { instruction: "XOM finansal performans özet grafiği" },
+      "Grafik üretildi: XOM 5-yıl gelir & marj özeti — gelir ↓2023, marj ~31%, P/E 13.2, hedef $128.5",
+      { episode: R, verbatim: true });
+    return { events, L, task: "XOM kapsamlı yatırım raporu (T5)", protectN: 2,
+      kw: ["xom", "revenue", "gelir", "p/e", "ratios", "oran", "technical", "analyst", "target"],
+      dag: "{A,B,C}∥{D,E,F}→G" };
+  }
+
+  const SCENARIOS = { config: buildConfig, equity: buildEquity };
+
+  const toolEvents = (events) => events.filter(e => e.kind === "tool");
+  const totalTokens = (events) => events.reduce((s, e) => s + tok(e), 0);
+  function tok(e) {
+    if (e.kind === "reason") return est(e.text);
+    if (e.cleared) return est(e.clearNote) + 4;
+    if (e.evicted && e.summary) return est(JSON.stringify(e.summary));
+    return e.raw;
+  }
+  const intentOf = (events, ev) => {
+    const r = events.find(e => e.seq === ev.intentRef && e.kind === "reason");
+    return r ? r.text.slice(0, 60) : (ev.name + " çağrıldı");
+  };
+  const relevant = (out) => { const l = out.toLowerCase(); return currentKW.some(k => l.includes(k)); };
+
+  function summarize(events, ev, reason) {
+    const args = ev.args || {};
+    const girdi = Object.entries(args).map(([k, v]) => k + "=" + v).join(", ") || "-";
+    let sonuc;
+    if (ev.verbatim) sonuc = ev.output.trim();
+    else {
+      const lines = ev.output.trim().split("\n");
+      const rel = relevant(ev.output), n = rel ? 2 : 1, cap = rel ? 120 : 60;
+      sonuc = lines.slice(0, n).join(" / ").slice(0, cap) + (ev.output.length > cap ? "…" : "");
+    }
+    return { niyet: intentOf(events, ev), girdi, sonuc: sonuc || "(boş)",
+      durum: ev.status === "ok" ? "ok" : "HATA: " + ev.status, etki: reason, crit: ev.verbatim };
+  }
+
+  // ---- compactor (compactor.py birebir, faz kütüğüyle) ----
+  function compact(events, L, budget, protectN) {
+    const tools = toolEvents(events).filter(e => !e.evicted && !e.cleared);
+    const protectedSeqs = protectN > 0 ? new Set(tools.slice(-protectN).map(e => e.seq)) : new Set();
+    const phases = []; const pb = []; const seen = new Set();
+    const curate = (text, tag) => {
+      const norm = text.trim().toLowerCase().replace(/\s+/g, " ");
+      const hit = pb.find(b => b.norm === norm);
+      if (hit) { hit.helpful++; return; }
+      pb.push({ text: text.trim(), tag, norm, helpful: 1 });
+    };
+    const done = (e) => e.evicted || e.cleared;
+    const over = () => totalTokens(events) > budget;
+
+    function freshLiveRead(ev) {
+      const p = ev.args.path; if (!p || L.catOf(ev.seq) !== "read") return null;
+      for (const la of toolEvents(events)) {
+        if (la.seq <= ev.seq || done(la)) continue;
+        if (la.args.path === p && L.catOf(la.seq) === "read" && !L.isStale(la.seq)) return la.seq;
+      }
+      return null;
+    }
+    function detectDup(ev) {
+      const nm = ev.name, ar = JSON.stringify(ev.args);
+      for (const e of toolEvents(events)) {
+        if (e.seq >= ev.seq) break;
+        if (done(e)) continue;
+        if (e.name === nm && JSON.stringify(e.args) === ar && ["read", "search"].includes(L.catOf(e.seq))
+          && !L.isStale(e.seq)) return e.seq;
+      }
+      return null;
+    }
+    function detectErr(ev) {
+      if (ev.status !== "error") return null;
+      for (const la of toolEvents(events)) {
+        if (la.seq <= ev.seq || done(la)) continue;
+        if (la.name === ev.name && la.status === "ok") return la.seq;
+      }
+      return null;
+    }
+    function errLesson(ev, corrSeq) {
+      const corr = toolEvents(events).find(e => e.seq === corrSeq);
+      const ca = corr ? corr.args : {};
+      const diffs = Object.keys(ev.args).filter(k => ev.args[k] !== ca[k])
+        .map(k => k + ": '" + ev.args[k] + "' değil '" + ca[k] + "'");
+      return ev.name + "(" + (ev.args.path || "") + "): " + (diffs.join("; ") || ev.output.slice(0, 50));
+    }
+    const evict = (ev, reason) => { ev.summary = summarize(events, ev, reason); ev.evicted = true;
+      return { seq: ev.seq, fate: "summary", reason }; };
+    const clr = (ev, note) => { ev.cleared = true; ev.clearNote = note;
+      return { seq: ev.seq, fate: "clear", reason: note }; };
+
+    // FAZ 1 — dedup
+    let acts = [];
+    for (const ev of tools) { if (protectedSeqs.has(ev.seq) || done(ev)) continue;
+      const d = detectDup(ev); if (d != null) acts.push(evict(ev, "tekrar (≡ seq=" + d + ")")); }
+    if (acts.length) phases.push({ n: "Faz 1", d: "tekrar (dedup) — sıfır kayıp", acts });
+
+    // FAZ 2 — staleness (clear vs summarize)
+    acts = [];
+    for (const ev of tools) { if (protectedSeqs.has(ev.seq) || done(ev)) continue;
+      if (L.isStale(ev.seq)) { const f = freshLiveRead(ev);
+        acts.push(f != null ? clr(ev, "bayat — güncel kopya seq=" + f + " canlı")
+          : evict(ev, "bayat (dosya değişti)")); } }
+    if (acts.length) phases.push({ n: "Faz 2", d: "bayat gözlem — B.11 sil / B.12 özetle", acts });
+
+    // FAZ 3 — hata-zinciri
+    acts = [];
+    for (const ev of tools) { if (protectedSeqs.has(ev.seq) || done(ev)) continue;
+      const c = detectErr(ev); if (c != null) {
+        ev.summary = { niyet: intentOf(events, ev),
+          girdi: Object.entries(ev.args).map(([k, v]) => k + "=" + v).join(", "),
+          sonuc: ev.output.trim().slice(0, 120), durum: "HATA (düzeltildi)",
+          etki: "düzeltme: seq=" + c, crit: true };
+        ev.evicted = true; acts.push({ seq: ev.seq, fate: "summary", reason: "hata-zinciri" });
+        curate(errLesson(ev, c), "hata-dersi"); } }
+    if (acts.length) phases.push({ n: "Faz 3", d: "hata-zinciri → ders playbook'a", acts });
+
+    // FAZ 4 — keşif katlama (bütçe aşılıyorsa)
+    if (over()) {
+      const runs = []; let cur = [];
+      for (const ev of toolEvents(events)) {
+        const elig = ["read", "search"].includes(L.catOf(ev.seq)) && !protectedSeqs.has(ev.seq) && !done(ev);
+        if (elig) cur.push(ev); else { if (cur.length >= 2) runs.push(cur); cur = []; }
+      }
+      if (cur.length >= 2) runs.push(cur);
+      acts = [];
+      for (const run of runs) {
+        const findings = run.filter(e => e.verbatim).map(e => e.output.trim()).filter(Boolean);
+        const finding = findings.join(" | ") || (run.length + " keşif adımı");
+        for (const e of run.slice(0, -1)) {
+          e.summary = { niyet: intentOf(events, e),
+            girdi: Object.entries(e.args).map(([k, v]) => k + "=" + v).join(", ") || "-",
+            sonuc: "(keşif dizisine katlandı)", durum: "ok", etki: "→ bulgu: seq=" + run[run.length - 1].seq };
+          e.evicted = true; acts.push({ seq: e.seq, fate: "summary", reason: "keşif katlama" });
+        }
+        const last = run[run.length - 1];
+        last.summary = { niyet: "keşif dizisi", girdi: run.length + " adım", sonuc: finding.slice(0, 150),
+          durum: "ok", etki: "keşif katlandı (bulgu korundu)", crit: true };
+        last.evicted = true; acts.push({ seq: last.seq, fate: "summary", reason: "keşif bulgusu" });
+        findings.forEach(f => curate(f, "bulgu"));
+      }
+      if (acts.length) phases.push({ n: "Faz 4", d: "keşif dizisi → tek bulguya", acts });
+    }
+
+    // FAZ 5 — kademeli: act, sonra expl
+    for (const grp of [["write", "test"], ["read", "search"]]) {
+      acts = [];
+      for (const ev of tools) {
+        if (!over()) break;
+        if (protectedSeqs.has(ev.seq) || done(ev)) continue;
+        if (grp.includes(L.catOf(ev.seq)))
+          acts.push(evict(ev, grp[0] === "write" ? "eylem (etki diskte)" : "keşif (katlandı)"));
+      }
+      if (acts.length) phases.push({ n: "Faz 5", d: (grp[0] === "write" ? "kalan eylemler" : "kalan keşif") + " (greedy)", acts });
+    }
+    return { phases, pb, protectedSeqs };
+  }
+
+  // ================= UI =================
+  let state = null;
+
+  function initTheme() {
+    const root = document.documentElement;
+    $("themeBtn").onclick = () => {
+      const cur = root.getAttribute("data-theme")
+        || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    };
+  }
+
+  let scenario = "config";
+
+  function fresh() {
+    const built = SCENARIOS[scenario]();
+    currentKW = built.kw;
+    state = { events: built.events, L: built.L, revealed: 0, compacted: false,
+      protectN: built.protectN, task: built.task, dag: built.dag };
+    $("taskChip").innerHTML = "görev: <b>" + built.task + "</b>" +
+      (built.dag ? ' &nbsp;·&nbsp; DAG <b style="color:var(--summary)">' + built.dag + "</b>" : "");
+    $("chat").innerHTML = ""; $("phaseLog").innerHTML =
+      '<span class="phase-empty">bütçe aşılınca fazlar burada sırayla ateşlenir</span>';
+    $("playbook").innerHTML = '<span class="pb-empty">evict edilen hata/bulgu buraya kalıcı yazılır (collapse yok)</span>';
+    $("pbCount").textContent = "0 ders";
+    $("result").style.display = "none";
+    $("stripHint").textContent = "çalıştır →";
+    $("gaugeState").textContent = "boşta";
+    $("tokDelta").textContent = "";
+    renderLedger(); renderStrip(); updateGauge(0);
+    $("chatCount").textContent = "0 tool birimi";
+    $("writeCount").textContent = "0 yazma";
+  }
+
+  function budget() { return parseInt($("budget").value, 10); }
+
+  function updateGauge(tokens) {
+    const b = budget(), max = 3600;
+    $("tokNow").textContent = tokens;
+    const pct = Math.min(100, tokens / max * 100);
+    const fill = $("fill"); fill.style.width = pct + "%";
+    fill.classList.toggle("over", tokens > b);
+    $("budgetMark").style.left = (b / max * 100) + "%";
+  }
+
+  function renderLedger() {
+    const L = state.L, files = {};
+    // sadece açığa çıkmış olayların gözlemleri
+    const shownSeqs = new Set(toolEvents(state.events).slice(0, state.revealed).map(e => e.seq));
+    L.obs.forEach(o => { if (shownSeqs.has(o.seq) && o.path) files[o.path] = true; });
+    Object.keys(L.local).forEach(p => { if (p) files[p] = true; });
+    const rows = Object.keys(files);
+    if (!rows.length) { $("ledgerRows").innerHTML =
+      '<tr><td colspan="3" style="color:var(--muted);font-style:italic">henüz gözlem yok</td></tr>'; return; }
+    $("ledgerRows").innerHTML = rows.map(p => {
+      const v = L.local[p] || 0, bumped = v > 0;
+      const staleReads = L.obs.filter(o => o.path === p && shownSeqs.has(o.seq) && o.lc < v).length;
+      return `<tr class="${bumped ? "bumped" : ""}"><td>${p}</td>
+        <td class="cnt">v${v}</td>
+        <td>${staleReads ? `<span class="chip-w">${staleReads} bayat okuma</span>` : "taze"}</td></tr>`;
+    }).join("");
+    $("writeCount").textContent = L.global + " yazma";
+  }
+
+  function toolHTML(ev) {
+    const args = Object.entries(ev.args).map(([k, v]) => k + "=" + v).join(", ");
+    return `<div class="turn">
+      <div class="reason">${escapeHTML(state.events.find(e => e.seq === ev.intentRef).text)}</div>
+      <div class="tool" id="tool-${ev.seq}" data-seq="${ev.seq}">
+        <div class="tool-h">
+          <span class="seqn">#${ev.seq}</span>
+          <span class="tname">${ev.name}</span>
+          ${ev.episode ? `<span class="ep-badge ${ev.episode === "rapor" ? "rapor" : ""}">${ev.episode}</span>` : ""}
+          <span class="targs">${escapeHTML(args)}</span>
+          <span class="tok-badge" id="tok-${ev.seq}">${ev.raw}t</span>
+          <span class="fate-pill" id="pill-${ev.seq}"></span>
+        </div>
+        <div class="tool-body" id="body-${ev.seq}">${bodyHTML(ev)}</div>
+      </div></div>`;
+  }
+  function bodyHTML(ev) {
+    if (ev.cleared) return `<div class="clearnote">🗑 ${escapeHTML(ev.clearNote)}</div>`;
+    if (ev.evicted && ev.summary) {
+      const s = ev.summary;
+      return `<dl class="summ">
+        <dt>niyet</dt><dd>${escapeHTML(s.niyet)}</dd>
+        <dt>girdi</dt><dd>${escapeHTML(s.girdi)}</dd>
+        <dt>sonuç</dt><dd class="${s.crit ? "crit" : ""}">${escapeHTML(s.sonuc)}</dd>
+        <dt>durum</dt><dd>${escapeHTML(s.durum)}</dd>
+        <dt>etki</dt><dd>${escapeHTML(s.etki)}</dd></dl>`;
+    }
+    return `<pre class="out-raw ${ev.verbatim ? "verbatim" : ""}">${escapeHTML(ev.output)}</pre>`;
+  }
+  function escapeHTML(s) { return String(s).replace(/[&<>"]/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function renderStrip() {
+    const tools = toolEvents(state.events);
+    $("strip").innerHTML = tools.map(ev => {
+      let cls = "cell", show = ev.seq < (tools[state.revealed - 1] ? tools[state.revealed - 1].seq + 1 : 0);
+      if (state.compacted) { cls += ev.cleared ? " clear" : ev.evicted ? " summary" : " keep"; }
+      else if (!show) cls += " dim";
+      return `<div class="${cls}" data-seq="${ev.seq}">
+        <div class="cseq">#${ev.seq}</div><div class="cname">${ev.name.replace("_file", "").replace("_dir", "")}</div></div>`;
+    }).join("");
+    document.querySelectorAll(".cell").forEach(c => c.onclick = () => {
+      const el = $("body-" + c.dataset.seq); if (!el) return;
+      $("tool-" + c.dataset.seq).scrollIntoView({ block: "center" });
+      el.classList.add("open");
+    });
+  }
+
+  async function run() {
+    if (!state) fresh();
+    if (state.revealed > 0) fresh();
+    $("run").disabled = true;
+    const tools = toolEvents(state.events);
+    $("gaugeState").textContent = "ajan çalışıyor…";
+
+    // 1) trace'i adım adım aç
+    for (let i = 0; i < tools.length; i++) {
+      state.revealed = i + 1;
+      const ev = tools[i];
+      $("chat").insertAdjacentHTML("beforeend", toolHTML(ev));
+      $("tool-" + ev.seq).querySelector(".tool-h").onclick = () =>
+        $("body-" + ev.seq).classList.toggle("open");
+      $("chat").scrollTop = $("chat").scrollHeight;
+      $("chatCount").textContent = (i + 1) + " tool birimi";
+      const revealedEvents = state.events.filter(e => e.seq <= ev.seq);
+      updateGauge(totalTokens(revealedEvents));
+      renderLedger(); renderStrip();
+      await sleep(360);
+    }
+    const before = totalTokens(state.events);
+    updateGauge(before);
+    $("gaugeState").textContent = before > budget() ? "bütçe aşıldı ⚠" : "bütçe içinde";
+    await sleep(500);
+
+    // 2) sıkıştırma
+    if (before <= budget()) {
+      $("stripHint").textContent = "bütçe aşılmadı — sıkıştırma yok";
+      $("run").disabled = false; return;
+    }
+    $("gaugeState").textContent = "sıkıştırılıyor…";
+    $("phaseLog").innerHTML = "";
+    const { phases, pb, protectedSeqs } = compact(state.events, state.L, budget(), state.protectN);
+    state.compacted = true;
+
+    for (const ph of phases) {
+      $("phaseLog").insertAdjacentHTML("beforeend",
+        `<div class="plog"><span class="pn">${ph.n}</span><span class="pd">${ph.d}</span></div>`);
+      for (const a of ph.acts) {
+        const ev = state.events.find(e => e.seq === a.seq);
+        // gövde güncelle
+        $("body-" + a.seq).innerHTML = bodyHTML(ev);
+        const tool = $("tool-" + a.seq);
+        tool.classList.add("fate-" + a.fate);
+        const pill = $("pill-" + a.seq);
+        pill.textContent = a.fate === "clear" ? "silindi" : "özet";
+        pill.classList.add("show");
+        // token rozetini güncelle
+        $("tok-" + a.seq).innerHTML = `<s>${ev.raw}t</s> ${tok(ev)}t`;
+        // strip hücresi
+        const cell = document.querySelector(`.cell[data-seq="${a.seq}"]`);
+        if (cell) { cell.classList.remove("dim"); cell.classList.add(a.fate); }
+        updateGauge(totalTokens(state.events));
+        await sleep(240);
+      }
+      await sleep(260);
+    }
+
+    // koruma penceresi işaretle
+    toolEvents(state.events).forEach(ev => {
+      if (!ev.evicted && !ev.cleared) {
+        const tool = $("tool-" + ev.seq); tool.classList.add("fate-keep");
+        const pill = $("pill-" + ev.seq); pill.textContent = "korundu"; pill.classList.add("show");
+        const cell = document.querySelector(`.cell[data-seq="${ev.seq}"]`);
+        if (cell) { cell.classList.remove("dim"); cell.classList.add("keep"); }
+      }
+    });
+
+    // playbook
+    renderPlaybook(pb);
+
+    // sonuç
+    const after = totalTokens(state.events);
+    const kept = toolEvents(state.events).filter(e => !e.evicted && !e.cleared).length;
+    const summ = toolEvents(state.events).filter(e => e.evicted).length;
+    const cleared = toolEvents(state.events).filter(e => e.cleared).length;
+    $("gaugeState").textContent = "sıkıştırıldı ✓";
+    $("tokDelta").className = "delta down";
+    $("tokDelta").textContent = "−" + Math.round((before - after) / before * 100) + "%";
+    $("stripHint").textContent = kept + " korundu · " + summ + " özet · " + cleared + " silindi";
+    const r = $("result"); r.style.display = "flex";
+    r.innerHTML = `<span><b>${before} → ${after} token</b> (%${Math.round((before - after) / before * 100)} azalma)</span>
+      <span class="muted">koruma penceresi: ${[...protectedSeqs].map(s => "#" + s).join(" ")}</span>
+      <span class="muted">playbook: ${pb.length} kalıcı ders · 0 birim SİLİNMEDİ (hepsi yerinde)</span>`;
+    $("run").disabled = false;
+  }
+
+  function renderPlaybook(pb) {
+    if (!pb.length) return;
+    $("playbook").innerHTML = pb.map(b =>
+      `<div class="bullet ${b.tag === "bulgu" ? "finding" : ""}">
+        <span class="btag">${b.tag}</span>
+        <span>${escapeHTML(b.text)}</span>
+        ${b.helpful > 1 ? `<span class="x2">×${b.helpful}</span>` : ""}</div>`).join("");
+    $("pbCount").textContent = pb.length + " ders";
+  }
+
+  function currentTokens() {
+    if (!state || !state.revealed) return 0;
+    const lastSeq = toolEvents(state.events)[state.revealed - 1].seq;
+    return totalTokens(state.events.filter(e => e.seq <= lastSeq));
+  }
+
+  initTheme();
+  $("budget").addEventListener("input", () => {
+    $("budgetVal").textContent = $("budget").value;
+    updateGauge(currentTokens());
+  });
+  function setScenario(s) {
+    scenario = s;
+    $("scnConfig").classList.toggle("active", s === "config");
+    $("scnEquity").classList.toggle("active", s === "equity");
+    fresh();
+  }
+  $("scnConfig").onclick = () => setScenario("config");
+  $("scnEquity").onclick = () => setScenario("equity");
+  $("run").onclick = run;
+  $("reset").onclick = fresh;
+  fresh();
+})();
+</script>

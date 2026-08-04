@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Compaction Chat</title>
+<style>
+  :root{
+    --ground:#0e1519; --panel:#131e25; --panel2:#0b1216; --line:#22303a; --line2:#1a262e;
+    --ink:#e9eff2; --dim:#b7c4cc; --muted:#7f929d; --signal:#74b9df; --signaldim:#3d6f8c;
+    --keep:#46c08a; --summary:#e0a94a; --clear:#d0726c;
+    --keepbg:rgba(70,192,138,.13); --sumbg:rgba(224,169,74,.13); --clrbg:rgba(208,114,108,.13);
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media(prefers-color-scheme:light){:root{
+    --ground:#eef2f5;--panel:#fff;--panel2:#f4f7f9;--line:#d7e0e6;--line2:#e5ebef;
+    --ink:#14212a;--dim:#35505f;--muted:#5d6f7a;--signal:#2c7fb0;--signaldim:#8fbdd6;
+    --keep:#17915f;--summary:#a9781f;--clear:#b64f49;
+    --keepbg:rgba(23,145,95,.10);--sumbg:rgba(169,120,31,.11);--clrbg:rgba(182,79,73,.10);}}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line)}
+  header .eb{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--signal);font-weight:600}
+  header h1{font-family:var(--mono);font-size:15px;margin:0;font-weight:600}
+  header .grow{flex:1}
+  header .badge{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);
+    border-radius:6px;padding:5px 9px}
+  header button{font-family:var(--mono);font-size:11px;color:var(--dim);background:transparent;
+    border:1px solid var(--line);border-radius:6px;padding:6px 11px;cursor:pointer}
+  header button:hover{border-color:var(--signaldim);color:var(--ink)}
+  .wrap{flex:1;display:grid;grid-template-columns:1.3fr .7fr;min-height:0}
+  @media(max-width:820px){.wrap{grid-template-columns:1fr}.panel{display:none}}
+
+  .chatcol{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+  #log{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:82%;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+  .msg.user{align-self:flex-end;background:var(--signal);color:var(--ground);border-bottom-right-radius:4px}
+  .msg.bot{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+  .msg.bot.err{border-color:var(--clear);color:var(--clear)}
+  .status{align-self:flex-start;font-family:var(--mono);font-size:11px;color:var(--muted);
+    padding:0 4px;margin-top:-6px}
+  .status b{color:var(--signal)} .status .down{color:var(--keep)}
+  .typing{align-self:flex-start;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .typing span{animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s} .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+  .inbar{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line);background:var(--panel2)}
+  #inp{flex:1;resize:none;font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:11px 13px;max-height:120px;outline:none}
+  #inp:focus{border-color:var(--signaldim)}
+  #send{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--ground);background:var(--signal);
+    border:none;border-radius:10px;padding:0 20px;cursor:pointer}
+  #send:disabled{opacity:.4;cursor:not-allowed}
+
+  .panel{display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:16px;gap:16px;background:var(--panel2)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .ch{display:flex;align-items:center;padding:10px 13px;border-bottom:1px solid var(--line2)}
+  .ch .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .ch .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--signal)}
+  .cb{padding:11px 13px}
+  .gauge .big{font-family:var(--mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+  .gauge .big .u{font-size:12px;color:var(--muted);font-weight:400}
+  .track{height:10px;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;margin:9px 0 4px;position:relative;overflow:hidden}
+  .fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--signaldim),var(--signal));border-radius:6px;transition:width .4s}
+  .fill.over{background:linear-gradient(90deg,var(--summary),var(--clear))}
+  .mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.5}
+  .gfoot{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;justify-content:space-between}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;padding:11px 13px}
+  .chip{font-family:var(--mono);font-size:10px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
+  .chip .s{color:var(--muted)}
+  .chip.keep{background:var(--keepbg);border-color:var(--keep);color:var(--keep)}
+  .chip.summary{background:var(--sumbg);border-color:var(--summary);color:var(--summary)}
+  .chip.clear{background:var(--clrbg);border-color:var(--clear);color:var(--clear)}
+  .pb{padding:9px 13px;display:flex;flex-direction:column;gap:7px}
+  .bullet{font-size:12px;color:var(--dim);border-left:3px solid var(--keep);padding:6px 9px;background:var(--panel2);border-radius:6px}
+  .bullet .t{font-family:var(--mono);font-size:9px;text-transform:uppercase;color:var(--keep);letter-spacing:.05em}
+  .empty{font-size:12px;color:var(--muted);font-style:italic;padding:11px 13px}
+  .ltab{width:100%;font-family:var(--mono);font-size:11px;border-collapse:collapse}
+  .ltab td{padding:5px 13px;border-bottom:1px solid var(--line2);color:var(--dim)}
+  .ltab td.st{text-align:right} .ltab td.stale{color:var(--clear)}
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="eb">canlı · Gemma + trace compaction</div>
+      <h1>Trace Compaction Chat</h1>
+    </div>
+    <div class="grow"></div>
+    <div class="badge" id="badge">domain: equity</div>
+    <button id="reset">↺ sıfırla</button>
+  </header>
+  <div class="wrap">
+    <div class="chatcol">
+      <div id="log">
+        <div class="msg bot">Merhaba 👋 Bir hisse sor — XOM için değerleme, gelir, teknik, analist, haber… Ben tool'ları çağırırım, arkada trace compaction çalışır. (Veri mock, sadece XOM dolu.)</div>
+      </div>
+      <div class="inbar">
+        <textarea id="inp" rows="1" placeholder="XOM için kapsamlı yatırım özeti çıkar…"></textarea>
+        <button id="send">Gönder</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="card gauge">
+        <div class="ch"><span class="lbl">bağlamdaki trace</span><span class="cnt" id="gstate">boşta</span></div>
+        <div class="cb">
+          <div class="big"><span id="tok">0</span> <span class="u">token</span> <span id="delta" class="u"></span></div>
+          <div class="track"><div class="fill" id="fill"></div><div class="mark" id="mark"></div></div>
+          <div class="gfoot"><span id="nunit">0 birim</span><span id="budget">bütçe —</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><span class="lbl">kader şeridi</span><span class="cnt" id="fatecnt"></span></div>
+        <div class="chips" id="chips"><span class="empty">henüz tool çağrısı yok</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><span class="lbl">playbook · öğrenilen</span><span class="cnt" id="pbcnt">0</span></div>
+        <div class="pb" id="pb"><span class="empty">evict'ten korunan dersler burada</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><span class="lbl">ledger</span></div>
+        <table class="ltab"><tbody id="ledger"><tr><td class="empty">gözlem yok</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+<script>
+const $=id=>document.getElementById(id);
+const log=$("log"), inp=$("inp"), send=$("send");
+function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function add(cls,txt){const d=document.createElement("div");d.className="msg "+cls;d.textContent=txt;log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+function typing(){const d=document.createElement("div");d.className="typing";d.innerHTML="düşünüyor <span>●</span><span>●</span><span>●</span>";log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+
+function panel(s,delta){
+  $("tok").textContent=s.tokens;
+  const over=s.tokens>s.budget;
+  $("fill").style.width=Math.min(100,s.tokens/(s.budget*1.6)*100)+"%";
+  $("fill").classList.toggle("over",over);
+  $("mark").style.left=(s.budget/(s.budget*1.6)*100)+"%";
+  $("budget").textContent="bütçe "+s.budget;
+  $("nunit").textContent=s.metrics.tool_events+" birim";
+  $("gstate").textContent=over?"bütçe üstü":"bütçe içinde";
+  if(delta){const parts=[];if(delta.tools)parts.push("+"+delta.tools+" tool");
+    if(delta.compactions)parts.push("compaction ×"+delta.compactions);
+    if(delta.evicted)parts.push("evict "+delta.evicted);
+    $("delta").innerHTML=parts.length?'· '+parts.join(" · "):'';}
+  // kader şeridi
+  const c=$("chips");
+  if(!s.trace.length){c.innerHTML='<span class="empty">henüz tool çağrısı yok</span>';}
+  else{c.innerHTML=s.trace.map(e=>{const k=e.fate==="SİLİNDİ"?"clear":e.fate==="ÖZET"?"summary":"keep";
+    return `<span class="chip ${k}" title="${esc(e.args)}">#${e.seq} ${e.name.replace("get_","").replace("_"," ").slice(0,14)}</span>`;}).join("");}
+  const kept=s.trace.filter(e=>e.fate==="TAM").length,su=s.trace.filter(e=>e.fate==="ÖZET").length,cl=s.trace.filter(e=>e.fate==="SİLİNDİ").length;
+  $("fatecnt").textContent=`${kept} tam · ${su} özet · ${cl} sil`;
+  // playbook
+  const pb=$("pb");
+  if(!s.playbook.length){pb.innerHTML='<span class="empty">evict\'ten korunan dersler burada</span>';}
+  else{pb.innerHTML=s.playbook.map(b=>`<div class="bullet"><span class="t">${b.tag}</span> ${esc(b.text)}${b.helpful>1?' ×'+b.helpful:''}</div>`).join("");}
+  $("pbcnt").textContent=s.playbook.length;
+  // ledger
+  const lt=$("ledger");
+  if(!s.ledger.length){lt.innerHTML='<tr><td class="empty">gözlem yok</td></tr>';}
+  else{lt.innerHTML=s.ledger.map(r=>`<tr><td>${esc(r.resource)}</td><td class="st ${r.stale?'stale':''}">v${r.version} · ${r.stale?'bayat':'taze'}</td></tr>`).join("");}
+}
+
+async function sendMsg(){
+  const text=inp.value.trim(); if(!text) return;
+  inp.value=""; inp.style.height="auto"; send.disabled=true;
+  add("user",text);
+  const tp=typing();
+  try{
+    const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+    const s=await r.json(); tp.remove();
+    if(s.error){add("bot err","⚠ "+s.error);}
+    else{
+      add("bot",s.answer||"(boş yanıt)");
+      const d=s.delta||{};const bits=[];if(d.tools)bits.push("+"+d.tools+" tool");
+      bits.push("compaction ×"+(d.compactions||0));if(d.evicted)bits.push("evict "+d.evicted);
+      const st=document.createElement("div");st.className="status";
+      st.innerHTML="┄ arkada: "+bits.join(" · ")+" · trace "+s.tokens+" tok";
+      log.appendChild(st);log.scrollTop=log.scrollHeight;
+      panel(s,d);
+    }
+  }catch(e){tp.remove();add("bot err","⚠ bağlantı hatası: "+e.message);}
+  send.disabled=false; inp.focus();
+}
+send.onclick=sendMsg;
+inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMsg();}});
+inp.addEventListener("input",()=>{inp.style.height="auto";inp.style.height=Math.min(120,inp.scrollHeight)+"px";});
+$("reset").onclick=async()=>{await fetch("/reset",{method:"POST"});location.reload();};
+inp.focus();
+</script>
+</body>
+</html>
