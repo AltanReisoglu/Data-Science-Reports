@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tool-Trace Compaction — POC Demo</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1d21; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --accent-ink:#fff; --chip:#eef2ff; --barbg:#eef0f3;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0e1116; --panel:#161a20; --ink:#e6e9ee; --muted:#9aa4b2; --line:#262c35;
+      --accent:#3b82f6; --chip:#1c2536; --barbg:#1c2027;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);color:var(--ink)}
+  header{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel);
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+  header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.2px}
+  header h1 small{color:var(--muted);font-weight:400}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
+  select,input,button{font:inherit;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+  select{min-width:210px}
+  button{cursor:pointer}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}
+  button.ghost{background:transparent}
+  .wrap{display:grid;grid-template-columns:minmax(320px,1fr) minmax(360px,1.25fr);
+    gap:16px;padding:16px;max-width:1200px;margin:0 auto}
+  @media (max-width:840px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+    margin:0;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .pad{padding:14px}
+  .blurb{color:var(--muted);font-size:12.5px;padding:0 14px 12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px}
+  .chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;
+    padding:5px 10px;font-size:12px;cursor:pointer}
+  .chatlog{padding:8px 14px;max-height:320px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .msg{padding:8px 11px;border-radius:10px;max-width:92%}
+  .msg.u{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+  .msg.a{align-self:flex-start;background:var(--barbg)}
+  .msg .meta{font-size:11px;opacity:.75;margin-top:4px}
+  .inputrow{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+  .inputrow input{flex:1}
+  /* savings */
+  .savings{padding:12px 14px}
+  .savings .big{font-size:22px;font-weight:700}
+  .bar{height:12px;background:var(--barbg);border-radius:999px;overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#22c55e,#16a34a)}
+  .kpis{display:flex;gap:16px;color:var(--muted);font-size:12.5px;margin-top:8px;flex-wrap:wrap}
+  /* trace rows */
+  .rows{padding:6px 8px 12px}
+  .row{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:6px 6px;
+    display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;cursor:pointer}
+  .row:hover{border-color:var(--accent)}
+  .badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;color:#fff;white-space:nowrap}
+  .rtitle{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rtitle .tt{color:var(--muted);font-weight:400}
+  .rnote{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .rtok{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);text-align:right}
+  .rtok b{color:var(--ink)}
+  .view{grid-column:1/-1;display:none;margin-top:8px;padding:9px;border-radius:8px;
+    background:var(--barbg);white-space:pre-wrap;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace}
+  .row.open .view{display:block}
+  .preamble{margin:6px 12px;padding:10px;border-radius:8px;border:1px dashed var(--line);
+    background:var(--chip);font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px 12px}
+  .legend span{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  /* compare table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.active{background:var(--chip)}
+  .mini{height:8px;background:var(--barbg);border-radius:999px;overflow:hidden;min-width:60px}
+  .mini > i{display:block;height:100%;background:linear-gradient(90deg,#22c55e,#16a34a)}
+  .hint{color:var(--muted);font-size:12px;padding:0 14px 12px}
+  .err{color:#ef4444;font-size:12.5px;padding:8px 14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🗜️ Tool-Trace Compaction <small>— POC demo · strateji değiştir → farklı compaction</small></h1>
+  <div class="controls">
+    <label>sistem
+      <select id="strategy"></select>
+    </label>
+    <label>bütçe
+      <input id="budget" type="number" value="1500" min="200" step="100" style="width:92px">
+    </label>
+    <label>mod
+      <select id="mode" style="min-width:auto">
+        <option value="mock">mock (offline)</option>
+        <option value="live">canlı (gemma)</option>
+      </select>
+    </label>
+    <label>tool seti
+      <select id="toolset" style="min-width:auto">
+        <option value="generic">generic (6 mock)</option>
+        <option value="product">product (119 gerçek · canlı)</option>
+      </select>
+    </label>
+    <button class="ghost" id="reset">sıfırla</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- SOL: chat -->
+  <div class="card">
+    <h2>sohbet — ajan tool çağırır, trace birikir</h2>
+    <div class="blurb" id="stratBlurb"></div>
+    <div class="chips" id="examples">
+      <span class="chip" data-q="src/server.py'yi oku, npm test çalıştır, sonra src/server.py'yi tekrar oku">oku→test→tekrar oku (dedup)</span>
+      <span class="chip" data-q="src/app.py'yi oku, içine log ekleyerek düzenle, sonra src/app.py'yi tekrar oku">oku→düzenle→oku (staleness)</span>
+      <span class="chip" data-q="https://app.local/dashboard için snapshot al, sonra https://app.local/settings için snapshot al">2 snapshot (supersede)</span>
+      <span class="chip" data-q="npm build çalıştır ve kod tabanında 'PORT' ara">build + grep (kes/crush)</span>
+    </div>
+    <div class="chatlog" id="chatlog"></div>
+    <div id="err" class="err" style="display:none"></div>
+    <div class="inputrow">
+      <input id="msg" placeholder="bir şey iste… (örn: src/server.py'yi oku ve tekrar oku)"
+             autocomplete="off">
+      <button class="primary" id="send">gönder</button>
+    </div>
+  </div>
+
+  <!-- SAĞ: trace + compaction -->
+  <div class="card">
+    <h2>arkadaki trace — seçili sistemin KADER'i</h2>
+    <div class="savings">
+      <div><span class="big" id="savedPct">%0</span> <span style="color:var(--muted)">tasarruf</span></div>
+      <div class="bar"><i id="savedBar" style="width:0%"></i></div>
+      <div class="kpis">
+        <span>ham <b id="rawTok">0</b> tok → sıkışık <b id="shownTok">0</b> tok</span>
+        <span id="unitsK">0 tool</span>
+        <span id="modeK">mock</span>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div id="preambleWrap"></div>
+    <div class="rows" id="rows"></div>
+    <div class="hint">satıra tıkla → modelin GÖRDÜĞÜ (sıkışık) gövdeyi aç.
+      <button class="ghost" id="compareBtn">13 sistemi karşılaştır ▸</button></div>
+    <div id="compareWrap"></div>
+  </div>
+</div>
+
+<script>
+const FATE_COLOR = {
+  "TAM":"#9ca3af","KES":"#f97316","ÖZET":"#2563eb","MASKE":"#8b5cf6","GİZLE":"#d97706",
+  "SİL":"#ef4444","KATLA":"#0d9488","SUPERSEDE":"#6366f1","DEDUP":"#db2777","CRUSH":"#16a34a"
+};
+const FATE_DESC = {
+  "TAM":"dokunulmadı","KES":"uçtan/ortadan kes","ÖZET":"tek-satır/LLM özeti","MASKE":"placeholder",
+  "GİZLE":"depoda tut","SİL":"kaldır/temizle","KATLA":"yapısal outline","SUPERSEDE":"bayat snapshot",
+  "DEDUP":"tekrar okuma","CRUSH":"algoritmik sıkıştır"
+};
+let META = [];
+
+const $ = s => document.querySelector(s);
+async function api(path, body){
+  const opt = body ? {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opt); return r.json();
+}
+
+function addMsg(cls, text, meta){
+  const d = document.createElement("div"); d.className = "msg "+cls;
+  d.innerHTML = escapeHtml(text) + (meta?`<div class="meta">${escapeHtml(meta)}</div>`:"");
+  $("#chatlog").appendChild(d); $("#chatlog").scrollTop = 1e9;
+}
+function escapeHtml(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+function render(st){
+  $("#err").style.display = st.error ? "block":"none";
+  if(st.error) $("#err").textContent = "⚠ "+st.error;
+  $("#savedPct").textContent = "%"+st.saved_pct;
+  $("#savedBar").style.width = st.saved_pct+"%";
+  $("#rawTok").textContent = st.raw;
+  $("#shownTok").textContent = st.shown;
+  $("#unitsK").textContent = (st.tools?st.tools.length:0)+" tool";
+  $("#modeK").textContent = st.mode + " · " + (st.toolset||"generic") + (st.mode==="live"?(" · gemma · motor:"+(st.engine||"-")):"");
+  if(st.toolset) $("#toolset").value = st.toolset;
+  if(st.mode) $("#mode").value = st.mode;
+  $("#budget").value = st.budget;
+  if(st.toolset==="product" && !st.is_live && !st.error){
+    $("#err").style.display="block";
+    $("#err").textContent="⚠ product (119 gerçek tool) yalnız CANLI gemma ile çalışır — mod'u 'canlı' yap.";
+  }
+  // legend (kullanılan kaderler)
+  const used = st.fates ? Object.keys(st.fates) : [];
+  $("#legend").innerHTML = used.map(f=>`<span><i class="dot" style="background:${FATE_COLOR[f]||'#888'}"></i>${f}×${st.fates[f]} · ${FATE_DESC[f]||''}</span>`).join("");
+  // preamble
+  $("#preambleWrap").innerHTML = st.preamble ? `<div class="preamble">${escapeHtml(st.preamble)}</div>` : "";
+  // rows
+  $("#rows").innerHTML = "";
+  (st.tools||[]).forEach(t=>{
+    const saved = t.raw - t.shown;
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `
+      <span class="badge" style="background:${FATE_COLOR[t.fate]||'#888'}">${t.fate}</span>
+      <div><div class="rtitle"><span class="tt">${t.tool_type}</span> · ${escapeHtml(t.resource||'—')}</div>
+        ${t.note?`<div class="rnote">← ${escapeHtml(t.note)}</div>`:''}</div>
+      <div class="rtok"><b>${t.raw}</b>→${t.shown}${saved>0?` <span style="color:#16a34a">−${saved}</span>`:''}</div>
+      <div class="view">${escapeHtml(t.view||'(boş)')}</div>`;
+    row.addEventListener("click",()=>row.classList.toggle("open"));
+    $("#rows").appendChild(row);
+  });
+}
+
+function setBlurb(){
+  const m = META.find(x=>x.name===$("#strategy").value);
+  $("#stratBlurb").innerHTML = m ? `<b>${m.name}</b> · ${m.repo} · ${m.ref} — ${escapeHtml(m.blurb)} ${m.uses_llm?'· <span style="color:#8b5cf6">strateji-LLM</span>':'· <span style="color:#16a34a">saf DET</span>'}` : "";
+}
+
+async function send(){
+  const msg = $("#msg").value.trim(); if(!msg) return;
+  $("#msg").value = ""; addMsg("u", msg);
+  $("#send").disabled = true; $("#send").textContent = ($("#mode").value==="live"?"gemma düşünüyor…":"…");
+  const st = await api("/api/send", {message:msg, strategy:$("#strategy").value,
+    budget:+$("#budget").value, mode:$("#mode").value, toolset:$("#toolset").value});
+  $("#send").disabled = false; $("#send").textContent = "gönder";
+  addMsg("a", st.answer || "(yanıt yok)",
+    `${st.tools.length} tool · ham ${st.raw}→sıkışık ${st.shown} tok (%${st.saved_pct} tasarruf)`);
+  render(st);
+}
+
+async function onStrategy(){
+  setBlurb();
+  const st = await api("/api/strategy", {strategy:$("#strategy").value});
+  render(st);
+  // görsel vurgu: strateji değişince trace yeniden çizildi
+  $("#rows").animate?.([{opacity:.3},{opacity:1}],{duration:250});
+}
+
+async function onBudget(){
+  const st = await api("/api/budget", {budget:+$("#budget").value}); render(st);
+}
+async function onMode(){
+  const st = await api("/api/reset", {mode:$("#mode").value, strategy:$("#strategy").value, toolset:$("#toolset").value});
+  $("#chatlog").innerHTML=""; render(st);
+}
+async function onToolset(){
+  // product tool'ları sadece canlı LLM ile → mod'u otomatik canlıya çek
+  if($("#toolset").value==="product" && $("#mode").value!=="live"){ $("#mode").value="live"; }
+  const st = await api("/api/reset", {mode:$("#mode").value, strategy:$("#strategy").value, toolset:$("#toolset").value});
+  $("#chatlog").innerHTML=""; $("#compareWrap").innerHTML="";
+  $("#examples").style.display = $("#toolset").value==="product" ? "none":"flex";
+  render(st);
+}
+async function reset(){
+  const st = await api("/api/reset", {strategy:$("#strategy").value, mode:$("#mode").value, toolset:$("#toolset").value});
+  $("#chatlog").innerHTML=""; $("#compareWrap").innerHTML=""; render(st);
+}
+
+async function compare(){
+  const c = await api("/api/compare", {});
+  const rows = c.rows.map(r=>{
+    const dom = Object.entries(r.fates).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}×${v}`).join(", ")||"—";
+    const active = r.name===$("#strategy").value ? "active":"";
+    return `<tr class="${active}">
+      <td><b>${r.name}</b> <span style="color:var(--muted)">${r.ref.split(' ')[0]}</span></td>
+      <td class="num">${r.shown}</td>
+      <td class="num">%${r.saved}</td>
+      <td><div class="mini"><i style="width:${r.saved}%"></i></div></td>
+      <td>${dom}${r.uses_llm?' <span style="color:#8b5cf6">ᴸᴸᴹ</span>':''}</td></tr>`;
+  }).join("");
+  $("#compareWrap").innerHTML = `<div class="pad"><table>
+    <thead><tr><th>sistem</th><th class="num">sıkışık</th><th class="num">tasarruf</th><th></th><th>baskın kader</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="hint" style="padding:10px 0 0">aynı trace (${c.units} tool, ham ${c.raw} tok) · 13 sistem yan yana. Bir satırdaki sistemi seçmek için üstteki menüyü kullan.</div></div>`;
+}
+
+async function boot(){
+  const s = await api("/api/strategies");
+  META = s.strategies;
+  $("#strategy").innerHTML = META.map(m=>`<option value="${m.name}">${m.name} — ${m.ref.split(' ')[0]}</option>`).join("");
+  $("#strategy").value = "ours";
+  if(!s.llm_available){ $("#mode").querySelector('[value=live]').disabled = true;
+    $("#mode").querySelector('[value=live]').textContent = "canlı (LLM yok)"; }
+  setBlurb();
+  const st = await api("/api/state"); render(st);
+}
+
+$("#send").addEventListener("click", send);
+$("#msg").addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
+$("#strategy").addEventListener("change", onStrategy);
+$("#budget").addEventListener("change", onBudget);
+$("#mode").addEventListener("change", onMode);
+$("#toolset").addEventListener("change", onToolset);
+$("#reset").addEventListener("click", reset);
+$("#compareBtn").addEventListener("click", compare);
+$("#examples").addEventListener("click", e=>{
+  if(e.target.classList.contains("chip")){ $("#msg").value = e.target.dataset.q; send(); }
+});
+boot();
+</script>
+</body>
+</html>
