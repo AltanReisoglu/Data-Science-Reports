@@ -1,0 +1,596 @@
+<title>Tool-Trace Compaction — Ajan Manzarası</title>
+<style>
+  :root{
+    --bg:#eef1f4; --panel:#ffffff; --ink:#141c24; --muted:#5a6672; --line:#dde3e9;
+    --accent:#0e8a7d; --accent-ink:#ffffff;
+    --det:#1f9d6b; --det-bg:#e5f4ec; --llm:#7c4dd6; --llm-bg:#efe6fb;
+    --card:#fbfcfd; --card-line:#e4e9ee; --chip:#eef2f4;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0c1015; --panel:#141a21; --ink:#e7ecf1; --muted:#93a1b0; --line:#232c37;
+      --accent:#22b6a4; --chip:#1a222c;}
+  }
+  :root[data-theme="dark"]{--bg:#0c1015; --panel:#141a21; --ink:#e7ecf1; --muted:#93a1b0;
+    --line:#232c37; --accent:#22b6a4; --chip:#1a222c;}
+  :root[data-theme="light"]{--bg:#eef1f4; --panel:#ffffff; --ink:#141c24; --muted:#5a6672;
+    --line:#dde3e9; --accent:#0e8a7d; --chip:#eef2f4;}
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+    -webkit-font-smoothing:antialiased;overflow:hidden}
+
+  /* ---- deck ---- */
+  .deck{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:64px 56px 76px}
+  .slide{position:absolute;inset:64px 56px 76px;opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .28s ease;display:grid;grid-template-columns:0.82fr 1.18fr;gap:40px;align-items:center}
+  .slide.active{opacity:1;visibility:visible;pointer-events:auto}
+  @media (max-width:820px){.slide{grid-template-columns:1fr;gap:20px;align-content:start;overflow:auto}}
+
+  /* ---- left column ---- */
+  .left{min-width:0}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .ref{color:var(--accent);font-weight:700}
+  .tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.03em}
+  .tag.det{color:var(--det);background:var(--det-bg)}
+  .tag.llm{color:var(--llm);background:var(--llm-bg)}
+  h2.name{font-size:clamp(30px,4.4vw,52px);line-height:1.02;margin:0 0 6px;font-weight:800;
+    letter-spacing:-.02em;text-wrap:balance}
+  .repo{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-bottom:18px;word-break:break-all}
+  .sum{font-size:16px;line-height:1.55;color:var(--ink);max-width:52ch;margin:0 0 20px}
+  .sum b{color:var(--accent)}
+  .symbols{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:20px}
+  .symbols code{font-family:var(--mono);font-size:12px;background:var(--chip);border:1px solid var(--line);
+    padding:4px 9px;border-radius:7px;color:var(--ink)}
+  .fate{font-size:13.5px;color:var(--muted);border-left:3px solid var(--accent);padding:4px 0 4px 12px}
+  .fate b{color:var(--ink);font-size:14.5px}
+
+  /* ---- right column: flowchart card (sabit açık yüzey, iki temada da) ---- */
+  .right{min-width:0;height:100%;display:flex;align-items:center}
+  .card{background:var(--card);border:1px solid var(--card-line);border-radius:16px;
+    padding:22px;width:100%;max-height:100%;overflow:auto;box-shadow:0 10px 40px -20px rgba(0,0,0,.35)}
+  .card pre.mermaid{margin:0;background:transparent;display:flex;justify-content:center}
+  .card svg{max-width:100%;height:auto}
+
+  /* ---- title slide ---- */
+  .title{grid-template-columns:1fr;place-content:center;text-align:center}
+  .title .kicker{font-family:var(--mono);color:var(--accent);letter-spacing:.14em;font-size:13px;
+    text-transform:uppercase;margin-bottom:20px}
+  .title h1{font-size:clamp(38px,7vw,84px);margin:0 0 18px;font-weight:850;letter-spacing:-.03em;
+    line-height:.98;text-wrap:balance}
+  .title p{font-size:clamp(15px,2vw,19px);color:var(--muted);max-width:60ch;margin:0 auto;line-height:1.6}
+  .legend{display:flex;gap:22px;justify-content:center;margin-top:34px;flex-wrap:wrap;font-size:13px}
+  .legend span{display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .legend i{width:13px;height:13px;border-radius:4px;display:inline-block}
+
+  /* ---- note slide (§2) ---- */
+  .note{grid-template-columns:1fr;place-content:center;text-align:center}
+  .note .box{max-width:70ch;margin:0 auto;background:var(--panel);border:1px dashed var(--line);
+    border-radius:14px;padding:30px 34px}
+  .note h2{font-size:clamp(26px,4vw,40px);margin:0 0 14px;font-weight:800;letter-spacing:-.02em}
+  .note p{font-size:16px;line-height:1.6;color:var(--muted);margin:0 auto 10px;max-width:58ch}
+  .note .sys{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+  .note .sys code{font-family:var(--mono);font-size:13px;background:var(--chip);padding:6px 12px;
+    border-radius:8px;border:1px solid var(--line)}
+
+  /* ---- table slide (§4) ---- */
+  .tbl{grid-template-columns:1fr;align-content:start;overflow:auto}
+  .tbl h2{font-size:clamp(24px,3.4vw,36px);margin:0 0 4px;font-weight:800;letter-spacing:-.02em}
+  .tbl .cap{font-size:13.5px;color:var(--muted);margin:0 0 16px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--muted);font-weight:600}
+  td.sys{font-weight:700;white-space:nowrap}
+  td .rel{color:var(--accent);font-weight:700}
+  tr.us{background:var(--det-bg)}
+  :root[data-theme="dark"] tr.us{background:rgba(31,157,107,.14)}
+  @media (prefers-color-scheme:dark){tr.us{background:rgba(31,157,107,.14)}}
+
+  /* ---- closing ---- */
+  .close{grid-template-columns:1fr;place-content:center}
+  .close h2{font-size:clamp(26px,4vw,42px);margin:0 0 24px;font-weight:800;letter-spacing:-.02em;text-align:center}
+  .obs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:1000px;margin:0 auto}
+  @media (max-width:820px){.obs{grid-template-columns:1fr}}
+  .obs .o{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .obs .o .n{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:700;margin-bottom:8px}
+  .obs .o p{margin:0;font-size:14px;line-height:1.55;color:var(--ink)}
+  .obs .o b{color:var(--accent)}
+  .honesty{max-width:74ch;margin:26px auto 0;font-size:13px;color:var(--muted);
+    text-align:center;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+
+  /* ---- chrome ---- */
+  .topbar{position:fixed;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
+    padding:0 22px;gap:12px;border-bottom:1px solid var(--line);background:var(--panel);z-index:10}
+  .topbar .brand{font-weight:800;font-size:14px;letter-spacing:-.01em}
+  .topbar .brand span{color:var(--accent)}
+  .topbar .sub{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .progress{position:fixed;top:52px;left:0;height:2px;background:var(--accent);z-index:10;transition:width .28s ease}
+  .navbar{position:fixed;bottom:0;left:0;right:0;height:56px;display:flex;align-items:center;
+    justify-content:center;gap:16px;border-top:1px solid var(--line);background:var(--panel);z-index:10}
+  .navbar button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;padding:7px 16px;cursor:pointer}
+  .navbar button:hover{border-color:var(--accent)}
+  .navbar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .counter{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:118px;text-align:center}
+  .hint{position:fixed;bottom:64px;right:16px;font-family:var(--mono);font-size:11px;color:var(--muted);opacity:.7;z-index:9}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="topbar">
+  <div class="brand">🗜️ Tool-Trace <span>Compaction</span></div>
+  <div class="sub">yalnız tool izi · fonksiyon-düzeyi manzara · Ağustos 2026</div>
+</div>
+
+<div class="deck" id="deck">
+
+  <!-- 0 · TITLE -->
+  <section class="slide title active">
+    <div>
+      <div class="kicker">§13 landscape · 13 sistem</div>
+      <h1>Tool çıktısı bağlama girince ne oluyor?</h1>
+      <p>13 ajan sisteminin <b>tool-trace compaction</b> yöntemi — her biri kendi reposundan,
+      birebir fonksiyon adlarıyla. <b>Output compaction</b> "bu tek çıktı büyük mü" der;
+      <b>trace compaction</b> "bu çağrılar birbiriyle nasıl ilişkili" der (aynı dosya 3 kez mi
+      okundu, bu okuma bayat mı). Manzarayı bu mercekle geziyoruz.</p>
+      <div class="legend">
+        <span><i style="background:#1f9d6b"></i> yeşil = deterministik (LLM'siz)</span>
+        <span><i style="background:#7c4dd6"></i> mor = LLM adımı</span>
+        <span><i style="background:#0d8b9c"></i> mavi = kayıplı/geri-alınabilir</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 · HERMES -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.1</span> · tool-trace-farkında · <span class="tag det">DET</span></div>
+      <h2 class="name">Hermes</h2>
+      <div class="repo">NousResearch/hermes-agent · context_compressor.py</div>
+      <p class="sum">Büyük tool çıktısını <b>model çağırmadan</b>, tool tipine göre tek bilgilendirici
+      satıra indirir. LLM özetinden <b>önce</b> çalışan ucuz ön-pas. Kısaltılmış çıktı tool-result
+      slotunda kalır — sadece gövde küçülür.</p>
+      <div class="symbols">
+        <code>_summarize_tool_result</code><code>_PRUNED_TOOL_PLACEHOLDER</code>
+        <code>drop_stale_api_content</code>
+      </div>
+      <div class="fate">kader: <b>ÖZET</b> — tip-farkında tek satır</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["tool çıktısı (ham, 47 satır)"] --> R{tool tipi?}
+  R -->|terminal| T["[terminal] cmd → exit code, N lines"]
+  R -->|web_extract| W["[web_extract] url (+N more) (M chars)"]
+  R -->|bilinmeyen| F["[tool] (N chars) — fallback"]
+  T --> S["tool-result slotunda kalır (DET)"]
+  W --> S
+  F --> S
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  class T,W,F,S det
+</pre></div></div>
+  </section>
+
+  <!-- 2 · HEADROOM -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.2</span> · bize en yakın (tip-özel) · <span class="tag det">DET</span></div>
+      <h2 class="name">Headroom</h2>
+      <div class="repo">headroomlabs-ai/headroom · content_router.py</div>
+      <p class="sum">Ajanla LLM arasına giren <b>proxy</b>; tool çıktısını içerik-tipine göre
+      <b>algoritmik</b> compressor'a yönlendirir. Kayıplı ama <b>geri-çağrılabilir</b>: atılan içerik
+      yerelde saklanır, model hash ile orijinali geri getirir (CCR).</p>
+      <div class="symbols">
+        <code>ContentRouter</code><code>SmartCrusher</code><code>CodeAwareCompressor</code>
+        <code>&lt;&lt;ccr:HASH&gt;&gt;</code><code>headroom_retrieve</code>
+      </div>
+      <div class="fate">kader: <b>CRUSH</b> — algoritmik + geri-çağrılabilir</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["tool çıktısı → proxy"] --> RT{ContentRouter: tip?}
+  RT -->|JSON| SC["SmartCrusher: şema dedup + satır düşür<br/>KeepErrors/Outliers koru"]
+  RT -->|kod| CC["CodeAwareCompressor: import/imza koru"]
+  RT -->|log/grep/diff| LG["Log/Search/Diff compressor"]
+  RT -->|metin| KM["Kompress: token skor>0.5 tut"]
+  SC --> CCR["CCR: orijinali sakla + marker"]
+  CC --> CCR
+  LG --> CCR
+  KM --> CCR
+  CCR --> M["sıkışık tool çıktısı → LLM"]
+  M -.gerekirse.-> RET["headroom_retrieve(hash) → orijinal (LOSS)"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef loss fill:#e0f2f5,stroke:#0d8b9c,color:#000;
+  class SC,CC,LG,KM,CCR,M det
+  class RET loss
+</pre></div></div>
+  </section>
+
+  <!-- 3 · CODEX -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.3</span> · tool-trace-farkında · <span class="tag det">DET</span> + <span class="tag llm">LLM</span></div>
+      <h2 class="name">OpenAI Codex</h2>
+      <div class="repo">openai/codex · utils/output-truncation · compact.rs</div>
+      <p class="sum">İki mekanizma: (a) ingest'te her tool çıktısını <b>ortasından keser</b>
+      (baş+son kalır, "…N truncated…"); (b) compaction'da tool çıktılarını <b>siler</b> — tek bir
+      LLM handoff özetine erir. İlişkiye bakmaz, sadece boyut.</p>
+      <div class="symbols">
+        <code>tool_output_token_limit</code><code>truncate_middle_chars</code>
+        <code>TruncationPolicy</code>
+      </div>
+      <div class="fate">kader: <b>KES</b> (ingest) + <b>SİL</b> (compaction)</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["tool çıktısı"] --> Q{boyut > tool_output_token_limit?}
+  Q -->|evet| T["truncate_middle: baş+son kalır<br/>'…N truncated…'"]
+  Q -->|hayır| K["olduğu gibi"]
+  T --> C["(compaction'da) tool çıktısı silinir → LLM özeti"]
+  K --> C
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class T,K det
+  class C llm
+</pre></div></div>
+  </section>
+
+  <!-- 4 · CLAUDE CODE -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.4</span> · tool-trace-farkında · <span class="tag det">DET</span></div>
+      <h2 class="name">Claude Code</h2>
+      <div class="repo">anthropic/claude-code · context editing (B.11)</div>
+      <p class="sum">Eski tool sonuçlarını bir placeholder'la <b>temizler</b>; aktif/son tool çağrıları
+      korunur. Codex "sil" (kalıcı) ≠ Claude Code "clear" (yerinde temizle, yapı durur). Compaction
+      sonrası son 5 düzenlenen dosyayı <b>tekrar okur</b> (state reconstruction).</p>
+      <div class="symbols">
+        <code>[Old tool result content cleared]</code><code>keep-active</code>
+      </div>
+      <div class="fate">kader: <b>SİL</b> — placeholder ile temizle</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["tool çıktısı birikti"] --> D{aktif/son mu?}
+  D -->|evet| K["korunur (TAM)"]
+  D -->|hayır| C["'[Old tool result cleared]' placeholder"]
+  C --> SR["compaction sonrası: son 5 dosyayı tekrar oku"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  class K,C,SR det
+</pre></div></div>
+  </section>
+
+  <!-- 5 · OPENCLAW -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.5</span> · tool-trace-farkında · <span class="tag det">DET</span> + <span class="tag llm">LLM</span></div>
+      <h2 class="name">OpenClaw</h2>
+      <div class="repo">openclaw/openclaw · overflow-context-recovery.ts</div>
+      <p class="sum">Bağlam taştığında, <b>pahalı LLM compaction'a başvurmadan önce</b> en büyük tool
+      sonuçlarını kırpar. Çoğu overflow birkaç dev çıktıdan gelir (build log, dosya dökümü); onları
+      kesmek çoğu zaman compaction'a hiç gerek bırakmaz. Sadece oversized olanlar.</p>
+      <div class="symbols">
+        <code>sessionLikelyHasOversizedToolResults</code>
+        <code>truncateOversizedToolResultsInActiveTarget</code>
+      </div>
+      <div class="fate">kader: <b>KES</b> — sadece oversized</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["overflow (bağlam taştı)"] --> C{sessionLikelyHasOversizedToolResults?}
+  C -->|evet| R["resolveLiveToolResultMaxChars → sınır"]
+  R --> T["truncateOversizedToolResultsInActiveTarget<br/>sadece oversized çıktıları kes (DET)"]
+  T --> Q{hâlâ dolu?}
+  C -->|hayır| Q
+  Q -->|evet| E["context-engine: LLM / lossless / native"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class R,T det
+  class E llm
+</pre></div></div>
+  </section>
+
+  <!-- 6 · OPENHANDS -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.6</span> · tool-trace-farkında · <span class="tag det">DET</span> + <span class="tag llm">LLM</span></div>
+      <h2 class="name">OpenHands</h2>
+      <div class="repo">OpenHands/software-agent-sdk · condenser/</div>
+      <p class="sum">Ajan döngüsü <b>Event</b> üretir: Action (karar) + Observation (tool çıktısı).
+      <b>ObservationMasking</b> eski Observation gövdesini placeholder'a çevirir (attention_window
+      dışı). <b>Pipeline</b> condenser'ları zincirler — bizim faz-faz yaklaşımımıza benzer.</p>
+      <div class="symbols">
+        <code>Pipeline</code><code>ObservationMaskingCondenser</code>
+        <code>BrowserOutputCondenser</code><code>attention_window</code>
+      </div>
+      <div class="fate">kader: <b>MASKE</b> — gövdeyi gizle (masking ≈ özet, ~yarı maliyet)</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["Event akışı: Action + Observation(tool çıktısı)"] --> PIPE["Pipeline: condenser'ları zincirle"]
+  PIPE --> B["BrowserOutputCondenser: browser tool çıktısı temizle (DET)"]
+  B --> M["ObservationMasking: eski Observation → placeholder<br/>(attention_window dışı) (DET)"]
+  M --> QQ{hâlâ dolu?}
+  QQ -->|hayır| K["bitti"]
+  QQ -->|evet| S["LLMSummarizingCondenser: TÜM olayları özetle (mor)"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class B,M,K det
+  class S llm
+</pre></div></div>
+  </section>
+
+  <!-- 7 · GEMINI-CLI -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.7</span> · kısmi staleness · <span class="tag det">DET</span> + <span class="tag llm">LLM</span></div>
+      <h2 class="name">gemini-cli</h2>
+      <div class="repo">google-gemini/gemini-cli · agents/local-executor.ts</div>
+      <p class="sum"><b>onBeforeTurn</b> genel kanca. Shipped kullanım browser'a özel:
+      <b>supersedeStaleSnapshots</b> eski <code>take_snapshot</code> çıktılarını bayat sayar (sadece
+      en güncel sayfa kalır). Belirli bir tool için staleness — tezimizi destekleyen ikinci örnek.</p>
+      <div class="symbols">
+        <code>supersedeStaleSnapshots</code><code>SNAPSHOT_SUPERSEDED_PLACEHOLDER</code>
+        <code>tryCompressChat</code>
+      </div>
+      <div class="fate">kader: <b>SUPERSEDE</b> — bayat snapshot</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["turn öncesi (onBeforeTurn genel kanca)"] --> SUP["supersedeStaleSnapshots:<br/>eski take_snapshot → PLACEHOLDER<br/>(sadece en güncel snapshot kalır) (DET, stale)"]
+  SUP --> C["(ayrı) tryCompressChat: tüm konuşma (LLM)"]
+  C --> G{özet ham'dan küçük mü?}
+  G -->|hayır| F["INFLATED → iptal (fayda freni)"]
+  G -->|evet| OK["uygula"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class SUP,F,OK det
+  class C llm
+</pre></div></div>
+  </section>
+
+  <!-- 8 · ROO -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.8</span> · yapısal fold · <span class="tag det">DET</span></div>
+      <h2 class="name">Roo-Code</h2>
+      <div class="repo">RooCodeInc/Roo-Code · core/condense/foldedFileContext</div>
+      <p class="sum">Eski <b>dosya-okuma çıktılarını</b> ham içerik yerine <b>yapısal outline'a katlar</b>
+      (tree-sitter ile) — bir IDE'nin kod-katlama özelliği gibi. "500 satır" yerine "şu fonksiyonlar
+      var". Fallback: mesajları silmez, gizler (non-destructive sliding-window).</p>
+      <div class="symbols">
+        <code>generateFoldedFileContext</code><code>parseSourceCodeDefinitionsForFile</code>
+        <code>injectSyntheticToolResults</code>
+      </div>
+      <div class="fate">kader: <b>KATLA</b> — tree-sitter outline</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["dosya okuma tool çıktıları (ham 500 satır)"] --> FOLD["generateFoldedFileContext<br/>parseSourceCodeDefinitionsForFile → outline (DET)"]
+  FOLD --> M["injectSyntheticToolResults<br/>(tool_call↔tool_result eşleşmesi korunur)"]
+  M --> S["(sonra) summarizeConversation: konuşma (LLM)"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class FOLD,M det
+  class S llm
+</pre></div></div>
+  </section>
+
+  <!-- 9 · OPENCODE -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.9</span> · tool-trace-farkında · <span class="tag det">DET</span> + <span class="tag llm">LLM</span></div>
+      <h2 class="name">OpenCode</h2>
+      <div class="repo">sst/opencode · SessionTime.Compacting</div>
+      <p class="sum">Eski tool çıktısını mesaj listesinden <b>silmez</b> — bir <b>Compacting zaman-sınırı</b>
+      koyar, o sınırdan eskiyi modele giden bağlamdan çıkarır ama transcript deposunda tutar
+      ("soft delete by time", geri-alınabilir). skill asla gizlenmez; son 40K + 2 user turn korunur.</p>
+      <div class="symbols">
+        <code>SessionTime.Compacting</code><code>SessionCompacted</code><code>session/summarize</code>
+      </div>
+      <div class="fate">kader: <b>GİZLE</b> — depoda tut, prompt'tan çıkar</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["pruning 20K+ token açar mı?"] --> H["Adım 1: Compacting timestamp sınırı<br/>eskiyi GİZLE (depoda kalır, DET)"]
+  H --> P["skill asla gizlenmez · son 40K + 2 user turn korunur"]
+  P --> Q{hâlâ dolu?}
+  Q -->|evet| S["Adım 2: gizlenmemiş kalanı LLM özetle"]
+  Q -->|hayır| R["bitir · son user mesajını replay"]
+  S --> R
+  H -.geri alınabilir.-> REV["revert/restore → gizleneni geri getir"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  classDef loss fill:#e0f2f5,stroke:#0d8b9c,color:#000;
+  class H,P,R det
+  class S llm
+  class REV loss
+</pre></div></div>
+  </section>
+
+  <!-- 10 · CLINE -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.10</span> · dedup + staleness · <span class="tag det">DET</span> + <span class="tag llm">LLM</span></div>
+      <h2 class="name">Cline</h2>
+      <div class="repo">cline/cline · formatResponse</div>
+      <p class="sum">Manzarada bize <b>en yakın</b>: aynı dosya birden çok okunduğunda <b>eski okumayı
+      kaldırır</b> ve "en güncele bak" notu koyar. Bu <b>dedup + staleness</b> (dosya-özel, sürümsüz).
+      Sonra sliding-window, en son LLM condense.</p>
+      <div class="symbols">
+        <code>duplicateFileReadNotice</code><code>getNextTruncationRange(quarter|half)</code>
+        <code>summarize_task</code>
+      </div>
+      <div class="fate">kader: <b>DEDUP</b> — eski okumayı kaldır</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["dosya tekrar okundu"] --> D["duplicateFileReadNotice:<br/>eski okumayı kaldır → 'en güncele bak' (DET, dedup+stale)"]
+  D --> Q1{hâlâ dolu?}
+  Q1 -->|evet| T["getNextTruncationRange: çeyrek/yarı at (DET)"]
+  T --> Q2{hâlâ dolu?}
+  Q2 -->|evet| S["summarize_task (LLM, basic|agentic)"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class D,T det
+  class S llm
+</pre></div></div>
+  </section>
+
+  <!-- 11 · SWE-AGENT -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§1.11</span> · konum-tabanlı · <span class="tag det">DET</span></div>
+      <h2 class="name">SWE-agent</h2>
+      <div class="repo">SWE-agent/SWE-agent · history_processors.py</div>
+      <p class="sum">observation = environment/tool çıktısı. Pluggable <b>history_processor</b>'lar deterministik
+      işler. <b>LastNObservations</b> — "orijinal makalenin yöntemi" — son n gözlem hariç hepsini eler;
+      yerine "Old environment output: (n lines omitted)". İlişki değil, <b>konum</b>.</p>
+      <div class="symbols">
+        <code>LastNObservations(n)</code><code>ClosedWindowHistoryProcessor</code>
+        <code>TagToolCallObservations</code>
+      </div>
+      <div class="fate">kader: <b>SİL</b> — son N hariç ele</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["gözlemler (tool/environment çıktıları)"] --> P{history_processor}
+  P -->|LastNObservations| L["son n hariç ele →<br/>'Old environment output: (n lines omitted)' (DET)"]
+  P -->|ClosedWindow| W["pencere sınırla (DET)"]
+  P -->|TagToolCall| T["tool-call gözlemlerini etiketle (DET)"]
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  class L,W,T det
+</pre></div></div>
+  </section>
+
+  <!-- 12 · §2 NOTE -->
+  <section class="slide note">
+    <div class="box">
+      <div class="eyebrow" style="justify-content:center"><span class="ref">§2</span> · tool-trace-farkında DEĞİL</div>
+      <h2>QM · Plandex · Aider</h2>
+      <p>Bu sistemler tool çıktısına <b>özel davranmaz</b> — tüm <code>SessionEntry</code>/mesajı
+      birlikte LLM'e özetletirler. Yani <i>context</i> compaction yaparlar, <i>tool-trace</i> değil.
+      "Aynı tool'u tekrar çağırdın" ya da "bu okuma bayatladı" kavramı <b>yoktur</b>.</p>
+      <p style="margin-top:14px">QM: çift-tavan (400 girdi / 120K token), <code>contextSummaryPayload</code>
+      başa · Plandex: rolling summary · Aider: recursive-halving whole-history özeti.</p>
+      <p style="color:var(--accent);margin-top:16px;font-family:var(--mono);font-size:13px">
+        tool-özel değil → flowchart yok</p>
+      <div class="sys"><code>QM</code><code>Plandex</code><code>Aider</code>
+        <code>Amp / Goose 🔖</code><code>LangGraph 🔖</code><code>Letta 🔖</code></div>
+    </div>
+  </section>
+
+  <!-- 13 · OURS -->
+  <section class="slide">
+    <div class="left">
+      <div class="eyebrow"><span class="ref">§3</span> · ilişki-farkında (tamamı) · <span class="tag det">DET</span></div>
+      <h2 class="name">Bizim sistem</h2>
+      <div class="repo">adapted/hybrid-compaction · ledger + CWL + fazlar</div>
+      <p class="sum">Sistemin <b>tamamı</b> tool izi üzerine. Her çağrıyı ledger'a işler ve
+      <b>çağrılar-arası ilişkiyi</b> bilir: aynı kaynağın tekrarı (dedup), sürüm/TTL ile bayatlık
+      (staleness), kategori, ve CWL episode bağımlılığı. Manzaradaki tek <b>genel</b> ilişki ledger'ı.</p>
+      <div class="symbols">
+        <code>ledger.record</code><code>is_stale</code><code>_detect_duplicate</code>
+        <code>tool_gist</code><code>render_event</code>
+      </div>
+      <div class="fate">kader: <b>DEDUP + SİL + ÖZET</b> — sürüm/TTL/CWL, sıfır LLM</div>
+    </div>
+    <div class="right"><div class="card"><pre class="mermaid">
+flowchart TD
+  A["tool çağrısı → ledger.record"] --> PR["çift-koruma (adet + token)"]
+  PR --> F1["FAZ 1 dedup: aynı kaynak+sürüm → SİL (DET)"]
+  F1 --> F2["FAZ 2 staleness: mutasyon/TTL → SİL/ÖZET (DET)"]
+  F2 --> F3["FAZ 3 keşif fold → tip-farkında gist (DET)"]
+  F3 --> F4["FAZ 4 CWL episode (DET)"]
+  F4 --> Q{hâlâ dolu VE summarize_fn?}
+  Q -->|hayır| OUT["render_event → messages · tool_call_id korunur"]
+  Q -->|evet| L["FAZ 5 LLM (opsiyonel)"]
+  L --> OUT
+  classDef det fill:#e0f5ec,stroke:#1f9d6b,color:#000;
+  classDef llm fill:#efe0ff,stroke:#7c4dd6,color:#000;
+  class PR,F1,F2,F3,F4,OUT det
+  class L llm
+</pre></div></div>
+  </section>
+
+  <!-- 14 · §4 TABLE -->
+  <section class="slide tbl">
+    <h2>Tool-trace ekseninde karşılaştırma</h2>
+    <p class="cap">§4 · tool çıktısına ne yapar · yöntem · çağrılar-arası ilişki görür mü</p>
+    <div style="overflow:auto">
+    <table>
+      <thead><tr><th>sistem</th><th>tool çıktısına</th><th>yöntem</th><th>ilişki?</th></tr></thead>
+      <tbody>
+        <tr><td class="sys">Hermes</td><td>tip-farkında tek satır</td><td>DET şablon</td><td>❌</td></tr>
+        <tr><td class="sys">Headroom</td><td>tipe göre algoritmik sıkıştır + geri-çağır</td><td>DET + küçük model</td><td>satır-içi</td></tr>
+        <tr><td class="sys">Codex</td><td>orta-kes + sil</td><td>DET boyut</td><td>❌</td></tr>
+        <tr><td class="sys">Claude Code</td><td>temizle (placeholder)</td><td>DET</td><td>❌</td></tr>
+        <tr><td class="sys">OpenClaw</td><td>oversized kes</td><td>DET</td><td>❌</td></tr>
+        <tr><td class="sys">OpenHands</td><td>eski gözlemi maskele</td><td>DET</td><td>❌</td></tr>
+        <tr><td class="sys">SWE-agent</td><td>son N hariç ele</td><td>DET</td><td>❌ (konum)</td></tr>
+        <tr><td class="sys">gemini-cli</td><td>bayat snapshot supersede</td><td>DET</td><td><span class="rel">✅ kısmi</span></td></tr>
+        <tr><td class="sys">Roo</td><td>dosya okumasını katla</td><td>DET tree-sitter</td><td>kısmi</td></tr>
+        <tr><td class="sys">Cline</td><td>eski dosya okumasını kaldır</td><td>DET</td><td><span class="rel">✅ kısmi</span></td></tr>
+        <tr><td class="sys">OpenCode</td><td>zaman-damgasıyla gizle</td><td>DET</td><td>❌</td></tr>
+        <tr><td class="sys">QM / Plandex / …</td><td>özel yok — birlikte özetle</td><td>LLM</td><td>❌</td></tr>
+        <tr class="us"><td class="sys">BİZ</td><td>dedup + bayat + kategori + CWL</td><td>DET ledger</td><td><span class="rel">✅ her kaynak, sürüm/TTL</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- 15 · CLOSING -->
+  <section class="slide close">
+    <div>
+      <h2>Üç gözlem</h2>
+      <div class="obs">
+        <div class="o"><div class="n">01 · çoğu tekil</div><p>Tool-trace-farkında sistemlerin
+          çoğu <b>tekil çıktıyı</b> ele alır (kes / tek-satır / maskele / gizle) — yani output
+          compaction. Çağrılar-arası israfı görmez.</p></div>
+        <div class="o"><div class="n">02 · bazıları ilişki görür</div><p><b>Cline</b> eski dosya
+          okumasını kaldırır (dedup+stale), <b>gemini-cli</b> bayat snapshot'ı supersede eder,
+          <b>Roo</b> dosya okumasını katlar. İlişki-farkındalık "yok" değil.</p></div>
+        <div class="o"><div class="n">03 · farkımız: genel</div><p>Cline dosya-özel, sürümsüz yapar.
+          Bizim ledger <b>her kaynak</b> için sürüm sayacı + TTL volatilitesi + CWL episode ile.
+          Fark <b>kapsam ve mekanizma</b>, varlık/yokluk değil.</p></div>
+      </div>
+      <p class="honesty"><b>Dürüstlük notu:</b> İlk sürümde "hiçbir sistemde ilişki-farkında
+      dedup/staleness yok" demiştim — yanlıştı. Cline'ın <code>duplicateFileReadNotice</code>'ı
+      (grep-doğrulandı) dosya okumaları için tam bunu yapıyor. Doğru ifade: genel, sürüm/TTL-farkında
+      ilişki ledger'ı hâlâ tek bizde; dosya-özel dedup/staleness Cline'da var.</p>
+    </div>
+  </section>
+
+</div>
+
+<div class="progress" id="progressbar" style="width:0"></div>
+<div class="navbar">
+  <button id="prev" aria-label="önceki">◂ önceki</button>
+  <div class="counter" id="counter">01 / 16</div>
+  <button id="next" aria-label="sonraki">sonraki ▸</button>
+</div>
+<div class="hint">← → ya da boşluk ile gez</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let i = 0;
+  const counter = document.getElementById('counter');
+  const bar = document.getElementById('progressbar');
+  function pad(n){return String(n).padStart(2,'0');}
+  function show(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach((s,k)=>s.classList.toggle('active', k===i));
+    counter.textContent = pad(i+1)+' / '+pad(slides.length);
+    bar.style.width = ((i)/(slides.length-1)*100)+'%';
+  }
+  document.getElementById('next').onclick = ()=>show(i+1);
+  document.getElementById('prev').onclick = ()=>show(i-1);
+  document.addEventListener('keydown', e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();show(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1);}
+    else if(e.key==='Home'){show(0);} else if(e.key==='End'){show(slides.length-1);}
+  });
+  show(0);
+</script>
