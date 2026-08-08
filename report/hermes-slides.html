@@ -1,0 +1,520 @@
+<title>Hermes-Agent — Harness Anatomisi</title>
+<style>
+  :root{
+    --ink:#0a0c10; --ink-2:#10141b; --panel:#141922; --edge:rgba(233,227,214,.10);
+    --edge-2:rgba(233,227,214,.16);
+    --text:#ece8df; --muted:#98a0ab; --dim:#6c7480;
+    --bronze:#c9a15a; --bronze-hi:#e7c884; --cyan:#5fd3d8; --cyan-dim:#3d8f93;
+    --rose:#d98a72; --violet:#a99be0;
+    --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --pad:clamp(28px,5vw,84px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -8%, rgba(201,161,90,.10), transparent 60%),
+      radial-gradient(900px 600px at 12% 108%, rgba(95,211,216,.07), transparent 55%),
+      var(--ink);
+    color:var(--text); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+
+  /* progress + counter */
+  #bar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--bronze),var(--bronze-hi));width:0;z-index:50;transition:width .35s ease}
+  #hud{position:fixed;bottom:18px;right:22px;z-index:50;font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--dim)}
+  #hud b{color:var(--bronze-hi);font-weight:600}
+  #hint{position:fixed;bottom:18px;left:22px;z-index:50;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim)}
+
+  /* slides */
+  .deck{position:relative;height:100vh;width:100vw}
+  .slide{
+    position:absolute;inset:0;display:none;
+    padding:var(--pad);
+    flex-direction:column;justify-content:center;
+    animation:fade .5s ease both;
+  }
+  .slide.on{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.slide{animation:none}#bar{transition:none}}
+
+  .wrap{width:100%;max-width:1080px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--bronze);margin-bottom:18px;display:flex;align-items:center;gap:12px}
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--bronze);opacity:.7}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(38px,7vw,82px);line-height:1.02;letter-spacing:-.02em;text-wrap:balance}
+  h2{font-family:var(--serif);font-weight:600;font-size:clamp(28px,4.6vw,50px);line-height:1.06;letter-spacing:-.015em;text-wrap:balance;margin-bottom:8px}
+  .lede{font-size:clamp(16px,1.9vw,21px);line-height:1.5;color:var(--muted);max-width:60ch;margin-top:20px}
+  p{line-height:1.55}
+  .accent{color:var(--bronze-hi)}
+  .cy{color:var(--cyan)}
+  code,.mono{font-family:var(--mono)}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:26px}
+  @media (max-width:820px){.cols{grid-template-columns:1fr;gap:18px}}
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--ink-2));border:1px solid var(--edge);border-radius:14px;padding:20px 22px}
+  .card h3{font-family:var(--sans);font-size:15px;letter-spacing:.02em;color:var(--bronze-hi);margin-bottom:10px;display:flex;align-items:center;gap:9px}
+  .card p,.card li{font-size:14.5px;line-height:1.5;color:var(--muted)}
+  .card .big{font-family:var(--serif);font-size:30px;color:var(--text);display:block;margin-bottom:2px}
+  ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  ul li{position:relative;padding-left:18px;font-size:15.5px;line-height:1.5;color:var(--muted)}
+  ul li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--bronze);opacity:.85}
+  ul.cyl li::before{background:var(--cyan)}
+  li b,p b{color:var(--text);font-weight:600}
+
+  pre{background:#0c0f14;border:1px solid var(--edge-2);border-radius:12px;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;line-height:1.65;color:#cdd4dc;margin-top:8px}
+  pre .k{color:var(--bronze-hi)} pre .t{color:var(--cyan)} pre .c{color:var(--dim)} pre .s{color:var(--rose)}
+
+  /* flow diagram */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin-top:24px}
+  .node{background:var(--panel);border:1px solid var(--edge-2);border-radius:11px;padding:13px 15px;font-size:13.5px;line-height:1.35;flex:1;min-width:130px;display:flex;flex-direction:column;justify-content:center}
+  .node .t{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--bronze);text-transform:uppercase;margin-bottom:5px}
+  .node b{color:var(--text)}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:20px;padding:0 6px}
+  @media (max-width:820px){.arrow{transform:rotate(90deg);padding:6px 0}.flow{flex-direction:column}}
+
+  /* layer stack */
+  .stack{display:flex;flex-direction:column;gap:8px;margin-top:22px}
+  .layer{border:1px solid var(--edge);border-radius:10px;padding:13px 18px;display:flex;align-items:center;gap:16px;background:linear-gradient(90deg,var(--ink-2),transparent)}
+  .layer .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--bronze);width:118px;flex:none}
+  .layer .desc{font-size:14.5px;color:var(--muted)}
+  .layer.hi{border-color:rgba(201,161,90,.45);background:linear-gradient(90deg,rgba(201,161,90,.10),transparent)}
+  .layer.hi .lbl{color:var(--bronze-hi)}
+
+  .tag{display:inline-block;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;padding:3px 9px;border:1px solid var(--edge-2);border-radius:999px;color:var(--muted);margin:3px 4px 0 0}
+  .tag.b{color:var(--bronze-hi);border-color:rgba(201,161,90,.4)}
+  .tag.c{color:var(--cyan);border-color:rgba(95,211,216,.35)}
+
+  table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--edge)}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--bronze);font-weight:500}
+  td{color:var(--muted)} td b{color:var(--text)}
+  tr:last-child td{border-bottom:none}
+
+  .kicker{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:26px;letter-spacing:.04em}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
+  @media (max-width:820px){.grid4{grid-template-columns:1fr 1fr}}
+  .mini{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:16px}
+  .mini .n{font-family:var(--mono);font-size:11px;color:var(--bronze);letter-spacing:.1em}
+  .mini h4{font-family:var(--sans);font-size:15px;margin:6px 0 6px;color:var(--text)}
+  .mini p{font-size:13px;color:var(--muted);line-height:1.45}
+
+  .clickzone{position:fixed;top:0;height:100vh;width:16vw;z-index:40;cursor:pointer}
+  #prev{left:0} #next{right:0}
+</style>
+
+<div id="bar"></div>
+<div id="hint">← → gezin · S başlık</div>
+<div id="hud"><b id="cur">01</b> / <span id="tot">18</span></div>
+<div class="clickzone" id="prev" title="Önceki"></div>
+<div class="clickzone" id="next" title="Sonraki"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 TITLE -->
+  <section class="slide on">
+    <div class="wrap">
+      <div class="eyebrow">Nous Research · MIT · açık kaynak</div>
+      <h1>Hermes-Agent<br><span class="accent">harness'ı baştan sona</span></h1>
+      <p class="lede">Kendi Hermes modelleriyle <b>birlikte tasarlanmış</b>, kendini geliştiren (self-improving) bir tool-use ajanı. Bu deste; tool-call formatından öğrenme döngüsüne, dört çok-ajan paterninden context sıkıştırmaya kadar mimariyi gerçek kaynak kod üzerinden gezer.</p>
+      <p class="kicker">agent/ · 128+ modül  •  tools/ · 40+ araç  •  Python + Node + Rust  •  18 slayt</p>
+    </div>
+  </section>
+
+  <!-- 2 IDENTITY -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">01 — Kimlik</div>
+      <h2>Ürün değil, model-harness ortak tasarımı</h2>
+      <p class="lede">Claude Code bir üründür. Hermes ise açık bir ajandır ve <span class="accent">harness, modelin eğitildiği trajectory formatını yayar</span> — "prompt'a XML gömme" bir tercih değil, modelin fine-tune edildiği sözleşmedir.</p>
+      <div class="cols">
+        <div class="card">
+          <h3>◆ Ne yapar</h3>
+          <ul>
+            <li><b>Learning loop</b> — deneyimden skill üretir, kullanırken iyileştirir</li>
+            <li><b>Kalıcı bellek</b> — geçmiş konuşmaları arar, kullanıcı modeli kurar</li>
+            <li><b>40+ tool</b> · MCP uyumlu · çok-platform</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>◆ Teknoloji</h3>
+          <ul class="cyl">
+            <li>Python (birincil) + Node.js + Rust</li>
+            <li>SQLite <span class="cy">FTS5</span> — oturum arama</li>
+            <li>FFmpeg (ses), ripgrep, MCP</li>
+            <li>9 provider · 7 terminal backend · 5+ mesaj platformu</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 LAYERS -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">02 — Katman haritası</div>
+      <h2>Soğan: girişten modele</h2>
+      <div class="stack">
+        <div class="layer"><span class="lbl">Gateway</span><span class="desc">CLI · TUI · web · ACP + Telegram · Discord · Slack · WhatsApp · Signal · voice</span></div>
+        <div class="layer hi"><span class="lbl">Çekirdek</span><span class="desc"><b>run_conversation</b> · tool-call formatı (XML + native FC) · tool_executor · context_compressor</span></div>
+        <div class="layer hi"><span class="lbl">Learning</span><span class="desc"><b>curator</b> (arka plan skill bakımı) · <b>/learn</b> · memory_manager · Honcho user-model</span></div>
+        <div class="layer"><span class="lbl">Yürütme</span><span class="desc">terminal backends · delegate_task (subagent) · MCP · providers</span></div>
+        <div class="layer"><span class="lbl">Model</span><span class="desc">Nous · OpenRouter · OpenAI · Anthropic · Gemini · Bedrock · Ollama · LM Studio</span></div>
+      </div>
+      <p class="kicker">Felsefe: sabit-döngü + <span class="accent">öğrenen bellek</span> + çok-provider normalizasyonu.</p>
+    </div>
+  </section>
+
+  <!-- 4 TOOL-CALL FORMAT -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">03 — İmza #1 · tool-call formatı</div>
+      <h2>XML-tagged JSON</h2>
+      <p class="lede">Kalp burada. System prompt araçları <code class="accent">&lt;tools&gt;</code> içinde katalogar (XML registry); model <code class="accent">&lt;tool_call&gt;</code> içine JSON gömer.</p>
+      <pre><span class="c">// agent/agent_runtime_helpers.py</span>
+<span class="s">"You are a function calling AI model. ... within</span> <span class="t">&lt;tools&gt; &lt;/tools&gt;</span> <span class="s">XML tags."</span>
+<span class="t">&lt;tools&gt;</span>
+  { ...her araç için JSON şema... }
+<span class="t">&lt;/tools&gt;</span>
+<span class="c"># sonuçlar &lt;tool_response&gt; içinde döner · reasoning &lt;think&gt; içinde</span>
+
+<span class="c"># model şöyle çağırır:</span>
+<span class="t">&lt;tool_call&gt;</span>
+{<span class="k">'name'</span>: read_file, <span class="k">'arguments'</span>: {<span class="k">'path'</span>: <span class="s">'a.py'</span>}}
+<span class="t">&lt;/tool_call&gt;</span></pre>
+      <p class="kicker">Parse: <code>_TOOL_CALL_TAG_NAMES</code> (5 varyanta toleranslı regex) + başıboş kapanış temizliği.</p>
+    </div>
+  </section>
+
+  <!-- 5 HYBRID -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">04 — İmza #2 · hibrit format</div>
+      <h2>Tek ajanda iki paradigma</h2>
+      <p class="lede">Hermes model-agnostiktir: yerel/Hermes modelde <span class="accent">XML registry</span>, Anthropic/Gemini/Bedrock'ta <span class="cy">native function-calling</span>. Adapter'lar ikisini tek iç temsile normalize eder.</p>
+      <div class="flow">
+        <div class="node"><span class="t">yerel model</span><b>&lt;tool_call&gt; XML</b></div>
+        <div class="arrow">→</div>
+        <div class="node" style="border-color:rgba(201,161,90,.4)"><span class="t">normalize</span><b>msg["tool_calls"]<br>tek iç temsil</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">bulut model</span><b>native FC (adapter)</b></div>
+      </div>
+      <p class="kicker mono">anthropic_adapter · gemini_native_adapter · bedrock_adapter · codex_responses_adapter</p>
+      <p style="margin-top:14px;color:var(--muted);font-size:15px">Daha önce ayrı anlattığımız <b>“XML registry”</b> ve <b>“native FC”</b> — burada <span class="accent">ikisi birden</span>, sağlayıcıya göre çalışma-zamanında seçilir.</p>
+    </div>
+  </section>
+
+  <!-- 6 BOOTSTRAP -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">05 — Bootstrap</div>
+      <h2>Döngü başlamadan önce</h2>
+      <div class="stack">
+        <div class="layer"><span class="lbl">1 · config</span><span class="desc">~/.hermes/config.yaml + .env → curator/provider/terminal ayarları</span></div>
+        <div class="layer"><span class="lbl">2 · model</span><span class="desc"><code>hermes model</code> — kod değişmeden provider/model seçimi</span></div>
+        <div class="layer"><span class="lbl">3 · backend</span><span class="desc">tool'lar nerede koşacak: local · Docker · SSH · Modal · Daytona · Vercel · Singularity</span></div>
+        <div class="layer"><span class="lbl">4 · registry</span><span class="desc">40+ built-in araç + MCP sunucularından dinamik keşif</span></div>
+        <div class="layer hi"><span class="lbl">5 · prompt</span><span class="desc">prompt_builder: kimlik + &lt;tools&gt; + paralel-çağrı rehberi + kullanıcı modeli + aktif skill'ler</span></div>
+        <div class="layer"><span class="lbl">6 · session</span><span class="desc">SQLite + FTS5 aç — geçmiş konuşma araması bunun üstünde</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 MAIN LOOP -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">06 — Ana döngü · run_conversation</div>
+      <h2>Turn'ün kalbi <span style="font-family:var(--mono);font-size:.4em;color:var(--dim)">(7334 satır)</span></h2>
+      <div class="flow">
+        <div class="node"><span class="t">giriş</span><b>mesaj → system prompt restore + context engine</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">model</span><b>provider çağrısı<br>(prompt cache)</b></div>
+        <div class="arrow">→</div>
+        <div class="node" style="border-color:rgba(201,161,90,.4)"><span class="t">karar</span><b>tool_call var mı?</b></div>
+      </div>
+      <div class="flow" style="margin-top:14px">
+        <div class="node"><span class="t">evet</span><b>tool_executor → &lt;tool_response&gt;</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">fren</span><b>iteration budget / context eşiği?</b></div>
+        <div class="arrow">↺</div>
+        <div class="node"><span class="t">döngü</span><b>modele geri</b></div>
+      </div>
+      <p class="kicker">Ek: <span class="accent">MoA</span> (mixture-of-agents) · iteration budget (sonsuz-döngü freni) · provider-özel prompt cache · failover senkronizasyonu.</p>
+    </div>
+  </section>
+
+  <!-- 8 TOOL EXECUTOR -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">07 — Tool yürütme</div>
+      <h2>Üç kip + yetki kapısı <span style="font-family:var(--mono);font-size:.35em;color:var(--dim)">(2403 satır)</span></h2>
+      <div class="cols">
+        <div class="card">
+          <h3>◆ Üç yürütme kipi</h3>
+          <ul>
+            <li><b>concurrent</b> — paralel tool'lar, thread pool + authorization gate</li>
+            <li><b>sequential</b> — bağımlı işler</li>
+            <li><b>segmented</b> — parça parça</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>◆ Her çağrıda</h3>
+          <ul class="cyl">
+            <li><b>file checkpoint</b> — değişiklikler geri alınabilir</li>
+            <li><b>middleware</b> — denetim/enjeksiyon noktası</li>
+            <li><b>approval</b> — auto-approve / auto-deny callback</li>
+            <li><b>interrupt/cancel</b> — kullanıcı yarıda kesebilir</li>
+          </ul>
+        </div>
+      </div>
+      <p class="kicker">40+ araç: dosya · kod çalıştırma · tarayıcı/computer-use · görsel-video üretimi · kanban · cron · delegasyon · MCP gateway.</p>
+    </div>
+  </section>
+
+  <!-- 9 CONTEXT -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">08 — Context yönetimi</div>
+      <h2>Production-grade sıkıştırma</h2>
+      <p class="lede">Claude Code compaction'ının ağır versiyonu — atomik, kilitli, kurtarılabilir.</p>
+      <div class="cols">
+        <div class="card">
+          <h3>◆ Güvenli sıkıştırma</h3>
+          <ul>
+            <li><b>CompressionCommitFence</b> — atomik commit; yarım kalırsa state geri sarılır</li>
+            <li><b>dağıtık kilit</b> — eşzamanlı sıkıştırma çakışmasını önler</li>
+            <li><b>session rotation</b> — gerekirse oturum döndürülür</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>◆ İnce ayar</h3>
+          <ul class="cyl">
+            <li><b>context_references</b> — büyük tool çıktıları referansa iner</li>
+            <li><b>context_breakdown</b> — pencerede ne kadar yer kim tutuyor</li>
+            <li>executor saturation — sıkıştırma bir iş kuyruğu, timeout'lu</li>
+          </ul>
+        </div>
+      </div>
+      <p class="kicker">POC bağı: bizimki <span class="accent">tek tool-mesajı</span> granülerliğinde (fate + fayda-freni); Hermes <span class="accent">tüm pencere</span> düzeyinde (commit-fence).</p>
+    </div>
+  </section>
+
+  <!-- 10 LEARNING LOOP -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">09 — İmza #3 · learning loop</div>
+      <h2>Kendini besleyen döngü — asıl fark</h2>
+      <div class="grid4">
+        <div class="mini"><div class="n">SKILLS</div><h4>Prosedürel bellek</h4><p>kategori başına DESCRIPTION.md + anthropics/openai/lobehub indeks cache</p></div>
+        <div class="mini"><div class="n">/LEARN</div><h4>Canlı skill üretimi</h4><p>ayrı motor YOK — ajan kendi tool'larıyla kaynağı toplar, skill_manage ile yazar</p></div>
+        <div class="mini"><div class="n">CURATOR</div><h4>Arka plan bakımı</h4><p>boştayken: oluştur · iyileştir · eskiyeni arşivle · konsolide et</p></div>
+        <div class="mini"><div class="n">MEMORY</div><h4>Kullanıcı modeli</h4><p>FTS5 geçmiş arama + LLM özet + Honcho user-model (oturumlar arası)</p></div>
+      </div>
+      <p class="kicker">Büyük kaynak → <span class="accent">knowledge-base layout</span>: yalın SKILL.md index + references/ dosyaları <code>skill_view</code> ile talep üzerine (progressive disclosure).</p>
+    </div>
+  </section>
+
+  <!-- 11 MAS OVERVIEW -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">10 — Multi-agent system</div>
+      <h2>Dört ayrı çok-ajan paterni</h2>
+      <table>
+        <tr><th>Patern</th><th>İletişim omurgası</th><th>Eşzamanlılık</th></tr>
+        <tr><td><b>delegate_task</b></td><td>fonksiyon-çağrısı + özet dönüş</td><td>senkron / batch-paralel</td></tr>
+        <tr><td><b>async delegation</b></td><td>paylaşılan <span class="cy">completion_queue</span> (event)</td><td>arka plan (non-blocking)</td></tr>
+        <tr><td><b>Kanban</b></td><td>paylaşılan <span class="cy">SQLite pano</span> (kanban.db)</td><td>dispatcher → çok worker</td></tr>
+        <tr><td><b>MoA</b></td><td>bellek-içi referans harmanı</td><td>paralel danışman modeller</td></tr>
+      </table>
+      <p class="kicker">Ortak imza (herkeste aynı): <span class="accent">delege → izole context → özet döndür.</span> Fark: koordinasyonun <i>nerede</i> durduğu.</p>
+    </div>
+  </section>
+
+  <!-- 12 delegate_task -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">11 — MAS · delegate_task</div>
+      <h2>Subagent mimarisinin çekirdeği</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>◆ Her child alır</h3>
+          <ul>
+            <li><b>taze konuşma</b> — parent geçmişi YOK</li>
+            <li><b>kendi task_id</b> — kendi terminal + file cache</li>
+            <li>parent toolset'i <b>eksi bloklu tool'lar</b></li>
+            <li>goal + context'ten <b>odaklı prompt</b></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>◆ Sınırlar</h3>
+          <ul class="cyl">
+            <li>parent yalnız <b>çağrı + özeti</b> görür (ara adımlar gizli)</li>
+            <li><b>recursive yok</b> — child'tan delegate_task çıkarılır</li>
+            <li>MAX_DEPTH=1 düz; nested yalnız <b>role="orchestrator"</b></li>
+            <li>steer / interrupt / spawn-pause canlı kontrol</li>
+          </ul>
+        </div>
+      </div>
+      <pre><span class="k">DELEGATE_BLOCKED_TOOLS</span> = {delegate_task, clarify, memory, send_message, cronjob}
+<span class="c"># recursive yok · kullanıcıya sormaz · paylaşılan belleğe/zamanlayıcıya/platforma dokunmaz</span></pre>
+    </div>
+  </section>
+
+  <!-- 13 async delegation -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">12 — MAS · async delegation</div>
+      <h2>Arka plan subagent + event kuyruğu</h2>
+      <div class="flow">
+        <div class="node"><span class="t">1</span><b>delegate_task(background=true)</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">2</span><b>hemen handle döner<br>(kullanıcı+model devam)</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">3</span><b>daemon executor:<br>child koşar</b></div>
+      </div>
+      <div class="flow" style="margin-top:14px">
+        <div class="node" style="border-color:rgba(95,211,216,.35)"><span class="t">4</span><b>completion_queue ← event</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">5 · boştayken</span><b>YENİ turn üretilir</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">6</span><b>parent sonucu sentezler</b></div>
+      </div>
+      <p class="kicker">Hard invariant: <span class="accent">past context asla mutasyona uğramaz</span> → rol alternasyonu + prompt cache korunur; de-dup & crash-recovery bedava.</p>
+    </div>
+  </section>
+
+  <!-- 14 kanban -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">13 — MAS · Kanban</div>
+      <h2>Paylaşılan pano (blackboard)</h2>
+      <p class="lede">Ajanlar birbirine mesaj atmaz — ortak bir <span class="cy">SQLite iş panosu</span> üzerinden koordine olur.</p>
+      <div class="flow">
+        <div class="node"><span class="t">dispatcher</span><b>görev ekle</b></div>
+        <div class="arrow">→</div>
+        <div class="node" style="border-color:rgba(95,211,216,.35)"><span class="t">pano</span><b>~/.hermes/kanban.db</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">worker'lar</span><b>görev çek · çalış · complete</b></div>
+      </div>
+      <p class="kicker">Neden tool (shell değil)? Worker terminali Docker/Modal/SSH'a bakabilir — orada <code>hermes</code> yok. Tool'lar <span class="accent">ajanın Python process'inde</span> koşar → backend ne olursa olsun DB'ye ulaşır.</p>
+    </div>
+  </section>
+
+  <!-- 15 MoA + compare -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">14 — MAS · MoA + kıyas</div>
+      <h2>Ensemble + felsefe ayrımı</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>◆ MoA — mixture-of-agents</h3>
+          <p><code>/moa</code> bir turn'ü ensemble yapar: referans modeller <b>paralel danışman</b>, ana model <b>sentezler</b>. Model-tool değil; loop tool-çağrısına sahip kalır. PII gizlilik filtresi var.</p>
+        </div>
+        <div class="card">
+          <h3>◆ Hermes vs Claude Code</h3>
+          <p><b class="cy">Blackboard</b> ailesi (Hermes): paylaşılan kuyruk + pano, doğrudan mesaj yok.<br><br><b class="accent">Mailbox</b> ailesi (Claude Code teams): yerel-JSON inbox + doğrudan ajanlar-arası mesaj.</p>
+        </div>
+      </div>
+      <p class="kicker">İki sistemin MAS felsefesindeki net ayrım: <span class="accent">nereye yazıyorlar</span> — ortak panoya mı, birbirinin posta kutusuna mı.</p>
+    </div>
+  </section>
+
+  <!-- 16 SURFACE -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">15 — Yüzey</div>
+      <h2>Gateway × backend × provider</h2>
+      <p class="lede">Hermes'in en geniş yüzeyi — üç eksende çarpım.</p>
+      <div style="margin-top:8px">
+        <p style="color:var(--muted);font-size:14px;margin-bottom:6px"><b class="accent">Gateway (giriş)</b></p>
+        <span class="tag b">CLI</span><span class="tag b">TUI</span><span class="tag b">web</span><span class="tag b">ACP</span><span class="tag b">Telegram</span><span class="tag b">Discord</span><span class="tag b">Slack</span><span class="tag b">WhatsApp</span><span class="tag b">Signal</span><span class="tag b">voice</span>
+      </div>
+      <div style="margin-top:18px">
+        <p style="color:var(--muted);font-size:14px;margin-bottom:6px"><b class="cy">Terminal backend (yürütme)</b></p>
+        <span class="tag c">local</span><span class="tag c">Docker</span><span class="tag c">SSH</span><span class="tag c">Modal</span><span class="tag c">Daytona</span><span class="tag c">Vercel</span><span class="tag c">Singularity</span>
+      </div>
+      <div style="margin-top:18px">
+        <p style="color:var(--muted);font-size:14px;margin-bottom:6px"><b>Provider (model)</b></p>
+        <span class="tag">Nous</span><span class="tag">OpenRouter</span><span class="tag">OpenAI</span><span class="tag">Anthropic</span><span class="tag">Bedrock</span><span class="tag">Gemini</span><span class="tag">Copilot ACP</span><span class="tag">LM Studio</span><span class="tag">Ollama</span>
+      </div>
+      <p class="kicker">Gateway tümünü tek iç mesaj formatına normalize eder + <code>cron/</code> gözetimsiz otomasyon.</p>
+    </div>
+  </section>
+
+  <!-- 17 END-TO-END MAP -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">16 — Uçtan uca</div>
+      <h2>Tek bakışta harness</h2>
+      <div class="flow">
+        <div class="node"><span class="t">gateway</span><b>mesaj → iç format</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">bootstrap</span><b>model · backend · registry · prompt · FTS5</b></div>
+        <div class="arrow">→</div>
+        <div class="node" style="border-color:rgba(201,161,90,.4)"><span class="t">loop</span><b>run_conversation</b></div>
+      </div>
+      <div class="flow" style="margin-top:14px">
+        <div class="node"><span class="t">çağrı</span><b>XML | native FC</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">tool</span><b>3-kip + checkpoint</b></div>
+        <div class="arrow">→</div>
+        <div class="node"><span class="t">context</span><b>fence + lock</b></div>
+        <div class="arrow">↺</div>
+        <div class="node"><span class="t">yanıt</span><b>gateway</b></div>
+      </div>
+      <p class="kicker">Yan raylar: <span class="accent">delegate_task</span> (izole subagent) · <span class="accent">/learn</span> (skill) · <span class="accent">curator</span> (boştayken bakım) · <span class="accent">cron</span> (zamanlı).</p>
+    </div>
+  </section>
+
+  <!-- 18 SIGNATURE -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">17 — Öne çıkanlar</div>
+      <h2>Hermes harness imzası</h2>
+      <div class="cols">
+        <div class="card">
+          <ul>
+            <li><b>Model-harness ortak tasarımı</b> — modelin eğitildiği trajectory'yi yayar</li>
+            <li><b>Hibrit tool-call</b> — XML registry + native FC, tek iç temsile normalize</li>
+            <li><b>Learning loop = asıl fark</b> — /learn + curator + Honcho + FTS5</li>
+          </ul>
+        </div>
+        <div class="card">
+          <ul class="cyl">
+            <li><b>Production context</b> — commit-fence + lock + session rotation</li>
+            <li><b>Dört MAS paterni</b> — delegate · async · Kanban · MoA (blackboard ailesi)</li>
+            <li><b>En geniş yüzey</b> — 5+ platform × 7 backend × 9 provider</li>
+            <li><b>Geri-alınabilirlik</b> — her tool'da checkpoint + interrupt</li>
+          </ul>
+        </div>
+      </div>
+      <p class="kicker">Kaynak: report/hermes-agent-harness.md · report/claude-code-harness.md · report/14-agentic-mega-atlas.md · repo: NousResearch/Hermes-Agent (MIT)</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const tot=slides.length; let i=0;
+  const bar=document.getElementById('bar'), cur=document.getElementById('cur');
+  document.getElementById('tot').textContent=String(tot).padStart(2,'0');
+  function show(n){
+    i=Math.max(0,Math.min(tot-1,n));
+    slides.forEach((s,k)=>s.classList.toggle('on',k===i));
+    bar.style.width=((i)/(tot-1)*100)+'%';
+    cur.textContent=String(i+1).padStart(2,'0');
+  }
+  function next(){show(i+1)} function prev(){show(i-1)}
+  document.getElementById('next').onclick=next;
+  document.getElementById('prev').onclick=prev;
+  addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();next()}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();prev()}
+    else if(e.key==='Home'){show(0)} else if(e.key==='End'){show(tot-1)}
+    else if(e.key==='s'||e.key==='S'){show(0)}
+  });
+  show(0);
+</script>
