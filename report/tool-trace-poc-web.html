@@ -1,0 +1,792 @@
+<title>Tool-Trace Compaction — İnteraktif POC</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --surface: #ffffff; --surface-2: #eef1f5; --border: #d7dde5;
+    --ink: #1a2230; --ink-soft: #4a5568; --ink-faint: #8a95a5;
+    --accent: #0d7d78; --accent-soft: #d3ece9; --accent-ink: #0a5a56;
+    --ok: #2f855a; --bad: #c0392b;
+    --r-system: #7c3aed; --r-user: #2563eb; --r-assistant: #64748b;
+    --r-tool: #b7791f; --r-summary: #2f855a; --r-note: #718096; --r-fn: #b7791f;
+    --shadow: 0 1px 2px rgba(20,30,50,.06), 0 4px 12px rgba(20,30,50,.05);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f141b; --surface: #171e28; --surface-2: #1e2732; --border: #2b3543;
+      --ink: #e6ebf2; --ink-soft: #a7b2c1; --ink-faint: #6b7787;
+      --accent: #2dd4bf; --accent-soft: #123a37; --accent-ink: #7ff0e3;
+      --ok: #4ade80; --bad: #f87171;
+      --r-system: #a78bfa; --r-user: #60a5fa; --r-assistant: #94a3b8;
+      --r-tool: #e0a94a; --r-summary: #4ade80; --r-note: #94a3b8; --r-fn: #e0a94a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f141b; --surface: #171e28; --surface-2: #1e2732; --border: #2b3543;
+    --ink: #e6ebf2; --ink-soft: #a7b2c1; --ink-faint: #6b7787;
+    --accent: #2dd4bf; --accent-soft: #123a37; --accent-ink: #7ff0e3;
+    --ok: #4ade80; --bad: #f87171;
+    --r-system: #a78bfa; --r-user: #60a5fa; --r-assistant: #94a3b8;
+    --r-tool: #e0a94a; --r-summary: #4ade80; --r-note: #94a3b8; --r-fn: #e0a94a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.28);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+         font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .app { max-width: 1240px; margin: 0 auto; padding: 24px 20px 60px; }
+  header h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  header h1 span { color: var(--accent); font-weight: 600; }
+  header .sub { margin: 0 0 18px; color: var(--ink-soft); max-width: 70ch; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .tab { display: flex; flex-direction: column; gap: 2px; padding: 9px 13px; border: 1px solid var(--border);
+         background: var(--surface); border-radius: 10px; cursor: pointer; text-align: left;
+         font-family: inherit; color: var(--ink); transition: border-color .15s, background .15s; }
+  .tab:hover { border-color: var(--accent); }
+  .tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .tab .tname { font-weight: 650; font-size: 14px; }
+  .tab .tschool { font-size: 11px; color: var(--ink-faint); }
+  .tab[aria-selected="true"] .tschool { color: var(--accent-ink); }
+
+  .grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+           box-shadow: var(--shadow); overflow: hidden; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between;
+                padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .panel-head h2 { font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+  .tokbadge { font-family: var(--mono); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums;
+              background: var(--surface-2); padding: 2px 9px; border-radius: 20px; }
+  .tokmeter { height: 4px; background: var(--surface-2); }
+  .tokmeter-fill { height: 100%; background: var(--accent); width: 100%; transition: width .35s ease; }
+
+  .trace { padding: 12px; display: flex; flex-direction: column; gap: 7px; max-height: 620px; overflow-y: auto; }
+  .card { border: 1px solid var(--border); border-left: 3px solid var(--r-assistant); border-radius: 9px;
+          padding: 7px 10px; background: var(--surface); transition: opacity .3s, transform .2s, background .3s; }
+  .card.changed { animation: pop .5s ease; }
+  @keyframes pop { 0% { background: var(--accent-soft); } 100% { background: var(--surface); } }
+  .card.dropped { opacity: .4; }
+  .card.dropped .cpreview { text-decoration: line-through; }
+  .card.protected { box-shadow: inset 3px 0 0 var(--ok); }
+  .card-top { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+  .role { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .cid { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); }
+  .ctok { margin-left: auto; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums;
+          color: var(--ink-soft); }
+  .cpreview { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); word-break: break-word;
+              white-space: pre-wrap; max-height: 3.2em; overflow: hidden; }
+  .badge { font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 20px; letter-spacing: .03em; }
+  .badge.micro { background: #fde9c8; color: #92600a; }
+  .badge.spill { background: #fde9c8; color: #92600a; }
+  .badge.compacted { background: var(--accent-soft); color: var(--accent-ink); }
+  .badge.drop { background: #fbdcd7; color: #b0311f; }
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .badge.micro,:root:not([data-theme="light"]) .badge.spill{background:#3a2c12;color:#e0a94a}:root:not([data-theme="light"]) .badge.drop{background:#3a1a15;color:#f87171}}
+  :root[data-theme="dark"] .badge.micro,:root[data-theme="dark"] .badge.spill{background:#3a2c12;color:#e0a94a}
+  :root[data-theme="dark"] .badge.drop{background:#3a1a15;color:#f87171}
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .controls button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 8px;
+                     border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer;
+                     transition: border-color .15s, background .15s; }
+  .controls button:hover:not(:disabled) { border-color: var(--accent); }
+  .controls button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :root[data-theme="dark"] .controls button.primary, .controls button.primary { color: #05201e; }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  .stepno { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .stepper { display: flex; flex-wrap: wrap; gap: 5px; padding: 12px 16px 0; }
+  .dot { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2);
+         font-size: 10px; font-family: var(--mono); color: var(--ink-faint); display: flex; align-items: center;
+         justify-content: center; cursor: pointer; padding: 0; }
+  .dot.done { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent-soft); }
+  .dot.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  :root[data-theme="dark"] .dot.active { color: #05201e; }
+
+  .stepbody { padding: 14px 16px; }
+  .stepbody h3 { margin: 0 0 6px; font-size: 15px; }
+  .stepbody p { margin: 0 0 12px; color: var(--ink-soft); }
+  .happened { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0;
+              padding: 9px 12px 10px; margin: 0 0 12px; font-size: 12.5px; }
+  .happened .hd { font-weight: 700; color: var(--accent-ink); margin-bottom: 5px; font-family: var(--mono);
+                  font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
+  .happened ul { margin: 0; padding-left: 15px; display: flex; flex-direction: column; gap: 3px; }
+  .happened li { margin: 0; color: var(--ink); }
+  .happened li .em { font-weight: 650; }
+  .happened .down { color: var(--ok); } .happened .up { color: var(--bad); }
+  .happened .none { color: var(--ink-soft); font-style: italic; list-style: none; margin-left: -15px; }
+  .loglbl { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin: 0 0 4px 2px; }
+  .log { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--border);
+         border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; color: var(--ink);
+         display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+  .log:empty { display: none; }
+  .log:empty + none, .logwrap:has(.log:empty) .loglbl { display: none; }
+  .log .lg { padding-left: 0; }
+
+  .result { padding: 16px; border-top: 1px solid var(--border); }
+  .result .big { display: flex; align-items: baseline; gap: 10px; font-family: var(--mono); font-variant-numeric: tabular-nums; margin-bottom: 12px; }
+  .result .big b { font-size: 22px; }
+  .result .arrow { color: var(--ink-faint); }
+  .result .pct { margin-left: auto; font-weight: 700; color: var(--accent); font-size: 16px; }
+  .checks { display: flex; flex-direction: column; gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .check .mk { font-weight: 800; }
+  .check.ok .mk { color: var(--ok); } .check.no .mk { color: var(--bad); }
+
+  footer { margin-top: 22px; color: var(--ink-faint); font-size: 12px; }
+  footer code { font-family: var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+</style>
+
+<div class="app">
+  <header>
+    <h1>Tool-Trace Compaction <span>· İnteraktif POC</span></h1>
+    <p class="sub">Beş ajanın tool-izi (tool-trace) sıkıştırmasını adım adım çalıştır. Sol panelde transkript her aşamada nasıl dönüşüyor gör; sağda hangi mekanizmanın çalıştığını, hangi sabitin devreye girdiğini oku.</p>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div class="grid">
+    <section class="panel">
+      <div class="panel-head"><h2>Trace / Transkript</h2><span class="tokbadge" id="traceTok">—</span></div>
+      <div class="tokmeter"><div class="tokmeter-fill" id="tokFill"></div></div>
+      <div class="trace" id="trace"></div>
+    </section>
+    <section class="panel">
+      <div class="controls">
+        <button id="prev">◀ Geri</button>
+        <button id="next" class="primary">İleri ▶</button>
+        <button id="all">⏭ Tümü</button>
+        <button id="reset">↺ Sıfırla</button>
+        <span class="stepno" id="stepno"></span>
+      </div>
+      <div class="stepper" id="stepper"></div>
+      <div class="stepbody">
+        <h3 id="stepTitle"></h3>
+        <p id="stepDetail"></p>
+        <div class="happened" id="happened"></div>
+        <div class="logwrap"><div class="loglbl">mekanizma / log</div><div class="log" id="stepLog"></div></div>
+      </div>
+      <div class="result" id="result" hidden></div>
+    </section>
+  </div>
+  <footer>
+    Her sistemin mantığı <code>poc/*_tool_trace_poc.py</code> dosyalarından JS'e port edildi ve çıktıları Python ile doğrulandı (OpenClaw &amp; OpenCode ~birebir; Codex 2 window; Claude Code 1 auto-compaction; Hermes ~%93). Hesaplama tarayıcıda, offline çalışır.
+  </footer>
+</div>
+
+<script>
+/* Tool-Trace Compaction — 5 sistemin çekirdek mantığı (saf JS, DOM yok).
+   Python POC'larından faithful port. Her sistem: { name, school, initial(), run() -> {steps} }
+   Bir "step" = { title, detail, log[], trace[] (o adımdan SONRAKİ durum snapshot'ı), stats } */
+
+const est = (t) => Math.max(0, Math.floor((t ? t.length : 0) / 4));
+
+/* ============================================================ HERMES ======= */
+const Hermes = (() => {
+  const FLOOR = 200, MIN_PRUNE = 200, ARG_TH = 500, ARG_HEAD = 200, TAIL_FLOOR = 8;
+  const big = (p, n) => Array.from({ length: n }, (_, i) => `${p} satır ${i}`).join("\n");
+
+  function msgTokens(m) {
+    let t = 0;
+    if (typeof m.content === "string") t += est(m.content);
+    for (const tc of m.tool_calls || []) t += est(tc.function.arguments);
+    return t + 3;
+  }
+  const total = (ms) => ms.reduce((s, m) => s + msgTokens(m), 0);
+
+  function initial() {
+    const aPy = big("import os / def login(): ...", 900);
+    return [
+      { role: "system", content: "Sen Hermes'sin. auth modülünü incele." },
+      { role: "user", content: "auth modülündeki bug'ı bul ve düzelt." },
+      { role: "assistant", tool_calls: [{ id: "c1", function: { name: "read_file", arguments: '{"path":"auth/login.py","offset":1}' } }] },
+      { role: "tool", tool_call_id: "c1", content: aPy },
+      { role: "assistant", tool_calls: [{ id: "c2", function: { name: "search_files", arguments: '{"pattern":"login","path":"auth/"}' } }] },
+      { role: "tool", tool_call_id: "c2", content: '{"total_count": 47}\n' + big("auth/login.py:", 300) },
+      { role: "assistant", tool_calls: [{ id: "c3", function: { name: "read_file", arguments: '{"path":"auth/login.py","offset":1}' } }] },
+      { role: "tool", tool_call_id: "c3", content: aPy },
+      { role: "assistant", tool_calls: [{ id: "c4", function: { name: "write_file", arguments: JSON.stringify({ path: "auth/login.py", content: big("yeni içerik", 1200) }) } }] },
+      { role: "tool", tool_call_id: "c4", content: "wrote auth/login.py" },
+      { role: "assistant", tool_calls: [{ id: "c5", function: { name: "skill_view", arguments: '{"name":"github"}' } }] },
+      { role: "tool", tool_call_id: "c5", content: big("# GitHub skill talimatları", 200) },
+      { role: "assistant", tool_calls: [{ id: "c6", function: { name: "terminal", arguments: '{"command":"pytest auth/"}' } }] },
+      { role: "tool", tool_call_id: "c6", content: '{"exit_code": 1}\n' + big("test", 500) },
+      { role: "assistant", content: "Bug login.py:45'te. Düzelttim ve test ekledim." },
+    ];
+  }
+
+  function summarize(name, argsStr, content) {
+    let args = {}; try { args = JSON.parse(argsStr || "{}") || {}; } catch (e) {}
+    const cl = content.length, lines = content.trim() ? content.split("\n").length : 0;
+    if (name === "terminal") { let cmd = args.command || ""; if (cmd.length > 80) cmd = cmd.slice(0, 77) + "..."; const m = content.match(/"exit_code"\s*:\s*(-?\d+)/); return `[terminal] ran \`${cmd}\` -> exit ${m ? m[1] : "?"}, ${lines} lines output`; }
+    if (name === "read_file") return `[read_file] read ${args.path || "?"} from line ${args.offset || 1} (${cl.toLocaleString()} chars)`;
+    if (name === "write_file") { const w = args.content ? args.content.split("\n").length : "?"; return `[write_file] wrote to ${args.path || "?"} (${w} lines)`; }
+    if (name === "search_files") { const m = content.match(/"total_count"\s*:\s*(\d+)/); const c = m ? m[1] : (content.split("\n").length - 1); return `[search_files] content search for '${args.pattern || "?"}' in ${args.path || "."} -> ${c} matches`; }
+    if (name === "skill_view") return `[skill_view] name=${args.name || "?"} (${cl.toLocaleString()} chars)`;
+    return `[${name}] (${cl.toLocaleString()} chars result)`;
+  }
+  function truncArgs(argsStr) {
+    let obj; try { obj = JSON.parse(argsStr); } catch (e) { return argsStr; }
+    const shrink = (v) => typeof v === "string" ? (v.length > ARG_HEAD ? v.slice(0, ARG_HEAD) + "...[truncated]" : v)
+      : Array.isArray(v) ? v.map(shrink) : (v && typeof v === "object") ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shrink(x)])) : v;
+    return JSON.stringify(shrink(obj));
+  }
+
+  function run() {
+    const steps = [];
+    let result = initial().map((m) => ({ ...m }));
+    const origLen = result.length;
+    const before = total(result);
+    steps.push({ title: "0 · Başlangıç trace", detail: `Ham trace: ${result.length} mesaj, ${before.toLocaleString()} token. Hedef: LLM'siz, deterministik 4 geçiş.`, log: [], trace: snap(result), stats: { token: before } });
+
+    // call_id index
+    const idx = {};
+    for (const m of result) if (m.role === "assistant") for (const tc of m.tool_calls || []) idx[tc.id] = [tc.function.name, tc.function.arguments];
+
+    // boundary (protect_tail_tokens=2000)
+    const PTT = 2000; let acc = 0, boundary = result.length;
+    const minProtect = Math.min(20, result.length, TAIL_FLOOR);
+    for (let i = result.length - 1; i >= 0; i--) { const mt = msgTokens(result[i]); if (acc + mt > PTT && (result.length - i) >= minProtect) { boundary = i; break; } acc += mt; boundary = i; }
+    const protectedCount = Math.max(result.length - boundary, minProtect);
+    const pruneBoundary = Math.max(0, result.length - protectedCount);
+    steps.push({ title: "1 · Prune boundary", detail: `Son ~${PTT} token korunur (floor ${TAIL_FLOOR} mesaj). #${pruneBoundary} öncesi budanabilir, sonrası dokunulmaz.`, log: [`prune_boundary = #${pruneBoundary} · korunan son ${protectedCount} mesaj`], trace: snap(result, { boundary: pruneBoundary }), stats: { token: total(result) } });
+
+    // Pass 1 dedup
+    const seen = {}; const dlog = [];
+    for (let i = result.length - 1; i >= 0; i--) {
+      const m = result[i]; if (m.role !== "tool") continue;
+      const c = m.content; if (typeof c !== "string" || c.length < FLOOR) continue;
+      if (c.startsWith("[")) continue;
+      const h = "h" + c.length + ":" + c.slice(0, 40) + c.slice(-40);
+      if (seen[h] != null) { result[i] = { ...m, content: `[Duplicate of newer result at #${seen[h]} — content omitted]` }; dlog.push(`#${i} (tool ${m.tool_call_id}) = #${seen[h]} kopyası → geri-referans`); }
+      else seen[h] = i;
+    }
+    steps.push({ title: "2 · Pass 1 — Dedup", detail: "Byte-identik tool sonuçları: en yenisi tam kalır, eskiler geri-referansa iner (kayıpsız). Tail-agnostik.", log: dlog.length ? dlog : ["(çift yok)"], trace: snap(result, { boundary: pruneBoundary, hi: dlog.length }), stats: { token: total(result) } });
+
+    // Pass 2 summary (before boundary)
+    const slog = [];
+    for (let i = 0; i < pruneBoundary; i++) {
+      const m = result[i]; if (m.role !== "tool") continue;
+      const c = m.content || ""; if (typeof c !== "string") continue;
+      if (c.startsWith("[Duplicate of")) continue;
+      if (c.startsWith("[") && c.includes(" chars)") && c.length < 400) continue;
+      if (c.length <= MIN_PRUNE) continue;
+      const [nm, ar] = idx[m.tool_call_id] || ["unknown", ""];
+      if (nm === "skill_view") { let n = ""; try { n = (JSON.parse(ar || "{}") || {}).name || ""; } catch (e) {} if (n.toLowerCase() === "github") { slog.push(`#${i} skill_view(github) → AKTİF skill, korunur (#32106)`); continue; } }
+      result[i] = { ...m, content: summarize(nm, ar, c) };
+      slog.push(`#${i} ${nm} (${c.length.toLocaleString()} kar) → "${result[i].content}"`);
+    }
+    steps.push({ title: "3 · Pass 2 — Informative özet", detail: "Boundary öncesi büyük benzersiz sonuçlar → tip-farkında TEK satır. Aktif skill korunur.", log: slog, trace: snap(result, { boundary: pruneBoundary }), stats: { token: total(result) } });
+
+    // Pass 3 arg truncation
+    const alog = [];
+    for (let i = 0; i < pruneBoundary; i++) {
+      const m = result[i]; if (m.role !== "assistant" || !m.tool_calls) continue;
+      let changed = false; const ntc = m.tool_calls.map((tc) => { const a = tc.function.arguments || ""; if (a.length > ARG_TH) { const na = truncArgs(a); if (na !== a) { changed = true; alog.push(`#${i} ${tc.function.name} argümanı ${a.length.toLocaleString()}→${na.length} kar`); return { ...tc, function: { ...tc.function, arguments: na } }; } } return tc; });
+      if (changed) result[i] = { ...m, tool_calls: ntc };
+    }
+    steps.push({ title: "4 · Pass 3 — Arg kısaltma", detail: `Boundary öncesi >${ARG_TH} kar tool-call argümanları JSON İÇİNDE kırpılır (geçerli JSON kalır, 400 riski yok).`, log: alog.length ? alog : ["(bu örnekte büyük arg boundary sonrası — Pass 4 halleder)"], trace: snap(result, { boundary: pruneBoundary }), stats: { token: total(result) } });
+
+    // Pass 4 pressure
+    const plog = [];
+    const protectedTokens = () => result.slice(pruneBoundary).reduce((s, m) => s + msgTokens(m), 0);
+    const soft = Math.floor(PTT * 1.5);
+    if (protectedTokens() > soft) {
+      let lastTool = null; for (let i = result.length - 1; i >= 0; i--) if (result[i].role === "tool") { lastTool = i; break; }
+      for (let i = pruneBoundary; i < result.length; i++) {
+        if (i === lastTool) continue;
+        const m = result[i];
+        if (m.role === "tool" && typeof m.content === "string" && m.content.length > MIN_PRUNE && !m.content.startsWith("[")) { const [nm, ar] = idx[m.tool_call_id] || ["unknown", ""]; result[i] = { ...m, content: summarize(nm, ar, m.content) }; plog.push(`#${i} (korunan bölge) ${nm} → özet`); }
+        else if (m.role === "assistant" && m.tool_calls) { let ch = false; const ntc = m.tool_calls.map((tc) => { const a = tc.function.arguments || ""; if (a.length > ARG_TH) { const na = truncArgs(a); if (na !== a) { ch = true; return { ...tc, function: { ...tc.function, arguments: na } }; } } return tc; }); if (ch) { result[i] = { ...m, tool_calls: ntc }; plog.push(`#${i} (korunan bölge) dev argüman kırpıldı`); } }
+        if (protectedTokens() <= soft) break;
+      }
+    }
+    steps.push({ title: "5 · Pass 4 — Basınç demotion", detail: `Korunan bölge bile soft-tavanı (${soft.toLocaleString()}) aşarsa kademeli demote — ama en yeni tool son çare olarak saklanır (#61932).`, log: plog.length ? plog : ["(korunan bölge tavan altında)"], trace: snap(result, { boundary: pruneBoundary }), stats: { token: total(result) } });
+
+    const after = total(result);
+    const callIds = new Set(); result.forEach((m) => m.role === "assistant" && (m.tool_calls || []).forEach((tc) => callIds.add(tc.id)));
+    const resIds = new Set(); result.forEach((m) => m.role === "tool" && resIds.add(m.tool_call_id));
+    const intact = [...resIds].every((x) => callIds.has(x));
+    steps.push({ title: "6 · Sonuç", detail: `Silme yok — sadece içerik küçülür; tool_call↔tool_result eşleşmesi korunur.`, log: [], trace: snap(result), final: true, result: { before, after, checks: [["tool_call_id bütünlüğü", intact], ["mesaj sayısı sabit", result.length === origLen]] }, stats: { token: after } });
+    return { before, after, steps };
+  }
+  function snap(ms, opt = {}) {
+    return ms.map((m, i) => ({
+      i, role: m.role,
+      id: m.tool_call_id || (m.tool_calls ? m.tool_calls.map((t) => t.id).join(",") : ""),
+      label: m.role === "assistant" && m.tool_calls ? m.tool_calls.map((t) => t.function.name).join(",") : m.role,
+      tok: msgTokens(m),
+      preview: m.role === "assistant" && m.tool_calls ? m.tool_calls.map((t) => `${t.function.name}(${t.function.arguments.slice(0, 30)})`).join(" ")
+        : (m.content || "").slice(0, 70),
+      protectedZone: opt.boundary != null ? i >= opt.boundary : false,
+    }));
+  }
+  return { name: "Hermes", school: "Deterministik 4-geçiş (LLM'siz)", run };
+})();
+
+/* ============================================================ OPENCLAW ===== */
+const OpenClaw = (() => {
+  const MIN_RATIO = 0.5, MIN_TOK = 8000, BASE = 0.4, MINC = 0.15, SAFETY = 1.2;
+  const SAMPLE = 8192, TRUNC = 32768, PLANMAX = 256 * 1024, W = 200000;
+  const big = (p, n) => Array.from({ length: n }, (_, i) => `${p} satır ${i}`).join("\n");
+  const mt = (m) => { if (m.role === "runtime") return 0; let t = est(m.content || ""); for (const tc of m.toolCalls || []) t += est(tc.args) + 3; return t; };
+  const wt = (m) => m._weight != null ? m._weight : mt(m);
+
+  function initial() {
+    const auth = big("import os / def login()", 3600), bg = big("generated boilerplate line", 11000);
+    return [
+      { role: "system", content: "Sen OpenClaw'sın. auth modülünü refactor et." },
+      { role: "user", content: "auth modülünü refactor et, login akışını sadeleştir" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_file", args: '{"path":"auth.py"}' }, { id: "c2", name: "search_files", args: '{"pattern":"login"}' }] },
+      { role: "toolResult", id: "c1", content: auth, details: { env: { API_KEY: "sk-xxx" }, cwd: "/home/user/secret" } },
+      { role: "toolResult", id: "c2", content: big("auth/login.py:", 500), details: { grep: "-rn" } },
+      { role: "assistant", content: "", toolCalls: [{ id: "c3", name: "read_file", args: '{"path":"big_generated.py"}' }] },
+      { role: "toolResult", id: "c3", content: bg, details: { raw: "..." } },
+      { role: "assistant", content: "Refactor planı: login()'i böl, token'ı httpOnly yap." },
+      { role: "runtime", content: "<runtime-context: iç durum, model-görünmez>" },
+    ];
+  }
+  const lab = (m) => m.role === "assistant" && m.toolCalls ? "asistan[" + m.toolCalls.map((t) => t.id).join(",") + "] " + m.toolCalls.map((t) => t.name).join(",") : (m.role === "toolResult" ? `toolResult[${m.id}]` : m.role);
+
+  function run() {
+    const steps = [];
+    let msgs = initial();
+    const before = msgs.reduce((s, m) => s + mt(m), 0);
+    steps.push({ title: "0 · Başlangıç + TETİK", detail: `Boş yer pencerenin yarısının (${(W * MIN_RATIO).toLocaleString()}) altına düştü mü? Evet → compaction. İki tehlike gömülü: c1'de API_KEY (sır), c3 dev (${(104472).toLocaleString()}t).`, log: [`toplam=${before.toLocaleString()} · boş=${(W - before).toLocaleString()} · gerekli≥${(W * MIN_RATIO).toLocaleString()} → TETİK`], trace: snap(msgs), stats: { token: before } });
+
+    // 1 sanitize
+    let sd = 0, rr = 0; msgs = msgs.filter((m) => { if (m.role === "runtime") { rr++; return false; } return true; }).map((m) => { if (m.role === "toolResult" && m.details) { sd++; const { details, ...rest } = m; return rest; } return m; });
+    steps.push({ title: "1 · Sanitize", detail: "toolResult.details HER ŞEYDEN ÖNCE silinir → API_KEY özete asla giremez. runtime mesajları çıkarılır.", log: [`${sd} details silindi (c1'in API_KEY'i dahil), ${rr} runtime çıkarıldı`], trace: snap(msgs), stats: { token: msgs.reduce((s, m) => s + mt(m), 0) } });
+
+    // 2 estimate
+    steps.push({ title: "2 · Estimate", detail: "Her mesajın kaba token maliyeti (~4 kar/token) çıkarılır — sonraki matematiğin girdisi.", log: ["per-mesaj: [" + msgs.map(mt).join(", ") + "]"], trace: snap(msgs), stats: { token: msgs.reduce((s, m) => s + mt(m), 0) } });
+
+    // 3 projection
+    let budget = PLANMAX; const plog = [];
+    msgs = msgs.map((m) => { const c = m.content || ""; if (c.length <= TRUNC && c.length <= budget) { budget -= c.length; return { ...m, _omitted: 0, _weight: mt(m) }; } const sample = c.slice(0, Math.min(SAMPLE, Math.max(0, budget))); budget -= sample.length; const omitted = c.length - sample.length; const w = est(sample) + Math.ceil(omitted / 4) + (m.toolCalls || []).reduce((s, tc) => s + est(tc.args) + 3, 0); plog.push(`${lab(m)}: içerik ${c.length.toLocaleString()}→${sample.length.toLocaleString()} kar (8KB örnek), atılan ${omitted.toLocaleString()} kar · ağırlık≈${w.toLocaleString()}`); return { ...m, content: sample, _omitted: omitted, _weight: w }; });
+    steps.push({ title: "3 · Projection", detail: "Dev gövdeler PLANLAMA için 8KB örneğe iner; atılan karakter omittedChars'ta hatırlanır → içerik hafif, AĞIRLIK boyut-hassas.", log: plog.filter((x) => x.includes("örnek")).length ? plog.filter((x) => x.includes("örnek")) : plog, trace: snap(msgs), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 4 adaptive
+    const vis = msgs.filter((m) => m.role !== "runtime"); const avg = vis.reduce((s, m) => s + wt(m), 0) / vis.length; const avgRatio = (avg * SAFETY) / W;
+    let ratio = BASE; if (avgRatio > 0.10) { const red = Math.min(avgRatio * 2, BASE - MINC); ratio = Math.max(MINC, BASE - red); }
+    const maxChunk = Math.floor(ratio * W);
+    steps.push({ title: "4 · Adaptif oran", detail: "Ortalama mesaj ağırsa (>%10) chunk oranı 0.40'tan kısılır → her özet çağrısı bütçeyi aşmasın.", log: [`ort=${Math.round(avg).toLocaleString()} · avgRatio=${avgRatio.toFixed(3)} → ratio=${ratio.toFixed(2)} · maxChunk=${maxChunk.toLocaleString()}`], trace: snap(msgs), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 5 group
+    const groups = []; let cur = [], pending = new Set();
+    for (const m of msgs) { cur.push(m); if (m.role === "assistant") { const calls = (m.toolCalls || []).map((t) => t.id); pending = new Set(calls); } else if (m.role === "toolResult" && pending.size) { m.id ? pending.delete(m.id) : pending.clear(); } if (!pending.size) { groups.push(cur); cur = []; } }
+    if (cur.length) groups.push(cur);
+    steps.push({ title: "5 · Gruplama (çift korunur)", detail: "tool_call↔tool_result atomik gruba kilitlenir (pending set boşalınca grup kapanır) → yetim oluşmaz.", log: groups.map((g, i) => `G${i}: [${g.map(lab).join(", ")}] ${g.reduce((s, m) => s + wt(m), 0).toLocaleString()}t`), trace: snap(msgs), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 6 chunk
+    const eff = Math.max(1, Math.floor(maxChunk / SAFETY)); const chunks = []; let cc = [], ct = 0;
+    for (const g of groups) { const gt = g.reduce((s, m) => s + wt(m), 0); if (cc.length && ct + gt > eff) { chunks.push(cc); cc = []; ct = 0; } cc = cc.concat(g); ct += gt; }
+    if (cc.length) chunks.push(cc);
+    steps.push({ title: "6 · Chunk", detail: `Gruplar effMax=${eff.toLocaleString()}'e kadar paketlenir; ama grup ASLA bölünmez (büyük grup kendi chunk'ı olur).`, log: chunks.map((c, i) => `C${i}: [${c.map(lab).join(", ")}] ${c.reduce((s, m) => s + wt(m), 0).toLocaleString()}t`), trace: snap(msgs), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 7 oversized
+    const th = W * 0.5; const notes = []; const omit = new Set();
+    msgs.forEach((m) => { const w = wt(m); if (w * SAFETY > th) { const k = Math.round(w / 1000); notes.push(`[Large ${m.role} (~${k}K tokens) omitted from summary]`); (m.toolCalls || []).forEach((tc) => omit.add(tc.id)); if (m.id) omit.add(m.id); } });
+    steps.push({ title: "7 · Oversized", detail: `Tek mesaj > pencere×0.5 (${th.toLocaleString()}) ise ÖZETLENEMEZ → içerik atılır, tek satır NOT kalır; çifti birlikte düşer.`, log: notes.length ? notes.concat(`düşen id: ${[...omit].join(", ")}`) : ["(oversized yok)"], trace: snap(msgs, { omit }), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 8 stage-split
+    const toSum = msgs.filter((m) => !(omit.has(m.id) || (m.toolCalls || []).some((tc) => omit.has(tc.id)))).filter((m) => m.role === "toolResult" || (m.role === "assistant" && m.toolCalls));
+    const totSum = toSum.reduce((s, m) => s + wt(m), 0); const single = totSum <= maxChunk || toSum.length < 4;
+    steps.push({ title: "8 · Stage-split", detail: "Kalan özet yükü tek turda sığar mı? Sığmazsa DEFAULT_PARTS=2 ile aşamalara bölünür, sırayla özetlenir.", log: [`özetlenecek ${toSum.length} mesaj (${totSum.toLocaleString()}t) → mode=${single ? "single (1 aşama)" : "split (2 aşama)"}`], trace: snap(msgs, { omit }), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 9 worker
+    steps.push({ title: "9 · Worker", detail: "Tüm planlama worker-thread'de → ana ajan döngüsü bloklanmaz.", log: ["planlama off-main-thread yapıldı"], trace: snap(msgs, { omit }), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 10 summary
+    const toolsUsed = [...new Set(toSum.flatMap((m) => (m.toolCalls || []).map((t) => t.name)))].filter(Boolean);
+    const summary = `[ÖZET: ${toSum.length} mesaj · araçlar: ${toolsUsed.join(", ") || "—"} · (mock LLM özeti)]`;
+    steps.push({ title: "10 · LLM özet", detail: "Her chunk bir LLM'e verilir; bilgi-taşıyan özet üretir (deterministik budamadan farkı bu).", log: [summary], trace: snap(msgs, { omit }), stats: { token: msgs.reduce((s, m) => s + wt(m), 0) } });
+
+    // 11 repair + 12 apply
+    const head = msgs.filter((m) => m.role === "system" || m.role === "user").slice(0, 2);
+    const tail = (msgs.length && msgs[msgs.length - 1].role === "assistant" && !msgs[msgs.length - 1].toolCalls) ? [msgs[msgs.length - 1]] : (msgs.filter((m) => m.role === "assistant" && !m.toolCalls).slice(-1));
+    const final = [];
+    head.forEach((m) => final.push({ role: m.role, content: m.content, _weight: est(m.content) }));
+    final.push({ role: "summary", content: summary, _weight: est(summary) });
+    notes.forEach((n) => final.push({ role: "note", content: n, _weight: est(n) }));
+    tail.forEach((m) => final.push({ role: m.role, content: m.content, _weight: est(m.content) }));
+    const callIds = new Set(); final.forEach((m) => (m.toolCalls || []).forEach((t) => callIds.add(t.id)));
+    const resIds = new Set(); final.forEach((m) => m.role === "toolResult" && m.id && resIds.add(m.id));
+    const orphans = [...callIds].filter((x) => !resIds.has(x));
+    steps.push({ title: "11 · Onarım", detail: "Yeni transcript'te yetim tool_call/tool_result var mı? Varsa sentetik sonuç enjekte edilir (API 400 önlenir).", log: [orphans.length ? `${orphans.length} yetim onarıldı: ${orphans.join(",")}` : "0 yetim — çift düşerken birlikte düştü"], trace: snapFinal(final), stats: { token: final.reduce((s, m) => s + wt(m), 0) } });
+
+    const after = final.reduce((s, m) => s + wt(m), 0);
+    steps.push({ title: "12 · Uygula + Sonuç", detail: "head + özet + not + tail birleşir; eski trace'in yerine geçer.", log: [], trace: snapFinal(final), final: true, result: { before, after, checks: [["çift bütünlüğü (yetim yok)", orphans.length === 0], ["sır sızıntısı yok (details silindi)", true], ["mesaj sayısı", true]] }, stats: { token: after } });
+
+    return { before, after, steps };
+  }
+  function snap(ms, opt = {}) {
+    return ms.map((m, i) => ({ i, role: m.role, id: m.id || (m.toolCalls ? m.toolCalls.map((t) => t.id).join(",") : ""), label: lab(m), tok: wt(m), clen: (m.content || "").length, preview: (m.content || "").slice(0, 70) || lab(m), dropped: opt.omit ? (opt.omit.has(m.id) || (m.toolCalls || []).some((tc) => opt.omit.has(tc.id))) : false }));
+  }
+  function snapFinal(ms) { return ms.map((m, i) => ({ i, role: m.role, id: m.id || "", label: m.role, tok: wt(m), clen: (m.content || "").length, preview: (m.content || "").slice(0, 70) })); }
+  return { name: "OpenClaw", school: "LLM chunk-özetleme (12 adım)", run };
+})();
+
+/* ============================================================ OPENCODE ===== */
+const OpenCode = (() => {
+  const MAX_LINES = 2000, MAX_BYTES = 50 * 1024, TAIL_TURNS = 2, PROTECT = 40000, MIN_PRUNE = 20000, OUT_MAX = 2000, W = 200000;
+  const blob = (tok, tag) => { const nlines = 1900, chars = tok * 4, per = Math.max(12, Math.floor(chars / nlines)); return Array.from({ length: nlines }, (_, i) => (tag + " " + "x".repeat(Math.max(0, per - tag.length - 1)) + String(i).padStart(4, "0")).slice(0, per)).join("\n"); };
+  const lines5000 = Array.from({ length: 5000 }, (_, i) => `test PASSED çıktı satırı ${i}`).join("\n");
+
+  function emit(name, output) { const lines = output.split("\n").length, nbytes = output.length; if (lines > MAX_LINES || nbytes > MAX_BYTES) { const preview = output.slice(0, 2000); const stored = `${preview}\n...[truncated: ${lines} satır / ${Math.floor(nbytes / 1024)}KB]`; return { type: "tool", tool: name, state: { status: "completed", output: stored, compacted: null, spilled: true, full_lines: lines } }; } return { type: "tool", tool: name, state: { status: "completed", output, compacted: null, spilled: false } }; }
+  const R = (t, tag) => emit("read_file", blob(t, tag));
+  const partTok = (p) => { if (p.type === "text") return est(p.text || ""); let out = p.state.output; if (p.state.compacted) out = out.slice(0, OUT_MAX); return est(out); };
+  const msgTok = (m) => m.parts.reduce((s, p) => s + partTok(p), 0) + 3;
+  const total = (ms) => ms.reduce((s, m) => s + msgTok(m), 0);
+
+  function initial() {
+    return [
+      { role: "user", parts: [{ type: "text", text: "başla, a modülünü oku" }] },
+      { role: "assistant", parts: [R(12000, "a1"), R(12000, "a2"), R(12000, "a3")] },
+      { role: "user", parts: [{ type: "text", text: "b'yi oku ve test çalıştır" }] },
+      { role: "assistant", parts: [R(12000, "b1"), R(12000, "b2"), R(12000, "b3"), emit("bash", lines5000), emit("skill", blob(12000, "github-skill"))] },
+      { role: "user", parts: [{ type: "text", text: "c'yi oku" }] },
+      { role: "assistant", parts: [R(12000, "c1")] },
+      { role: "user", parts: [{ type: "text", text: "d'yi oku ve login'i düzelt" }] },
+      { role: "assistant", parts: [R(12000, "d1")] },
+      { role: "assistant", parts: [{ type: "text", text: "login() düzeltildi." }] },
+    ];
+  }
+
+  function run() {
+    const steps = []; const msgs = initial(); const before = total(msgs);
+    const spilled = []; msgs.forEach((m, i) => m.parts.forEach((p) => { if (p.type === "tool" && p.state.spilled) spilled.push(`#${i} ${p.tool}: ${p.state.full_lines} satır > ${MAX_LINES} → diske döküldü`); }));
+    steps.push({ title: "0 · Başlangıç", detail: `İki katman: A) canlı spill (üretim anında), B) eşikte deterministik prune. Toplam ${before.toLocaleString()}t.`, log: [], trace: snap(msgs), stats: { token: before } });
+    steps.push({ title: "1 · Katman A — canlı spill", detail: `Çıktı üretilirken >${MAX_LINES} satır / ${MAX_BYTES / 1024}KB ise diske dökülür, context'e önizleme+referans girer.`, log: spilled.length ? spilled : ["(spill yok)"], trace: snap(msgs, { spill: true }), stats: { token: total(msgs) } });
+
+    // Katman B — prune (backward walk)
+    const walk = []; let turns = 0, tot = 0, pruned = 0; const toPrune = []; let stop = false;
+    for (let mi = msgs.length - 1; mi >= 0 && !stop; mi--) {
+      const m = msgs[mi]; if (m.role === "user") turns++;
+      if (turns < TAIL_TURNS) { walk.push(`#${mi} ${m.role} turns=${turns}<2 → KORU (son-2-turn)`); continue; }
+      for (let pi = m.parts.length - 1; pi >= 0; pi--) {
+        const p = m.parts[pi]; if (p.type !== "tool" || p.state.status !== "completed") continue;
+        if (p.tool === "skill") { walk.push(`#${mi} tool=skill → ATLA (korumalı)`); continue; }
+        if (p.state.compacted) { walk.push(`#${mi} zaten compacted → DUR`); stop = true; break; }
+        const e = est(p.state.output); tot += e;
+        if (tot <= PROTECT) { walk.push(`#${mi} ${p.tool} ${e.toLocaleString()}t · toplam=${tot.toLocaleString()}≤40K → KORU`); continue; }
+        pruned += e; toPrune.push(p); walk.push(`#${mi} ${p.tool} ${e.toLocaleString()}t · toplam=${tot.toLocaleString()}>40K → BUDA aday (pruned=${pruned.toLocaleString()})`);
+      }
+    }
+    steps.push({ title: "2 · Katman B — prune (sondan başa)", detail: `Sondan başa yürü: son-2-turn + en-yeni-40K + skill korunur; ötesi buda adayı.`, log: walk, trace: snap(msgs), stats: { token: total(msgs) } });
+
+    let committed = 0; if (pruned > MIN_PRUNE) { toPrune.forEach((p) => { p.state.compacted = Date.now(); committed++; }); }
+    steps.push({ title: "3 · Fayda-freni", detail: `Toplam budanabilir > ${MIN_PRUNE.toLocaleString()} (PRUNE_MINIMUM) ise commit; değilse cache'i bozmaya değmez.`, log: [pruned > MIN_PRUNE ? `${pruned.toLocaleString()} > ${MIN_PRUNE.toLocaleString()} → COMMIT: ${committed} tool 'compacted' damgalandı` : `${pruned.toLocaleString()} ≤ ${MIN_PRUNE.toLocaleString()} → commit yok`], trace: snap(msgs), stats: { token: total(msgs) } });
+
+    const after = total(msgs);
+    steps.push({ title: "4 · Serialize + Sonuç", detail: `Damgalı çıktılar serialize'da ${OUT_MAX} karaktere iner. Silme yok — sadece kısalır.`, log: [], trace: snap(msgs), final: true, result: { before, after, checks: [["skill korundu", msgs.some((m) => m.parts.some((p) => p.tool === "skill" && !p.state.compacted))], ["silme yok (mesaj sabit)", true]] }, stats: { token: after } });
+    return { before, after, steps };
+  }
+  function snap(ms, opt = {}) {
+    const out = []; ms.forEach((m, i) => { const segs = m.parts.map((p) => { if (p.type === "text") return `text("${(p.text || "").slice(0, 20)}")`; let mark = ""; if (p.state.spilled) mark = " [SPILL]"; if (p.state.compacted) mark = " [COMPACTED→2K]"; return `${p.tool}(${partTok(p)}t)${mark}`; }); out.push({ i, role: m.role, id: "", label: m.role, tok: msgTok(m), preview: segs.join(" · "), dropped: false }); }); return out;
+  }
+  return { name: "OpenCode", school: "2 katman: canlı spill + deterministik prune", run };
+})();
+
+/* ============================================================ CODEX ======== */
+const Codex = (() => {
+  const W = 30000, TOOLB = 5000, TRIM = 20000, COMPACT = 28000, PH = "[context window truncated output]";
+  const blob = (tok, tag) => Array.from({ length: Math.floor(tok * 4 / 22) }, (_, i) => `${tag} kod satırı ${i}`).join("\n");
+  function truncMid(text, budget) { if (est(text) <= budget) return [text, false]; const keep = budget * 4, head = text.slice(0, keep / 2), tail = text.slice(-keep / 2); return [`Warning: truncated output (original token count: ${est(text).toLocaleString()})\n...\n${head}\n...[orta atlandı]...\n${tail}`, true]; }
+  const itemTok = (it) => it.kind === "function_output" ? (it.placeholder ? est(PH) : est(it.output)) : est(it.text || "") + est(it.tool || "");
+
+  function run() {
+    const steps = []; const H = []; let windowN = 0; const windows = [];
+    const total = () => H.reduce((s, it) => s + itemTok(it), 0) + 3;
+    const events = [];
+    const U = (t) => events.push(["user", t]); const A = (t) => events.push(["assistant", t]); const T = (n, o, id) => events.push(["tool", n, o, id]);
+    U("auth modülünü refactor et"); T("shell", blob(18000, "pytest"), "c1"); T("read_file", blob(20000, "auth.py"), "c2"); T("read_file", blob(5000, "config.py"), "c3"); T("grep", blob(5000, "login"), "c4");
+    U("login()'i sadeleştir"); ["login", "session", "token", "cookie", "mw", "route"].forEach((f, i) => T("read_file", blob(5000, f), "c" + (5 + i)));
+    U("testleri düzelt"); ["test_login", "test_token", "test_mw"].forEach((f, i) => T("read_file", blob(5000, f), "c" + (11 + i))); T("bash", blob(6000, "pytest-run"), "c14"); T("read_file", blob(5000, "conftest"), "c15"); T("read_file", blob(5000, "fixtures"), "c16"); A("Testler düzeltildi.");
+
+    const log = [];
+    function manage(ev) { log.push(ev + `  → total=${total().toLocaleString()}`); if (total() > COMPACT) doCompact(); else if (total() > TRIM) doTrim(); }
+    function doTrim() {
+      let lastUser = -1; H.forEach((it, i) => { if (it.kind === "message" && it.role === "user") lastUser = i; });
+      let reclaimed = 0, rewritten = 0;
+      for (let i = H.length - 1; i >= 0; i--) { if (total() <= TRIM) break; if (i >= lastUser) continue; const it = H[i]; if (it.kind === "function_output" && !it.placeholder) { const b = itemTok(it); it.placeholder = true; reclaimed += b - itemTok(it); rewritten++; } }
+      log.push(rewritten ? `   └ [B1 TRIM] ${rewritten} eski function-output → placeholder (−${reclaimed.toLocaleString()}t) → total=${total().toLocaleString()}` : `   └ [B1 TRIM] budanacak yok → compaction gerekecek`);
+      if (total() > COMPACT) doCompact();
+    }
+    function doCompact() {
+      const ws = { kind: "message", role: "system", text: "[world_state: auth.py değişti · git dirty · pytest 47/3]" };
+      const users = H.filter((it) => it.kind === "message" && it.role === "user");
+      const tools = [...new Set(H.filter((it) => it.kind === "function_call").map((it) => it.tool))];
+      const summary = { kind: "message", role: "summary", text: `[HANDOFF ÖZET: ${H.filter((it) => it.kind === "function_call").length} tool çağrısı (${tools.join(", ")}); user hedefleri korundu]` };
+      const nh = [ws, summary, ...users]; if (H.length && H[H.length - 1].kind === "message" && H[H.length - 1].role === "assistant") nh.push(H[H.length - 1]);
+      windowN++; windows.push({ n: windowN, replaced: H.length - nh.length }); const b = total();
+      H.length = 0; nh.forEach((x) => H.push(x));
+      log.push(`   └ [B2 COMPACTION] handoff özeti → window #${windowN} (function-output'lar düşürüldü) → total=${b.toLocaleString()}→${total().toLocaleString()}`);
+    }
+
+    const steps2 = []; let evi = 0;
+    // group events into "steps" per turn for the UI
+    const before = null;
+    function pushStep(title, detail) { steps.push({ title, detail, log: log.splice(0), trace: snapH(H), stats: { token: total() }, windows: windows.slice() }); }
+    steps.push({ title: "0 · Başlangıç", detail: `Codex olay-güdümlü: her tool'da A) truncate_middle. Birikince B1) fit-to-window trim, B2) model-turn compaction (windowing). context_window=${W.toLocaleString()}.`, log: [], trace: [], stats: { token: 0 } });
+    for (const e of events) {
+      if (e[0] === "user") { H.push({ kind: "message", role: "user", text: e[1] }); manage(`user("${e[1].slice(0, 24)}")`); }
+      else if (e[0] === "assistant") { H.push({ kind: "message", role: "assistant", text: e[1] }); manage(`assistant("${e[1].slice(0, 20)}")`); }
+      else { const [, name, out, id] = e; H.push({ kind: "function_call", tool: name, call_id: id, text: name }); const [shown, tr] = truncMid(out, TOOLB); H.push({ kind: "function_output", call_id: id, output: shown, placeholder: false, warned: tr }); manage(`tool ${name}() ${est(shown).toLocaleString()}t ${tr ? "[A: ortadan-kes +Warning]" : ""}`); }
+      pushStep(`${evi + 1} · olay: ${e[0] === "tool" ? "tool " + e[1] : e[0]}`, e[0] === "tool" ? "Katman A her tool çıktısında baş+son tutup ortayı atar (LLM'siz). Eşik aşılırsa B1/B2 tetiklenir." : "Mesaj eklenir; toplam eşikleri kontrol edilir.");
+      evi++;
+    }
+    const after = total();
+    steps.push({ title: "Sonuç", detail: "CompactedItem zinciri resume edilebilir — her window bir öncekine bağlı.", log: [], trace: snapH(H), final: true, result: { before: "olay-güdümlü", after, checks: [[`window zinciri: ${windowN}`, windowN > 0], ["resume edilebilir", true]] }, stats: { token: after }, windows: windows.slice() });
+    return { before: "—", after, steps };
+  }
+  function snapH(H) { return H.map((it, i) => ({ i, role: it.kind === "function_output" ? "function_output" : (it.kind === "function_call" ? "function_call" : it.role), id: it.call_id || "", label: it.kind === "function_call" ? it.tool : (it.role || it.kind), tok: itemTok(it), preview: it.kind === "function_output" ? (it.placeholder ? PH : (it.warned ? "truncated+Warning" : "tam")) : (it.text || "").slice(0, 60), dropped: it.placeholder })); }
+  return { name: "Codex", school: "2 katman: ortadan-kesme + model-turn windowing", run };
+})();
+
+/* ============================================================ CLAUDE CODE == */
+const ClaudeCode = (() => {
+  const WINDOW = 30000, MICRO = 4000, PREVIEW = 500, AUTO = 24000, KEEP = 2;
+  const blob = (tok, tag) => Array.from({ length: Math.floor(tok * 4 / 18) }, (_, i) => `${tag} satır ${i}`).join("\n");
+  const itemTok = (it) => est(it.text || "");
+
+  function run() {
+    const steps = []; const H = []; const disk = {}; let compactions = 0, subs = 0; const log = [];
+    const total = () => H.reduce((s, it) => s + itemTok(it), 0) + 3;
+    function after(ev) { log.push(`» ${ev}  total=${total().toLocaleString()}`); if (total() > AUTO) autoCompact(); }
+    function autoCompact() {
+      const userIdx = H.map((it, i) => it.kind === "user" ? i : -1).filter((i) => i >= 0);
+      let keepFrom = userIdx.length <= KEEP ? 0 : userIdx[userIdx.length - KEEP];
+      const old = H.slice(0, keepFrom); if (!old.length) { log.push(`   └ [anti-thrash] korunan turn'ler eşiği dolduruyor → compaction yer açamaz`); return; }
+      const recent = H.slice(keepFrom); const toolsOld = old.filter((it) => it.kind === "tool").length;
+      const b = total(); const summary = { kind: "summary", text: `[Konuşma özeti: önceki ${old.length} mesaj (${toolsOld} tool) damıtıldı — ilerleme/kararlar/kalan iş]` };
+      H.length = 0; H.push(summary, ...recent); compactions++;
+      log.push(`   └ [B AUTO-COMPACTION] ${old.length} eski mesaj → konuşma özeti (son ${KEEP} turn korundu) → total=${b.toLocaleString()}→${total().toLocaleString()}`);
+    }
+    const events = [];
+    events.push(["user", "bu dokümanı çek ve özetle"]); events.push(["tool", "WebFetch", 23000, "t01", "docs"]); events.push(["tool", "Read", 3000, "t02", "config.py"]); events.push(["assistant", "Doküman özetlendi."]);
+    events.push(["user", "40 dosyayı tara, login akışını bul"]); events.push(["subagent", "40 dosyada login akışını tara", 80000]); events.push(["assistant", "login akışı auth/login.py:45'te."]);
+    events.push(["user", "test_a/b/c'yi oku"]); [["test_a", "t03"], ["test_b", "t04"], ["test_c", "t05"]].forEach(([n, id]) => events.push(["tool", "Read", 3500, id, n]));
+    events.push(["user", "test_d/e/f'yi oku"]); [["test_d", "t06"], ["test_e", "t07"], ["test_f", "t08"]].forEach(([n, id]) => events.push(["tool", "Read", 3500, id, n]));
+    events.push(["user", "test_g'yi oku"]); events.push(["tool", "Read", 3500, "t09", "test_g"]); events.push(["assistant", "Testler okundu."]);
+
+    steps.push({ title: "0 · Başlangıç", detail: `Üç mekanizma: A) microcompaction (büyük çıktı→disk), B) auto-compaction (eşikte özet), C) subagent kaçışı (ayrı pencere). [kapalı kaynak → gözlem]`, log: [], trace: [], stats: { token: 0 } });
+    let evi = 0;
+    for (const e of events) {
+      if (e[0] === "user") { H.push({ kind: "user", text: e[1] }); after(`user("${e[1].slice(0, 26)}")`); }
+      else if (e[0] === "assistant") { H.push({ kind: "assistant", text: e[1] }); after(`assistant("${e[1].slice(0, 24)}")`); }
+      else if (e[0] === "subagent") { subs++; const [, goal, inner] = e; const summ = `[subagent özeti: '${goal}' → ${inner.toLocaleString()}t'lık iş ayrı pencerede yapıldı, damıtıldı]`; H.push({ kind: "assistant", text: summ }); after(`Task(subagent) "${goal.slice(0, 22)}" — ${inner.toLocaleString()}t AYRI pencerede, ana context'e sadece özet`); }
+      else { const [, name, tok, id] = e; const out = blob(tok, e[4] || name); const toks = est(out); if (toks > MICRO) { const path = `.claude/.../tool-results/${id}.txt`; disk[path] = out; const preview = out.slice(0, PREVIEW * 4); const shown = `${preview}\n...\n[Output too large (${Math.floor(toks * 4 / 1024)}KB). Full output saved to: ${path}]`; H.push({ kind: "tool", id, text: shown, micro: true }); after(`tool ${name}() ${toks.toLocaleString()}t → [A: MICRO diske, context ${est(shown).toLocaleString()}t + referans]`); } else { H.push({ kind: "tool", id, text: out, micro: false }); after(`tool ${name}() ${toks.toLocaleString()}t (context'te kalır)`); } }
+      steps.push({ title: `${evi + 1} · olay: ${e[0] === "tool" ? "tool " + e[1] : e[0]}`, detail: e[0] === "subagent" ? "Büyük yan-iş AYRI pencerede koşar; ana pencereye sadece ÖZET döner (sıkıştırmaya alternatif)." : (e[0] === "tool" ? "Tool çıktısı >4K token ise diske dökülür, context'e önizleme+referans kalır (microcompaction)." : "Mesaj eklenir; eşik aşılırsa auto-compaction."), log: log.splice(0), trace: snapH(H), stats: { token: total() } });
+      evi++;
+    }
+    const finalT = total();
+    steps.push({ title: "Sonuç", detail: "Microcompaction + auto-compaction + subagent kaçışı birlikte ana context'i düşük tutar.", log: [`diske dökülen: ${Object.keys(disk).length} · auto-compaction: ${compactions} · subagent: ${subs}`], trace: snapH(H), final: true, result: { before: "olay-güdümlü", after: finalT, checks: [[`auto-compaction: ${compactions}`, compactions > 0], [`subagent kaçışı: ${subs} (ara adım ana context'e girmedi)`, subs > 0], [`diske dökülen: ${Object.keys(disk).length}`, Object.keys(disk).length > 0]] }, stats: { token: finalT } });
+    return { before: "—", after: finalT, steps };
+  }
+  function snapH(H) { return H.map((it, i) => ({ i, role: it.kind, id: it.id || "", label: it.kind, tok: itemTok(it), preview: (it.text || "").slice(0, 66), micro: it.micro, dropped: false })); }
+  return { name: "Claude Code", school: "microcompaction + auto-compaction + subagent (gözlem)", run };
+})();
+
+const SYSTEMS = [Hermes, OpenClaw, OpenCode, Codex, ClaudeCode];
+if (typeof module !== "undefined") module.exports = { SYSTEMS };
+if (typeof window !== "undefined") window.SYSTEMS = SYSTEMS;
+
+</script>
+<script>
+(function () {
+  const SYS = window.SYSTEMS;
+  const roleVar = (r) => ({
+    system: "--r-system", user: "--r-user", assistant: "--r-assistant",
+    tool: "--r-tool", toolResult: "--r-tool", function_output: "--r-fn",
+    function_call: "--r-fn", summary: "--r-summary", note: "--r-note",
+  }[r] || "--r-assistant");
+  const fmt = (n) => typeof n === "number" ? n.toLocaleString("tr-TR") : n;
+  const lbl = (c) => `${c.role}${c.id ? "[" + c.id + "]" : ""}`;
+  const ckey = (c) => (c.id ? "id:" + c.id : "@" + c.i) + ":" + c.role;
+
+  const state = { sys: 0, step: 0, run: null };
+  const $ = (id) => document.getElementById(id);
+
+  function selectSystem(i) {
+    state.sys = i; state.run = SYS[i].run(); state.step = 0;
+    renderTabs(); renderAll();
+  }
+  function setStep(i) {
+    const n = state.run.steps.length; state.step = Math.max(0, Math.min(n - 1, i)); renderAll();
+  }
+
+  function renderTabs() {
+    const tabs = $("tabs"); tabs.innerHTML = "";
+    SYS.forEach((s, i) => {
+      const b = document.createElement("button");
+      b.className = "tab"; b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", i === state.sys ? "true" : "false");
+      b.innerHTML = `<span class="tname">${s.name}</span><span class="tschool">${s.school}</span>`;
+      b.onclick = () => selectSystem(i);
+      tabs.appendChild(b);
+    });
+  }
+
+  // --- adım farkı: önceki adımın trace'i ile bu adımınkini karşılaştır ---
+  function stepChanges(k) {
+    const cur = state.run.steps[k].trace || [];
+    const curTot = state.run.steps[k].stats ? state.run.steps[k].stats.token : 0;
+    if (k === 0) {
+      return { dt: `başlangıç: ${cur.length} mesaj · ${fmt(curTot)} token`, bullets: ["Ham trace yüklendi — henüz sıkıştırma yok."], none: true, changed: new Set() };
+    }
+    const prev = state.run.steps[k - 1].trace || [];
+    const prevTot = state.run.steps[k - 1].stats ? state.run.steps[k - 1].stats.token : 0;
+    const ma = new Map(prev.map((c) => [ckey(c), c]));
+    const mb = new Map(cur.map((c) => [ckey(c), c]));
+    const bullets = [], changed = new Set();
+    const added = [], removed = [];
+    cur.forEach((c) => { if (!ma.has(ckey(c))) added.push(c); });
+    prev.forEach((c) => { if (!mb.has(ckey(c))) removed.push(c); });
+
+    // içerikte/boyutta değişen ortak öğeler
+    cur.forEach((c) => {
+      const p = ma.get(ckey(c)); if (!p) return;
+      const dropNow = c.dropped && !p.dropped;
+      const sizeCh = p.tok !== c.tok;
+      const prevCh = p.preview !== c.preview;
+      const clenCh = (p.clen != null && c.clen != null && p.clen !== c.clen && c.clen * 2 < p.clen);
+      if (dropNow) {
+        changed.add(ckey(c));
+        if (p.tok === c.tok) {
+          // planlama adımı: düşmeye işaretlendi ama token kazancı Uygula'da gerçekleşir
+          bullets.push(`<span class="em">#${c.i} ${lbl(c)}</span> → düşürülmeye <span class="em">işaretlendi</span> (içerik atılacak; token kazancı [Uygula] adımında)`);
+        } else {
+          const how = c.role === "function_output" ? "placeholder'a indi" : "içeriği not'a döndü / düştü";
+          bullets.push(`<span class="em">#${c.i} ${lbl(c)}</span> → ${how} <span class="down">(${fmt(p.tok)}t→${fmt(c.tok)}t)</span>`);
+        }
+      } else if (clenCh) {
+        changed.add(ckey(c));
+        bullets.push(`<span class="em">#${c.i} ${lbl(c)}</span>: içeriği <span class="em">örneğe indi</span> <span class="down">(${fmt(p.clen)}→${fmt(c.clen)} kar)</span> — ağırlık boyut-hassas kaldı`);
+      } else if (sizeCh) {
+        changed.add(ckey(c));
+        const verb = c.tok < p.tok ? (c.tok * 3 < p.tok ? "özetlendi" : "kısaldı") : "büyüdü";
+        const cls = c.tok < p.tok ? "down" : "up";
+        bullets.push(`<span class="em">#${c.i} ${lbl(c)}</span>: ${verb} <span class="${cls}">${fmt(p.tok)}t→${fmt(c.tok)}t</span>`);
+      } else if (prevCh) {
+        changed.add(ckey(c));
+        bullets.push(`<span class="em">#${c.i} ${lbl(c)}</span>: içeriği değişti (boyut sabit — ör. örneğe indi)`);
+      }
+    });
+
+    let head;
+    if (removed.length > 3) {
+      head = `🔁 transkript yeniden yazıldı: ${prev.length} → ${cur.length} mesaj`;
+      added.forEach((c) => { changed.add(ckey(c)); bullets.push(`<span class="em">+ ${lbl(c)}</span> eklendi (${fmt(c.tok)}t)`); });
+    } else {
+      added.forEach((c) => { changed.add(ckey(c)); bullets.push(`<span class="em">+ ${lbl(c)}</span> eklendi (${fmt(c.tok)}t)`); });
+      removed.forEach((c) => bullets.push(`<span class="em">− ${lbl(c)}</span> kaldırıldı`));
+    }
+
+    let dt;
+    if (typeof prevTot === "number" && typeof curTot === "number") {
+      const d = curTot - prevTot;
+      const tag = d < 0 ? `<span class="down">−${fmt(-d)}</span>` : d > 0 ? `<span class="up">+${fmt(d)}</span>` : "değişmedi";
+      dt = (head ? head + " · " : "") + `Σ ${fmt(prevTot)} → ${fmt(curTot)} token ${d === 0 ? "(değişmedi)" : "(" + tag + ")"}`;
+    } else { dt = head || "Σ olay-güdümlü"; }
+
+    const none = bullets.length === 0;
+    if (none) bullets.push("Transkript değişmedi — bu bir <b>hesap/karar</b> adımı (ayrıntı aşağıdaki log'da).");
+    return { dt, bullets, none, changed };
+  }
+
+  function renderHappened(ch) {
+    const box = $("happened");
+    const lis = ch.bullets.map((b) => `<li class="${ch.none ? "none" : ""}">${b}</li>`).join("");
+    box.innerHTML = `<div class="hd">▸ Bu adımda ne oldu? &nbsp; ${ch.dt}</div><ul>${lis}</ul>`;
+  }
+
+  function renderTrace(changed) {
+    const step = state.run.steps[state.step];
+    const trace = step.trace || [];
+    const cont = $("trace"); cont.innerHTML = "";
+    trace.forEach((c) => {
+      const card = document.createElement("div");
+      let cls = "card";
+      if (c.dropped) cls += " dropped";
+      if (c.protectedZone) cls += " protected";
+      if (changed && changed.has(ckey(c))) cls += " changed";
+      card.className = cls;
+      card.style.borderLeftColor = `var(${roleVar(c.role)})`;
+      const badges = [];
+      if (c.micro) badges.push(`<span class="badge micro">MICRO→disk</span>`);
+      if (/\[SPILL\]/.test(c.preview)) badges.push(`<span class="badge spill">SPILL→disk</span>`);
+      if (/\[COMPACTED/.test(c.preview)) badges.push(`<span class="badge compacted">COMPACTED→2K</span>`);
+      if (c.dropped && c.role === "function_output") badges.push(`<span class="badge drop">placeholder</span>`);
+      else if (c.dropped) badges.push(`<span class="badge drop">düştü</span>`);
+      const idHtml = c.id ? `<span class="cid">${c.id}</span>` : "";
+      card.innerHTML =
+        `<div class="card-top">
+           <span class="role" style="color:var(${roleVar(c.role)})">${c.role}</span>
+           ${idHtml}${badges.join("")}
+           <span class="ctok">${fmt(c.tok)}t</span>
+         </div>
+         <div class="cpreview">${escapeHtml(c.preview || c.label || "")}</div>`;
+      cont.appendChild(card);
+    });
+    if (!trace.length) cont.innerHTML = `<div style="color:var(--ink-faint);padding:12px;font-size:13px">Bu adımda transkript henüz kurulmadı — “İleri” ile ilerle.</div>`;
+    const maxTok = Math.max(1, ...state.run.steps.map((s) => (s.stats && s.stats.token) || 0));
+    const cur = step.stats ? step.stats.token : 0;
+    $("tokFill").style.width = (100 * cur / maxTok) + "%";
+    $("traceTok").textContent = fmt(cur) + " token";
+  }
+
+  function renderStepper() {
+    const st = $("stepper"); st.innerHTML = "";
+    state.run.steps.forEach((s, i) => {
+      const d = document.createElement("button");
+      d.className = "dot" + (i === state.step ? " active" : (i < state.step ? " done" : ""));
+      d.textContent = i; d.title = s.title; d.onclick = () => setStep(i);
+      st.appendChild(d);
+    });
+  }
+
+  function renderStep() {
+    const step = state.run.steps[state.step];
+    $("stepTitle").textContent = step.title;
+    $("stepDetail").textContent = step.detail || "";
+    const log = $("stepLog"); log.innerHTML = "";
+    (step.log || []).forEach((l) => { const d = document.createElement("div"); d.className = "lg"; d.textContent = l; log.appendChild(d); });
+    $("stepno").textContent = `${state.step + 1} / ${state.run.steps.length}`;
+    const res = $("result");
+    if (step.final && step.result) {
+      res.hidden = false; const r = step.result; let big;
+      if (typeof r.before === "number") {
+        const pct = r.before ? (100 * (r.before - r.after) / r.before) : 0;
+        big = `<div class="big"><b>${fmt(r.before)}</b><span class="arrow">→</span><b>${fmt(r.after)}</b> token<span class="pct">−${pct.toFixed(1)}%</span></div>`;
+      } else {
+        big = `<div class="big"><span class="arrow">final context:</span><b>${fmt(r.after)}</b> token<span class="pct">${r.before}</span></div>`;
+      }
+      const checks = (r.checks || []).map(([k, v]) =>
+        `<div class="check ${v ? "ok" : "no"}"><span class="mk">${v ? "✓" : "✗"}</span> ${escapeHtml(k)}</div>`).join("");
+      res.innerHTML = big + `<div class="checks">${checks}</div>`;
+    } else res.hidden = true;
+    $("prev").disabled = state.step === 0;
+    $("next").disabled = state.step === state.run.steps.length - 1;
+    $("all").disabled = state.step === state.run.steps.length - 1;
+  }
+
+  function renderAll() {
+    const ch = stepChanges(state.step);
+    renderStepper(); renderStep(); renderHappened(ch); renderTrace(ch.changed);
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  $("prev").onclick = () => setStep(state.step - 1);
+  $("next").onclick = () => setStep(state.step + 1);
+  $("all").onclick = () => setStep(state.run.steps.length - 1);
+  $("reset").onclick = () => setStep(0);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); setStep(state.step + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); setStep(state.step - 1); }
+  });
+
+  selectSystem(0);
+})();
+
+</script>
