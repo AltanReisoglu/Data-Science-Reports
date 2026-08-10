@@ -24,9 +24,15 @@ PY = sys.executable
 
 # beyaz-liste: sadece bunlar çalıştırılabilir
 POCS = {
+    # 1. KISIM — framework'ler tek başına
     "hermes":   {"script": HERE / "hermes_real_poc.py",   "label": "Hermes (SQLite kernel)",     "timeout": 60},
     "temporal": {"script": HERE / "temporal_real_poc.py", "label": "Temporal (SDK + dev server)", "timeout": 180},
     "celery":   {"script": HERE / "celery_real_poc.py",   "label": "Celery (worker + broker)",    "timeout": 120},
+    # 2. KISIM — beynimizi (brain_chat_V2) altyapılara sarma
+    "brain_temporal": {"script": HERE / "brain_on_temporal_poc.py", "label": "brain → Temporal", "timeout": 180},
+    "brain_celery":   {"script": HERE / "brain_on_celery_poc.py",   "label": "brain → Celery",   "timeout": 120},
+    "brain_hermes":   {"script": HERE / "brain_on_hermes_poc.py",   "label": "brain → Hermes",   "timeout": 60},
+    "brain_build":    {"script": HERE / "brain_build_own_poc.py",   "label": "brain → build",    "timeout": 60},
 }
 # çıktıdan filtrelenecek gürültü
 NOISE = re.compile(r"(vulnerable to the WAL|DeprecationWarning|warnings\.warn|pkg_resources|"
@@ -126,6 +132,7 @@ footer{margin-top:22px;color:var(--faint);font-size:12px}
 <p class="sub">Aşağıdaki butonlar <b>gerçek framework'leri</b> (Hermes kanban_db · Temporal SDK+server · Celery worker+broker) yerelde çalıştırır ve sonucu adım-adım + sonuç rozetleriyle gösterir. Simülasyon değil.</p>
 <div class="scenario"><b>Senaryo (hepsi aynı):</b> 3-adımlı iş <code>fetch → process → deliver</code>; <code>process</code> ilk denemede geçici hata verir → <b>retry</b>. Ek: worker <b>çökmesi</b> sonrası ne olur. Kilit soru: <b>retry'da <code>fetch</code> kaç kez koşar?</b></div>
 
+<h2 style="margin:24px 0 6px;font-size:17px">1. KISIM — Framework'ler tek başına</h2>
 <div class="grid" id="cards"></div>
 
 <div class="card airflow" style="margin-top:14px">
@@ -144,6 +151,21 @@ schedule="0 8 * * *" · retries=2 · catchup=False · fetch→process→deliver
 <tr><td><b>Celery</b></td><td>broker redelivery</td><td><b>2×</b> (baştan)</td></tr>
 <tr><td><b>Airflow</b></td><td>sadece hatalı düğüm retry</td><td><b>1×</b> (düğüm ayrı)</td></tr>
 </tbody></table>
+
+<h2 style="margin:34px 0 4px;font-size:18px">2. KISIM — Beynimizi (brain_chat_V2) altyapılara sarma <span style="color:var(--accent)">·</span></h2>
+<p class="sub">Aynı beyni (<code>brain_core.py</code>) dört altyapıya sarıyoruz — üçü gerçek framework, biri kendi kurduğumuz çekirdek. Beyin 4 adımlı bir iş: <code>retrieve → reason → act → respond</code>; <code>reason</code> (= LLM adımı) ilk denemede geçici hata verir.</p>
+<div class="scenario"><b>Kilit soru:</b> çökme/retry sonrası <b>pahalı <code>retrieve</code> kaç kez koşar?</b> — tamamlanan işi koruyor muyuz (1×), yoksa baştan mı başlıyoruz (2×)?</div>
+
+<div class="grid" id="cards2"></div>
+
+<h2 style="margin:22px 0 4px;font-size:16px">Karşılaştırma — aynı beyin, <code>retrieve</code> kaç kez?</h2>
+<table><thead><tr><th>Rota</th><th>Taksonomi</th><th>Çökme/retry sonrası</th><th>retrieve</th></tr></thead><tbody>
+<tr><td><b>brain → Temporal</b></td><td>buy (durable motora bin)</td><td>replay biten activity'yi atlar</td><td><b>1×</b></td></tr>
+<tr><td><b>brain → Hermes</b></td><td>build (hazır motor)</td><td>otomatik reclaim + handoff taşır</td><td><b>1×</b></td></tr>
+<tr><td><b>brain → build</b></td><td>build (sıfırdan ~200 satır)</td><td>recover_stale + checkpoint</td><td><b>1×</b></td></tr>
+<tr><td><b>brain → Celery</b></td><td>buy (kuyruğa devret)</td><td>self.retry() baştan koşar</td><td><b>2×</b> ⚠️</td></tr>
+</tbody></table>
+<p class="note">Pahalı <code>retrieve</code> üç dayanıklı rotada 1×, naif Celery'de 2×. Fark: "kaldığı yerden devam" altyapıdan <b>yerleşik gelir</b> (Temporal/Hermes/build) mi, yoksa <b>sen mi kurarsın</b> (Celery)? Tam kod + anlatım: <code>report/brain-chat-v2-task-management-entegrasyon.md</code>.</p>
 
 <footer>Sunucu: yerel stdlib http.server (yalnız 127.0.0.1). POC'lar gerçek framework koşar; Temporal ilk çalıştırmada dev server indirir (~15-30s).</footer>
 </div>
@@ -170,32 +192,64 @@ const BADGE={
    if(/run_order sonucu/.test(o))b.push(["tamamlandı ✓","good"]);
    if(m=o.match(/fetch KAÇ KEZ koştu:\s*(\d+)/))b.push([`fetch ×${m[1]} (BAŞTAN)`,"warn"]);
    return b;},
+ brain_temporal:(o)=>{const b=[];let m;
+   if(m=o.match(/retrieve\s+:\s*(\d+) kez/))b.push([`retrieve ×${m[1]}`,m[1]==="1"?"good":"warn"]);
+   if(m=o.match(/reason\s+:\s*(\d+) kez/))b.push([`reason ×${m[1]} (retry)`,"good"]);
+   if(m=o.match(/toplam (\d+) durable event/))b.push([`${m[1]} durable event`,"good"]);
+   return b;},
+ brain_celery:(o)=>{const b=[];let m;
+   if(/run_brain sonucu/.test(o))b.push(["tamamlandı ✓","good"]);
+   if(m=o.match(/retrieve KAÇ KEZ koştu:\s*(\d+)/))b.push([`retrieve ×${m[1]} (BAŞTAN)`,m[1]==="1"?"good":"warn"]);
+   return b;},
+ brain_hermes:(o)=>{const b=[];let m;
+   if(m=o.match(/release_stale_claims\(\)\s*→\s*(\d+)/))b.push([`crash-recovery: ${m[1]} ✓`,"good"]);
+   if(/handoff okundu/.test(o))b.push(["handoff taşıdı ✓","good"]);
+   if(/run#2\s+status=done/.test(o))b.push(["worker-B devraldı ✓","good"]);
+   if(m=o.match(/retrieve\s+:\s*(\d+) kez/))b.push([`retrieve ×${m[1]}`,m[1]==="1"?"good":"warn"]);
+   return b;},
+ brain_build:(o)=>{const b=[];let m;
+   if(/at-most-once/.test(o))b.push(["at-most-once ✓","good"]);
+   if(m=o.match(/recover_stale\(\)\s*→\s*(\d+)/))b.push([`crash-recovery: ${m[1]} ✓`,"good"]);
+   if(m=o.match(/retrieve\s+:\s*(\d+) kez/))b.push([`retrieve ×${m[1]} (checkpoint)`,m[1]==="1"?"good":"warn"]);
+   if(m=o.match(/reason\s+:\s*(\d+) kez/))b.push([`reason ×${m[1]}`,"good"]);
+   if(/status=done/.test(o))b.push(["done ✓","good"]);
+   return b;},
 };
 function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function colorize(s){return esc(s)
   .replace(/^(──.*|=+|#+.*)$/gm,'<span class="h">$1</span>')
   .replace(/(KANIT:|✓|KAZANDI|done|completed|reclaimed)/g,'<span class="k">$1</span>')
   .replace(/(HATA|None|BAŞTAN|✗)/g,'<span class="b">$1</span>');}
-const wrap=document.getElementById("cards");
-for(const c of CARDS){
-  const el=document.createElement("div");el.className="card";
-  el.innerHTML=`<div class="chead"><h2>${c.title}</h2><p class="p">${c.prove}</p></div>
-  <div class="cbody">
-    <div style="display:flex;align-items:center;gap:10px">
-      <button class="run" data-id="${c.id}">▶ Çalıştır</button>
-      <span class="pill" id="pill-${c.id}"></span>
-    </div>
-    <div class="badges" id="badges-${c.id}"></div>
-    <div class="term" id="term-${c.id}"></div>
-  </div>`;
-  wrap.appendChild(el);
+const CARDS2=[
+ {id:"brain_temporal",title:"brain → Temporal (buy)",prove:"brain adımları = activity; replay biten activity'yi atlar → retrieve 1×"},
+ {id:"brain_hermes",title:"brain → Hermes (build/hazır motor)",prove:"brain işi = kanban kartı; handoff partial-state taşır → retrieve 1×"},
+ {id:"brain_build",title:"brain → KENDİ çekirdeğimiz (build)",prove:"~200 satır SQLite: CAS+lease+recover_stale+checkpoint → retrieve 1×"},
+ {id:"brain_celery",title:"brain → Celery (buy)",prove:"brain işi = tek task; self.retry() BAŞTAN koşar → retrieve 2×"},
+];
+function renderCards(list, containerId){
+  const wrap=document.getElementById(containerId);
+  for(const c of list){
+    const el=document.createElement("div");el.className="card";
+    el.innerHTML=`<div class="chead"><h2>${c.title}</h2><p class="p">${c.prove}</p></div>
+    <div class="cbody">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="run" data-id="${c.id}">▶ Çalıştır</button>
+        <span class="pill" id="pill-${c.id}"></span>
+      </div>
+      <div class="badges" id="badges-${c.id}"></div>
+      <div class="term" id="term-${c.id}"></div>
+    </div>`;
+    wrap.appendChild(el);
+  }
 }
+renderCards(CARDS,"cards");
+renderCards(CARDS2,"cards2");
 document.querySelectorAll(".run").forEach(btn=>btn.onclick=async()=>{
   const id=btn.dataset.id;
   const pill=document.getElementById("pill-"+id), term=document.getElementById("term-"+id), badges=document.getElementById("badges-"+id);
   btn.disabled=true;badges.innerHTML="";
   pill.className="pill run- show";pill.innerHTML='<span class="spin"></span> çalışıyor…';
-  term.className="term show";term.textContent = id==="temporal" ? "Temporal dev server hazırlanıyor (~15-30s)…" : "çalışıyor…";
+  term.className="term show";term.textContent = /temporal/.test(id) ? "Temporal dev server hazırlanıyor (~15-30s)…" : "çalışıyor…";
   const t0=performance.now();
   try{
     const r=await fetch("/run?poc="+id);const j=await r.json();

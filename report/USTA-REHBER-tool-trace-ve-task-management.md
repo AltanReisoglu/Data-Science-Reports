@@ -135,6 +135,44 @@ Hepsinde ortak: **(a) tool_call↔tool_result çifti bozulmaz, (b) yakın tail k
 
 **Ekol haritası:** *Deterministik ağırlıklı* → Hermes, OpenCode. *LLM-özet* → OpenClaw, MiniMax, Claude Code(auto). *Hibrit (iki katman)* → OpenCode(+LLM), Codex, **Kimi**. *İlkel* → DeepSeek-code. **Kimi ≈ Codex+OpenCode birleşimi** (en olgun hibrit).
 
+### I.5.1 Neden bazıları %99, bazıları %31 kısaltıyor?
+
+Tablodaki uçurum (OpenCode %31.8 ↔ Codex %99.9) bir **kalite farkı değil, amaç farkıdır**. Beş etken belirliyor:
+
+**1) Amaç: pencereyi *derle* mi, *boşalt* mı?**
+İki temel duruş var:
+- **Seyreltenler** (OpenCode, Hermes) — oturum devam ederken bağlamı derli toplu tutar; model çalışmaya *aynı pencerede* devam eder, o yüzden çok şey atamazlar.
+- **Pencere kapatanlar** (Codex, Claude Code auto, OpenClaw) — eski pencereyi özete indirip **yeni bir sayfa açar**. Doğal olarak %99'a çıkar, çünkü geride sadece özet kalır.
+
+> Yüksek yüzde "daha iyi sıkıştırma" değil, **"daha radikal karar"** demektir.
+
+**2) Geri alınabilirlik: attığın geri gelebiliyor mu?**
+- **Diske döken** (OpenCode Katman A, Claude Code micro) tam içeriği saklar, context'e referans bırakır → kaybı *ucuz*, o yüzden agresif olmasına gerek yoktur.
+- **Özete indiren** (OpenClaw, Codex Katman B) içeriği **kalıcı** olarak damıtır → geri dönüş yok, bu yüzden daha dikkatli ama daha kazançlıdır.
+
+**3) Koruma penceresinin genişliği**
+En belirleyici teknik etken. OpenCode **son-2-turn + en-yeni-40K + `skill`**'i dokunulmaz sayar; bizim POC'ta korunan bölge zaten 76K tuttuğu için kazanç %31.8'de kaldı. Codex'te böyle bir kalıcı koruma yoktur — pencere kapanır, sadece handoff özeti ve son birkaç mesaj taşınır.
+
+**4) Tetikleme anı: proaktif mi, taşınca mı?**
+- **Proaktif** (OpenCode prune, Hermes) — her turda çalışır, o yüzden *her seferinde az* alır; bedava olduğu için sık çalışması sorun değil.
+- **Eşikte** (Codex, Claude Code, OpenClaw) — ancak pencere dolunca devreye girer, bu yüzden *bir kerede çok* alır.
+
+**5) Fayda-freni ve prompt cache**
+OpenCode, kazanç `PRUNE_MINIMUM=20K`'yı geçmiyorsa **hiçbir şey yapmaz** — çünkü içeriği değiştirmek prompt cache'i kırar ve küçük kazanç için buna değmez. Bu fren tek başına yüzdeyi bilinçli olarak düşük tutar. LLM-özet ekolünde böyle bir fren yoktur; zaten pahalı bir çağrı yapılıyorsa mümkün olduğunca çok yer açılır.
+
+#### Ölçülen bedel: agresiflik ajanı yeniden çalışmaya iter
+Demo ajanında (`demo-brain-agent/`) canlı gözlendi: `hermes` + düşük bütçede bir tool çıktısı tek satıra indi ve model **"içerik gelmedi, tekrar aratın"** diyerek aynı veriyi yeniden istedi. Yani kazanılan token'ın bir kısmı **yeniden tool çağrısı olarak geri harcanır**. Aynı deneyde `none` stratejisiyle koşu 43,5 sn sürerken sıkıştıranlarla ~12 sn'ye indi (**~3,5× hızlanma**) — yani compaction hem gerekli hem de aşırısı zararlı.
+
+#### Doğru okuma
+| Soru | Bak |
+|---|---|
+| "Hangisi en çok sıkıştırıyor?" | ❌ yanlış soru |
+| "Sıkıştırdıktan sonra **ne kaldı**?" | ✅ doğru soru |
+| "Model işini yapabildi mi, tekrar tool çağırdı mı?" | ✅ asıl ölçüt |
+| "Kayıp geri alınabilir mi (disk/referans)?" | ✅ riski belirler |
+
+> **Tek cümle:** Düşük yüzde muhafazakârlığın (geri alınabilir kayıp + geniş koruma + cache dostu), yüksek yüzde radikalliğin (pencere kapatma + kalıcı özet) işaretidir; doğru seçim ajanın *aynı pencerede mi devam edeceği* yoksa *temiz sayfa mı açacağı* sorusuna bağlıdır.
+
 **Çalışan kanıt:** `report/tool-trace-poc-web.html` (interaktif) — ilk beş sistemi adım adım koşturur, her ilerlemede transkriptin gerçek farkını gösterir.
 
 ---
@@ -383,3 +421,318 @@ flowchart TB
 - **Çalışan POC'lar:** `poc/` (tool-trace, 5 sistem) · `poc-task-mgmt/` (gerçek Airflow/Celery/Temporal/Hermes + `web_server.py`).
 
 > **Son söz:** Bu tek belgeyi kavradıysan, hem *bir ajanın context'ini nasıl ayakta tuttuğunu* (tool-trace) hem *işlerini nasıl dayanıklı yönettiğini* (task-mgmt) — sekiz ajan (Hermes, OpenClaw, OpenCode, Codex, Claude Code, Kimi, MiniMax, DeepSeek) + Wren/Shannon ve üç altyapı (Airflow/Celery/Temporal) üzerinden — anlatabilecek seviyedesin.
+
+Elimizdeki ölçümlerle, dört stratejinin artı-eksileri:
+
+1. Kendi çekirdeğimiz (SQLite board) — build
+İyi yanları
+
+Operasyonel maliyet ~sıfır — tek dosya, ek servis yok, Docker yok
+Tam kontrol — FSM, DAG kapısı, checkpoint, breaker: hepsi bizim kodumuz, istediğimiz gibi eğilir
+Dinamik graf tam destekli — ajan çalışma anında düğüm ekleyebiliyor (spawn_task)
+Checkpoint'ten devam ölçüldü — worker tur ortasında çöktü, recover_stale otomatik topladı, turn0 tekrar koşmadı
+Şeffaf denetim izi — created → claimed → recovered → claimed → completed, SQLite'tan doğrudan sorgulanabilir
+Hızlı — 5 düğüm 11 sn; kayıtlı akış yeniden koşumu 0,1 sn
+Kötü yanları
+
+Yazdığın kadar var — exactly-once, dağıtık kilit, backpressure gibi şeyler senin sorumluluğun
+Scheduling yok — cron/backfill istersen dışarıdan eklemelisin
+Tek-makine varsayımı — SQLite ile çok-makineli ölçek zor (Postgres'e taşımak gerekir)
+Test edilmemiş uç durumlar — bizim demoda gerçek eşzamanlı worker yarışı hâlâ kanıtlanmadı
+Bakım yükü sende: her yeni ihtiyaç (öncelik, kota, retry politikası) elle kodlanır
+2. Temporal — buy, durable execution
+İyi yanları
+
+En güçlü dayanıklılık — event-history replay, biten activity atlanır (exactly-once)
+Tam denetim izi — bizim koşuda 95 durable event; her adım kalıcı
+Activity-seviyesi retry politikası hazır (RetryPolicy)
+Uzun-süren iş / insan onayı için tasarlanmış (signal, timer, saatlerce/günlerce bekleyebilir)
+Scheduling + backfill dahili
+Kötü yanları
+
+Operasyonel yük yüksek — cluster ya da Cloud; kurulum, izleme, sürüm yönetimi
+Determinizm disiplini zorunlu — LLM/rastgele/IO yalnız activity içinde olabilir; workflow gövdesi saf kalmalı. Kural ihlali sinsi hatalar üretir
+Kod kısıtları — workflow sınıfı modül seviyesinde olmalı (bunu canlı yaşadık, "local classes unsupported")
+Payload sınırı — biz state'i activity payload'ında taşıyoruz; sıkıştırma olmasa ~10-20 turda duvara toslar (~2MB limit). Doğrusu referans geçirmek
+Yavaş başlangıç: dev server + worker ayağa kalkması
+3. Celery — buy, dağıtık kuyruk
+İyi yanları
+
+En iyi yatay ölçek — native worker havuzu, olgun ekosistem
+Basit zihinsel model — fonksiyonu kuyruğa at, worker çeksin
+at-least-once + acks_late — worker çökerse mesaj yeniden teslim edilir
+Broker seçenekleri esnek (Redis/RabbitMQ)
+Kötü yanları
+
+DAG/bağımlılık kavramı YOK — bizim demoda board'u yine biz yönettik; Celery sadece dağıtım katmanı oldu
+Retry task'ı BAŞTAN koşturur — tamamlanan adımlar tekrarlanır; "kaldığı yerden devam" senin işin
+State takibi zayıf — result backend kurmazsan hiçbir şey görmüyorsun
+En yavaş bizim ölçümde: 23,3 sn (worker süreç başlatma + broker gecikmesi)
+Broker işletme yükü (orta seviye ama sıfır değil)
+4. Airflow — zamanlı statik DAG
+İyi yanları
+
+Scheduling'de rakipsiz — cron + backfill/catchup + max_active_runs
+Operatör UI'ı en zengin — koşu geçmişi, log, yeniden tetikleme
+Olgun ekosistem — yüzlerce hazır operatör/provider
+Düğüm-seviyesi retry, upstream done kalır
+Kötü yanları
+
+Dinamik graf YAPISAL OLARAK imkânsız — DAG parse zamanında bilinmeli. Bizim graf çalışma anında LLM kararıyla doğuyor → verecek DAG yok. Bu demonun en net bulgusu
+Üç kaçış yolu da bedelli: .expand graf şeklini sabitler · tek düğüme sıkıştırırsan Airflow sadece scheduler olur · DAG dosyası ürettirirsen parse gecikmesi + kırılganlık
+En ağır operasyon — scheduler + webserver + metadata DB
+Ajanın "sonucu görünce planı değiştirmesi" mümkün değil (donmuş graf)
+Özet karar tablosu
+own	Temporal	Celery	Airflow
+Dinamik ajan grafı	✅ tam	✅ tam	⚠️ kısmi	❌ yok
+Kaldığı yerden devam	✅ checkpoint	✅ replay	❌ baştan	⚠️ düğüm bazlı
+Scheduling	❌	✅	⚠️ Beat	✅✅ en güçlü
+Yatay ölçek	⚠️	✅	✅✅	✅
+Denetim izi	✅	✅✅	❌	✅✅
+Operasyon yükü	✅✅ çok düşük	❌ yüksek	⚠️ orta	❌ yüksek
+
+---
+
+# EK — Her sistemin tool-trace akışı, TEK PARAGRAFTA
+
+> Aşağıdakiler §I.3'ün "anlatım" hali: her sistemin akışını baştan sona, tek nefeste.
+> Sunumda ya da birine anlatırken doğrudan bunları kullan.
+
+## Hermes — deterministik 4 geçiş
+
+Hermes hiç LLM kullanmaz, her şeyi kurallarla yapar ve bunu **proaktif** olarak, yani pencere dolmadan da çalıştırır; önce geçmişi bir `prune_boundary` ile ikiye böler — bu sınır token bütçesiyle geriye doğru sayılarak bulunur ve en az 8 mesaj (`_MAX_TAIL_MESSAGE_FLOOR`) her hâlükârda korunur — sonra sınırın **öncesindeki** bölgeye sırayla dört geçiş uygular: **(1) dedup**, byte-identik tool sonuçlarından en yenisini tam bırakıp eskileri `[Duplicate of #N]` referansına indirir (kayıpsız, çünkü içerik zaten başka yerde duruyor; `_DEDUP_FLOOR=200` altındakilere dokunmaz); **(2) informative summary**, büyük ve benzersiz sonuçları **tip-farkında tek satıra** çevirir (`[read_file] dosya okundu (40.000 chars) · ilk satır: …`) ve bu fonksiyon asla çökmez, bozuk çağrıda bile bir backstop metin döner; **(3) arg truncation**, 500 karakteri aşan `tool_call` argümanlarını **JSON'ın içinde** kırpar ki çıktı geçerli JSON kalsın ve sağlayıcı 400 dönmesin; **(4) basınç demotion'ı**, korunan tail'in *kendisi* yumuşak tavanı (bütçe × 1.5) aşarsa devreye giren emniyet valfidir ve kademeli çalışır — önce en yeni tool **hariç** korunan bölgedeki büyükleri demote eder, tavanın altına iner inmez durur, hepsi yetmezse son çare olarak **en yeni tool'u da** feda eder; tüm bu işlem boyunca **hiçbir mesaj silinmez**, sadece içerik küçülür, dolayısıyla `tool_call ↔ tool_result` eşleşmesi bozulmaz; ve kritik bir fren vardır: budama prompt-cache'i bozacağı için Hermes **ancak ≥4096 token geri kazanılacaksa commit** eder, aksi halde hiçbir şeye dokunmaz — POC'ta sonuç 33.063 → 2.101 token (%93.6), mesaj sayısı sabit.
+
+## OpenClaw — LLM chunk-özetleme (12 adım)
+
+OpenClaw deterministik budama yapmaz, işi tamamen LLM'e devreder ama bunu **güvenli ve bütünlüğü koruyarak** yapmak için 12 adımlık bir boru hattı kurar: boş yer pencerenin yarısının altına düşünce **[0] tetiklenir**, önce **[1] sanitize** ile `toolResult.details` alanı sökülür — bu bir güvenlik adımıdır, çünkü özet LLM'e gidecektir ve API anahtarı gibi sırların özete sızması engellenmelidir — ardından **[2] estimate** ile boyut ölçülür ve **[3] projection** devreye girer: dev gövdeler 8KB'lık bir örneğe indirilip yanına `omittedChars` bilgisi konur, yani özetlenecek içerik hafifler ama **ağırlık hesabı boyut-doğru kalır** (`TEXT_SAMPLE=8192`, `TRUNCATE_THRESHOLD=32768`); **[4] adaptif oran** mesajların ağırlığına göre chunk oranını 0.40'tan 0.15'e kadar kısar; **[5] gruplama** en kritik adımdır — `tool_call` ile `tool_result` **atomik bir grup** sayılır, asla ayrı chunk'lara düşmezler; **[6] chunk** ile parçalar oluşur, **[7] oversized** tek başına pencerenin yarısını aşan mesajı özetlemeye kalkmaz, onu tek satırlık bir NOT'a indirir ve çiftini birlikte düşürür; **[8] stage-split** ve **[9] worker-thread** ile parçalar paralel işlenir, **[10] LLM özet** her chunk için damıtılmış metin üretir, **[11] onarım** özet sonrası yetim kalmış çiftlere sentetik sonuç uydurup zinciri tamir eder ve **[12] uygula** ile yeni geçmiş yerine konur — POC'ta 138.850 → 66 token, sır sızmadı, çift bütünlüğü korundu.
+
+## OpenCode — canlı spill + deterministik prune
+
+OpenCode compaction'ı iki ayrı anda devreye girer: **birincisi tool çıktısı daha üretilirken** — `truncate.ts` çıktının 2000 satırı ya da 50KB'ı aştığını görürse metni diske yazar ve context'e yalnız ~2000 karakterlik önizlemeyle bir dosya referansı bırakır, yani dev çıktı context'e **hiç girmez**; **ikincisi eşikte çalışan deterministik prune**, ki overflow'u beklemez, LLM kullanmadığı için bedavadır ve her turda proaktif koşar — sondan başa yürür ve bir koruma hiyerarşisi uygular: **son 2 kullanıcı turu** dokunulmaz, önceki bir **compaction özetine** rastlarsa durur, **`skill`** çıktılarını atlar, **zaten `compacted` damgalı** bir tool görürse önceki prune'un sınırına geldiğini anlayıp durur, ve ötedeki tool çıktılarını toplarken kümülatif toplam **40K'yı aşana kadar** hepsini korur; bu sıcak bölgenin ötesindekiler **buda-adayı** olur ama hemen budanmaz — araya **fayda-freni** girer: adayların toplamı **20K'yı geçmiyorsa hiçbir şey yapılmaz**, çünkü damgalamak serialize edilen içeriği değiştirir ve **prompt cache'i kırar**; geçiyorsa `state.time.compacted` alanına zaman damgası basılır ve asıl küçülme **serialize anında** olur (damgalı çıktı `TOOL_OUTPUT_MAX_CHARS=2000` karaktere iner); bu boyunca **hiçbir mesaj silinmez** ve tam içerik zaten diskte durduğu için geri çağrılabilir; hâlâ `usable = pencere − 20K` sınırı aşılıyorsa son çare **overflow LLM özeti** devreye girer — POC'ta 111.714 → 76.167 token (%31.8), çünkü amaç pencereyi boşaltmak değil, canlı çalışırken bağlamı derli toplu tutmaktır.
+
+## Codex — ortadan-kesme + model-turn windowing
+
+Codex hiçbir şeyi diske dökmez, onun yerine "neyi kesersem en az bilgi kaybederim" sorusuna oynar: ilk katmanda `truncate_middle` devreye girer ve tek bir tool çıktısı bütçeyi aştığında **baş ile sonu tutup ortayı atar**, üstüne `Warning: truncated output` başlığı ekler — bu tercih tesadüf değildir, çünkü bir dosyanın ya da komut çıktısının **başı** (imports, imza) ve **sonu** (hata satırı, exit kodu) en bilgilendirici kısımlardır, ortadaki tekrarlı gövde ise en az bilgi taşır — ve görseller bu kesmeden **muaftır** çünkü bir resmin ortasını atmak onu anlamsız kılar; ikinci katman Codex'i ayıran şeydir: **compaction ayrı bir bakım işi değil, bizzat bir MODEL TURN'üdür** — history sığmadığında önce **dinamik fit-to-window trim** çalışır, en eski `function_call_output`'lar teker teker placeholder'a çevrilir (içerik gider, çağrı iskeleti kalır ki çift zinciri kırılmasın) ve yakın turn'ler korunur; bu ucuz adım yetmezse `SUMMARIZATION_PROMPT` ile modele bir **handoff özeti** yazdırılır ve bu özet bir `CompactedItem` olarak **yeni bir pencerenin başına** konur, eski pencere kapanır; kritik nokta bunun bir "silme" değil **devretme** olmasıdır — pencereler `CompactedItem` zinciriyle bağlıdır, oturum **resume edilebilir**, geriye izlenebilir (*windowing*) — POC'ta 3 turn'de 2 pencere açıldı ve ham 123.254 token yalnız 136 token'lık aktif context'e indi (%99.9), çünkü Codex pencereyi *seyreltmez, kapatır*.
+
+## Claude Code — micro + auto + subagent kaçışı
+
+Claude Code kapalı kaynaktır, dolayısıyla aşağıdaki akış dokümantasyon ve **birebir gözlemlenen davranışa** dayanır (93KB'lık bir `WebFetch` çıktısının diske dökülmesi bu oturumda görüldü); üç mekanizma tool'lar tetiklendikçe sırayla ortaya çıkar: **(A) microcompaction**, tek bir tool çıktısı ~4000 token'ı aştığında metni `.claude/projects/.../tool-results/` altına diske yazar ve context'e yalnız ~500 token'lık önizleme ile `Full output saved to: …` referansı bırakır — bu tamamen otomatiktir ve modele "gerekirse dosyadan okuyabilirsin" mesajı verir; **(B) auto-compaction**, context pencerenin ~%80'ine ulaştığında devreye girer, eski turn'ler bir **konuşma özetine** indirilir (ilerleme, alınan kararlar, kalan iş) ve yalnız son birkaç turn verbatim korunur — bu işlem `PreCompact` ve `PostCompact` **hook**'larıyla sarmalanmıştır, yani kullanıcı compaction'ı engelleyebilir ya da öncesinde/sonrasında kendi kodunu çalıştırabilir; ayrıca bir **anti-thrash** koruması vardır: korunan turn'ler tek başına eşiği dolduruyorsa compaction yer açamayacağı için yapılmaz ve kullanıcıya "yeni thread aç" önerilir; **(C) subagent kaçış yolu** ise compaction'a bir *alternatiftir* — büyük bir yan-iş (ör. "40 dosyayı tara") **ayrı bir context penceresinde** koşturulur ve ana pencereye yalnızca damıtılmış özet döner, yani ara adımlar ana context'e **hiç girmez**; POC'ta ölçülen: ham 126.487 token → 13.189 (%89.6), bunun içinde 80K'lık tarama işi subagent sayesinde ana pencereye hiç uğramadı.
+
+## Kimi Code — hibrit: per-tool kırpma + event-sourced LLM handoff
+
+Kimi Code bu kategorinin en olgunlarındandır çünkü Codex ile OpenCode'un iki iyi fikrini birleştirir: **Katman A**'da her tool çıktısı daha üretilirken `result-builder.ts` tarafından `maxChars` ve `maxLineLength` sınırlarına kırpılır, sonuna `[...truncated]` ve "Output is truncated to fit in the message." işareti konur (OpenCode'un canlı spill'inin, Codex'in `truncate_middle`'ının muadili; görseller için ayrıca `image-compress.ts` vardır); **Katman B**'de ise eşik `fullCompaction/strategy.ts` içinde `reservedContextSize=50_000` ile tanımlıdır ve `shouldCompact(usedSize)` karar verir — tetiklendiğinde `compactionHandoff.ts` bir **handoff özeti** üretir, ama buradaki incelik şudur: kullanıcı mesajlarının **başı (2K token) ve sonu korunur, ortası elide edilir** (`compaction_elision`) ve sıkışan bir user-mesajı en fazla 20K token'a sınırlanır — yani kullanıcının niyeti hiç kaybolmaz; en ayırt edici özelliği ise compaction'ın bir **op** olarak (`context.apply_compaction`) event-sourced akışa yazılmasıdır: bu sayede oturum **wire-replay** ya da snapshot reducer ile yeniden kurulabilir, yani compaction geri izlenebilir bir olaydır (Codex'in windowing felsefesi + OpenCode'un deterministik kırpması aynı sistemde).
+
+## MiniMax Mini-Agent — tek katmanlı token-limit özeti
+
+MiniMax en sade yaklaşımı temsil eder: deterministik bir per-tool kırpma katmanı **yoktur**, tek bir eşik vardır — toplam token 80K'yı aştığında geçmiş bir LLM'e verilip özetlenir; özetlemede **kullanıcı turları korunur** (asistan/tool gürültüsü damıtılır, kullanıcının söyledikleri kalır) çünkü niyet bilgisi en değerli olandır; ayrıca API tarafında `retry.py` ile `max_retries=3` bir backoff mekanizması bulunur ama bu **API-retry**'dır, task-seviyesi bir kurtarma değildir ve disk-resume yoktur; yani MiniMax "context dolarsa özetle, gerisini dert etme" diyen minimal bir tasarımdır — çalışır ama ne kayıp kontrolü (neyin atıldığını bilemezsin) ne de geri alınabilirlik (diske döküm yok) sunar.
+
+## DeepSeek-code — ilkel tetik (⚠️ topluluk sürümü)
+
+DeepSeek-code'da gerçek bir compaction **yoktur**: mesaj sayısı 100'ü aştığında kullanıcıya "geçmişi temizle / yeni oturum aç" gibi bir **öneri** üretilir, o kadar; ne tool-çıktısı kırpma, ne özetleme, ne diske döküm, ne de çift-bütünlüğü koruması vardır — bu yüzden rehberde bir çözüm olarak değil, **karşılaştırma tabanı** olarak durur: diğer yedi sistemin çözdüğü problemin çözülmediğinde neye benzediğini gösterir (ayrıca bu bir topluluk implementasyonudur, resmî değildir).
+
+> **Sekizini tek cümlede:** Hermes kurallarla küçültür · OpenClaw sırrı söküp chunk'ları LLM'e özetletir · OpenCode büyüğü diske döküp gerisini muhafazakârca budar · Codex ortayı kesip pencereyi kapatır · Claude Code diske döker, eskiyi özetler, ağır işi ayrı pencereye kaçırır · Kimi ikisini birleştirip olayı replay-edilebilir yapar · MiniMax sadece eşikte özetler · DeepSeek-code hiçbir şey yapmaz.
+
+---
+
+# EK-2 — Adım adım akış: SADECE tool-trace'i ilgilendiren aşamalar
+
+> Bu ek, sistemlerin **tüm** compaction akışını değil, yalnızca **tool izine dokunan**
+> adımları içerir. Genel context-yönetimi adımları (tetik eşiği, token sayımı, worker
+> thread'i, konuşma özeti, cache freni…) bilerek **dışarıda bırakıldı** — her bölümün
+> sonunda hangileri elendiği yazılı.
+>
+> Ölçüt: adım ya **tool çıktısına** dokunuyorsa ya da **`tool_call ↔ tool_result`
+> çiftini** ilgilendiriyorsa buraya girdi.
+
+### Tetik özeti — kim ne zaman devreye giriyor?
+
+İki tür tetik var: **üretim anında** (tek çıktının boyutuna bakar) ve **eşikte**
+(context'in toplamına bakar). Çoğu sistemde ikisi birden vardır.
+
+| Sistem | Üretim anında (tek çıktı) | Eşikte (toplam context) |
+|---|---|---|
+| **Hermes** | — | **proaktif: her turda** (pencere dolmasa da); ama kazanç <4096t ise commit etmez |
+| **OpenClaw** | — | **boş yer < pencere × 0.5** (yani kullanılan > %50) |
+| **OpenCode** | **>2000 satır VEYA >50KB** → diske spill | **proaktif: her turda** (prune açıksa); overflow özeti ancak `kullanılan ≥ pencere − 20K` |
+| **Codex** | **tek çıktı ayrılan bütçeyi aşarsa** → truncate_middle | **history pencereye sığmazsa** → placeholder trim, yetmezse yeni pencere |
+| **Claude Code** | **>~4K token** → microcompaction (diske) | **context > ~%80** → auto-compaction |
+
+**Subagent (Claude Code)** bu tabloya girmez: eşik değil **karar**dır — ajan büyük bir yan-işi
+ayrı pencerede koşturmayı seçer, böylece tool izi hiç oluşmaz.
+
+> **Kalıp:** *üretim anında* tetiklenenler **boyut** filtresidir (tek çıktı çok mu büyük?),
+> *eşikte* tetiklenenler **birikim** filtresidir (toplam taştı mı?). Biri diğerinin yerini tutmaz —
+> çünkü eşiğin altında kalan orta boy çıktılar birike birike pencereyi doldurur (bkz. §I.5.1).
+
+#### İki ayrı "bütçe" — karıştırmayın
+
+Metinlerde geçen "bütçe" kelimesi **iki farklı şeyi** anlatır; sistemlerin tetiklerini okurken
+hangisinden bahsedildiğine dikkat:
+
+| | **Tek-çıktı tavanı** | **Pencere bütçesi** |
+|---|---|---|
+| Neyi ölçer | **bir** tool çıktısının boyutu | **tüm** context'in toplamı |
+| Kime bakar | o mesaja, tek başına | geçmişin tamamına |
+| Pencere doluluğu önemli mi | **hayır** — pencere boşken de keser | evet, tanım gereği |
+| Örnek sabitler | Codex `TOOL_BUDGET_TOKENS=5.000` · OpenCode `2000 satır / 50KB` · Claude Code `~4K token` | Codex `CONTEXT_WINDOW=30.000` · OpenClaw `pencere×0.5` · OpenCode `pencere−20K` · Claude Code `~%80` |
+| Hangi katman | Katman A (üretim anında) | Katman B (eşikte) |
+
+**Codex'te `truncate_middle` bütçeyi nasıl kullanır:** tavan **ikiye bölünür** — yarısı baştan,
+yarısı sondan korunur, orta atılır:
+
+```python
+keep = budget_tokens * 4     # 5.000 token ≈ 20.000 karakter
+head = text[: keep // 2]     # ilk  10.000 karakter
+tail = text[-keep // 2:]     # son  10.000 karakter
+```
+
+Kesilen çıktının başına şu başlık konur — model neyi kaçırdığını **bilir**, gerekirse hedefli
+bir çağrı yapar:
+
+```
+Warning: truncated output (original token count: 23,530)
+Total output lines: 2,291
+
+<ilk 10.000 karakter>
+...[orta atlandı]...
+<son 10.000 karakter>
+```
+
+Bir çıktı **hem** (A)'da kesilip **sonra** (B)'de windowing'e de yakalanabilir — sıralı iki filtre,
+biri diğerini iptal etmez.
+
+> **Not:** POC'taki sayılar (5.000 / 30.000) sabittir; gerçek Codex'te bu bir model-format
+> sınırıdır (`MODEL_FORMAT_MAX_BYTES` / `MAX_LINES` mertebesinde) ve modele/ayara göre değişir.
+> Değişen **sayı**dır, **mekanizma** değil.
+
+---
+
+## Hermes — 4 tool-trace geçişi
+
+**Ne zaman tetiklenir:** **Proaktif** — pencere dolmasını beklemez, LLM kullanmadığı için
+bedavadır ve her turda çalışabilir. Tek fren: toplam kazanç **4096 token**'ın altındaysa
+hiçbir şeye dokunmaz (prompt-cache'i boşuna bozmamak için).
+
+```mermaid
+flowchart LR
+    H1["DEDUP<br/>aynı tool çıktısı → referans"] --> H2["TİP-FARKINDA ÖZET<br/>büyük çıktı → tek satır"]
+    H2 --> H3["ARG KIRPMA<br/>tool_call argümanı"] --> H4["BASINÇ DEMOTİON<br/>en yeni tool son çare"]
+```
+
+**1 · Dedup** — Byte-byte aynı **tool sonucu** iki kez tutulmaz; en yenisi tam kalır, eskiler `[Duplicate of #N]` referansına iner. Kayıpsızdır çünkü içerik hâlâ transcript'te duruyor.
+
+**2 · Tip-farkında özet** — Büyük ve benzersiz **tool çıktısı**, tool'un *tipine göre* tek satıra iner (`[read_file] dosya okundu (40.000 chars)` / `[grep] 120 eşleşme`). Hangi tool, ne kadar veri — bu kalır; içerik gider.
+
+**3 · Argüman kırpma** — Sadece sonuç değil **`tool_call`'un argümanı** da şişebilir; 500 karakteri aşan argüman JSON'ın *içinde* kırpılır ki çıktı geçerli JSON kalsın ve sağlayıcı 400 dönmesin.
+
+**4 · Basınç demotion'ı** — Korunan bölge bile taşarsa **tool sonuçları** kademeli demote edilir; **en yeni tool bilinçli olarak en sona saklanır** ve ancak son çare olarak feda edilir.
+
+*Tool-trace dışı (bu şemada yok):* proaktif tetik · boundary hesabı · 4096-token cache freni.
+
+---
+
+## OpenClaw — 5 tool-trace adımı (12'nin içinden)
+
+**Ne zaman tetiklenir:** **[0] adımında** — boş yer pencerenin yarısının altına düştüğünde
+(`boş < pencere × 0.5`). Yani tool izi pencereyi yarılamışsa. Üretim anında çalışan bir
+katmanı **yoktur**; her şey bu tek eşikte olur.
+
+```mermaid
+flowchart LR
+    O1["[1] SANITIZE<br/>toolResult.details sil"] --> O3["[3] PROJECTION<br/>dev tool gövdesi → 8KB"]
+    O3 --> O5["[5] GRUPLAMA<br/>call↔result atomik"] --> O7["[7] OVERSIZED<br/>dev sonuç → NOT, çift düşer"]
+    O7 --> O11["[11] ONARIM<br/>yetim çift → sentetik sonuç"]
+```
+
+**[1] Sanitize** — `toolResult.details` alanı silinir. Tool çıktısı birazdan bir LLM'e gidecek; API anahtarı gibi sırların özete sızması **burada** engellenir.
+
+**[3] Projection** — Dev **tool gövdeleri** 8KB örneğe indirilir ama ağırlıkları gerçek boyutta sayılmaya devam eder. Çalışma kopyasıdır, final transcript'e girmez; amacı özetleyici LLM'i patlatmamak.
+
+**[5] Gruplama** — `tool_call` ile `tool_result` **atomik bir grup** sayılır; asla ayrı chunk'lara düşemezler, yoksa çift kırılır ve API isteği reddedilir.
+
+**[7] Oversized** — Tek başına pencerenin yarısını aşan **tool sonucu** özetlenmeye *çalışılmaz*; tek satır NOT'a iner (`[Large toolResult (~104K tokens) omitted]`) ve **çifti birlikte düşer**. Bu özet değil, bilinçli feragattir.
+
+**[11] Onarım** — Özetleme sonrası çifti kopmuş bir `tool_call` kaldıysa ona **sentetik sonuç** uydurulur; zincir kırık bırakılmaz.
+
+*Tool-trace dışı:* [0] tetik · [2] estimate · [4] adaptif oran · [8] stage-split · [9] worker · [10] LLM özeti · [12] uygula.
+*(Not: [6] chunk kısmen tool-farkındadır — [5]'in kurduğu atomik grupları bölmez.)*
+
+---
+
+## OpenCode — 5 tool-trace adımı
+
+**Ne zaman tetiklenir:** **İki ayrı anda.** (A) Tool çıktısı **üretilirken**: >2000 satır
+veya >50KB ise anında diske döker. (B) **Her turda proaktif** prune (`cfg.compaction.prune`
+açıksa) — bedava olduğu için overflow beklemez; LLM'li overflow özeti ise ancak
+`kullanılan ≥ pencere − 20K buffer` olunca devreye girer.
+
+```mermaid
+flowchart LR
+    A["[A] CANLI SPILL<br/>>2000 satır/50KB → diske"] --> B1["SKILL KORUMASI<br/>skill çıktısı atlanır"]
+    B1 --> B2["EN-YENİ-40K<br/>tool çıktıları kümülatif"]
+    B2 --> B3["COMPACTED DAMGASI<br/>tool.state.time"]
+    B3 --> B4["SERIALIZE<br/>damgalı çıktı → 2000 kar"]
+```
+
+**[A] Canlı spill** — **Tool çıktısı üretilirken** 2000 satırı ya da 50KB'ı aşarsa diske yazılır; context'e önizleme + dosya referansı girer. Dev çıktı context'e **hiç girmez** ve tam içerik geri çağrılabilir.
+
+**[B] Skill koruması** — `skill` **tool çıktıları** budamadan muaftır; referans materyaldir, eskise de değerini yitirmez.
+
+**[B] En-yeni-40K** — Korunan tail'in ötesindeki **tool çıktıları** kümülatif toplanır; toplam 40K'ya varana kadar hepsi korunur, ötesi buda-adayı olur. Yani ölçüt mesaj sayısı değil, **tool izinin hacmi**.
+
+**[B] Compacted damgası** — Buda kararı, tool'un `state.time.compacted` alanına basılan zaman damgasıdır. İçerik o an değişmez; damga hem "serialize'da küçült" hem de sonraki prune için "buradan öteye geçme" anlamına gelir.
+
+**[B] Serialize** — Asıl küçülme burada: damgalı **tool çıktısı** context'e yazılırken `TOOL_OUTPUT_MAX_CHARS=2000` karaktere iner. Mesaj **silinmez**, çift bozulmaz.
+
+*Tool-trace dışı:* proaktif tetik · son-2-turn koruması (turn bazlı) · 20K fayda-freni (cache) · overflow LLM özeti.
+
+---
+
+## Codex — 3 tool-trace adımı
+
+**Ne zaman tetiklenir:** (A) **Tek tool çıktısı, kendisine tanınan tavanı aştığında**
+`truncate_middle` anında devreye girer — bu tavan pencereden **bağımsız sabit bir sınırdır**
+(POC'ta `TOOL_BUDGET_TOKENS = 5.000`); pencere bomboş olsa bile kesme yapılır.
+(B) **History pencereye sığmadığında** (POC'ta `CONTEXT_WINDOW = 30.000`) önce placeholder
+trim, o da yetmezse handoff özeti + yeni pencere. Yani Codex proaktif çalışmaz — **taşınca**
+müdahale eder; ama (A) bir "taşma" değil, girişte uygulanan boyut filtresidir.
+
+```mermaid
+flowchart LR
+    C1["truncate_middle<br/>BAŞ+SON tut, ORTA at"] --> C2["MULTİMODAL MUAFİYETİ<br/>görsel kesilmez"]
+    C2 --> C3["PLACEHOLDER<br/>function_call_output → iskelet"]
+```
+
+**1 · truncate_middle** — Tek bir **tool çıktısı** bütçeyi aşarsa başı ve sonu tutulur, ortası atılır; üstüne `Warning: truncated output` konur. Gerekçe: çıktının başı (imports/imza) ve sonu (hata satırı/exit kodu) en bilgilendirici, ortası en tekrarlı kısımdır.
+
+**2 · Multimodal muafiyeti** — Görsel içerikli tool sonuçları bu kesmeden muaftır; bir resmin ortasını atmak onu tamamen anlamsız kılar.
+
+**3 · Placeholder trim** — History sığmazsa en eski **`function_call_output`**'lar teker teker placeholder'a çevrilir: içerik gider, **çağrı iskeleti kalır** — böylece `tool_call ↔ tool_result` zinciri kırılmaz.
+
+*Tool-trace dışı:* handoff özeti (`SUMMARIZATION_PROMPT`) · `CompactedItem` ile yeni pencere açma (windowing) — bunlar konuşma seviyesidir, tool iziyle sınırlı değildir.
+
+---
+
+## Claude Code — 2 tool-trace mekanizması
+
+**Ne zaman tetiklenir:** (A) Microcompaction, **tek tool çıktısı ~4K token'ı aştığında**
+üretim anında (gözlem). (C) Subagent kaçışı bir **eşik değil karardır** — ajan büyük bir
+yan-işi ayrı pencerede koşturmayı seçer, böylece tool izi ana context'te **hiç oluşmaz**.
+*(Auto-compaction ~%80'de tetiklenir ama o konuşma seviyesidir, bu şemada yok.)*
+
+```mermaid
+flowchart LR
+    K1["[A] MICROCOMPACTION<br/>büyük tool çıktısı → diske<br/>context'e önizleme + referans"]
+    K2["[C] SUBAGENT KAÇIŞI<br/>tool izi AYRI pencerede<br/>ana context'e sadece özet"]
+    K1 -.-> K2
+```
+
+**[A] Microcompaction** — Tek bir **tool çıktısı** ~4K token'ı aşarsa diske yazılır (`tool-results/…txt`) ve context'te ~500 token'lık önizleme + `Full output saved to:` referansı kalır. Model içeriğin kaybolmadığını, gerekirse dosyadan okuyabileceğini bilir.
+
+**[C] Subagent kaçışı** — Compaction'a *alternatif*: büyük bir yan-iş ayrı bir context penceresinde koşar, ana pencereye yalnız damıtılmış özet döner. Ara adımların **tool izi ana context'e hiç girmez** — yani sıkıştırılacak bir iz **oluşmaz bile**. Sıkıştırmanın en ucuz hali: hiç üretmemek.
+
+*Tool-trace dışı:* auto-compaction (konuşma özeti, turn seviyesi) · Pre/PostCompact hook'ları · anti-thrash koruması.
+
+---
+
+> **Beş sistemi tool-trace ekseninde tek cümlede:** Hermes *tool sonuçlarını tekilleştirip tek satıra indirir ve en yeniyi son çare tutar* · OpenClaw *sırrı söker, devi feragatle düşürür, çifti atomik tutar ve kopanı tamir eder* · OpenCode *büyüğü üretimde diske alır, tool izini hacimle (40K) ölçer, damgalayıp serialize'da kısar* · Codex *çıktının ortasını keser, görseli muaf tutar, eskiyi iskelete indirir* · Claude Code *büyüğü diske alır, ağır işin izini hiç ana pencereye sokmaz*.

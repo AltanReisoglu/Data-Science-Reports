@@ -18,6 +18,26 @@ Tool'lar tetiklendikçe Codex'in üç aşaması SIRAYLA ortaya çıkar:
 from __future__ import annotations
 from typing import Any
 
+try:
+    import llm  # gerçek LLM handoff özeti (poc/llm.py; .env'den, anahtar yazdırılmaz)
+except Exception:
+    llm = None
+
+
+def _llm_handoff(trace_text, fallback, sysprompt, tag):
+    """llm.available() ise GERÇEK LLM özeti, değilse fallback (mock)."""
+    if llm is not None and llm.available():
+        try:
+            r = llm.chat([{"role": "system", "content": sysprompt},
+                          {"role": "user", "content": trace_text[:6000]}],
+                         max_tokens=200, temperature=0.2)
+            s = (r.get("content") or "").strip()
+            if s:
+                return f"[{tag} (GERÇEK LLM · {llm.MODEL}): {s}]"
+        except Exception:
+            return fallback
+    return fallback
+
 # ---- Codex ayarları (POC ölçeğinde küçültülmüş) ----
 CONTEXT_WINDOW = 30_000
 TOOL_BUDGET_TOKENS = 5_000     # Katman A: tek çıktı bu token'ı aşarsa ortadan kes
@@ -58,21 +78,26 @@ class CodexSession:
         self.window_number = 0
         self.compacted: list[dict] = []
         self.log: list[str] = []
+        self.raw_total = 0   # hiç sıkıştırma olmasaydı context (tüm ham çıktılar toplamı)
+        self.peak = 0        # ulaşılan en yüksek GERÇEK context (compaction öncesi zirve)
 
     def total(self) -> int:
         return sum(item_tokens(it) for it in self.history) + 3
 
     # --- olay: mesaj ekle ---
     def user(self, text):
+        self.raw_total += est(text) + 3
         self.history.append({"kind": "message", "role": "user", "text": text})
         self._manage(f'user("{text[:30]}")')
 
     def assistant(self, text):
+        self.raw_total += est(text) + 3
         self.history.append({"kind": "message", "role": "assistant", "text": text})
         self._manage(f'assistant("{text[:30]}")')
 
     # --- olay: tool tetikle (Katman A burada) ---
     def tool(self, name, output, call_id):
+        self.raw_total += est(output) + est(name) + 3   # HAM çıktı (kesme öncesi)
         self.history.append({"kind": "function_call", "tool": name, "call_id": call_id, "text": name})
         shown, truncated = truncate_middle(output, TOOL_BUDGET_TOKENS)
         self.history.append({"kind": "function_output", "call_id": call_id,
@@ -84,6 +109,7 @@ class CodexSession:
     def _manage(self, ev):
         line = f"  » {ev:<52} total={self.total():,}"
         self.log.append(line)
+        self.peak = max(self.peak, self.total())
         if self.total() > COMPACT_THRESHOLD:
             self._compact()
         elif self.total() > TRIM_THRESHOLD:
@@ -124,9 +150,21 @@ class CodexSession:
         # user mesajlarını topla (KORUNUR), özet üret (mock handoff)
         user_msgs = [it for it in self.history if it["kind"] == "message" and it["role"] == "user"]
         tools_used = [it["tool"] for it in self.history if it["kind"] == "function_call"]
+        _fallback = (f"[HANDOFF ÖZET: {len(tools_used)} tool çağrısı ({', '.join(dict.fromkeys(tools_used))}); "
+                     f"user hedefleri korundu (mock)]")
+        _trace = []
+        for it in self.history:
+            if it["kind"] == "message":
+                _trace.append(f"{it['role']}: {it.get('text','')[:300]}")
+            elif it["kind"] == "function_call":
+                _trace.append(f"tool çağrısı: {it['tool']}")
+            elif it["kind"] == "function_output" and not it.get("placeholder"):
+                _trace.append(f"çıktı: {it.get('output','')[:800]}")
         summary = {"kind": "message", "role": "summary",
-                   "text": f"[HANDOFF ÖZET: {len(tools_used)} tool çağrısı ({', '.join(dict.fromkeys(tools_used))}); "
-                           f"user hedefleri korundu (mock)]"}
+                   "text": _llm_handoff("\n".join(_trace), _fallback,
+                       "Codex ajanının geçmişini sonraki pencereye devretmek için handoff özeti üret. "
+                       "Yapılan tool çağrıları, ulaşılan sonuçlar ve kullanıcı hedeflerini 2-3 cümlede Türkçe özetle. "
+                       "Sadece özeti döndür.", "HANDOFF ÖZET")}
         # build_compacted_history: world_state + özet + user mesajları.
         # function_call/output DÜŞÜRÜLÜR (özet zaten onları içeriyor) — gerçek reset.
         new_history = [world_state, summary] + user_msgs
@@ -195,7 +233,12 @@ def main():
     print(f"\n  window sayısı (CompactedItem zinciri): {s.window_number}")
     for w in s.compacted:
         print(f"    window #{w['window_number']} ← replaced {w['replaced_items']} öğe (resume edilebilir)")
-    print(f"  final total: {s.total():,} token")
+    _final = s.total(); _saved = s.raw_total - _final
+    print(f"\n── KAÇTAN KAÇA " + "─" * 56)
+    print(f"  ham (hiç sıkıştırma olmasaydı) ≈ {s.raw_total:,} token")
+    print(f"  pik gerçek context (compaction'dan hemen önce) : {s.peak:,} token")
+    print(f"  final context : {_final:,} token")
+    print(f"  → {s.raw_total:,} → {_final:,} token  |  −{_saved:,} ({_saved/s.raw_total*100:.1f}% kazanç, {s.window_number} window ile)")
     print("=" * 78)
     print("\nAŞAMA ÖZETİ:")
     print("  A  Katman A ortadan-kesme  → c1,c2 üretilirken (18K/20K → 5K + Warning)")

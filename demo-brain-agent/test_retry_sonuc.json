@@ -1,0 +1,82 @@
+{
+ "gecici": {
+  "cagri": 1,
+  "araliklar": [],
+  "attempt": 1,
+  "durum": "done",
+  "sn": 0.003,
+  "ust_tekrar": 1,
+  "toplam_cagri": 5
+ },
+ "kalici": {
+  "cagri": 0,
+  "attempt": 3,
+  "durum": "failed",
+  "sn": 0.001,
+  "alt_cagri": 0
+ },
+ "yan_etki": {
+  "is_yapilmadan": 1,
+  "is_yapildiktan_sonra": 2,
+  "detay": {
+   "iş YAPILMADAN patlıyor": {
+    "fetch_source": 1,
+    "run_test_suite": 1,
+    "scan_patterns": 1,
+    "cross_check": 1,
+    "render_report": 1
+   },
+   "iş YAPILDIKTAN SONRA patlıyor": {
+    "fetch_source": 1,
+    "run_test_suite": 1,
+    "scan_patterns": 2,
+    "cross_check": 1,
+    "render_report": 1
+   }
+  }
+ },
+ "backendler": [
+  {
+   "backend": "own",
+   "yurutme_denemesi": 2,
+   "bayat_yazma": 0,
+   "attempt": 1,
+   "durum": "done",
+   "sn": 0.011,
+   "hata": "",
+   "tamamlanan": 5,
+   "toplam": 5
+  },
+  {
+   "backend": "temporal",
+   "yurutme_denemesi": 2,
+   "bayat_yazma": 0,
+   "attempt": 1,
+   "durum": "done",
+   "sn": 0.529,
+   "hata": "",
+   "tamamlanan": 5,
+   "toplam": 5
+  },
+  {
+   "backend": "celery",
+   "yurutme_denemesi": 2,
+   "bayat_yazma": 0,
+   "attempt": 1,
+   "durum": "done",
+   "sn": 40.353,
+   "hata": "",
+   "tamamlanan": 5,
+   "toplam": 5
+  }
+ ],
+ "breaker_sifirlama": {
+  "sifirlandi": true,
+  "attempt": 2
+ },
+ "kalici_atlama": {
+  "cagri": 1,
+  "attempt": 1,
+  "atlandi": true
+ }
+}

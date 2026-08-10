@@ -98,3 +98,33 @@ SQLite çekirdeğiyle çökmeyi otomatik toparlar ve handoff özetiyle bağlamı
 
 > Bu, `report/task-yonetimi-altyapi-karari.md` ve `report/task-management-sunum-ve-flowchart.md`
 > dökümanlarındaki iddiaların **çalışan kanıtıdır**.
+
+---
+
+## BİZİM BEYNİ (brain_chat_V2) altyapılara sarma POC'ları
+
+Yukarıdaki dört POC "framework kendi başına nasıl davranır"ı gösterir. Aşağıdakiler ise
+**aynı beyni** (`brain_core.py`) her altyapıya **sarıp/simüle ederek** ne olduğunu ölçer.
+İlk POC'lara dokunulmadı; bunlar onların **altına** eklendi.
+
+Ortak beyin (`brain_core.py`) 4 adımlı bir iş (A): `retrieve → reason → act → respond`;
+`reason` (= LLM adımı) ilk denemede geçici hata verir. **Ölçülen soru: pahalı `retrieve`
+çökme/retry sonrası kaç kez koşar?**
+
+```bash
+.venv/bin/python poc-task-mgmt/brain_on_temporal_poc.py   # buy   → retrieve 1× (replay)
+.venv/bin/python poc-task-mgmt/brain_on_celery_poc.py     # buy   → retrieve 2× (baştan)
+.venv/bin/python poc-task-mgmt/brain_on_hermes_poc.py     # build → retrieve 1× (handoff)
+.venv/bin/python poc-task-mgmt/brain_build_own_poc.py     # build → retrieve 1× (checkpoint+recovery)
+```
+
+| POC | Rota | `retrieve` | Kanıt |
+|---|---|:---:|---|
+| `brain_on_temporal_poc.py` | buy (durable motora bin) | **1×** | replay biten activity'yi atlar; 29 durable event |
+| `brain_on_celery_poc.py` | buy (kuyruğa devret) | **2×** ⚠️ | `self.retry()` tüm task'ı baştan koşar; A-resume sende |
+| `brain_on_hermes_poc.py` | build (hazır motor) | **1×** | `release_stale_claims` otomatik + handoff (task_comment) taşır |
+| `brain_build_own_poc.py` | build (sıfırdan ~200 satır) | **1×** | CAS-claim + lease + `recover_stale` + **checkpoint** + breaker |
+
+`brain_build_own_poc.py` hiçbir dış framework kullanmaz (yalnız `sqlite3`): otomatik crash-recovery
+(Hermes-tarzı) + kaldığı yerden devam (Temporal-tarzı) tek dosyada. **"Build" rotasının tam kodu +
+anlatımı:** `report/brain-chat-v2-task-management-entegrasyon.md`.
