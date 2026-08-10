@@ -1,0 +1,282 @@
+[
+ {
+  "ad": "hata sonrası durum 'ready'",
+  "beklenen": "ready",
+  "gercek": "ready",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "attempt artıyor",
+  "beklenen": "1",
+  "gercek": "1",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "breaker sayacı artıyor",
+  "beklenen": "1",
+  "gercek": "1",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "başka worker yeniden claim edebiliyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "tamamlanınca breaker sıfırlanıyor",
+  "beklenen": "0",
+  "gercek": "0",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "olay günlüğü retry'ı kaydetti",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "son durum 'failed' (sonsuz retry yok)",
+  "beklenen": "failed",
+  "gercek": "failed",
+  "gecti": true,
+  "detay": "durum dizisi: ['ready', 'ready', 'failed']"
+ },
+ {
+  "ad": "failed task artık claim edilemiyor",
+  "beklenen": "None",
+  "gercek": "None",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "breaker limitte kapandı",
+  "beklenen": "3",
+  "gercek": "3",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "fonksiyon düğümünde çökme TETİKLENİYOR",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": "fetch_source() sonrası worker öldü"
+ },
+ {
+  "ad": "çökme sonrası checkpoint DOLU",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "task hâlâ 'running' (complete çağrılmadı)",
+  "beklenen": "running",
+  "gercek": "running",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "recover_stale topluyor",
+  "beklenen": "1",
+  "gercek": "1",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "durum 'ready'ye döndü",
+  "beklenen": "ready",
+  "gercek": "ready",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "checkpoint KORUNDU (kurtarma silmedi)",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "bağımlı task 'blocked' doğuyor",
+  "beklenen": "blocked",
+  "gercek": "blocked",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "blocked task claim EDİLEMİYOR",
+  "beklenen": "t_b23a95",
+  "gercek": "t_b23a95",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "recompute_ready parent bitmeden açmıyor",
+  "beklenen": "0",
+  "gercek": "0",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "parent bitince kapı açılıyor",
+  "beklenen": "1",
+  "gercek": "1",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "çocuk artık 'ready'",
+  "beklenen": "ready",
+  "gercek": "ready",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "1. spawn kabul",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "2. spawn kabul",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "3. spawn REDDEDİLDİ (task başına fren)",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "yürütme-anında üretilenler işaretli",
+  "beklenen": "2",
+  "gercek": "2",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "spawn'lanan task bağımsız (parents boş)",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "board tavanı dolunca REDDEDİLİYOR",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "bilinmeyen fonksiyon reddediliyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "bozuk JSON argüman reddediliyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "olmayan bağımlılık reddediliyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "tanımsız argüman ELENİYOR",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "çöp argüman board'a YAZILMIYOR",
+  "beklenen": "['pattern']",
+  "gercek": "['pattern']",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "boş başlık reddediliyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "kind=function ama fn yok → reddediliyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "yürütücü de bilinmeyen fn'yi reddediyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "upstream sonucu görünüyor",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "upstream'de path (referans) var",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "ham içerik sonuçta TAŞINMIYOR",
+  "beklenen": "False",
+  "gercek": "False",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "alt düğüm upstream'i KULLANDI (eşleşme buldu)",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": "count=4"
+ },
+ {
+  "ad": "zamanlanmış koşu (cron/interval) UYGULANMIŞ mı",
+  "beklenen": "False",
+  "gercek": "False",
+  "gecti": true,
+  "detay": "→ HAYIR: scheduling bu sistemde hiç yok (koçun 6 ekseninden biri açık)"
+ },
+ {
+  "ad": "board'da zaman alanı (next_run/schedule) var mı",
+  "beklenen": "False",
+  "gercek": "False",
+  "gecti": true,
+  "detay": ""
+ }
+]

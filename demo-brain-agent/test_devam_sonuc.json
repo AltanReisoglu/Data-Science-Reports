@@ -1,0 +1,47 @@
+{
+ "dugum_seviyesi": {
+  "onceki_tekrar_yok": true,
+  "sayimlar": {
+   "fetch_source": 1,
+   "run_test_suite": 1,
+   "scan_patterns": 2,
+   "cross_check": 1
+  },
+  "crashes": 1,
+  "recovered": 1
+ },
+ "fonksiyon_ici": {
+  "checkpoint_yazildi": true,
+  "cagri": 2,
+  "geri_okunuyor": false
+ },
+ "ajan_ici": {
+  "devam": 1,
+  "yazma": 3,
+  "crashes": 1,
+  "durum": "done"
+ },
+ "backendler": [
+  {
+   "backend": "own",
+   "korundu": true,
+   "durum": "done",
+   "sn": 1.5,
+   "hata": ""
+  },
+  {
+   "backend": "celery",
+   "korundu": true,
+   "durum": "done",
+   "sn": 11.8,
+   "hata": ""
+  },
+  {
+   "backend": "temporal",
+   "korundu": true,
+   "durum": "done",
+   "sn": 1.9,
+   "hata": ""
+  }
+ ]
+}

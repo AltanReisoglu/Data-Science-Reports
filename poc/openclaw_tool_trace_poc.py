@@ -20,6 +20,11 @@ from __future__ import annotations
 import math
 from typing import Any
 
+try:
+    import llm  # gerçek LLM özeti (poc/llm.py; .env'den yükler, anahtar ASLA yazdırılmaz)
+except Exception:
+    llm = None
+
 # ---- OpenClaw sabitleri (birebir) ----
 MIN_PROMPT_BUDGET_TOKENS = 8_000
 MIN_PROMPT_BUDGET_RATIO = 0.5
@@ -189,14 +194,34 @@ def step8_stage_split(msgs, max_tokens, parts=DEFAULT_PARTS):
     return ("split" if len(out) > 1 else "single"), out
 
 
-def step10_summarize_mock(chunk):
-    """LLM özeti (mock) — gerçekte model çağrılır."""
+def step10_summarize(chunk):
+    """Chunk'ı özetler: llm.available() ise GERÇEK LLM çağrısı, değilse mock'a düşer."""
     tools = []
     for m in chunk:
         for tc in m.get("toolCalls", []) or []:
             tools.append(tc["name"])
     tools_s = ", ".join(dict.fromkeys(tools)) or "—"
-    return f"[ÖZET: {len(chunk)} mesaj · araçlar: {tools_s} · (mock LLM özeti)]"
+    if llm is not None and llm.available():
+        lines = []
+        for m in chunk:  # chunk sanitize edilmiş; details zaten silinmiş (sır yok)
+            if m["role"] == "assistant" and m.get("toolCalls"):
+                lines.append("asistan çağrıları: " + ", ".join(
+                    f"{tc['name']}({tc.get('args','')})" for tc in m["toolCalls"]))
+            elif m["role"] == "toolResult":
+                lines.append(f"tool sonucu[{m.get('id')}]: " + (m.get("content", "") or "")[:1500])
+            elif m.get("content"):
+                lines.append(f"{m['role']}: {m['content'][:400]}")
+        try:
+            r = llm.chat([
+                {"role": "system", "content": "Ajan tool-izi özetleyicisisin. Verilen tool çağrıları ve sonuçlarını, ilerlemeyi ve kararları koruyacak şekilde 2-3 cümlede Türkçe özetle. Sadece özeti döndür."},
+                {"role": "user", "content": "\n".join(lines)[:6000]},
+            ], max_tokens=200, temperature=0.2)
+            s = (r.get("content") or "").strip()
+            if s:
+                return f"[ÖZET (GERÇEK LLM · {llm.MODEL}): {s}]"
+        except Exception as e:
+            return f"[ÖZET: {len(chunk)} mesaj · araçlar: {tools_s} · (LLM hata: {str(e)[:40]} → mock)]"
+    return f"[ÖZET: {len(chunk)} mesaj · araçlar: {tools_s} · (mock — llm.available()=False)]"
 
 
 def step11_repair(final_msgs):
@@ -312,8 +337,9 @@ def main():
     print(f"[9] WORKER       planlama worker-thread'de yapıldı (simüle) — ana döngü bloklanmadı")
 
     # 10
-    summaries = [step10_summarize_mock(s) for s in stages if s]
-    print(f"[10] LLM ÖZET    {len(summaries)} özet (mock):")
+    summaries = [step10_summarize(s) for s in stages if s]
+    _mode = "GERÇEK LLM" if (llm is not None and llm.available()) else "mock"
+    print(f"[10] LLM ÖZET    {len(summaries)} özet ({_mode}):")
     for s in summaries:
         print(f"                 {s}")
 

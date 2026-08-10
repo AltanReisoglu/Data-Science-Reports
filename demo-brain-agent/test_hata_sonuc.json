@@ -1,0 +1,354 @@
+{
+ "kontroller": [
+  {
+   "ad": "retry tetiklendi",
+   "gecti": true,
+   "detay": "retries=1"
+  },
+  {
+   "ad": "hata veren düğüm sonunda tamamlandı",
+   "gecti": true,
+   "detay": "attempt=1"
+  },
+  {
+   "ad": "ARDINDAKİ düğümlerin hepsi koştu (akış devam etti)",
+   "gecti": true,
+   "detay": "['done', 'done', 'done', 'done', 'done']"
+  },
+  {
+   "ad": "breaker sayacı başarıdan sonra sıfırlandı",
+   "gecti": true,
+   "detay": "cf=0"
+  },
+  {
+   "ad": "olay günlüğü hatayı kaydetti",
+   "gecti": true,
+   "detay": "['created', 'unblocked', 'claimed', 'retry_scheduled', 'claimed', 'completed']"
+  },
+  {
+   "ad": "koşu SONLANDI (sonsuz döngü/asılma yok)",
+   "gecti": true,
+   "detay": "0.0s"
+  },
+  {
+   "ad": "breaker devreye girdi → failed",
+   "gecti": true,
+   "detay": "attempt=3, cf=3"
+  },
+  {
+   "ad": "sonsuz retry yok (deneme ≤ BREAKER_LIMIT)",
+   "gecti": true,
+   "detay": "attempt=3"
+  },
+  {
+   "ad": "hatadan ÖNCEKİ düğümün işi korundu (boşa gitmedi)",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "ardındaki düğüm çalıştırılmadı (yanlış veriyle koşmadı)",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "ardındaki düğüm 'cancelled' — 'bekliyor' ile karışmıyor",
+   "gecti": true,
+   "detay": "durum=cancelled"
+  },
+  {
+   "ad": "iptal ZİNCİRİ torunlara da indi (yalnız çocuk değil)",
+   "gecti": true,
+   "detay": "torun (render_report) durumu=cancelled"
+  },
+  {
+   "ad": "batan dalla İLGİSİZ düğüm etkilenmedi",
+   "gecti": true,
+   "detay": "run_test_suite=done"
+  },
+  {
+   "ad": "board 'iş bitti' diyebiliyor (asılı düğüm kalmadı)",
+   "gecti": true,
+   "detay": "counts={'cancelled': 2, 'done': 2, 'failed': 1}"
+  },
+  {
+   "ad": "iptal olay günlüğüne yazıldı (denetim izi)",
+   "gecti": true,
+   "detay": "['created', 'cancelled']"
+  },
+  {
+   "ad": "koşu özeti koşmayan düğümü RAPORLUYOR",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "ok bayrağı False (kısmi başarıyı 'başarı' saymıyor)",
+   "gecti": true,
+   "detay": "done=2, failed=1"
+  },
+  {
+   "ad": "HATA attempt'i artırıyor",
+   "gecti": true,
+   "detay": "attempt=1"
+  },
+  {
+   "ad": "ÇÖKME attempt'i artırMIYOR (worker suçlu, iş değil)",
+   "gecti": true,
+   "detay": "attempt=0"
+  },
+  {
+   "ad": "ÇÖKME sonrası recover_stale devraldı",
+   "gecti": true,
+   "detay": "recovered=1"
+  },
+  {
+   "ad": "ÇÖKEN düğüm sonunda tamamlandı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "çökmede akışın tamamı bitti",
+   "gecti": true,
+   "detay": "['done', 'done', 'done', 'done', 'done']"
+  },
+  {
+   "ad": "üç backend de kalıcı hatada ASILMADI",
+   "gecti": true,
+   "detay": "own=0.0s, temporal=0.5s, celery=12.3s"
+  },
+  {
+   "ad": "hata veren düğümün son durumu üç backend'de AYNI",
+   "gecti": true,
+   "detay": "scan durumları: {'failed'}"
+  },
+  {
+   "ad": "ardındaki düğümün son durumu üç backend'de AYNI",
+   "gecti": true,
+   "detay": "report durumları: {'cancelled'}"
+  },
+  {
+   "ad": "retry sayısı backend'ler arasında tutarlı",
+   "gecti": true,
+   "detay": "{'own': 3, 'temporal': 3, 'celery': 3}"
+  },
+  {
+   "ad": "olmayan fonksiyon board'a YAZILMADAN reddedildi",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "bozuk kayıtlı akış YÜKLEMEDE reddedildi (yarım koşmadı)",
+   "gecti": true,
+   "detay": "note=kayıtlı akış geçersiz: bilinmeyen fonksiyon: artik_olmayan_fn (geçerli"
+  },
+  {
+   "ad": "bozuk akışta hiçbir düğüm koşmadı (kısmi yan etki yok)",
+   "gecti": true,
+   "detay": "done=0"
+  },
+  {
+   "ad": "geçersiz argüman koşuyu düşürmedi (filtrelendi)",
+   "gecti": true,
+   "detay": "durum=done"
+  },
+  {
+   "ad": "eksik veri kenarı yürütmeden ÖNCE yakalandı",
+   "gecti": true,
+   "detay": "3 onarım: ⚠ EKSİK KENAR ONARILDI: eşleştir (cross_check) ← tara (scan_patterns) "
+  },
+  {
+   "ad": "tüketici üreticiye BAĞLANDI (cross_check ← scan_patterns)",
+   "gecti": true,
+   "detay": "parents=['t_faca74', 't_3694c8', 't_ec2089']"
+  },
+  {
+   "ad": "onarım sonrası akış tamamlandı",
+   "gecti": true,
+   "detay": "counts={'done': 5}"
+  },
+  {
+   "ad": "rapor GERÇEK sayıları basıyor (varsayılan 0 değil)",
+   "gecti": true,
+   "detay": "- Taranan desen eşleşmesi: **4**"
+  },
+  {
+   "ad": "yinelenen bağımlılık tekilleştirildi (kapı kilitlenmiyor)",
+   "gecti": true,
+   "detay": "parents=['t_78f1fb']"
+  },
+  {
+   "ad": "yinelenen parent'lı düğüm koştu",
+   "gecti": true,
+   "detay": "durum=done"
+  },
+  {
+   "ad": "üstü batmış düğüm NORMAL yolda asla 'ready' olamıyor",
+   "gecti": true,
+   "detay": "durum=cancelled"
+  },
+  {
+   "ad": "DB dosyası silinince yazma hatası GÖRÜNÜR oluyor",
+   "gecti": true,
+   "detay": "SQLite açık tanıtıcıya yazmaya devam etti (POSIX unlink semantiği)"
+  },
+  {
+   "ad": "lease dolunca task geri kuyruğa döndü ve devralındı",
+   "gecti": true,
+   "detay": "ilk claim=var, recover=1, devralan=var"
+  },
+  {
+   "ad": "geç kalan worker'ın yazması ENGELLENDİ (fencing)",
+   "gecti": true,
+   "detay": "kabul=False, result=None"
+  },
+  {
+   "ad": "devralan worker normal yazabiliyor (fencing fazla katı değil)",
+   "gecti": true,
+   "detay": "result=DEVRALANIN SONUCU"
+  },
+  {
+   "ad": "dev sonuç kırpıldı ama board ayakta",
+   "gecti": true,
+   "detay": "2,129 karakter"
+  },
+  {
+   "ad": "kırpılmış sonuç hâlâ geçerli JSON (aşağı akış bozulmuyor)",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "hiçbir strateji uç girdide patlamadı",
+   "gecti": true,
+   "detay": "6×6 kombinasyon"
+  },
+  {
+   "ad": "olmayan tool: akış düzgün kapandı (done)",
+   "gecti": true,
+   "detay": "tipler={'done', 'summary', 'chat'}"
+  },
+  {
+   "ad": "olmayan tool: kullanıcıya çökme izi sızmadı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "olmayan tool: boş cevap dönmedi",
+   "gecti": true,
+   "detay": "526 karakter"
+  },
+  {
+   "ad": "eksik argüman: akış düzgün kapandı (done)",
+   "gecti": true,
+   "detay": "tipler={'done', 'summary', 'chat'}"
+  },
+  {
+   "ad": "eksik argüman: kullanıcıya çökme izi sızmadı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "eksik argüman: boş cevap dönmedi",
+   "gecti": true,
+   "detay": "268 karakter"
+  },
+  {
+   "ad": "olmayan fn ile pipeline: akış düzgün kapandı (done)",
+   "gecti": true,
+   "detay": "tipler={'node_added', 'log', 'board', 'done', 'reduction', 'saved', 'summary', 'phase'}"
+  },
+  {
+   "ad": "olmayan fn ile pipeline: kullanıcıya çökme izi sızmadı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "olmayan fn ile pipeline: boş cevap dönmedi",
+   "gecti": true,
+   "detay": "1404 karakter"
+  },
+  {
+   "ad": "hatalı isteklerden sonra sunucu SAĞLIKLI",
+   "gecti": true,
+   "detay": ""
+  }
+ ],
+ "bulgular": [
+  {
+   "baslik": "Fonksiyon düğümünde HATA olduğunda checkpoint yazılmıyor",
+   "aciklama": "Çökmede kısmi iş korunuyor ama hatada retry sıfırdan başlıyor. Fonksiyonlar deterministik ve kısa olduğu için pratikte bedeli düşük — ama uzun süren bir fonksiyon eklenirse tüm iş tekrarlanır.",
+   "agirlik": "düşük"
+  },
+  {
+   "baslik": "Geçersiz argüman sessizce yutuluyor",
+   "aciklama": "olmayan_arg=42 hiçbir uyarı üretmeden atıldı. LLM yanlış parametre verdiğinde düğüm 'başarılı' görünüp yanlış varsayılanla koşar.",
+   "agirlik": "orta"
+  },
+  {
+   "baslik": "Fonksiyonlar boş upstream'i kendi başlarına yakalamıyor",
+   "aciklama": "upstream={} olduğu halde scan_patterns varsayılan path'e düşüp 4 eşleşme döndürdü. Board seviyesindeki iptal zinciri bunu artık normal yolda ULAŞILMAZ kılıyor; savunma tek katmanlı — düğümler board dışından çağrılırsa koruma yok.",
+   "agirlik": "düşük"
+  },
+  {
+   "baslik": "Board dosyası silinse bile yazmalar 'başarılı' dönüyor",
+   "aciklama": "POSIX'te açık dosya tanıtıcısı unlink sonrası yaşar; sonuçlar artık kimsenin okuyamayacağı bir inode'a yazılıyor. Koşu başarılı görünür, veri yoktur.",
+   "agirlik": "orta"
+  }
+ ],
+ "backend_tablosu": [
+  {
+   "backend": "own",
+   "sn": 0.0,
+   "durumlar": [
+    "done",
+    "failed",
+    "cancelled",
+    "cancelled",
+    "done"
+   ],
+   "counts": {
+    "cancelled": 2,
+    "done": 2,
+    "failed": 1
+   },
+   "hata": "",
+   "attempt": 3
+  },
+  {
+   "backend": "temporal",
+   "sn": 0.5,
+   "durumlar": [
+    "done",
+    "failed",
+    "cancelled",
+    "cancelled",
+    "done"
+   ],
+   "counts": {
+    "cancelled": 2,
+    "done": 2,
+    "failed": 1
+   },
+   "hata": "",
+   "attempt": 3
+  },
+  {
+   "backend": "celery",
+   "sn": 12.3,
+   "durumlar": [
+    "done",
+    "failed",
+    "cancelled",
+    "cancelled",
+    "done"
+   ],
+   "counts": {
+    "cancelled": 2,
+    "done": 2,
+    "failed": 1
+   },
+   "hata": "",
+   "attempt": 3
+  }
+ ],
+ "gecen": 54,
+ "toplam": 54
+}

@@ -1,0 +1,145 @@
+{
+ "gecici": {
+  "own": {
+   "deneme": 2,
+   "attempt": 1,
+   "scan": "done",
+   "done": 5,
+   "sn": 0.0,
+   "bayat": 0,
+   "counts": {
+    "done": 5
+   }
+  },
+  "airflow": {
+   "deneme": 0,
+   "attempt": 0,
+   "scan": "blocked",
+   "done": 0,
+   "sn": 0.0,
+   "bayat": 0,
+   "counts": {
+    "blocked": 3,
+    "ready": 2
+   }
+  },
+  "celery": {
+   "deneme": 2,
+   "attempt": 1,
+   "scan": "done",
+   "done": 5,
+   "sn": 15.32,
+   "bayat": 0,
+   "counts": {
+    "done": 5
+   }
+  },
+  "temporal": {
+   "deneme": 2,
+   "attempt": 1,
+   "scan": "done",
+   "done": 5,
+   "sn": 0.51,
+   "bayat": 0,
+   "counts": {
+    "done": 5
+   }
+  }
+ },
+ "kalici": {
+  "own": {
+   "deneme": 3,
+   "attempt": 3,
+   "scan": "failed",
+   "ardil": [
+    "cancelled",
+    "cancelled"
+   ],
+   "done": 2,
+   "sn": 0.01,
+   "counts": {
+    "cancelled": 2,
+    "done": 2,
+    "failed": 1
+   }
+  },
+  "airflow": {
+   "deneme": 0,
+   "attempt": 0,
+   "scan": "blocked",
+   "ardil": [
+    "blocked",
+    "blocked"
+   ],
+   "done": 0,
+   "sn": 0.0,
+   "counts": {
+    "blocked": 3,
+    "ready": 2
+   }
+  },
+  "celery": {
+   "deneme": 3,
+   "attempt": 3,
+   "scan": "failed",
+   "ardil": [
+    "cancelled",
+    "cancelled"
+   ],
+   "done": 2,
+   "sn": 12.35,
+   "counts": {
+    "cancelled": 2,
+    "done": 2,
+    "failed": 1
+   }
+  },
+  "temporal": {
+   "deneme": 3,
+   "attempt": 3,
+   "scan": "failed",
+   "ardil": [
+    "cancelled",
+    "cancelled"
+   ],
+   "done": 2,
+   "sn": 0.25,
+   "counts": {
+    "cancelled": 2,
+    "done": 2,
+    "failed": 1
+   }
+  }
+ },
+ "cokme": {
+  "own": {
+   "crashes": 1,
+   "recovered": 1,
+   "scan": "done",
+   "done": 5
+  },
+  "airflow": {
+   "crashes": 0,
+   "recovered": 0,
+   "scan": "blocked",
+   "done": 0
+  },
+  "celery": {
+   "crashes": 0,
+   "recovered": 0,
+   "scan": "done",
+   "done": 5
+  },
+  "temporal": {
+   "crashes": 0,
+   "recovered": 0,
+   "scan": "done",
+   "done": 5
+  }
+ },
+ "yapisal": {
+  "airflow_retries": "\"retries\": 2,                       # DÜĞÜM bazında retry",
+  "airflow_delay": "\"retry_delay\": timedelta(seconds=30),",
+  "dag_file": "/home/altan/Desktop/adapted/demo-brain-agent/brain_agent_plan.py"
+ }
+}

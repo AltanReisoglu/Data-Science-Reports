@@ -18,6 +18,27 @@ Tool'lar tetiklendikçe Claude Code'un üç mekanizması ortaya çıkar:
 """
 from __future__ import annotations
 
+try:
+    import llm  # gerçek LLM konuşma-özeti (poc/llm.py; .env'den, anahtar yazdırılmaz)
+except Exception:
+    llm = None
+
+
+def _llm_handoff(trace_text, fallback, sysprompt, tag):
+    """llm.available() ise GERÇEK LLM özeti, değilse fallback (mock)."""
+    if llm is not None and llm.available():
+        try:
+            r = llm.chat([{"role": "system", "content": sysprompt},
+                          {"role": "user", "content": trace_text[:6000]}],
+                         max_tokens=200, temperature=0.2)
+            s = (r.get("content") or "").strip()
+            if s:
+                return f"[{tag} (GERÇEK LLM · {llm.MODEL}): {s}]"
+        except Exception:
+            return fallback
+    return fallback
+
+
 # ---- yaklaşık ayarlar (gözlem/tahmin; kapalı kaynak) ----
 WINDOW = 30_000
 MICRO_TOKENS = 4_000        # tek tool çıktısı bunu aşarsa diske dök (gözlem: ~93KB→önizleme)
@@ -41,22 +62,27 @@ class ClaudeCodeSession:
         self.log: list[str] = []
         self.compactions = 0
         self.subagent_runs = 0
+        self.raw_total = 0   # hiç sıkıştırma/kaçış olmasaydı context (tüm ham çıktılar + subagent işi)
+        self.peak = 0        # ulaşılan en yüksek GERÇEK ana context
 
     def total(self) -> int:
         return sum(item_tokens(it) for it in self.history) + 3
 
     # --- olay: mesaj ---
     def user(self, text):
+        self.raw_total += est(text) + 3
         self.history.append({"kind": "user", "text": text})
         self._after(f'user("{text[:30]}")')
 
     def assistant(self, text):
+        self.raw_total += est(text) + 3
         self.history.append({"kind": "assistant", "text": text})
         self._after(f'assistant("{text[:28]}")')
 
     # --- olay: tool (A: microcompaction burada) ---
     def tool(self, name, output, call_id):
         toks = est(output)
+        self.raw_total += toks + est(name) + 3   # HAM çıktı (microcompaction öncesi)
         if toks > MICRO_TOKENS:
             # microcompaction: diske yaz, context'e önizleme + referans
             path = f".claude/projects/.../tool-results/{call_id}.txt"
@@ -74,6 +100,7 @@ class ClaudeCodeSession:
     def subagent(self, goal, inner_tool_tokens):
         """Büyük yan-iş AYRI pencerede koşar; ana pencereye SADECE özet döner."""
         self.subagent_runs += 1
+        self.raw_total += inner_tool_tokens   # kaçış olmasaydı ana context'e girecek iş
         # ana context'e ara adımlar GİRMEZ; sadece özet
         summ = f"[subagent özeti: '{goal}' → {inner_tool_tokens:,}t'lık iş ayrı pencerede yapıldı, damıtıldı]"
         self.history.append({"kind": "assistant", "text": summ})
@@ -82,6 +109,7 @@ class ClaudeCodeSession:
 
     def _after(self, ev):
         self.log.append(f"  » {ev:<62} total={self.total():,}")
+        self.peak = max(self.peak, self.total())
         if self.total() > AUTO_COMPACT_AT:
             self._auto_compact()
 
@@ -103,9 +131,13 @@ class ClaudeCodeSession:
             return
         recent = self.history[keep_from:]
         tools_in_old = sum(1 for it in old if it["kind"] == "tool")
+        _fallback = (f"[Konuşma özeti: önceki {len(old)} mesaj ({tools_in_old} tool) damıtıldı — "
+                     f"ilerleme, kararlar, kalan iş (auto-compaction)]")
+        _trace = [f"{it.get('kind')}: {(it.get('text','') or '')[:400]}" for it in old]
         summary = {"kind": "summary",
-                   "text": f"[Konuşma özeti: önceki {len(old)} mesaj ({tools_in_old} tool) damıtıldı — "
-                           f"ilerleme, kararlar, kalan iş (auto-compaction)]"}
+                   "text": _llm_handoff("\n".join(_trace), _fallback,
+                       "Claude Code oturumunun eski kısmını damıt: ilerleme, alınan kararlar ve kalan işi "
+                       "2-3 cümlede Türkçe özetle (auto-compaction). Sadece özeti döndür.", "Konuşma özeti")}
         before = self.total()
         self.history = [summary] + recent
         self.compactions += 1
@@ -160,6 +192,12 @@ def main():
     print(f"  auto-compaction sayısı : {s.compactions}")
     print(f"  subagent kaçışı        : {s.subagent_runs} (ara adımlar ana context'e HİÇ girmedi)")
     print(f"  final ana context      : {s.total():,} token")
+    _saved = s.raw_total - s.total()
+    print("\n── KAÇTAN KAÇA " + "─" * 54)
+    print(f"  ham (sıkıştırma+kaçış olmasaydı) ≈ {s.raw_total:,} token")
+    print(f"  pik gerçek ana context           : {s.peak:,} token")
+    print(f"  final ana context                : {s.total():,} token")
+    print(f"  → {s.raw_total:,} → {s.total():,} token  |  −{_saved:,} ({_saved/s.raw_total*100:.1f}% kazanç)")
     print("=" * 80)
     print("\nMEKANİZMA ÖZETİ:")
     print("  A Microcompaction  → WebFetch 23K → diske, context'e ~500t önizleme+referans")

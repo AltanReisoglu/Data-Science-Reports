@@ -95,6 +95,8 @@ def prune(msgs: list[dict], verbose: bool = True) -> tuple[int, list]:
     to_prune = []
     log = []
     stop = False
+    log.append("  konum    tool           boyut   40K-sayacı   KARAR")
+    log.append("  " + "─" * 68)
     for mi in range(len(msgs) - 1, -1, -1):
         if stop:
             break
@@ -102,30 +104,41 @@ def prune(msgs: list[dict], verbose: bool = True) -> tuple[int, list]:
         if m["role"] == "user":
             turns += 1
         if turns < DEFAULT_TAIL_TURNS:
-            log.append(f"  #{mi} {m['role']:<9} turns={turns} < 2 → KORU (son-2-turn)")
+            log.append(f"  #{mi:<8} {'(' + m['role'] + ')':<13} {'—':>7}  {'—':>10}   "
+                       f"KORU · son-2-turn (turn {turns})")
             continue
         if m["role"] == "assistant" and m.get("summary"):
-            log.append(f"  #{mi} assistant(summary) → DUR (önceki compaction sınırı)")
+            log.append(f"  #{mi:<8} {'(özet)':<13} {'—':>7}  {'—':>10}   "
+                       f"DUR · önceki compaction sınırı")
             break
-        for pi in range(len(m["parts"]) - 1, -1, -1):
-            p = m["parts"][pi]
-            if p["type"] != "tool" or p["state"]["status"] != "completed":
-                continue
+        tool_parts = [(pi, m["parts"][pi]) for pi in range(len(m["parts"]) - 1, -1, -1)
+                      if m["parts"][pi]["type"] == "tool"
+                      and m["parts"][pi]["state"]["status"] == "completed"]
+        if not tool_parts:
+            log.append(f"  #{mi:<8} {'(tool yok)':<13} {'—':>7}  {'—':>10}   "
+                       f"atlanır · budanacak tool çıktısı yok")
+            continue
+        for pi, p in tool_parts:
+            loc = f"#{mi}.{pi}"
             if p["tool"] in PRUNE_PROTECTED_TOOLS:
-                log.append(f"  #{mi} tool={p['tool']} → ATLA (PRUNE_PROTECTED)")
+                log.append(f"  {loc:<8} {p['tool']:<13} {est(p['state']['output']):>6,}t  "
+                           f"{'—':>10}   ATLA · korunan tool (skill)")
                 continue
             if p["state"]["time"]["compacted"]:
-                log.append(f"  #{mi} tool={p['tool']} zaten compacted → DUR")
+                log.append(f"  {loc:<8} {p['tool']:<13} {'—':>7}  {'—':>10}   "
+                           f"DUR · zaten compacted (önceki prune sınırı)")
                 stop = True
                 break
             estimate = est(p["state"]["output"])
             total += estimate
             if total <= PRUNE_PROTECT:
-                log.append(f"  #{mi} tool={p['tool']} {estimate:>6}t · toplam={total} ≤ 40K → KORU (en-yeni-40K)")
+                log.append(f"  {loc:<8} {p['tool']:<13} {estimate:>6,}t  {total:>10,}   "
+                           f"KORU · 40K sıcak bölge içinde")
                 continue
             pruned += estimate
             to_prune.append(p)
-            log.append(f"  #{mi} tool={p['tool']} {estimate:>6}t · toplam={total} > 40K → BUDA aday (pruned={pruned})")
+            log.append(f"  {loc:<8} {p['tool']:<13} {estimate:>6,}t  {total:>10,}   "
+                       f"BUDA ADAYI · 40K aşıldı")
     if verbose:
         print("\n".join(log))
     # fayda-freni
@@ -227,7 +240,10 @@ def main():
     print(f"  LLM özeti   : isOverflow = kullanılan({before:,}) ≥ usable({u:,}) → {is_overflow(before, W)}")
     print(f"  → Bu turda deterministik prune çalışır (maliyet için); LLM fazı yalnız overflow'da.")
 
-    print(f"\n── KATMAN B.1 / Deterministik prune (sondan başa, PROAKTİF) " + "─" * 5)
+    print(f"\n── KATMAN B.1 / Deterministik prune " + "─" * 42)
+    print("  Sondan başa (en YENİden en ESKİye) yürünür; her TOOL ÇIKTISI için karar verilir.")
+    print("  'konum' = #mesaj.part (bir mesajda birden çok tool olabilir)")
+    print("  '40K-sayacı' = korunan tail'in ötesinde o ana kadar biriken tool çıktısı toplamı\n")
     pruned, to_prune, committed = prune(msgs)
 
     print(f"\n── KATMAN B / Fayda-freni " + "─" * 40)
