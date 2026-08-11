@@ -26,6 +26,10 @@ HERMES = "/home/altan/Desktop/adapted/harnesses/hermes-agent"
 sys.path.insert(0, HERMES)
 import hermes_cli.kanban_db as kb   # ← GERÇEK Hermes durable kernel
 
+# ── AYARLAR (web arayüzünden env ile değiştirilebilir; varsayılanlar özgün senaryo)
+CRASH = os.environ.get("POC_CRASH", "1") == "1"          # worker-A çöksün mü?
+LEASE_EXPIRED = os.environ.get("POC_LEASE", "expired") == "expired"  # lease dolmuş mu?
+
 
 def row(conn: sqlite3.Connection, tid: str) -> dict:
     r = conn.execute(
@@ -82,32 +86,44 @@ def main():
     print(f"  worker-B aynı anda claim denedi → {dup}  (at-most-once: sadece biri kapar)")
 
     # 3) CRASH: worker-A ölür (lease geçmişe, PID ölü)
-    print("\n── 3) CRASH simülasyonu: worker-A çöktü (complete çağırmadan) " + "─" * 6)
-    past = int(time.time()) - 3600
-    conn.execute("UPDATE tasks SET claim_expires=?, last_heartbeat_at=?, worker_pid=? WHERE id=?",
-                 (past, past, 999999, tid))            # 999999 = var olmayan PID
-    conn.commit()
-    show(conn, tid, "crash sonrası (ham)")
-    print("  → lease GEÇMİŞ, PID ölü. Hermes bunu bir sonraki tick'te toparlamalı.")
+    reclaimed, again = 0, None
+    if CRASH:
+        print("\n── 3) CRASH simülasyonu: worker-A çöktü (complete çağırmadan) " + "─" * 6)
+        if LEASE_EXPIRED:
+            stamp = int(time.time()) - 3600                # lease GEÇMİŞ
+        else:
+            stamp = int(time.time()) + 3600                # lease HÂLÂ GEÇERLİ
+        conn.execute("UPDATE tasks SET claim_expires=?, last_heartbeat_at=?, worker_pid=? WHERE id=?",
+                     (stamp, int(time.time()) - 3600, 999999, tid))   # 999999 = var olmayan PID
+        conn.commit()
+        show(conn, tid, "crash sonrası (ham)")
+        print(f"  → lease {'GEÇMİŞ' if LEASE_EXPIRED else 'HÂLÂ GEÇERLİ (+1h)'}, PID ölü.")
 
-    # 4) release_stale_claims — Hermes çökmeyi fark eder, otomatik ready'ye döndürür
-    print("\n── 4) release_stale_claims: Hermes otomatik crash-recovery " + "─" * 10)
-    reclaimed = kb.release_stale_claims(conn, signal_fn=lambda *_: None)
-    print(f"  release_stale_claims() → {reclaimed} stale claim geri alındı")
-    show(conn, tid, "recovery sonrası")
-    print("  → status yeniden 'ready': iş KAYBOLMADI, başka worker devralabilir.")
+        # 4) release_stale_claims — Hermes çökmeyi fark eder, otomatik ready'ye döndürür
+        print("\n── 4) release_stale_claims: Hermes otomatik crash-recovery " + "─" * 10)
+        reclaimed = kb.release_stale_claims(conn, signal_fn=lambda *_: None)
+        print(f"  release_stale_claims() → {reclaimed} stale claim geri alındı")
+        show(conn, tid, "recovery sonrası")
+        if reclaimed:
+            print("  → status yeniden 'ready': iş KAYBOLMADI, başka worker devralabilir.")
+        else:
+            print("  → lease dolmadığı için Hermes HENÜZ toparlamaz: iş 'running' kilitli bekler.")
+            print("    (gerçekte lease süresi dolunca bir sonraki tick'te toparlanır)")
 
-    # 5) yeni worker devralır (yeni deneme)
-    print("\n── 5) claim_task: worker-B devralır (yeni task_run) " + "─" * 15)
-    kb.recompute_ready(conn)
-    again = kb.claim_task(conn, tid, claimer=f"{kb._claimer_id().split(':',1)[0]}:worker-B")
-    print(f"  claim_task döndü: {'Task (worker-B KAZANDI)' if again else 'None'}")
-    show(conn, tid, "worker-B claimed")
+        # 5) yeni worker devralır (yeni deneme)
+        print("\n── 5) claim_task: worker-B devralır (yeni task_run) " + "─" * 15)
+        kb.recompute_ready(conn)
+        again = kb.claim_task(conn, tid, claimer=f"{kb._claimer_id().split(':',1)[0]}:worker-B")
+        print(f"  claim_task döndü: {'Task (worker-B KAZANDI)' if again else 'None (devralamadı)'}")
+        show(conn, tid, "worker-B claimed")
+    else:
+        print("\n── 3-5) ÇÖKME YOK: worker-A işi kendi bitiriyor " + "─" * 20)
+        print("  (kurtarma mekanizması hiç devreye girmez — mutlu yol)")
 
     # 6) complete_task — done
     print("\n── 6) complete_task: iş tamamlandı " + "─" * 30)
     ok = kb.complete_task(conn, tid, result="ok",
-                          summary="ödeme+stok+kargo tamam (worker-B, çökmeden sonra devraldı)")
+                          summary="ödeme+stok+kargo tamam" + (" (worker-B devraldı)" if again else ""))
     print(f"  complete_task() → {ok}")
     show(conn, tid, "final")
 
@@ -117,6 +133,22 @@ def main():
     print("\n── OLAY GÜNLÜĞÜ (task_events) " + "─" * 40)
     evs = conn.execute("SELECT kind, created_at FROM task_events WHERE task_id=? ORDER BY id", (tid,)).fetchall()
     print("  " + " → ".join(e["kind"] for e in evs))
+
+    # ── web arayüzü için makine-okunur akış özeti
+    final = row(conn, tid).get("status")
+    if not CRASH:
+        steps = [("oluştur", 1, "ok"), ("worker-A", 1, "ok"), ("bitti", 1, "ok")]
+        verdict = "çökme yok — tek denemede bitti; kurtarma mekanizması hiç gerekmedi"
+    elif reclaimed:
+        steps = [("oluştur", 1, "ok"), ("worker-A", 1, "crash"), ("kurtarma", reclaimed, "ok"),
+                 ("worker-B", 1, "ok"), ("bitti", 1, "ok" if final == "done" else "fail")]
+        verdict = "worker çöktü ama iş kaybolmadı — Hermes otomatik geri aldı, worker-B devraldı"
+    else:
+        steps = [("oluştur", 1, "ok"), ("worker-A", 1, "crash"), ("kurtarma", 0, "fail"),
+                 ("worker-B", 0, "skip"), ("bitti", 1, "ok" if final == "done" else "fail")]
+        verdict = "lease hâlâ geçerli olduğu için kurtarma devreye girmedi — iş kilitli bekledi"
+    print("##FLOW## " + "|".join(f"{n}:{c}:{s}" for n, c, s in steps))
+    print(f"##VERDICT## {verdict}")
 
     print("\n" + "=" * 78)
     print("KANIT: create → claim(CAS/lease) → CRASH → release_stale_claims(otomatik) →")

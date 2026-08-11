@@ -9,7 +9,7 @@ except ImportError:
     pass  # dotenv yoksa ortam değişkenleri doğrudan okunur
 
 # --- LLM (OpenAI-uyumlu endpoint) ---
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://mia.csp.kloudeks.com/v1")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://your-llm-endpoint.example/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemma-4-31B-it")
 

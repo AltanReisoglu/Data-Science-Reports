@@ -13,7 +13,7 @@ Sonra tarayıcıda:  http://127.0.0.1:8000
 Sadece 127.0.0.1'e bağlanır ve yalnızca beyaz-listedeki POC scriptlerini çalıştırır.
 """
 from __future__ import annotations
-import json, sys, subprocess, re
+import json, os, sys, subprocess, re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -38,21 +38,45 @@ POCS = {
 NOISE = re.compile(r"(vulnerable to the WAL|DeprecationWarning|warnings\.warn|pkg_resources|"
                    r"^\[\d{4}-\d\d-\d\d|INFO/|WARNING/|No hostname)")
 
+# URL'den kabul edilen ayarlar → POC'lara env olarak geçer. Değerler katı doğrulanır.
+KNOBS = {
+    "fail":    ("POC_FAIL_TIMES", lambda v: v if v.isdigit() and 0 <= int(v) <= 9 else None),
+    "retries": ("POC_MAX_RETRIES", lambda v: v if v.isdigit() and 1 <= int(v) <= 9 else None),
+    "crash":   ("POC_CRASH", lambda v: v if v in ("0", "1") else None),
+    "lease":   ("POC_LEASE", lambda v: v if v in ("expired", "valid") else None),
+}
+FLOW_RE = re.compile(r"^##FLOW## (.+)$", re.M)
+VERDICT_RE = re.compile(r"^##VERDICT## (.+)$", re.M)
 
-def run_poc(name: str) -> dict:
+
+def run_poc(name: str, knobs: dict) -> dict:
     spec = POCS[name]
+    env = {**os.environ}
+    for k, val in knobs.items():
+        if k in KNOBS:
+            var, check = KNOBS[k]
+            clean = check(val)
+            if clean is not None:
+                env[var] = clean
     try:
-        p = subprocess.run([PY, str(spec["script"])], cwd=str(ROOT),
+        p = subprocess.run([PY, str(spec["script"])], cwd=str(ROOT), env=env,
                            capture_output=True, text=True, timeout=spec["timeout"])
         out = p.stdout or ""
         if p.returncode != 0 and p.stderr:
             out += "\n[stderr]\n" + p.stderr[-2000:]
-        lines = [l for l in out.splitlines() if not NOISE.search(l)]
-        return {"ok": p.returncode == 0, "returncode": p.returncode, "output": "\n".join(lines)}
+        flow = FLOW_RE.search(out)
+        verdict = VERDICT_RE.search(out)
+        # ##FLOW##/##VERDICT## satırları arayüzde ayrı gösterilir → ham çıktıdan çıkar
+        lines = [l for l in out.splitlines() if not NOISE.search(l) and not l.startswith("##")]
+        return {"ok": p.returncode == 0, "returncode": p.returncode,
+                "output": "\n".join(lines),
+                "flow": flow.group(1) if flow else "",
+                "verdict": verdict.group(1) if verdict else ""}
     except subprocess.TimeoutExpired:
-        return {"ok": False, "returncode": -1, "output": f"[zaman aşımı: {spec['timeout']}s]"}
+        return {"ok": False, "returncode": -1, "output": f"[zaman aşımı: {spec['timeout']}s]",
+                "flow": "", "verdict": ""}
     except Exception as e:
-        return {"ok": False, "returncode": -1, "output": f"[hata] {e}"}
+        return {"ok": False, "returncode": -1, "output": f"[hata] {e}", "flow": "", "verdict": ""}
 
 
 class H(BaseHTTPRequestHandler):
@@ -77,7 +101,8 @@ class H(BaseHTTPRequestHandler):
             if name not in POCS:
                 self._send(400, json.dumps({"ok": False, "output": "bilinmeyen poc"}), "application/json")
                 return
-            self._send(200, json.dumps(run_poc(name)), "application/json; charset=utf-8")
+            knobs = {k: v[0] for k, v in q.items() if k in KNOBS and v}
+            self._send(200, json.dumps(run_poc(name, knobs)), "application/json; charset=utf-8")
         else:
             self._send(404, "not found")
 

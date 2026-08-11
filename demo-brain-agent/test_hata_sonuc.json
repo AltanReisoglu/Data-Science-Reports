@@ -113,7 +113,7 @@
   {
    "ad": "üç backend de kalıcı hatada ASILMADI",
    "gecti": true,
-   "detay": "own=0.0s, temporal=0.5s, celery=12.3s"
+   "detay": "own=0.0s, temporal=0.4s, celery=63.4s"
   },
   {
    "ad": "hata veren düğümün son durumu üç backend'de AYNI",
@@ -158,7 +158,7 @@
   {
    "ad": "tüketici üreticiye BAĞLANDI (cross_check ← scan_patterns)",
    "gecti": true,
-   "detay": "parents=['t_faca74', 't_3694c8', 't_ec2089']"
+   "detay": "parents=['t_4f0911', 't_931575', 't_08329d']"
   },
   {
    "ad": "onarım sonrası akış tamamlandı",
@@ -173,7 +173,7 @@
   {
    "ad": "yinelenen bağımlılık tekilleştirildi (kapı kilitlenmiyor)",
    "gecti": true,
-   "detay": "parents=['t_78f1fb']"
+   "detay": "parents=['t_43d6e7']"
   },
   {
    "ad": "yinelenen parent'lı düğüm koştu",
@@ -223,7 +223,7 @@
   {
    "ad": "olmayan tool: akış düzgün kapandı (done)",
    "gecti": true,
-   "detay": "tipler={'done', 'summary', 'chat'}"
+   "detay": "tipler={'summary', 'done', 'chat'}"
   },
   {
    "ad": "olmayan tool: kullanıcıya çökme izi sızmadı",
@@ -233,12 +233,12 @@
   {
    "ad": "olmayan tool: boş cevap dönmedi",
    "gecti": true,
-   "detay": "526 karakter"
+   "detay": "549 karakter"
   },
   {
    "ad": "eksik argüman: akış düzgün kapandı (done)",
    "gecti": true,
-   "detay": "tipler={'done', 'summary', 'chat'}"
+   "detay": "tipler={'summary', 'done', 'chat'}"
   },
   {
    "ad": "eksik argüman: kullanıcıya çökme izi sızmadı",
@@ -248,12 +248,12 @@
   {
    "ad": "eksik argüman: boş cevap dönmedi",
    "gecti": true,
-   "detay": "268 karakter"
+   "detay": "352 karakter"
   },
   {
    "ad": "olmayan fn ile pipeline: akış düzgün kapandı (done)",
    "gecti": true,
-   "detay": "tipler={'node_added', 'log', 'board', 'done', 'reduction', 'saved', 'summary', 'phase'}"
+   "detay": "tipler={'board', 'motor_basladi', 'log', 'node_added', 'karsilastirma', 'phase', 'motor_bitti', 'motor_cikti', 'summary', 'done', 'saved', 'reduction'}"
   },
   {
    "ad": "olmayan fn ile pipeline: kullanıcıya çökme izi sızmadı",
@@ -263,7 +263,7 @@
   {
    "ad": "olmayan fn ile pipeline: boş cevap dönmedi",
    "gecti": true,
-   "detay": "1404 karakter"
+   "detay": "2775 karakter"
   },
   {
    "ad": "hatalı isteklerden sonra sunucu SAĞLIKLI",
@@ -314,7 +314,7 @@
   },
   {
    "backend": "temporal",
-   "sn": 0.5,
+   "sn": 0.4,
    "durumlar": [
     "done",
     "failed",
@@ -332,7 +332,7 @@
   },
   {
    "backend": "celery",
-   "sn": 12.3,
+   "sn": 63.4,
    "durumlar": [
     "done",
     "failed",

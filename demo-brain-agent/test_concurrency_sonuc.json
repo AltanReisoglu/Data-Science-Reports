@@ -5,13 +5,13 @@
  "benzersiz": 24,
  "cift_claim": 0,
  "tamamlanan": 24,
- "sure_paralel": 0.27,
+ "sure_paralel": 0.26,
  "sure_tek": 1.29,
- "hizlanma": 4.71,
+ "hizlanma": 4.97,
  "cokme_kurtarma": 1,
  "devralindi": true,
  "gecti": {
-  "id": "t_05d187",
+  "id": "t_c70291",
   "title": "çökecek iş",
   "body": "",
   "status": "running",
@@ -24,14 +24,14 @@
   "priority": 5,
   "created_by": "agent",
   "claim_lock": "devralan-worker",
-  "claim_expires": 1786386277,
-  "worker_pid": 143299,
+  "claim_expires": 1786434742,
+  "worker_pid": 178315,
   "attempt": 0,
   "consecutive_failures": 0,
   "checkpoint": {
    "kismi": "w99 yarıda bıraktı"
   },
   "result": null,
-  "created_at": 1786386247
+  "created_at": 1786434712
  }
 }

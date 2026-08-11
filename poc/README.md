@@ -156,6 +156,147 @@ tool-trace-farkında sistemlerin çoğu **tekil çıktıyı** küçültür (outp
 **çağrılar-arası ilişkiyi** (dedup/bayat/sürüm) genel ve sürüm-farkında biçimde
 gören tek sistem bizimki (Cline dosya-özel, sürümsüz bir istisna).
 
+## Tarayıcı paneli — her mantık ayrı sekmede (`web_server.py`, :8010)
+
+```bash
+.venv/bin/python poc/web_server.py     # → http://127.0.0.1:8010
+```
+
+Önceden bu sayfa beş POC'u subprocess ile koşturup **stdout'u** ekrana basıyordu.
+Stdout insan için yazılmış bir anlatı: hangi tool'un ham çıktısının ne olduğu ve
+sıkıştırmadan sonra context'te ne kaldığı oradan çıkarılamıyordu. Sayfa şimdi üç
+şey gösteriyor:
+
+**1 · Her ajan mantığı kendi sekmesinde.** Hermes · OpenCode · OpenClaw · Codex ·
+Claude Code. Sekme başlığında o mantığın kazancı yazılı.
+
+**2 · EK-2'nin adım şeridi — ve bu koşuda hangisinin vurduğu.** Yalnız **tool izine
+dokunan** adımlar (ölçüt: adım ya tool çıktısına dokunuyor ya da
+`tool_call ↔ tool_result` çiftini ilgilendiriyor). Vuran adım renkli, vurmayan soluk;
+her adımda "ne kaybediliyor" ve kaç birime dokunduğu yazılı. Elenmiş genel
+context-yönetimi adımları da listeleniyor — neyin **bilerek** dışarıda bırakıldığı
+görünür olsun diye.
+
+**3 · Her tool birimi için ÖNCE / SONRA, kırpılmadan.** Satır açılınca solda ham tool
+çıktısı, sağda o mantığın context'te bıraktığı metin; üstünde birime dokunan
+adım zinciri (`sicak40k → damga → serialize` gibi) ve o birime tam olarak ne
+olduğunun cümlesi.
+
+Ham stdout kaybolmadı: her sekmenin altındaki düğme gerçek
+`*_tool_trace_poc.py` subprocess'ini eskisi gibi koşturuyor.
+
+Veri `poc/kiyas.py`'den geliyor. O modül POC'ları **import ederek** kendi gerçek
+fonksiyonlarını (`prune_old_tool_results`, `prune`, `step1..step11`, `CodexSession`,
+`ClaudeCodeSession`) çağırıyor; POC'ların `main()` yolu değişmedi.
+
+Ölçülen (her mantık kendi POC senaryosunda):
+
+```
+                ham        final     kazanç   tool izine dokunan adımlardan vuran
+Hermes        33.063 →     2.101     %93,6    dedup(1) · tip-farkında özet(3)
+OpenCode     148.413 →    76.167     %48,7    spill(1) · skill koruma(1) · 40K(8) · damga+serialize(3)
+OpenClaw     138.850 →       104     %99,9    sanitize(3) · projection(3) · gruplama(2) · oversized(1)
+Codex        123.254 →       153     %99,9    truncate_middle(13) · [+windowing, kapsam dışı]
+Claude Code  126.487 →    13.190     %89,6    microcompaction(1) · subagent(1) · [+auto, kapsam dışı]
+```
+
+Sayıları yan yana koymak yanıltıcı olur — senaryolar aynı değil, her POC kendi
+sistemini gösteren bir iz kuruyor. Karşılaştırılabilir olan **mekanizma**: aynı tool
+birimine kim ne yapıyor ve geriye ne bırakıyor.
+
+Panelin ortaya çıkardığı iki şey:
+
+- **Bir birime birden çok adım sırayla vurabiliyor.** Codex'te `shell` çıktısı önce
+  Katman A'da ortadan kesiliyor (18.536 → 5.026), sonra B2 windowing onu tamamen
+  düşürüyor. Tek bir "18.536 → 0" satırı bu ara adımı yutardı; zincir gösterimi
+  bunu görünür kılıyor. Aynısı Claude Code'da `WebFetch` için: önce diske
+  (microcompaction), sonra konuşma özetine.
+- **Bir koşuda vurmayan adımlar da bilgi.** Codex'in `placeholder trim`'i hiç
+  tetiklenmedi (log: "budanacak eski çıktı YOK → compaction gerekecek"), Hermes'in
+  basınç demotion'ı gerekmedi, OpenClaw'ın onarımı gerekmedi (batch düşerken çift
+  birlikte düştüğü için yetim kalmadı). Mekanizmanın **ne zaman** devreye girmediğini
+  görmek, girdiğini görmek kadar öğretici.
+
+`kapsam dışı` etiketi EK-2'nin ölçütünü uyguluyor: Codex'in windowing'i ve Claude
+Code'un auto-compaction'ı konuşma seviyesidir, tool izine ait değildir — ama bu
+koşuda iz üzerinde ölçülebilir etkileri olduğu için gizlenmiyor, kesikli çerçeveyle
+işaretleniyor.
+
+## Gerçek repoya sadakat — doğrulama (11.08.2026)
+
+POC'lar "sadık simülasyon" iddiasında. `harnesses/` altındaki gerçek klonlara karşı
+tek tek denetlendi. Sonuç: **dördü doğrulandı, biri doğrulanamaz, ikisinde sapma var.**
+
+| Sistem | Kaynak | Sabitler | Mekanizma |
+|---|---|---|---|
+| **Hermes** | `hermes-agent/agent/context_compressor.py` (6.883 satır) | **7/7 birebir** | 4 geçiş ✓ |
+| **OpenCode** | `opencode/…/tool/truncate.ts` + `session/compaction.ts` | **6/6 birebir** | 2 katman ✓ |
+| **OpenClaw** | `openclaw/src/agents/compaction-planning*.ts` | **8/8 birebir** | 5 tool adımı ✓ |
+| **Codex** | `codex/codex-rs/` | POC ölçeği (belirtilmiş) | A ✓ · B2 ✓ · **B1 sapıyor** |
+| **Claude Code** | ✗ **kapalı kaynak** | gözlem | gözlem |
+
+Doğrulanan sabitler:
+
+```
+Hermes    _MAX_TAIL_MESSAGE_FLOOR=8 · _PRESSURE_KEEP_RECENT_MESSAGES=3
+          _SKILL_VIEW_PRUNE_MIN_CHARS=5000 · dedup floor 200 · arg eşiği 500 · arg head 200
+          _PRUNED_TOOL_PLACEHOLDER ve SKILL_PRUNED_MARKER_PREFIX metinleri birebir
+OpenCode  MAX_LINES=2000 · MAX_BYTES=50*1024 · PRUNE_MINIMUM=20_000 · PRUNE_PROTECT=40_000
+          TOOL_OUTPUT_MAX_CHARS=2_000 · PRUNE_PROTECTED_TOOLS=["skill"] · DEFAULT_TAIL_TURNS=2
+OpenClaw  BASE_CHUNK_RATIO=0.4 · MIN_CHUNK_RATIO=0.15 · SAFETY_MARGIN=1.2
+          SUMMARIZATION_OVERHEAD_TOKENS=4096 · TEXT_TRUNCATE_THRESHOLD_CHARS=32_768
+          TEXT_SAMPLE_CHARS=8_192 · PLANNING_MAX_CHARS=256*1024 · oversized eşiği ×0.5
+Codex     "Warning: truncated output (original token count: N)\nTotal output lines: M"
+          → output-truncation/src/lib.rs:21 ile birebir
+```
+
+Hermes'in dört geçişi de gerçek fonksiyon adlarıyla eşleşiyor
+(`_prune_old_tool_results`, `_summarize_tool_result`, `_truncate_tool_call_args_json`);
+OpenClaw'ın beş tool adımı da (`stripToolResultDetails`, `groupCompactionMessages`,
+`repairToolUseResultPairing`) gerçekte var. OpenCode'un `prune`'u aynı yönde
+(sondan başa) yürüyor ve `turns < 2` / `msg.info.summary` kırılımları birebir.
+
+### Bulunan iki sapma
+
+**1 · Hermes dedup markeri — düzeltildi.** POC
+`[Duplicate of newer result at #N — content omitted]` yazıyordu; gerçekte
+(`context_compressor.py:2889`) `[Duplicate tool output — same content as a more
+recent call]` — `#N` indeksi **yok**. Panel bu metni SONRA kutusunda aynen
+gösterdiği için birebir hale getirildi.
+
+**2 · Codex "B1 placeholder trim" — gerçekte böyle çalışmıyor.** POC, history
+sığmayınca eski `function_call_output`'ları `[context window truncated output]`
+yer tutucusuna çeviriyor. Gerçek Codex'te bu string **hiç yok**; bağlam taşınca
+`ContextManager::remove_first_item()` çağrılıyor — en eski öğe **tamamen siliniyor**,
+`normalize::remove_corresponding_for` ile çift eşi de birlikte
+(`codex-rs/core/src/compact.rs:310`, `context_manager/history.rs:191`).
+
+> Korunan **değişmez aynı** (çift bütünlüğü hiç bozulmuyor), ama **teknik farklı**:
+> gerçek Codex *içeriği yer tutucuyla değiştirmiyor, öğeyi kaldırıyor*. POC'un
+> gösterdiği "iskelet kalır" davranışı Codex'in kendisinde değil. Panelde bu adım
+> zaten "vurmadı" çıkıyor (log: "budanacak eski çıktı YOK"), yani ekranda yanlış
+> bir şey gösterilmiyor — ama mekanizma anlatımı düzeltilmeli.
+>
+> Bu POC'un davranışını **değiştirmedim**: Katman A ve B2 doğru, B1'i kaldırmak
+> POC'un anlattığı hikâyeyi değiştirir. Karar senin.
+
+### Claude Code neden doğrulanamıyor
+
+`harnesses/claude-code` **kaynak kod içermiyor** — public issue/changelog reposu
+(`CHANGELOG.md`, `feed.xml`, `plugins/`, `scripts/`). POC'un kendi başlığı bunu
+zaten söylüyor: *"kapalı kaynak → gözlem"*. Yani microcompaction eşiği (~4K token),
+önizleme boyutu (~500 token) ve auto-compact eşiği (~%80) **ölçülmüş değil,
+gözlemlenmiş** değerler. Panelde bu sekmenin sayıları diğer dördüyle aynı
+güvenilirlikte okunmamalı.
+
+### Ortak sınır
+
+Beş POC da gerçek sistemlerin **tool-trace ile ilgili alt kümesini** uyguluyor —
+tam kopya değil. Ölçek farkı somut: Hermes'in gerçek `context_compressor.py`'si
+6.883 satır, POC'u 406. Sabitler ve invariant'lar birebir; çevresindeki üretim
+kodu (retry, telemetri, config, çoklu sağlayıcı yolları) POC'ta yok. Sayfadaki
+uyarı bunu söylüyor ve doğru.
+
 ## Sonraki adım (isteğe bağlı)
 
 - Mock tool'ları gerçek ürün tool'larıyla değiştir (`../toolsmockproduct/` → 119 tool);

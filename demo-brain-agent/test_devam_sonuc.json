@@ -1,47 +1,56 @@
 {
- "dugum_seviyesi": {
-  "onceki_tekrar_yok": true,
-  "sayimlar": {
-   "fetch_source": 1,
-   "run_test_suite": 1,
-   "scan_patterns": 2,
-   "cross_check": 1
+ "olcumler": {
+  "dugum_seviyesi": {
+   "onceki_tekrar_yok": true,
+   "sayimlar": {
+    "fetch_source": 1,
+    "run_test_suite": 1,
+    "scan_patterns": 1,
+    "cross_check": 1
+   },
+   "crashes": 1,
+   "recovered": 1
   },
-  "crashes": 1,
-  "recovered": 1
- },
- "fonksiyon_ici": {
-  "checkpoint_yazildi": true,
-  "cagri": 2,
-  "geri_okunuyor": false
- },
- "ajan_ici": {
-  "devam": 1,
-  "yazma": 3,
-  "crashes": 1,
-  "durum": "done"
- },
- "backendler": [
-  {
-   "backend": "own",
-   "korundu": true,
-   "durum": "done",
-   "sn": 1.5,
-   "hata": ""
+  "fonksiyon_ici": {
+   "checkpoint_yazildi": true,
+   "cagri": 1,
+   "geri_okunuyor": true
   },
-  {
-   "backend": "celery",
-   "korundu": true,
-   "durum": "done",
-   "sn": 11.8,
-   "hata": ""
+  "ajan_ici": {
+   "devam": 1,
+   "yazma": 3,
+   "crashes": 1,
+   "durum": "done"
   },
+  "backendler": [
+   {
+    "backend": "own",
+    "korundu": true,
+    "durum": "done",
+    "sn": 1.8,
+    "hata": ""
+   },
+   {
+    "backend": "celery",
+    "korundu": true,
+    "durum": "done",
+    "sn": 11.9,
+    "hata": ""
+   },
+   {
+    "backend": "temporal",
+    "korundu": true,
+    "durum": "done",
+    "sn": 2.0,
+    "hata": ""
+   }
+  ]
+ },
+ "kontroller": [
   {
-   "backend": "temporal",
-   "korundu": true,
-   "durum": "done",
-   "sn": 1.9,
-   "hata": ""
+   "ad": "fonksiyon düğümü çökme sonrası işi TEKRARLAMIYOR",
+   "gecti": true,
+   "detay": "1 kez koştu"
   }
  ]
 }

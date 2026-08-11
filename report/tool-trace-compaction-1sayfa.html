@@ -1,0 +1,162 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<title>Tool-Trace Compaction — tek sayfa</title>
+<style>
+@page { size: A3 landscape; margin: 8mm; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:8.6pt;
+ line-height:1.35;color:#16202b;background:#fff}
+.bas{display:flex;align-items:baseline;gap:10px;border-bottom:1.6px solid #16202b;
+ padding-bottom:3px;margin-bottom:5px}
+h1{font-size:14pt;letter-spacing:-.2px}
+.alt{font-size:8.4pt;color:#5b6673;flex:1}
+.tarih{font-size:7.7pt;color:#8b95a1}
+
+.ust{display:grid;grid-template-columns:1.32fr 1fr;gap:7px;margin-bottom:6px}
+.kutu{border:1px solid #d5dbe2;border-radius:4px;padding:5px 7px}
+.kb{font-size:7.4pt;letter-spacing:.09em;text-transform:uppercase;color:#7c8895;
+ font-weight:700;margin-bottom:3px}
+table{width:100%;border-collapse:collapse;font-size:8.0pt}
+th{text-align:left;font-size:7.2pt;text-transform:uppercase;letter-spacing:.05em;
+ color:#7c8895;border-bottom:1px solid #d5dbe2;padding:2px 4px}
+td{padding:2.5px 4px;border-bottom:1px solid #edf0f3;vertical-align:top}
+td.ts{font-weight:700;white-space:nowrap;width:60px}
+.kavram b{color:#0d7d78}
+.kavram div{margin-bottom:2.5px}
+
+.sut_kap{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.sut{border:1px solid #d5dbe2;border-top:2.6px solid var(--c);border-radius:4px;
+ padding:5px 6px;break-inside:avoid}
+.sh{border-bottom:1px solid #edf0f3;padding-bottom:3px;margin-bottom:4px}
+.sad{font-size:10.9pt;font-weight:700;color:var(--c);line-height:1.15}
+.sek{font-size:7.3pt;color:#7c8895;text-transform:uppercase;letter-spacing:.05em}
+.skz{font-size:8.6pt;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1.5px}
+.stetik{background:#f5f7f9;border-radius:3px;padding:3.5px 5px;margin-bottom:4px;
+ font-size:7.5pt;line-height:1.35;color:#3d4a57}
+.stetik b{color:var(--c);text-transform:uppercase;font-size:6.8pt;letter-spacing:.05em}
+.ad{border-bottom:1px solid #f0f2f5;padding:2.5px 0}
+.ad:last-of-type{border-bottom:none}
+.a1{font-size:8.2pt;display:flex;align-items:baseline;gap:3px;flex-wrap:wrap}
+.im{color:var(--c);font-size:7.4pt}
+.v{font-size:6.8pt;color:var(--c);border:.6px solid var(--c);border-radius:5px;
+ padding:0 3px;white-space:nowrap}
+.kd{font-size:6.5pt;color:#b45309;border:.6px dashed #b45309;border-radius:5px;padding:0 3px}
+.a2{font-family:ui-monospace,Menlo,monospace;font-size:7.0pt;color:#5b6673;margin-top:.5px}
+.a3{font-size:7.3pt;color:#3d4a57;margin-top:1px;line-height:1.3}
+.a4{font-size:6.8pt;color:#8b95a1;margin-top:.5px}
+.disar{font-size:6.8pt;color:#8b95a1;margin-top:3px;padding-top:3px;
+ border-top:1px dashed #dfe4e9;line-height:1.3}
+.dip{margin-top:5px;padding-top:4px;border-top:1px solid #d5dbe2;font-size:7.4pt;
+ color:#5b6673;display:flex;gap:14px}
+.dip b{color:#16202b}
+</style></head><body>
+
+<div class="bas">
+  <h1>Tool-Trace Compaction</h1>
+  <div class="alt">Beş sistem · yalnız <b>tool izine dokunan</b> adımlar ·
+    ne zaman tetiklenir, ne yapar, ne kaybettirir</div>
+  <div class="tarih">ölçümler: poc/kiyas.py — canlı koşudan</div>
+</div>
+
+<div class="ust">
+  <div class="kutu">
+    <div class="kb">tetik özeti — iki tür tetik var, karıştırılmasın</div>
+    <table><thead><tr><th>sistem</th>
+      <th>ÜRETİM ANINDA (tek çıktının boyutu)</th>
+      <th>EŞİKTE (toplam context)</th></tr></thead>
+      <tbody><tr><td class="ts">Hermes</td><td>—</td><td>proaktif: HER turda (pencere dolmasa da). Tek fren: kazanç &lt;4096 token ise commit etmez</td></tr><tr><td class="ts">OpenClaw</td><td>—</td><td>boş yer &lt; pencere × 0.5 (kullanılan &gt; %50)</td></tr><tr><td class="ts">OpenCode</td><td>&gt;2000 satır VEYA &gt;50KB → diske spill</td><td>proaktif: her turda (prune açıksa) · overflow özeti ancak kullanılan ≥ pencere−20K</td></tr><tr><td class="ts">Codex</td><td>tek çıktı tavanı aşarsa → truncate_middle</td><td>history pencereye sığmazsa → placeholder trim, yetmezse YENİ pencere</td></tr><tr><td class="ts">Claude Code</td><td>&gt;~4K token → microcompaction (diske)</td><td>context &gt; ~%80 → auto-compaction</td></tr></tbody></table>
+    <div style="font-size:7.2pt;color:#7c8895;margin-top:3px">
+      Üretim anında tetiklenen = <b>boyut filtresi</b> (tek çıktı çok mu büyük).
+      Eşikte tetiklenen = <b>birikim filtresi</b> (toplam taştı mı).
+      Biri diğerinin yerini tutmaz: eşiğin altında kalan orta boy çıktılar
+      birike birike pencereyi doldurur.</div>
+  </div>
+  <div class="kutu kavram">
+    <div class="kb">iki ayrı &quot;bütçe&quot; — karıştırmayın</div>
+    <div><b>Tek-çıktı tavanı</b> — bir tool çıktısının boyutu. Pencere BOŞKEN bile keser.
+      Katman A. <i>Codex TOOL_BUDGET=5.000 · OpenCode 2000 satır/50KB · Claude Code ~4K</i></div>
+    <div><b>Pencere bütçesi</b> — tüm context'in toplamı. Tanım gereği doluluğa bakar.
+      Katman B. <i>Codex WINDOW=30.000 · OpenClaw pencere×0.5 · OpenCode pencere−20K ·
+      Claude Code ~%80</i></div>
+    <div style="margin-top:3px;padding-top:3px;border-top:1px dashed #dfe4e9">
+      <b>Bir çıktı ikisine de yakalanabilir:</b> önce (A)'da kesilir, sonra (B)'de
+      windowing'e girer. Sıralı iki filtre — biri diğerini iptal etmez.
+      <i>Ölçüldü: Codex'te shell çıktısı 18.536 → 5.026 (A) → 0 (B).</i></div>
+  </div>
+</div>
+
+<div class="sut_kap">
+        <div class="sut" style="--c:#0d7d78">
+          <div class="sh">
+            <div class="sad">Hermes</div>
+            <div class="sek">deterministik · LLM'siz</div>
+            <div class="skz">33.063 → 2.104  ·  %93.6 kazanç</div>
+          </div>
+          <div class="stetik">
+            
+            <div><b>eşikte</b> Proaktif — pencere dolmasını beklemez, LLM&#x27;siz olduğu için her turda çalışabilir. Tek fren: toplam kazanç 4096 token&#x27;ın altındaysa hiçbir şeye dokunmaz (prompt-cache&#x27;i boşuna bozmamak için).</div>
+          </div>
+          <div class="ad"><div class="a1"><span class="im">●</span><b>1 · Dedup</b><span class=v>1 birim</span></div><div class="a2">aynı tool çıktısı → referans</div><div class="a3">Byte-byte aynı tool sonucu iki kez tutulmaz; en yenisi tam kalır, eskiler &#x27;[Duplicate tool output — same content as a more recent call]&#x27; referansına iner. İçerik hâlâ transcript&#x27;te.</div><div class="a4">kayıp: kayıpsız</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>2 · Tip-farkında özet</b><span class=v>3 birim</span></div><div class="a2">büyük çıktı → tek satır</div><div class="a3">Büyük ve benzersiz tool çıktısı, tool&#x27;un TİPİNE göre tek satıra iner ([read_file] dosya okundu (40.000 chars) / [grep] 120 eşleşme). Hangi tool, ne kadar veri — bu kalır.</div><div class="a4">kayıp: içerik gider, kimlik kalır</div></div><div class="ad"><div class="a1"><span class="im">○</span><b>3 · Argüman kırpma</b></div><div class="a2">tool_call argümanı</div><div class="a3">Sadece sonuç değil ÇAĞRININ argümanı da şişer; 500 karakteri aşan argüman JSON&#x27;ın İÇİNDE kırpılır ki çıktı geçerli JSON kalsın ve sağlayıcı 400 dönmesin.</div><div class="a4">kayıp: argüman gövdesi</div></div><div class="ad"><div class="a1"><span class="im">○</span><b>4 · Basınç demotion</b></div><div class="a2">en yeni tool son çare</div><div class="a3">Korunan bölge bile taşarsa tool sonuçları kademeli demote edilir; en yeni tool bilinçli olarak en sona saklanır ve ancak son çare olarak feda edilir.</div><div class="a4">kayıp: içerik tamamen</div></div>
+          <div class="disar"><b>tool-trace dışı:</b> proaktif tetik · boundary hesabı · 4096-token cache freni</div>
+        </div>
+        <div class="sut" style="--c:#2563a8">
+          <div class="sh">
+            <div class="sad">OpenCode</div>
+            <div class="sek">deterministik · LLM'siz</div>
+            <div class="skz">148.413 → 76.167  ·  %48.7 kazanç</div>
+          </div>
+          <div class="stetik">
+            <div><b>üretim anında</b> Tool çıktısı ÜRETİLİRKEN &gt;2000 satır veya &gt;50KB ise anında diske döker.</div>
+            <div><b>eşikte</b> Her turda proaktif prune (bedava olduğu için overflow beklemez). LLM&#x27;li overflow özeti ancak kullanılan ≥ pencere − 20K buffer olunca devreye girer.</div>
+          </div>
+          <div class="ad"><div class="a1"><span class="im">●</span><b>[A] Canlı spill</b><span class=v>1 birim</span></div><div class="a2">&gt;2000 satır / 50KB → diske</div><div class="a3">Tool çıktısı üretilirken eşiği aşarsa diske yazılır; context&#x27;e önizleme + dosya referansı girer. Dev çıktı context&#x27;e HİÇ girmez ve tam içerik geri çağrılabilir.</div><div class="a4">kayıp: geri çağrılabilir (diskte)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[B] Skill koruması</b><span class=v>1 birim</span></div><div class="a2">skill çıktısı atlanır</div><div class="a3">skill tool çıktıları budamadan MUAFTIR; referans materyaldir, eskise de değerini yitirmez.</div><div class="a4">kayıp: yok</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[B] Son-2-turn koruması</b><span class=v>2 birim</span></div><div class="a2">son 2 turn&#x27;e HİÇ bakılmaz</div><div class="a3">Prune sondan başa yürürken user mesajlarını sayar; ilk 2 turn&#x27;e hiç girmez. Bu birimler 40K SAYACINA DA GİRMEZ — yani &#x27;40K korunur&#x27; derken kastedilen, son 2 turn&#x27;ün ÜSTÜNE eklenen 40K&#x27;dır. Bu yüzden pratikte korunan hacim 40K&#x27;yı r</div><div class="a4">kayıp: yok (koruma)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[B] 40K buda bütçesi</b><span class=v>6 birim</span></div><div class="a2">yalnız BUDANABİLİR birim sayılır</div><div class="a3">Prune sondan başa yürürken gördüğü tool çıktılarını toplar; toplam 40.000&#x27;e varana kadar hepsi korunur, ötesi buda-adayı olur. Ölçüt mesaj SAYISI değil, tool izinin HACMİ. ADI YANILTICI OLMASIN: bu &#x27;context&#x27;in en yeni 40K&#x27;sı&#x27; DEĞİ</div><div class="a4">kayıp: yok (koruma)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[B] Compacted damgası</b><span class=v>3 birim</span></div><div class="a2">tool.state.time</div><div class="a3">Buda kararı, tool&#x27;un state.time.compacted alanına basılan zaman damgasıdır. İçerik O AN değişmez; damga hem &#x27;serialize&#x27;da küçült&#x27; hem de sonraki prune için &#x27;buradan öteye geçme&#x27; anlamına gelir.</div><div class="a4">kayıp: yok (o an)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[B] Serialize</b><span class=v>3 birim</span></div><div class="a2">damgalı çıktı → 2000 karakter</div><div class="a3">Asıl küçülme burada: damgalı tool çıktısı context&#x27;e yazılırken TOOL_OUTPUT_MAX_CHARS=2000 karaktere iner. Mesaj SİLİNMEZ, çift bozulmaz.</div><div class="a4">kayıp: gövde (mesaj durur)</div></div>
+          <div class="disar"><b>tool-trace dışı:</b> proaktif tetik · 20K fayda-freni (cache) · overflow LLM özeti</div>
+        </div>
+        <div class="sut" style="--c:#8b5cf6">
+          <div class="sh">
+            <div class="sad">OpenClaw</div>
+            <div class="sek">LLM-özet · LLM</div>
+            <div class="skz">138.850 → 104  ·  %99.9 kazanç</div>
+          </div>
+          <div class="stetik">
+            
+            <div><b>eşikte</b> [0] adımında — boş yer pencerenin YARISININ altına düştüğünde (boş &lt; pencere × 0.5). Üretim anında çalışan katmanı yok; her şey bu tek eşikte olur.</div>
+          </div>
+          <div class="ad"><div class="a1"><span class="im">●</span><b>[1] Sanitize</b><span class=v>3 birim</span></div><div class="a2">toolResult.details sil</div><div class="a3">toolResult.details alanı silinir. Tool çıktısı birazdan bir LLM&#x27;e gidecek; API anahtarı gibi SIRLARIN özete sızması burada engellenir.</div><div class="a4">kayıp: yan alanlar (kasıtlı)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[3] Projection</b><span class=v>3 birim</span></div><div class="a2">dev gövde → 8KB örnek</div><div class="a3">Dev tool gövdeleri 8KB örneğe indirilir ama AĞIRLIKLARI gerçek boyutta sayılmaya devam eder. Final transcript&#x27;e girmez; amacı özetleyici LLM&#x27;i patlatmamak.</div><div class="a4">kayıp: yok (çalışma kopyası)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[5] Gruplama</b><span class=v>2 birim</span></div><div class="a2">call ↔ result atomik</div><div class="a3">tool_call ile tool_result atomik bir grup sayılır; asla ayrı chunk&#x27;lara düşemezler — yoksa çift kırılır ve API isteği reddedilir.</div><div class="a4">kayıp: yok (bütünlük koruması)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[7] Oversized</b><span class=v>1 birim</span></div><div class="a2">dev sonuç → NOT, çift düşer</div><div class="a3">Tek başına pencerenin yarısını aşan tool sonucu ÖZETLENMEYE ÇALIŞILMAZ; tek satır NOT&#x27;a iner ve çifti birlikte düşer. Bu özet değil, bilinçli feragattir.</div><div class="a4">kayıp: tamamen (bilinçli feragat)</div></div><div class="ad"><div class="a1"><span class="im">○</span><b>[11] Onarım</b></div><div class="a2">yetim çift → sentetik sonuç</div><div class="a3">Özetleme sonrası çifti kopmuş bir tool_call kaldıysa ona sentetik sonuç uydurulur; zincir kırık bırakılmaz.</div><div class="a4">kayıp: yok (bütünlük onarımı)</div></div>
+          <div class="disar"><b>tool-trace dışı:</b> [0] tetik · [2] estimate · [4] adaptif oran · [8] stage-split · [9] worker · [10] LLM özeti · [12] uygula</div>
+        </div>
+        <div class="sut" style="--c:#b45309">
+          <div class="sh">
+            <div class="sad">Codex</div>
+            <div class="sek">hibrit · LLM</div>
+            <div class="skz">123.254 → 136  ·  %99.9 kazanç</div>
+          </div>
+          <div class="stetik">
+            <div><b>üretim anında</b> Tek tool çıktısı kendisine tanınan TAVANI aşarsa truncate_middle anında devreye girer — bu tavan pencereden BAĞIMSIZ sabit bir sınırdır (POC&#x27;ta TOOL_B</div>
+            <div><b>eşikte</b> History pencereye sığmazsa (POC&#x27;ta CONTEXT_WINDOW=30.000) önce placeholder trim, o da yetmezse handoff özeti + yeni pencere. Codex proaktif çalışmaz — taşınca müdahale eder.</div>
+          </div>
+          <div class="ad"><div class="a1"><span class="im">●</span><b>1 · truncate_middle</b><span class=v>13 birim</span></div><div class="a2">BAŞ+SON tut, ORTA at</div><div class="a3">Tek bir tool çıktısı bütçeyi aşarsa başı ve sonu tutulur, ortası atılır; üstüne &#x27;Warning: truncated output&#x27; konur. Gerekçe: çıktının BAŞI (imports/imza) ve SONU (hata satırı/exit kodu) en bilgilendirici, ORTASI en tekrarlı kısımdı</div><div class="a4">kayıp: orta gövde</div></div><div class="ad"><div class="a1"><span class="im">○</span><b>2 · Multimodal muafiyeti</b></div><div class="a2">görsel kesilmez</div><div class="a3">Görsel içerikli tool sonuçları bu kesmeden MUAFTIR; bir resmin ortasını atmak onu tamamen anlamsız kılar.</div><div class="a4">kayıp: yok</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>3 · Placeholder trim</b><span class=v>4 birim</span></div><div class="a2">output → iskelet</div><div class="a3">History sığmazsa en eski function_call_output&#x27;lar teker teker placeholder&#x27;a çevrilir: içerik gider, ÇAĞRI İSKELETİ kalır — böylece tool_call ↔ tool_result zinciri kırılmaz.</div><div class="a4">kayıp: içerik (iskelet kalır)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>B2 · Windowing (kapsam dışı)</b><span class="kd">kapsam dışı</span><span class=v>16 birim</span></div><div class="a2">handoff özeti + yeni pencere</div><div class="a3">EK-2&#x27;ye göre bu adım tool-trace DIŞIDIR — konuşma seviyesidir. Ama bu koşuda function-output&#x27;ların tamamını düşürdüğü için gizlenmiyor: iz üzerindeki etkisi ölçülebilir.</div><div class="a4">kayıp: tool çıktıları tamamen</div></div>
+          <div class="disar"><b>tool-trace dışı:</b> handoff özeti (SUMMARIZATION_PROMPT) · CompactedItem ile yeni pencere</div>
+        </div>
+        <div class="sut" style="--c:#be3455">
+          <div class="sh">
+            <div class="sad">Claude Code</div>
+            <div class="sek">hibrit · LLM</div>
+            <div class="skz">126.487 → 13.189  ·  %89.6 kazanç</div>
+          </div>
+          <div class="stetik">
+            <div><b>üretim anında</b> Microcompaction, tek tool çıktısı ~4K token&#x27;ı aştığında üretim anında (gözlem).</div>
+            <div><b>eşikte</b> Auto-compaction context ~%80&#x27;de tetiklenir — ama o KONUŞMA seviyesidir, tool-trace kapsamında değil.</div>
+          </div>
+          <div class="ad"><div class="a1"><span class="im">●</span><b>[A] Microcompaction</b><span class=v>1 birim</span></div><div class="a2">büyük çıktı → diske + referans</div><div class="a3">Tek bir tool çıktısı ~4K token&#x27;ı aşarsa diske yazılır (tool-results/…txt) ve context&#x27;te ~500 token&#x27;lık önizleme + &#x27;Full output saved to:&#x27; referansı kalır. Model içeriğin KAYBOLMADIĞINI, gerekirse dosyadan okuyabileceğini bilir.</div><div class="a4">kayıp: geri çağrılabilir (diskte)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>[C] Subagent kaçışı</b><span class=v>1 birim</span></div><div class="a2">iz AYRI pencerede oluşur</div><div class="a3">Compaction&#x27;a ALTERNATİF: büyük bir yan-iş ayrı bir context penceresinde koşar, ana pencereye yalnız damıtılmış özet döner. Ara adımların tool izi ana context&#x27;e HİÇ girmez — sıkıştırılacak bir iz oluşmaz bile. Sıkıştırmanın en ucuz</div><div class="a4">kayıp: yok (iz hiç oluşmaz)</div></div><div class="ad"><div class="a1"><span class="im">●</span><b>B · Auto-compaction (kapsam dışı)</b><span class="kd">kapsam dışı</span><span class=v>5 birim</span></div><div class="a2">eski turn&#x27;ler → konuşma özeti</div><div class="a3">EK-2&#x27;ye göre tool-trace DIŞI (turn seviyesi). Bu koşuda eski turn&#x27;lerin tool çıktılarını tamamen özete sürüklediği için gösteriliyor.</div><div class="a4">kayıp: tool çıktıları tamamen</div></div>
+          <div class="disar"><b>tool-trace dışı:</b> auto-compaction (konuşma özeti, turn seviyesi) · Pre/PostCompact hook&#x27;ları · anti-thrash koruması</div>
+        </div></div>
+
+<div class="dip">
+  <div><b>● / ○</b> bu koşuda adım vurdu / vurmadı — vurmaması da bilgi:
+    mekanizmanın ne zaman devreye GİRMEDİĞİ</div>
+  <div><b>kapsam dışı</b> = konuşma seviyesi (tool izine ait değil) ama bu koşuda ize etki etti</div>
+  <div><b>Tek cümlede:</b> Hermes tekilleştirir · OpenClaw sırrı söker ve devi feragatle
+    düşürür · OpenCode üretimde diske alır, hacimle ölçer · Codex ortayı keser ·
+    Claude Code ağır işin izini hiç ana pencereye sokmaz</div>
+</div>
+</body></html>

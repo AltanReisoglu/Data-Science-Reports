@@ -28,7 +28,7 @@
    "attempt": 1,
    "scan": "done",
    "done": 5,
-   "sn": 15.32,
+   "sn": 15.38,
    "bayat": 0,
    "counts": {
     "done": 5
@@ -39,7 +39,7 @@
    "attempt": 1,
    "scan": "done",
    "done": 5,
-   "sn": 0.51,
+   "sn": 0.49,
    "bayat": 0,
    "counts": {
     "done": 5
@@ -87,7 +87,7 @@
     "cancelled"
    ],
    "done": 2,
-   "sn": 12.35,
+   "sn": 37.35,
    "counts": {
     "cancelled": 2,
     "done": 2,
@@ -103,7 +103,7 @@
     "cancelled"
    ],
    "done": 2,
-   "sn": 0.25,
+   "sn": 0.24,
    "counts": {
     "cancelled": 2,
     "done": 2,

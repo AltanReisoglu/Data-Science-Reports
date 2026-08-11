@@ -1,0 +1,141 @@
+{
+ "kontroller": [
+  {
+   "ad": "hedeflenen düğüm (n2) battı",
+   "gecti": true,
+   "detay": "attempt=3"
+  },
+  {
+   "ad": "AYNI fn'li diğer düğüm (n1) ETKİLENMEDİ",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "n1'e bağlı 'tara' koştu",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "ilgisiz 'testler' koştu",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "eski yol İKİSİNİ birden vuruyordu (fark kanıtı)",
+   "gecti": true,
+   "detay": "node_sim bunu düğüm bazına indirdi"
+  },
+  {
+   "ad": "mod=normal → tara=done",
+   "gecti": true,
+   "detay": "gerçek=done"
+  },
+  {
+   "ad": "mod=gecici → tara=done",
+   "gecti": true,
+   "detay": "gerçek=done"
+  },
+  {
+   "ad": "mod=kalici → tara=failed",
+   "gecti": true,
+   "detay": "gerçek=failed"
+  },
+  {
+   "ad": "  kalıcıda ardıl düğüm cancelled",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "mod=sonra → tara=done",
+   "gecti": true,
+   "detay": "gerçek=done"
+  },
+  {
+   "ad": "mod=cokme → tara=done",
+   "gecti": true,
+   "detay": "gerçek=done"
+  },
+  {
+   "ad": "  çökmede akış TAMAMLANDI (sonsuz döngü yok)",
+   "gecti": true,
+   "detay": "counts={'done': 5}"
+  },
+  {
+   "ad": "  çökme sayacı 1 (tek atış)",
+   "gecti": true,
+   "detay": "crashes=1"
+  },
+  {
+   "ad": "mod=yavas → akış en az 2 sn sürdü",
+   "gecti": true,
+   "detay": "2.02 sn"
+  },
+  {
+   "ad": "motorlar AYNI düğüm durumlarını üretti",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "airflow: 1 failed + ardıl upstream_failed",
+   "gecti": true,
+   "detay": "sayım={'success': 3, 'upstream_failed': 1, 'failed': 1}"
+  },
+  {
+   "ad": "airflow: batan dalla ilgisiz düğümler koştu",
+   "gecti": true,
+   "detay": "success=3"
+  },
+  {
+   "ad": "materialize eski→yeni haritası üretti",
+   "gecti": true,
+   "detay": "5 eşleme"
+  },
+  {
+   "ad": "çeviri yeni id'ye bakıyor",
+   "gecti": true,
+   "detay": "['t_0cdc2d'] vs beklenen ['t_0cdc2d']"
+  },
+  {
+   "ad": "zaten yeni id verilirse aynen geçer",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "bilinmeyen id akışı BOZMUYOR",
+   "gecti": true,
+   "detay": "counts={'done': 5}"
+  },
+  {
+   "ad": "override board'a yazıldı",
+   "gecti": true,
+   "detay": "fn_args={'pattern': 'verify'}"
+  },
+  {
+   "ad": "override'lı akış tamamlandı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "node_sim=None → akış normal koşuyor",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "fail_at geçici hata → toparlıyor",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "fail_at kalıcı hata → failed + cancelled",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "crash_at eski yolu çalışıyor",
+   "gecti": true,
+   "detay": "crashes=1"
+  }
+ ],
+ "gecen": 27,
+ "toplam": 27
+}

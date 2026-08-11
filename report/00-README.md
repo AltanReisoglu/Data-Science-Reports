@@ -30,9 +30,11 @@ Rapor bu tezi altı mekanizma üzerinden inceliyor: tool, skill, memory, getirme
 | [10](10-sonuc.md) | **Sonuç** | Bulguların sentezi, mekanizma tablosu, sınırlar |
 | [11](11-guncel-durum-ve-harness-atlasi.md) | **Güncel durum ve harness atlası** | Alanın 2026 hâlinden çekirdeğe 8 katman; her harness yapısının tam I/O formu; uçtan uca tur izi; kontrol listesi |
 | [12](12-mcp-ve-modern-yontemler.md) | **MCP ve modern yöntemler** | MCP'nin wire mekaniği (JSON-RPC, transport, yaşam döngüsü, güvenlik); §11 yöntemlerinin çalıştırılabilir kod hâli (ACE, sıkıştırma, ajanik arama, PTC) |
+| [13](13-tool-trace-compaction.md) | **Tool trace compaction** | Trace vs output, anatomi, 5-alan özet şeması, sıkıştırma yöntemleri (output/trace), temsil biçimi (flat vs yapılandırılmış), karar rehberi |
 | [Ek A](ek-a-tool-referans.md) | **Tool referansı** | Uygulama düzeyinde referans, dil eşlemeleri, kontrol listesi |
+| [Ek B](ek-b-derinlestirmeler.md) | **Derinleştirmeler** | Compaction'ın 3 seviye/4 biçimi (SALT), ACE rol ayrımı, bölge×compaction, uzaysal/zamansal, ADK ToolContext değerlendirmesi |
 
-**Önerilen okuma sırası:** 01 → 02 → 03 → (04–07 herhangi bir sırada) → 08 → 09 → 10 → 11 → 12.
+**Önerilen okuma sırası:** 01 → 02 → 03 → (04–07 herhangi bir sırada) → 08 → 09 → 10 → 11 → 12 → 13.
 
 Aceleniz varsa: **01 + 02 + 10** raporun iskeletini verir.
 Tek dosya okuyacaksanız: **[11](11-guncel-durum-ve-harness-atlasi.md)** — kendi başına okunabilecek şekilde yazıldı; hem alanın güncel haritasını hem her mekanizmanın wire düzeyinde formunu içerir.

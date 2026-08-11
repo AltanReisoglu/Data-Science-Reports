@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>Motorlar — Anlatım Föyü</title>
+<style>
+@page { size: A4; margin: 8mm 9mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  color: #1a2230; font-size: 7.05pt; line-height: 1.27;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+:root { --ac:#0d7d78; --ac2:#0a5a56; --soft:#5a6675; --line:#d5dce4;
+        --ok:#1c6b3f; --okbg:#eef8f2; --bad:#a8341f; --badbg:#fdf2ef; --tint:#eef6f5; }
+
+header { border-bottom: 2pt solid var(--ac); padding-bottom: 2.5pt; margin-bottom: 4pt;
+         display:flex; align-items:baseline; justify-content:space-between; }
+h1 { font-size: 14pt; letter-spacing: -.3pt; }
+h1 span { color: var(--ac); }
+.lede { font-size: 7.4pt; color: var(--soft); }
+
+/* motor bloğu */
+.eng { border: .7pt solid var(--line); border-radius: 4pt; overflow: hidden;
+       margin-bottom: 3.4pt; break-inside: avoid; }
+.eng.mine { border-color: var(--ac); border-width: 1.1pt; }
+.bar { background: var(--ac); color: #fff; padding: 2.1pt 7pt;
+       display: flex; align-items: baseline; gap: 6pt; }
+.bar h2 { font-size: 9.4pt; letter-spacing: -.2pt; }
+.bar .sub { font-size: 7.2pt; opacity: .92; font-style: italic; }
+.bar .best { margin-left: auto; font-size: 6.6pt; font-weight: 700; letter-spacing: .3pt;
+             background: rgba(255,255,255,.22); padding: 1.3pt 5pt; border-radius: 7pt; }
+.cols { display: grid; grid-template-columns: 1.28fr 1fr 1fr; }
+.col { padding: 3.4pt 6pt 3.8pt; }
+.col + .col { border-left: .6pt solid var(--line); }
+.col.pos { background: var(--okbg); }
+.col.neg { background: var(--badbg); }
+h4 { font-size: 6.3pt; letter-spacing: .5pt; text-transform: uppercase;
+     color: var(--ac2); margin-bottom: 3pt; }
+.col.pos h4 { color: var(--ok); } .col.neg h4 { color: var(--bad); }
+
+.flow { font-family: "Consolas", "DejaVu Sans Mono", monospace; font-size: 6.5pt;
+        background: #fff; border: .5pt solid var(--line); border-radius: 3pt;
+        padding: 2.4pt 4pt; margin-bottom: 2.6pt; line-height: 1.38; color: #2b3644; }
+.flow b { color: var(--ac2); }
+ul { list-style: none; }
+li { padding-left: 7.5pt; position: relative; margin-bottom: 1.6pt; }
+li::before { position: absolute; left: 0; font-size: 6.6pt; }
+.col li::before { content: "▸"; color: var(--ac); top: -.2pt; }
+.col.pos li::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.col.neg li::before { content: "✗"; color: var(--bad); font-weight: 700; }
+b { font-weight: 650; }
+.key { color: var(--ac2); }
+
+/* alt şerit */
+.bottom { display: grid; grid-template-columns: 1.5fr 1fr; gap: 6pt; margin-top: 1pt; }
+table { border-collapse: collapse; width: 100%; font-size: 7pt; }
+th, td { border: .6pt solid var(--line); padding: 2pt 4.5pt; text-align: left; }
+th { background: var(--ac); color: #fff; font-size: 6.6pt; letter-spacing: .2pt; }
+td:first-child { font-weight: 650; color: var(--ac2); }
+td small { font-weight: 400; color: var(--soft); font-size: 6pt; }
+tr:nth-child(even) td { background: #f7f9fa; }
+td.n { text-align:center; font-weight:700; }
+.g { color: var(--ok); } .r { color: var(--bad); }
+.note { border: .7pt dashed var(--ac); border-radius: 4pt; padding: 4.5pt 6pt; background: var(--tint); font-size: 7pt; }
+.note h4 { margin-bottom: 2.5pt; }
+.note p + p { margin-top: 3pt; }
+footer { margin-top: 5pt; padding-top: 2.5pt; border-top: .6pt solid var(--line);
+         font-size: 6.2pt; color: #8a95a5; display: flex; justify-content: space-between; }
+
+/* ── 2. SAYFA: mentalite + piyasa ── */
+.p2 { page-break-before: always; }
+.ment { border: .7pt solid var(--line); border-radius: 4pt; overflow: hidden;
+        margin-bottom: 4.5pt; break-inside: avoid; }
+.ment.mine { border-color: var(--ac); border-width: 1.1pt; }
+.mtop { display: grid; grid-template-columns: auto 1fr; align-items: stretch; }
+.mname { background: var(--ac); color: #fff; padding: 5pt 8pt; display: flex;
+         flex-direction: column; justify-content: center; min-width: 88pt; }
+.mname h2 { font-size: 11pt; letter-spacing: -.2pt; line-height: 1.1; }
+.mname .yr { font-size: 6.4pt; opacity: .85; margin-top: 1.5pt; }
+.creed { padding: 5pt 8pt; background: var(--tint); display: flex; align-items: center;
+         font-size: 8.6pt; font-style: italic; color: var(--ac2); font-weight: 600; line-height: 1.3; }
+.mbody { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: .6pt solid var(--line); }
+.mbody .col { padding: 3.6pt 7pt 4pt; }
+.mbody .col + .col { border-left: .6pt solid var(--line); }
+.mbody p { margin-bottom: 2.5pt; }
+.who { font-size: 6.9pt; }
+.chip { display:inline-block; background:#fff; border:.5pt solid var(--line); border-radius:6pt;
+        padding: .8pt 4pt; margin: 0 2pt 2pt 0; font-size: 6.4pt; font-weight: 600; color: var(--ac2); }
+.trend { border: .7pt solid var(--ac); border-radius: 4pt; padding: 5.5pt 8pt; background: var(--tint); font-size: 7.3pt; }
+.trend h4 { margin-bottom: 3pt; }
+.trend p + p { margin-top: 3pt; }
+</style></head><body>
+
+<header>
+  <h1>Motorlar — <span>Anlatım Föyü</span></h1>
+  <p class="lede">Nasıl çalışır · artıları · eksileri — <b>“hangisi daha iyi” değil, “benim işim hangisine benziyor”</b></p>
+</header>
+
+<!-- CELERY -->
+<div class="eng">
+  <div class="bar"><h2>Celery</h2><span class="sub">dağıtık iş kuyruğu</span><span class="best">EN HIZLI KURULAN</span></div>
+  <div class="cols">
+    <div class="col">
+      <h4>Nasıl çalışır</h4>
+      <div class="flow"><b>.delay()</b> → mesaj kuyruğa (Redis)<br>&nbsp;&nbsp;↓<br>boştaki worker <b>kendi çeker</b> → çalıştırır → siler</div>
+      <ul>
+        <li>Fonksiyonun <b>kodu gitmez</b>, sadece <span class="key">adı</span> gider. Kod worker’da zaten var.</li>
+        <li>Kimse worker seçmez — <b>boşta olan gelip alır.</b></li>
+        <li>Retry = aynı mesajı kuyruğa geri koymak → fonksiyon <span class="key">1. satırdan</span> başlar.</li>
+      </ul>
+    </div>
+    <div class="col pos"><h4>Artıları</h4><ul>
+      <li><b>Yarım günde kurulur</b> — bir Redis, o kadar.</li>
+      <li>Öğrenmesi kolay: <code>@app.task</code> yaz, bitti.</li>
+      <li><b>Worker ekleyerek büyür</b> — 10 kat yük, 10 kat worker.</li>
+      <li>Python’un standardı; Django/Flask hazır.</li>
+      <li>Yük patlamasında sistem çökmez, <b>kuyruk tamponlar</b>.</li>
+    </ul></div>
+    <div class="col neg"><h4>Eksileri</h4><ul>
+      <li><b>Çok adımlı iş kavramı yok</b> — her task bölünmez bir kutu.</li>
+      <li><b>Retry baştan koşar</b> → pahalı adımı 2 kez ödersin.</li>
+      <li>“Nerede kaldım” defterini <b>sen tutarsın</b>.</li>
+      <li>Aynı iş iki kez çalışabilir → idempotency sende.</li>
+      <li>Geçmiş/denetim kaydı tutmaz.</li>
+    </ul></div>
+  </div>
+</div>
+
+<!-- CELERY CANVAS -->
+<div class="eng">
+  <div class="bar"><h2>Celery + Canvas</h2><span class="sub">aynı Celery — ama adımlar ayrılmış (chain / group / chord)</span><span class="best">EN UCUZ BORU HATTI</span></div>
+  <div class="cols">
+    <div class="col">
+      <h4>Nasıl çalışır</h4>
+      <div class="flow"><b>chain</b>(fetch.s(), process.s(), deliver.s())<br>&nbsp;&nbsp;↓ her adım <b>AYRI mesaj</b><br>fetch biter → sonucu process’in mesajına eklenir<br>→ yayınlanır → process koşar → …</div>
+      <ul>
+        <li>Zincirin <b>devamı mesajın içinde</b> taşınır.</li>
+        <li>Adımlar ayrı olduğu için patlayan <b>sadece kendisi</b> tekrar koşar — tek-task kurgusunun aksine.</li>
+        <li><code>group</code> = paralel, <code>chord</code> = paralel + sonra toplama.</li>
+      </ul>
+    </div>
+    <div class="col pos"><h4>Artıları</h4><ul>
+      <li><b>Pahalı adım 1×</b> — biten adım tekrar koşmaz.</li>
+      <li><b>Ek maliyet sıfır</b> — zaten Celery varsa bedava gelir.</li>
+      <li>Paralel + toplama hazır (<code>group</code>/<code>chord</code>).</li>
+      <li>Sabit, kısa boru hatları için <b>fazlasıyla yeterli</b> — Temporal/Airflow abartı olur.</li>
+    </ul></div>
+    <div class="col neg"><h4>Eksileri</h4><ul>
+      <li><b>Şekil yayın anında donar</b> — <code>if</code>/<code>while</code> yok. (<code>self.replace()</code> ile zorlanır ama mantık task’lara dağılır.)</li>
+      <li><b>Kalıcı hata sessiz</b> — zincirin kalanı hiç yayınlanmaz, kayıt kalmaz.</li>
+      <li>“Nerede kaldı?” sorulacak yer yok.</li>
+      <li>Ara sonuçlar broker’dan geçer — büyük veri tıkar.</li>
+      <li>Uzun bekleme / dışarıdan sinyal yok.</li>
+    </ul></div>
+  </div>
+</div>
+
+<!-- AIRFLOW -->
+<div class="eng">
+  <div class="bar"><h2>Airflow</h2><span class="sub">zamanlı iş planlayıcı</span><span class="best">EN GÖRÜNÜR OLAN</span></div>
+  <div class="cols">
+    <div class="col">
+      <h4>Nasıl çalışır</h4>
+      <div class="flow">DAG yazılır: <b>fetch → process → deliver</b><br>&nbsp;&nbsp;↓ saati gelince scheduler tetikler<br>adımlar sırayla koşar, durum <b>DB’ye</b> yazılır → UI</div>
+      <ul>
+        <li>İşin <b>şekli önceden çizilir</b> (statik graf).</li>
+        <li>Biten adım DB’de <span class="key">“başarılı”</span> kalır.</li>
+        <li>Bir adım patlarsa <b>sadece o adım</b> tekrar koşar.</li>
+      </ul>
+    </div>
+    <div class="col pos"><h4>Artıları</h4><ul>
+      <li><b>Zamanlamada rakipsiz</b> — cron’u yaz, gerisi onun.</li>
+      <li><b>Backfill:</b> “bugün kurdum, 6 ayı doldur”. Başka araçta yok.</li>
+      <li><b>Arayüzü çok güçlü</b> — hangi adım, ne kadar sürdü, logu ne.</li>
+      <li>Öncekiler korunur, boşa iş yapılmaz.</li>
+      <li>Yüzlerce hazır bağlantı (S3, BigQuery, Spark, dbt…).</li>
+    </ul></div>
+    <div class="col neg"><h4>Eksileri</h4><ul>
+      <li><b>Ağır kurulum</b> — 4 bileşen ayakta olmalı.</li>
+      <li><b>İşin şekli önceden belli olmalı</b> → ajanın serbest akışı sığmaz.</li>
+      <li>Adımın <b>içinde</b> kayıt yok: 7/10’da çökerse baştan.</li>
+      <li>Uzun beklemeler (“3 gün onay”) için uygun değil.</li>
+      <li>Tek bir işi arka plana atmak için abartı.</li>
+    </ul></div>
+  </div>
+</div>
+
+<!-- TEMPORAL -->
+<div class="eng">
+  <div class="bar"><h2>Temporal</h2><span class="sub">çökmeye dayanıklı yürütme</span><span class="best">EN DAYANIKLI OLAN</span></div>
+  <div class="cols">
+    <div class="col">
+      <h4>Nasıl çalışır</h4>
+      <div class="flow">Workflow <b>normal kod</b> olarak yazılır<br>&nbsp;&nbsp;↓ her adım <b>kalıcı deftere</b> yazılır<br>çökünce kod baştan koşar ama deftere bakıp<br><b>biten adımları ATLAR</b> → kaldığı yerden devam</div>
+      <ul>
+        <li>Defteri tutan taraf <b>senin sürecinin dışında</b> — o yüzden çökmeyi kurtarabiliyor.</li>
+        <li>Yan etkili her adım ayrı bir parça (“activity”).</li>
+      </ul>
+    </div>
+    <div class="col pos"><h4>Artıları</h4><ul>
+      <li><b>Tamamlanan adım bir daha koşmaz</b> — pahalı adımı iki kez ödemezsin.</li>
+      <li><b>Kurtarma kodu yazmıyorsun</b> — retry/timeout/devam hazır.</li>
+      <li><b>Günlerce bekler.</b> “3 gün insan onayı” normal bir satır.</li>
+      <li><b>Dinamik + dayanıklı</b> aynı anda — akış koşarken belirlenebilir.</li>
+      <li>Her adımın kaydı → geriye sarıp “ne oldu” görürsün.</li>
+    </ul></div>
+    <div class="col neg"><h4>Eksileri</h4><ul>
+      <li><b>Cluster işletmen gerekir</b> (ya da Cloud’a ücret).</li>
+      <li><b>Determinizm kuralları:</b> workflow’da rastgele/saat/HTTP yasak.</li>
+      <li>Öğrenmesi <b>haftalar</b> sürer — kalıcı disiplin.</li>
+      <li>Kod değişince sürüm yönetimi derdi.</li>
+      <li>Basit zamanlı iş için fazla ağır.</li>
+    </ul></div>
+  </div>
+</div>
+
+<!-- KENDİ -->
+<div class="eng mine">
+  <div class="bar"><h2>Kendi Çekirdeğimiz</h2><span class="sub">SQLite üstünde hafif motor</span><span class="best">EN HAFİF OLAN</span></div>
+  <div class="cols">
+    <div class="col">
+      <h4>Nasıl çalışır</h4>
+      <div class="flow">İş = SQLite’ta <b>bir satır</b><br>&nbsp;&nbsp;↓ worker satırı <b>kilitleyerek</b> kapar (tek worker alır)<br>kilidin süresi var → worker çökerse <b>süre dolar</b><br>başka worker devralır → <b>kayıttan</b> devam eder</div>
+      <ul>
+        <li>Temporal’ın fikri, tek makinede ve birkaç yüz satırda.</li>
+      </ul>
+    </div>
+    <div class="col pos"><h4>Artıları</h4><ul>
+      <li><b>Sıfır yeni servis</b> — sadece SQLite.</li>
+      <li><b>Kod tamamen bizim</b> — anlamadığımız yer yok.</li>
+      <li><b>Ölçtük:</b> pahalı adım <b>1 kez</b> koşuyor (Temporal’la aynı).</li>
+      <li>Worker çökerse iş kaybolmuyor, başkası devralıyor.</li>
+    </ul></div>
+    <div class="col neg"><h4>Eksileri</h4><ul>
+      <li><b>Bakım bize ait</b> — hata çıkarsa biz düzeltiriz.</li>
+      <li>Tek makine ölçeği; çok sunucuda zorlanır.</li>
+      <li>Kenar durumlar zamanla ortaya çıkar.</li>
+      <li>Hazır arayüz / ekosistem yok.</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div>
+    <table>
+      <tr><th>Motor</th><th>En iyi yaptığı şey</th><th>En zayıf yanı</th><th>Pahalı adım<br>kaç kez koştu?</th></tr>
+      <tr><td>Celery <small>(tek task)</small></td><td>Hızlı kurulur, kolay ölçeklenir</td><td>Adım kavramı yok</td><td class="n r">2× <span style="font-weight:400;font-size:5.8pt">ölçüldü</span></td></tr>
+      <tr><td>Celery + Canvas</td><td>Sıfır maliyetle boru hattı</td><td>Dallanma + görünürlük yok</td><td class="n g">1× <span style="font-weight:400;font-size:5.8pt">referans</span></td></tr>
+      <tr><td>Airflow</td><td>Zamanlama + görünürlük</td><td>Şekil önceden sabit</td><td class="n g">1× <span style="font-weight:400;font-size:5.8pt">referans</span></td></tr>
+      <tr><td>Temporal</td><td>Çökmeye dayanıklılık</td><td>Ağır kurulum + disiplin</td><td class="n g">1× <span style="font-weight:400;font-size:5.8pt">ölçüldü</span></td></tr>
+      <tr><td>Kendi çekirdeğimiz</td><td>Hafiflik + tam kontrol</td><td>Bakım bizde</td><td class="n g">1× <span style="font-weight:400;font-size:5.8pt">ölçüldü</span></td></tr>
+    </table>
+  </div>
+  <div class="note">
+    <h4>Anlatırken vurgula</h4>
+    <p><b>Tek soru şu:</b> iş yarıda çökerse “nerede kalmıştım” defterini <b>kim tutuyor?</b> Celery’de <b>hiç kimse</b> · Canvas’ta <b>mesajın kendisi</b> (ama dışarıdan sorulamaz) · Airflow’da <b>sistem, adımlar arasında</b> · Temporal’da <b>tamamen sistem</b>.</p>
+    <p><b>İkinci soru:</b> akışın şekli ne zaman belli? <b>Canvas ve Airflow’da önceden</b>, <b>Temporal’da koşarken</b> — ajan işini ayıran nokta bu.</p>
+  </div>
+</div>
+
+<footer>
+  <span>Task-Management · Motor Anlatım Föyü · <b>sayfa 1/2</b></span>
+  <span>Kanıt: <b>poc-task-mgmt/</b> — Celery · Temporal · kendi çekirdeğimiz gerçekten koşturuldu (Canvas ve Airflow: referans)</span>
+</footer>
+
+<!-- ══════════════ SAYFA 2 ══════════════ -->
+<div class="p2">
+<header>
+  <h1>Çalışma <span>Mentaliteleri</span></h1>
+  <p class="lede">Her araç bir <b>inançtan</b> doğdu. Piyasada neden yaygın olduğu, o inancın kaç şirketin derdine denk düştüğüdür.</p>
+</header>
+
+<!-- CELERY -->
+<div class="ment">
+  <div class="mtop">
+    <div class="mname"><h2>Celery</h2><div class="yr">Python dünyası · 2009</div></div>
+    <div class="creed">“Kullanıcıyı bekletme. İşi birine devret, sen hemen cevap dön.”</div>
+  </div>
+  <div class="mbody">
+    <div class="col">
+      <h4>Nereden doğdu</h4>
+      <p>Web uygulamaları büyüdükçe aynı dert çıktı: kullanıcı butona basıyor, sunucu <b>e-posta gönderirken 10 saniye kilitleniyor</b>.</p>
+      <p>Celery bu tek derde çözüm olarak doğdu — ve o kadarla kaldı. Sadeliği gücü.</p>
+    </div>
+    <div class="col">
+      <h4>Piyasada kim / ne için</h4>
+      <p class="who"><b>Kim:</b> Python/Django ile web ürünü yazan hemen herkes. Ölçek örneği: Instagram’ın bilinen en büyük Celery+RabbitMQ kurulumlarından biri var.</p>
+      <p class="who"><b>Ne için:</b> e-posta/bildirim, resim–video işleme, rapor üretme, ödeme sonrası işler, <b>tek seferlik LLM çağrısı</b>.</p>
+    </div>
+    <div class="col">
+      <h4>Neden bu kadar yaygın</h4>
+      <ul>
+        <li><b>Dert evrensel:</b> her web uygulamasının arka plan işi var.</li>
+        <li>Girişi bedava — mevcut Redis’in üstüne kurulur.</li>
+        <li>Django/Flask ile <b>fiilen standart</b>; her ekipte bilen biri var.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- CANVAS -->
+<div class="ment">
+  <div class="mtop">
+    <div class="mname"><h2>Celery<br>+ Canvas</h2><div class="yr">Celery 3.0 · 2012</div></div>
+    <div class="creed">“Sırayı da mesajın içine göm — yeni bir sistem kurma.”</div>
+  </div>
+  <div class="mbody">
+    <div class="col">
+      <h4>Nereden doğdu</h4>
+      <p>Celery kullanan herkes aynı yere geldi: <b>“iki task’ı arka arkaya çalıştırmam lazım.”</b> İnsanlar bunu elle yapıyordu — task’ın sonunda bir sonrakini <code>.delay()</code> ile çağırmak.</p>
+      <p>Canvas bu kalıbı <b>standartlaştırdı</b>: sıra, paralellik ve toplama mesajın kendisine gömüldü — <b>yeni servis eklemeden</b>.</p>
+    </div>
+    <div class="col">
+      <h4>Piyasada kim / ne için</h4>
+      <p class="who"><b>Kim:</b> Celery kullanan ekiplerin büyük kısmı — çoğu zaman ayrı bir “araç” olduğunun farkına bile varmadan. <code>chain</code> en yaygın kullanılan parça.</p>
+      <p class="who"><b>Ne için:</b> indir → dönüştür → yükle boru hatları, medya işleme zincirleri, <code>group</code> ile toplu iş, <code>chord</code> ile toplu iş + özet.</p>
+    </div>
+    <div class="col">
+      <h4>Neden bu rota</h4>
+      <ul>
+        <li><b>“Airflow kurmaya değmez” boşluğunu</b> dolduruyor.</li>
+        <li>Sıfır ek altyapı — mevcut broker yetiyor.</li>
+        <li><b>Sınırı net:</b> dallanma ya da görünürlük gerektiği an duvar. O noktada ya Airflow ya Temporal.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- AIRFLOW -->
+<div class="ment">
+  <div class="mtop">
+    <div class="mname"><h2>Airflow</h2><div class="yr">Airbnb → Apache · 2014</div></div>
+    <div class="creed">“Veri işleri takvime bağlıdır ve insan gözüyle izlenmelidir.”</div>
+  </div>
+  <div class="mbody">
+    <div class="col">
+      <h4>Nereden doğdu</h4>
+      <p>Airbnb’de veri ekibi her gece onlarca rapor/tablo üretiyordu ve <b>cron script’leri yönetilemez</b> hâle gelmişti: hangisi patladı, hangisi hangisini bekliyor, dünkü eksik nasıl doldurulur?</p>
+      <p>Airflow tam bu kaosu <b>görünür</b> kılmak için yazıldı.</p>
+    </div>
+    <div class="col">
+      <h4>Piyasada kim / ne için</h4>
+      <p class="who"><b>Kim:</b> veri mühendisliği ekipleri — fiilen sektör standardı. Bulut sağlayıcılar yönetilen sürümünü satıyor (AWS MWAA, Google Cloud Composer, Astronomer).</p>
+      <p class="who"><b>Ne için:</b> gecelik ETL, veri ambarı beslemesi, dbt/Spark zincirleri, günlük iş zekâsı raporları, ML eğitim pipeline’ları.</p>
+    </div>
+    <div class="col">
+      <h4>Neden bu kadar yaygın</h4>
+      <ul>
+        <li><b>Veri ekibinin dili</b> — “DAG” kelimesi bu yüzden yerleşti.</li>
+        <li><b>Backfill</b> tek başına satın alma sebebi.</li>
+        <li>Arayüz, teknik olmayan paydaşa da gösterilebiliyor.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- TEMPORAL -->
+<div class="ment">
+  <div class="mtop">
+    <div class="mname"><h2>Temporal</h2><div class="yr">Uber/Cadence → 2019</div></div>
+    <div class="creed">“‘Ya yarıda kalırsa?’ sorusu geliştiricinin derdi olmamalı.”</div>
+  </div>
+  <div class="mbody">
+    <div class="col">
+      <h4>Nereden doğdu</h4>
+      <p>Uber’de bir yolculuk/ödeme akışı onlarca servise dağılıyordu. Her ekip aynı şeyi tekrar yazıyordu: durum tablosu, retry sayacı, “çökerse nereden devam” kodu.</p>
+      <p>Cadence bunu <b>bir kez ve doğru</b> çözmek için yazıldı; ekibi ayrılıp Temporal’ı kurdu.</p>
+    </div>
+    <div class="col">
+      <h4>Piyasada kim / ne için</h4>
+      <p class="who"><b>Kim:</b> para/işlem akışı kritik olan şirketler. Kamuya açık konuşan kullanıcılar arasında Netflix, Snap, Coinbase, Datadog, Box var.</p>
+      <p class="who"><b>Ne için:</b> ödeme ve sipariş akışları, kullanıcı onboarding/KYC, altyapı sağlama (provisioning), <b>ajan iş akışları</b>.</p>
+    </div>
+    <div class="col">
+      <h4>Neden yükselişte</h4>
+      <ul>
+        <li>Mikroservis dağıldıkça “yarıda kalma” <b>en pahalı hata</b> hâline geldi.</li>
+        <li>Yazılmayan kod: retry/state/kurtarma katmanı komple gidiyor.</li>
+        <li><b>LLM ajanları</b> uzun ve pahalı adımlar ürettikçe talep arttı.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- KENDİ -->
+<div class="ment mine">
+  <div class="mtop">
+    <div class="mname"><h2>Kendi<br>Çekirdeğimiz</h2><div class="yr">Hermes/OpenClaw deseni</div></div>
+    <div class="creed">“Garantinin %80’i, maliyetin %5’iyle — ve kod tamamen bizde.”</div>
+  </div>
+  <div class="mbody">
+    <div class="col">
+      <h4>Nereden doğdu</h4>
+      <p>Ajan araçları tek makinede koşuyor ve küçük ekipler yönetiyor. Temporal cluster’ı işletecek kişi yok; ama “worker çökerse iş kaybolmasın” yine de şart.</p>
+      <p>Çözüm: <b>SQLite üstünde</b> aynı fikrin küçük hâli.</p>
+    </div>
+    <div class="col">
+      <h4>Piyasada kim / ne için</h4>
+      <p class="who"><b>Kim:</b> kaynak kodunu incelediğimiz ajanlar — <b>Hermes</b> ve <b>OpenClaw</b> tam bu deseni kuruyor. <b>Shannon</b> ise tersini seçip doğrudan Temporal’a biniyor.</p>
+      <p class="who"><b>Ne için:</b> ajan görev yönetimi — sıraya alma, deneme sayacı, çökme sonrası devralma, kaldığı yerden devam.</p>
+    </div>
+    <div class="col">
+      <h4>Neden bu rota</h4>
+      <ul>
+        <li>Yeni servis eklemeden <b>bugün</b> çalışıyor.</li>
+        <li><b>Ölçtük:</b> pahalı adım 1× — Temporal’la aynı sonuç.</li>
+        <li>İleride büyürse Temporal’a geçiş yolu açık kalıyor.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="bottom" style="grid-template-columns:1fr 1fr">
+  <div class="trend">
+    <h4>Mentaliteleri tek satırda ayır</h4>
+    <ul>
+      <li><b>Celery:</b> “işi <b>başkasına</b> ver” → <span class="key">iş gücü</span> sorunu çözer.</li>
+      <li><b>Celery + Canvas:</b> “<b>sırayı da</b> mesajın içine göm” → <span class="key">basit boru hattı</span> sorunu çözer.</li>
+      <li><b>Airflow:</b> “işi <b>takvime</b> bağla” → <span class="key">zaman + görünürlük</span> sorunu çözer.</li>
+      <li><b>Temporal:</b> “işi <b>ölümsüz</b> yap” → <span class="key">güvenilirlik</span> sorunu çözer.</li>
+      <li><b>Kendi çekirdeğimiz:</b> “işi <b>kendi defterimize</b> yaz” → <span class="key">maliyet + kontrol</span> sorunu çözer.</li>
+    </ul>
+  </div>
+  <div class="trend">
+    <h4>Piyasa nereye gidiyor</h4>
+    <p>Uzun yıllar <b>Celery + Airflow</b> ikilisi yetti: kısa arka plan işleri + gecelik veri işleri.</p>
+    <p>Sonra mikroservisler dağıldı, işler <b>uzadı ve pahalılaştı</b> → “yarıda kalırsa” maliyeti arttı, <b>durable execution</b> (Temporal) yükseldi.</p>
+    <p><b>Şimdi LLM ajanları</b> aynı baskıyı katlıyor: her adım para, her akış dinamik. Bu yüzden yeni ajan altyapıları ya Temporal’a biniyor ya da kendi küçük durable çekirdeğini yazıyor — <b>tam bizim durduğumuz yer.</b></p>
+  </div>
+</div>
+
+<footer>
+  <span>Task-Management · Çalışma Mentaliteleri · <b>sayfa 2/2</b></span>
+  <span>Kaynak: <b>report/task-yonetimi-altyapi-karari.md</b> — yedi ajanın kaynak kodu incelendi</span>
+</footer>
+</div>
+
+</body></html>

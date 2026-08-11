@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>Hata Anları — Ne Olur?</title>
+<style>
+@page { size: A4; margin: 9mm 9mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+       color: #1a2230; font-size: 7.6pt; line-height: 1.3;
+       -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+:root { --ac:#0d7d78; --ac2:#0a5a56; --soft:#5a6675; --line:#d5dce4;
+        --ok:#1c6b3f; --okbg:#eef8f2; --bad:#a8341f; --badbg:#fdf2ef;
+        --warn:#8a5a08; --warnbg:#fdf6e7; --tint:#eef6f5; }
+
+header { border-bottom: 2pt solid var(--ac); padding-bottom: 3.5pt; margin-bottom: 7pt;
+         display:flex; align-items:baseline; justify-content:space-between; gap:10pt; }
+h1 { font-size: 14.5pt; letter-spacing: -.3pt; }
+h1 span { color: var(--ac); }
+.lede { font-size: 7.4pt; color: var(--soft); text-align: right; }
+
+.sc { margin-bottom: 8pt; break-inside: avoid; }
+.sctop { background: var(--ac); color:#fff; border-radius: 4pt 4pt 0 0;
+         padding: 3.5pt 8pt; display:flex; align-items:baseline; gap:7pt; }
+.sctop .num { font-size: 9pt; font-weight: 800; opacity:.55; }
+.sctop h2 { font-size: 10.5pt; letter-spacing: -.2pt; }
+.sctop .q { margin-left:auto; font-size: 7.3pt; font-style: italic; opacity:.95; }
+
+table { border-collapse: collapse; width: 100%; font-size: 7.2pt; }
+th, td { border: .55pt solid var(--line); padding: 3pt 6pt; text-align: left; vertical-align: top; }
+th { background: #eaf1f1; color: var(--ac2); font-size: 6.7pt; letter-spacing:.2pt;
+     text-transform: uppercase; font-weight: 700; }
+td.eng { font-weight: 700; color: var(--ac2); white-space: nowrap; }
+td.eng small { display:block; font-weight:400; color: var(--soft); font-size:6.3pt; letter-spacing:0; text-transform:none; }
+tr.mine td { background: #f4faf9; }
+tr.mine td.eng { color: var(--ac); }
+.y { color: var(--ok); font-weight: 700; }
+.n { color: var(--bad); font-weight: 700; }
+.w { color: var(--warn); font-weight: 700; }
+.ctr { text-align: center; font-weight: 700; }
+.tag { font-size: 6pt; font-weight: 700; padding: .6pt 3.5pt; border-radius: 5pt; white-space: nowrap; }
+.tag.m { background: var(--okbg); color: var(--ok); border:.5pt solid #bfe3cd; }
+.tag.r { background: #eef1f5; color: var(--soft); border:.5pt solid var(--line); }
+
+.foot { display:grid; grid-template-columns: 1.35fr 1fr; gap: 7pt; margin-top: 2pt; }
+.box { border:.7pt solid var(--ac); border-radius:4pt; padding:5.5pt 8pt; background: var(--tint); font-size:7.2pt; }
+.box.plain { border-style: dashed; }
+h4 { font-size:6.7pt; letter-spacing:.5pt; text-transform:uppercase; color:var(--ac2); margin-bottom:3pt; }
+ul { list-style:none; } li { padding-left:8pt; position:relative; margin-bottom:2.2pt; }
+li::before { content:"▸"; position:absolute; left:0; color:var(--ac); font-size:6.6pt; }
+b { font-weight:650; }
+footer { margin-top:6pt; padding-top:3pt; border-top:.6pt solid var(--line);
+         font-size:6.2pt; color:#8a95a5; display:flex; justify-content:space-between; }
+</style></head><body>
+
+<header>
+  <h1>Hata Anları — <span>ne olur?</span></h1>
+  <p class="lede">Üç ayrı senaryo, beş kurgu. <b>Karıştırılan şey:</b> “çökme” ile “retry” aynı şey değil,<br>“retry” ile “kalıcı başarısızlık” da aynı şey değil.</p>
+</header>
+
+<!-- 1 -->
+<div class="sc">
+  <div class="sctop"><span class="num">1</span><h2>WORKER ÇÖKERSE</h2>
+    <span class="q">işi yapan süreç, iş ortasında ölür (kill, deploy, elektrik)</span></div>
+  <table>
+    <tr>
+      <th style="width:15%">Motor</th>
+      <th style="width:13%">İş kaybolur mu?</th>
+      <th style="width:16%">Kim fark eder?</th>
+      <th style="width:20%">Ne kadar sonra?</th>
+      <th>İş nereden devam eder?</th>
+    </tr>
+    <tr>
+      <td class="eng">Celery<small>varsayılan ayar</small></td>
+      <td class="ctr n">EVET ✗</td>
+      <td class="n">Hiç kimse</td>
+      <td>Hiçbir zaman</td>
+      <td><b class="n">Devam etmez.</b> Mesaj worker onu alır almaz silinmişti — iş buharlaştı, kimsenin haberi olmaz.</td>
+    </tr>
+    <tr>
+      <td class="eng">Celery<small>acks_late=True</small></td>
+      <td class="ctr y">Hayır ✓</td>
+      <td>Broker</td>
+      <td>RabbitMQ: <b>anında</b><br>Redis: görünürlük süresi (<b>varsayılan 1 saat</b>)</td>
+      <td><b class="n">En baştan.</b> Mesaj yeniden teslim edilir, fonksiyon 1. satırdan başlar. Yarım kalan iş geri alınmaz.</td>
+    </tr>
+    <tr>
+      <td class="eng">Celery + Canvas<small>chain / group / chord</small></td>
+      <td class="ctr y">Hayır ✓</td>
+      <td>Broker</td>
+      <td>RabbitMQ: <b>anında</b><br>Redis: görünürlük süresi</td>
+      <td><b class="w">Koşan adımın başından.</b> Zincirin biten adımları tekrar koşmaz — devamı mesajda taşındığı için zincir kaldığı yerden sürer.</td>
+    </tr>
+    <tr>
+      <td class="eng">Airflow</td>
+      <td class="ctr y">Hayır ✓</td>
+      <td>Scheduler<br><small>(“zombie” tespiti)</small></td>
+      <td>Kalp atışı kesilince (dakikalar)</td>
+      <td><b class="w">Patlayan adımın başından.</b> Önceki adımlar DB’de “başarılı” kalır, tekrar koşmaz.</td>
+    </tr>
+    <tr>
+      <td class="eng">Temporal</td>
+      <td class="ctr y">Hayır ✓</td>
+      <td>Cluster</td>
+      <td>Adıma verdiğin süre dolunca (<b>saniyeler</b>)</td>
+      <td><b class="y">Tam kaldığı yerden.</b> Defterdeki biten adımlar atlanır, sadece yarım kalan tekrar denenir.</td>
+    </tr>
+    <tr class="mine">
+      <td class="eng">Kendi çekirdeğimiz</td>
+      <td class="ctr y">Hayır ✓</td>
+      <td>Kilit süresi<br><small>(lease) dolunca</small></td>
+      <td>Kilit süresi kadar (<b>sen belirlersin</b>)</td>
+      <td><b class="y">Kayıttan devam.</b> Satır “hazır”a döner, başka worker kapar, son kayıttan sürdürür.</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 2 -->
+<div class="sc">
+  <div class="sctop"><span class="num">2</span><h2>RETRY OLUNCA</h2>
+    <span class="q">bir adım hata verdi, sistem yeniden deniyor (worker yaşıyor)</span></div>
+  <table>
+    <tr>
+      <th style="width:15%">Motor</th>
+      <th style="width:22%">Neyi tekrar koşar?</th>
+      <th style="width:22%">Biten adımlar korunur mu?</th>
+      <th style="width:14%">Pahalı adım kaç kez?</th>
+      <th>Deneme sayacı nerede?</th>
+    </tr>
+    <tr>
+      <td class="eng">Celery</td>
+      <td><b class="n">Tüm fonksiyonu</b> — baştan</td>
+      <td class="n">Korunmaz, hepsi tekrar koşar</td>
+      <td class="ctr n">2× <span class="tag m">ölçüldü</span></td>
+      <td>Mesajın içinde (<code>retries</code>) — her denemede yeni mesaj yayınlanır</td>
+    </tr>
+    <tr>
+      <td class="eng">Celery + Canvas<small>chain / group / chord</small></td>
+      <td class="y">Sadece patlayan task’ı</td>
+      <td class="y">Korunur — her adım ayrı mesaj</td>
+      <td class="ctr y">1× <span class="tag r">referans</span></td>
+      <td>O adımın kendi mesajında (<code>retries</code>)</td>
+    </tr>
+    <tr>
+      <td class="eng">Airflow</td>
+      <td class="y">Sadece patlayan düğümü</td>
+      <td class="y">Korunur (“başarılı” kalır)</td>
+      <td class="ctr y">1× <span class="tag r">referans</span></td>
+      <td>Metadata DB (<code>try_number</code>)</td>
+    </tr>
+    <tr>
+      <td class="eng">Temporal</td>
+      <td class="y">Sadece patlayan adımı</td>
+      <td class="y">Korunur (defter atlar)</td>
+      <td class="ctr y">1× <span class="tag m">ölçüldü</span></td>
+      <td>Kalıcı defterde (event history)</td>
+    </tr>
+    <tr class="mine">
+      <td class="eng">Kendi çekirdeğimiz</td>
+      <td class="y">Sadece patlayan adımı</td>
+      <td class="y">Korunur (checkpoint)</td>
+      <td class="ctr y">1× <span class="tag m">ölçüldü</span></td>
+      <td>SQLite (<code>task_runs</code> + deneme sayacı)</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 3 -->
+<div class="sc">
+  <div class="sctop"><span class="num">3</span><h2>KALICI ÇÖKERSE</h2>
+    <span class="q">deneme hakkı bitti, sistem pes etti</span></div>
+  <table>
+    <tr>
+      <th style="width:15%">Motor</th>
+      <th style="width:20%">İş ne olur?</th>
+      <th style="width:20%">Geriye kayıt kalır mı?</th>
+      <th style="width:17%">Haberin olur mu?</th>
+      <th>Elle kurtarabilir misin?</th>
+    </tr>
+    <tr>
+      <td class="eng">Celery</td>
+      <td class="n">Sessizce ölür. Sonuç hiç üretilmez. <span class="tag m">ölçüldü</span></td>
+      <td class="n">Hayır — sonuç deposu kurmadıysan hiçbir iz yok</td>
+      <td class="n">Hayır — kendin izlemezsen fark etmezsin</td>
+      <td><b class="n">Hayır.</b> Görevi elle yeniden gönderirsin; o da <b>en baştan</b> koşar.</td>
+    </tr>
+    <tr>
+      <td class="eng">Celery + Canvas<small>chain / group / chord</small></td>
+      <td class="n"><b>Zincirin kalanı hiç yayınlanmaz</b> — sessizce durur</td>
+      <td class="n">Hayır — <code>link_error</code> kurmadıysan iz yok</td>
+      <td class="n">Hayır — <code>link_error</code> kurarsan evet</td>
+      <td><b class="w">Kısmen.</b> Kalan adımları <b>elle</b> yayınlarsın; ama “nerede kaldı”yı kendin bulman gerekir.</td>
+    </tr>
+    <tr>
+      <td class="eng">Airflow</td>
+      <td class="w">Adım “başarısız”, koşu “başarısız”</td>
+      <td class="y">Evet — DB’de durum + log durur</td>
+      <td class="y">Evet — arayüzde kırmızı, uyarı gönderir</td>
+      <td><b class="y">Evet.</b> Arayüzden “temizle” dersin, <b>o düğümden</b> yeniden koşar.</td>
+    </tr>
+    <tr>
+      <td class="eng">Temporal</td>
+      <td class="w">Workflow “başarısız” <span class="tag m">ölçüldü</span></td>
+      <td class="y"><b>Evet — tüm defter durur</b>, hangi adımda ne oldu görünür</td>
+      <td class="y">Evet — arayüzde, sorgulanabilir</td>
+      <td><b class="y">Evet.</b> Defteri inceleyip belirli bir noktaya sıfırlar ya da devam ettirirsin.</td>
+    </tr>
+    <tr class="mine">
+      <td class="eng">Kendi çekirdeğimiz</td>
+      <td class="w">Sigorta atar, iş “engellendi”ye düşer</td>
+      <td class="y">Evet — deneme geçmişi + olay kaydı durur</td>
+      <td class="y">Evet — DB’den görünür</td>
+      <td><b class="y">Evet.</b> Durumu “hazır”a çevirirsin, <b>kayıttan</b> devam eder.</td>
+    </tr>
+  </table>
+</div>
+
+<div class="foot">
+  <div class="box">
+    <h4>Üç senaryoyu karıştırma — anlatırken ayır</h4>
+    <ul>
+      <li><b>Çökme</b> = süreç öldü. Soru: <b>iş kayboldu mu, kim fark etti?</b></li>
+      <li><b>Retry</b> = adım patladı, tekrar deneniyor. Soru: <b>neyi tekrar koşuyor?</b></li>
+      <li><b>Kalıcı başarısızlık</b> = hak bitti. Soru: <b>geriye kayıt kaldı mı, kurtarabilir miyim?</b></li>
+    </ul>
+    <p style="margin-top:3.5pt"><b>Üçünün de tek ortak sorusu:</b> “iş nerede kalmıştı” defterini kim tutuyor? Celery’de <b class="n">hiç kimse</b> · Canvas’ta <b class="w">mesajın kendisi</b> (dışarıdan sorulamaz) · Airflow’da <b class="w">sistem, adımlar arasında</b> · Temporal ve kendi çekirdeğimizde <b class="y">tamamen sistem</b>.</p>
+    <p style="margin-top:3pt"><b>Canvas’ın kapattığı ve kapatmadığı:</b> retry granülerliğini <b class="y">çözer</b> (adım seviyesi), ama <b class="n">kalıcı hatada sessizliği ve görünürlük eksikliğini çözmez</b>.</p>
+  </div>
+  <div class="box plain">
+    <h4>En sık yapılan üç hata</h4>
+    <ul>
+      <li><b>Celery’yi varsayılan ayarla kullanmak.</b> <code>acks_late</code> açık değilse worker çökmesi işi <b>tamamen</b> yok eder.</li>
+      <li><b>Redis’te görünürlük süresini ayarlamamak.</b> Varsayılan 1 saat: uzun işler bu süreyi aşarsa <b>iki worker aynı işi</b> koşar.</li>
+      <li><b>“Retry var, o zaman güvendeyim” sanmak.</b> Retry, işin <b>baştan</b> koşması demek olabilir — pahalı adımı iki kez ödersin.</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  <span>Task-Management · Hata Anları Föyü &nbsp;·&nbsp; <span class="tag m">ölçüldü</span> = POC’ta gerçekten koşturuldu &nbsp; <span class="tag r">referans</span> = dokümantasyona göre (kurulumu ağır, koşturulmadı)</span>
+  <span>Kanıt: <b>poc-task-mgmt/</b></span>
+</footer>
+
+</body></html>

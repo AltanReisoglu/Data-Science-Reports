@@ -50,17 +50,26 @@ def _short(result, cap: int = 220):
 
 
 def listing(limit: int = 50) -> list:
-    """Kayıtlı akışların özeti (yeniden eskiye)."""
-    out = []
-    for f in sorted(STORE.glob("p_*.json"), reverse=True)[:limit]:
+    """Kayıtlı akışların özeti (yeniden eskiye).
+
+    DİKKAT — sıralama DOSYA ADINA göre yapılamaz: id `int(time.time()*1000) % 1e8`
+    ile üretiliyor ve bu sayaç ~27,7 saatte bir başa sarıyor. Dosya adına göre
+    sıralayınca yeni kaydedilen akış listenin dibine düşüyor ve `limit` penceresine
+    hiç giremiyordu — yani sohbette kurulan graf "Akışlar" ekranında GÖRÜNMÜYORDU.
+    Gerçek zaman damgası `at` alanında; sıralama onunla yapılmalı.
+    """
+    kayitlar = []
+    for f in STORE.glob("p_*.json"):
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
         except Exception:
             continue
-        out.append({"id": d["id"], "goal": d["goal"], "pack": d["pack"],
-                    "backend": d["backend"], "at": d["at"],
-                    "n": len(d["nodes"]), "stats": d.get("stats", {})})
-    return out
+        kayitlar.append(d)
+    kayitlar.sort(key=lambda d: d.get("at", 0), reverse=True)
+    return [{"id": d["id"], "goal": d["goal"], "pack": d["pack"],
+             "backend": d["backend"], "at": d["at"],
+             "n": len(d["nodes"]), "stats": d.get("stats", {})}
+            for d in kayitlar[:limit]]
 
 
 def load(pid: str) -> dict | None:

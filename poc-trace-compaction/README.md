@@ -140,6 +140,65 @@ asistan › Analist Moderate Buy; RSI 54 nötr.
 Komutlar: `/trace` (kaderler) · `/playbook` (öğrenilen) · `/ledger` · `/reset` · `/quit`.
 `agent.py` artık çok-turlu (`send()`); trace/ledger/playbook/mesajlar turlar arası korunur.
 
+## Tarayıcı paneli — aynı trace, altı mantık
+
+```bash
+python chat_server.py --port 8010     # → http://localhost:8010
+```
+
+Sağ sütundaki tool listesi artık makine değil **insan** okuyacak biçimde:
+ne çağrıldı, ne için, ne döndü, ona ne oldu ve **neden** olduğu tek bakışta.
+
+Üstteki **⇄ mantık karşılaştır** düğmesi asıl ekranı açıyor: o ana kadar birikmiş
+**tek bir gerçek trace**, altı ayrı compaction mantığından geçiriliyor ve her biri
+kendi sekmesinde duruyor.
+
+| sekme | ekol | ne yapar |
+|---|---|---|
+| **CWL · bu POC** | deterministik | kademeli eviction: dedup → bayat → hata-zinciri → keşif katlama → kategori → episode |
+| **hermes** | deterministik | dedup → tip-farkında tek satır özet → arg-kırp → basınç demotion |
+| **opencode** | deterministik | canlı spill (diske dök) + backward-prune |
+| **openclaw** | LLM-özet | grupla → parçala → LLM chunk-özeti |
+| **codex** | hibrit | ortadan-kesme + model-turn windowing (handoff özeti) |
+| **claude_code** | hibrit | microcompaction (diske dök + referans) + auto-compaction |
+
+Beş harness mantığı `../demo-brain-agent/compaction.py`'den geliyor — orada zaten
+gerçek sistemlerin davranışı taklit edilmiş, burada yeniden yazılmadı.
+
+Her tool satırı açılıyor ve **ÖNCE (ham çıktı) / SONRA (context'te kalan)** yan yana,
+**kırpılmadan** görünüyor. Yanında o mantığın o birime neden dokunduğu yazıyor.
+Birleştiren stratejilerde birimin gittiği yer de gösteriliyor: "bu birim ayrı bir
+mesaj olarak kalmadı" + o mantığın **ürettiği** yeni metin (handoff/konuşma özeti).
+
+Ölçülen (8 tool birimi, 1.957 token ham bağlam, bütçe 1.200):
+
+```
+CWL · bu POC   1.957 → 1.465   %25,1      3 birim özete indi, 5'i korundu
+hermes         1.957 →   968   %50,5      3 birim tek satıra indi
+opencode       1.957 → 1.957   %0,0       çalıştı, hiçbir birime DOKUNMADI
+openclaw       1.957 →   214   %89,1      8 birim tek LLM özetinde birleşti
+codex          1.957 →   709   %63,8      7 birim handoff özetine girdi
+claude_code    1.957 →   690   %64,7      7 birim konuşma özetine girdi
+```
+
+`opencode`'un %0'ı hata değil, **bulgu**: eşikleri (2000 satır / 50KB spill,
+en yeni 40K token korunur) 2 bin token'lık bir bağlamda hiç aşılmıyor. OpenCode'un
+mantığı büyük çıktılar için tasarlanmış; küçük ama çok sayıda tool birimi olan bir
+trace onun radarına hiç girmiyor. Sekmedeki log bunu satır satır gösteriyor.
+
+Kazanç sıralaması yanıltıcı okunmasın: **ne kadar küçülttüğü kadar geriye ne
+bıraktığı önemli.** openclaw %89 kazanıyor ama 8 birimin hepsi tek bir LLM özetine
+giriyor — ÖNCE/SONRA panelinde tam olarak neyin kaybolduğu görülebiliyor.
+
+> **Yol boyunca çıkan hata.** Düğüm bazlı ÖNCE/SONRA görünümü eklenince
+> `get_company_info` biriminin **31 → 32 token**'a çıktığı görüldü: sıkıştırma
+> bağlamı BÜYÜTÜYORDU. Sebep, `_evict_event`'teki fayda güvencesinin trace
+> muhasebesine (payload JSON vs özet dict) bakması, ama özetin bağlama
+> `summary.render()` metni olarak düşüp yalnızca `output`'un yerini alması —
+> **iki farklı cetvel.** Ayrıca keşif-katlama fazı bu kontrolü hiç yapmıyordu.
+> `_fayda_var()` artık iki ölçeği birden kontrol ediyor ve faz onu kullanıyor.
+> Ders: *ölçüm, etkinin düştüğü yerden alınmalı.*
+
 ## Genel ledger + equity case (HF dataset case 5.8)
 
 Sistem dosya senaryosuna değil, **herhangi bir domain'e** oturacak şekilde

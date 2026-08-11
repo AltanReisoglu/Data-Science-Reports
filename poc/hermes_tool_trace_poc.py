@@ -213,7 +213,13 @@ def prune_old_tool_results(
         h = hashlib.sha1(content.encode("utf-8")).hexdigest()
         if h in seen:
             newest = seen[h]
-            result[i] = {**msg, "content": f"[Duplicate of newer result at #{newest} — content omitted]"}
+            # Metin gerçek repodan BİREBİR: context_compressor.py:2889.
+            # (POC önce "[Duplicate of newer result at #N — content omitted]" yazıyordu;
+            #  #N indeksi gerçekte YOK. Panelde SONRA kutusunda bu metin aynen
+            #  gösterildiği için birebir olması gerekiyor.)
+            _ = newest
+            result[i] = {**msg,
+                         "content": "[Duplicate tool output — same content as a more recent call]"}
             stats["dedup"] += 1
         else:
             seen[h] = i
@@ -228,7 +234,7 @@ def prune_old_tool_results(
             return False
         if content.startswith("[") and " chars)" in content and len(content) < 400:
             return False   # zaten budanmış
-        if content.startswith("[Duplicate of") or content.startswith("[screenshot removed"):
+        if content.startswith("[Duplicate tool output") or content.startswith("[screenshot removed"):
             return False
         if len(content) <= min_prune_chars:
             return False   # küçük — değmez

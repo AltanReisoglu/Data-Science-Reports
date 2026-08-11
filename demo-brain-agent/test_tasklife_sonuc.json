@@ -113,8 +113,8 @@
  },
  {
   "ad": "blocked task claim EDİLEMİYOR",
-  "beklenen": "t_b23a95",
-  "gercek": "t_b23a95",
+  "beklenen": "t_263aa4",
+  "gercek": "t_263aa4",
   "gecti": true,
   "detay": ""
  },
@@ -266,14 +266,28 @@
   "detay": "count=4"
  },
  {
-  "ad": "zamanlanmış koşu (cron/interval) UYGULANMIŞ mı",
-  "beklenen": "False",
-  "gercek": "False",
+  "ad": "zamanlanmış koşu (cron) UYGULANMIŞ mı",
+  "beklenen": "True",
+  "gercek": "True",
   "gecti": true,
-  "detay": "→ HAYIR: scheduling bu sistemde hiç yok (koçun 6 ekseninden biri açık)"
+  "detay": "→ EVET: scheduler.py (cron + claim/lease + yoklayıcı)"
  },
  {
-  "ad": "board'da zaman alanı (next_run/schedule) var mı",
+  "ad": "zamanlama deposunda next_run_at alanı var mı",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "bayatlık kontrolü claim'in İÇİNDE (ayrı kurtarma adımı yok)",
+  "beklenen": "True",
+  "gercek": "True",
+  "gecti": true,
+  "detay": ""
+ },
+ {
+  "ad": "board zamanlama alanı tutMUYOR (ayrı sorumluluk)",
   "beklenen": "False",
   "gercek": "False",
   "gecti": true,
