@@ -53,6 +53,13 @@ def run_task(self, task_id: str) -> str:
     strategy = os.environ.get("BRAIN_STRATEGY", "hermes")
     budget = int(os.environ.get("BRAIN_BUDGET", "3000"))
     fail_at = os.environ.get("BRAIN_FAIL_AT") or None
+    # Düğüm bazlı simülasyon ana süreçten JSON olarak geliyor. Anahtarlar board'un
+    # GÜNCEL task id'leri (çeviri materialize() içinde yapıldı).
+    try:
+        import json as _json
+        node_sim = _json.loads(os.environ.get("BRAIN_NODE_SIM") or "{}")
+    except Exception:
+        node_sim = {}
 
     task = board.get(task_id)
     if not task or task["status"] == "done":
@@ -68,12 +75,25 @@ def run_task(self, task_id: str) -> str:
 
     try:
         # ORTAK yönlendirici: fonksiyon düğümü → LLM'siz; ajan düğümü → LLM
+        # Deneme sayacı BOARD'dan gelmeli. `self.request.retries` yalnız Celery'nin
+        # KENDİ retry'ını sayar; retry otoritesini board'a devrettiğimiz için o sayaç
+        # hep 0 kalıyor ve "geçici hata" sonsuza dek ilk deneme sanılıyordu
+        # (Temporal'da yaşanan sorunun aynısı — orada da board'a çevirmiştik).
+        att = max(int(self.request.retries or 0), int(task.get("attempt") or 0))
         kind, result, _extra = orchestrator.run_one_task(
             task, board, strategy, budget,
-            fail_at=fail_at, attempt=self.request.retries)
+            fail_at=fail_at, attempt=att, node_sim=node_sim)
     except RuntimeError as e:
+        # RETRY OTORİTESİ TEK YERDE: board.
+        # Eskiden burada ayrıca `self.retry()` çağrılıyordu. Ama `board.fail()`
+        # task'ı 'ready'ye döndürüyor ve dispatcher'ın dalga döngüsü onu ZATEN
+        # yeniden kuyruğa atıyor → düğüm İKİ ayrı yoldan yeniden dağıtılıyordu.
+        # Ölçüldü: geçici hatada düğüm own/temporal/airflow'da 2 kez koşarken
+        # celery'de 3 kez koşuyordu. Yan etkili bir düğümde bu, işin fazladan
+        # bir kez yapılması demek. Celery'nin kendi retry'ını kapatıp board'a
+        # bırakıyoruz (Temporal'daki çift-katman sorununun aynısı).
         board.fail(task["id"], str(e), claimer=task.get("claim_lock"))
-        raise self.retry(exc=e, countdown=0)      # Celery retry: task BAŞTAN koşar
+        return f"fail:{type(e).__name__}"
     if not board.complete(task["id"], result, claimer=task.get("claim_lock")):
         return "stale-write-reddedildi"
     return f"ok:{kind}"

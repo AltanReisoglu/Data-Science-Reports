@@ -29,6 +29,20 @@ def _raw_cost(ev: Event) -> int:
     return estimate_tokens(json.dumps(ev.payload, ensure_ascii=False))
 
 
+def _fayda_var(ev: Event, ozet: TraceSummary) -> bool:
+    """Bu özet gerçekten KÜÇÜLTÜYOR mu — İKİ ölçekte birden?
+
+    Fayda güvencesi eskiden yalnız trace muhasebesine (payload JSON vs özet dict)
+    bakıyordu. Ama özet bağlama `summary.render()` metni olarak düşüyor ve
+    messages[]'te yerini aldığı şey yalnızca `output`. İki ölçek farklı olduğu
+    için guard'dan geçen bir birim GERÇEK bağlamda büyüyebiliyordu — ölçüldü:
+    31 → 32 token. Ölçüm, etkinin düştüğü yerden alınmalı; ikisini de kontrol et.
+    """
+    if ozet.token_cost() >= _raw_cost(ev):
+        return False
+    return estimate_tokens(ozet.render()) < estimate_tokens(ev.payload.get("output", ""))
+
+
 # expl/act ayrımı (§5.2): keşif mi eylem mi
 _EXPL = {"read", "search"}
 _ACT = {"write", "test"}
@@ -100,7 +114,7 @@ def _summarize_deterministic(trace: Trace, ev: Event, ledger: ExecutionLedger,
 class TraceCompactor:
     def __init__(self, budget: int, protect_window: int,
                  summarize_fn: Optional[Callable[[Event], str]] = None,
-                 task: str = "", playbook=None, target_ratio: float = 0.6) -> None:
+                 task: str = "", playbook=None, target_ratio: float = 0.5) -> None:
         # İki eşik (Wegent'ten ilham): budget = TETİKLE (bu aşılınca başla),
         # target = BURAYA KADAR İN (belirgin altı). Histerezis: bir kez sıkıştır,
         # bir sonraki tool çağrısı hemen tekrar tetiklemesin (ACM "sawtooth").
@@ -121,10 +135,11 @@ class TraceCompactor:
         zararlı olurdu → ham bırak, False dön. Küçük tool çıktılarında olur.
         """
         summary = _summarize_deterministic(trace, ev, ledger, reason, self.keywords)
-        if summary.token_cost() >= _raw_cost(ev):
+        if not _fayda_var(ev, summary):
             return False
         ev.summary = summary
         ev.evicted = True
+        ev.neden = reason
         self.log.append(f"  seq={ev.seq} {ev.payload.get('name')} → ÖZET · {reason}")
         return True
 
@@ -139,6 +154,7 @@ class TraceCompactor:
             return False
         ev.cleared = True
         ev.clear_note = note
+        ev.neden = note
         self.log.append(f"  seq={ev.seq} {ev.payload.get('name')} → SİLİNDİ · {note}")
         return True
 
@@ -173,12 +189,17 @@ class TraceCompactor:
         evicted = 0
 
         # --- Faz 1: DUPLICATE'ler (en güvenli — sonuç zaten başka yerde) ---
+        # Önce ÖZET (5-alan iz + "≡ seq=X" bağı). Ama verbatim bir tekrarda özet =
+        # ham olur, fayda freni engeller → o zaman SİL'e düş: bire bir aynı içerik
+        # daha erken (canlı) bir olayda durduğu için silme B.11 açısından güvenli.
         for ev in tool_evs:
-            if ev.seq in protected or ev.evicted:
+            if ev.seq in protected or ev.evicted or ev.cleared:
                 continue
             det = _detect_duplicate(trace, ev, ledger)
             if det is not None:
                 if self._evict_event(trace, ev, ledger, f"tekrar (≡ seq={det})"):
+                    evicted += 1
+                elif self._clear_event(ev, f"tekrar ≡ seq={det} (aynı içerik canlı)"):
                     evicted += 1
 
         # --- Faz 2: STALE gözlemler (dosya sonradan değişti) ---
@@ -214,7 +235,7 @@ class TraceCompactor:
                     durum="HATA (düzeltildi)",
                     etki=f"düzeltme: seq={corr}")
                 ev.evicted = True
-                self.log.append(f"  seq={ev.seq} → ÖZET · hata-zinciri (düzeltme seq={corr})")
+                ev.neden = f"hata-zinciri — düzeltmesi seq={corr}'te, ders playbook'a alındı"
                 evicted += 1
                 # ACE Curation (K4): dersi playbook'a ARTIMLI DELTA olarak yaz.
                 # Trace özeti sonra sıkışsa da ders playbook'ta kalıcı (collapse yok).
@@ -240,24 +261,45 @@ class TraceCompactor:
                         if f:
                             self.playbook.curate(f, tag="bulgu")
                 # dizinin son birimine roll-up bulgu, öncekiler diziye katlanır
+                #
+                # FAYDA GÜVENCESİ: `_evict_event` bunu zaten yapıyor ama bu faz
+                # kendi özetini elle kuruyor ve kontrolü ATLIYORDU. Düğüm bazlı
+                # ÖNCE/SONRA görünümü eklenince ölçüldü: küçük bir tool çıktısı
+                # (31 token) 32 token'lık bir "özete" çevriliyordu — sıkıştırma
+                # bağlamı BÜYÜTÜYORDU. Küçük çıktılarda 5-alan özetin sabit yükü
+                # ham veriden pahalı; o durumda ham bırakmak doğru.
+                def _katla(e, ozet, neden) -> bool:
+                    if not _fayda_var(e, ozet):
+                        self.log.append(f"  seq={e.seq} katlanmadı — özet ham'dan "
+                                        f"büyük olurdu ({ozet.token_cost()} ≥ {_raw_cost(e)})")
+                        return False
+                    e.summary, e.evicted, e.neden = ozet, True, neden
+                    return True
+
+                katlanan = 0
                 for e in run[:-1]:
-                    e.summary = TraceSummary(
-                        niyet=_intent_of(trace, e),
-                        girdi=", ".join(f"{k}={v}" for k, v in
-                                        e.payload.get("args", {}).items()) or "-",
-                        sonuc="(keşif dizisine katlandı)", durum="ok",
-                        etki=f"→ bulgu: seq={run[-1].seq}")
-                    e.evicted = True
-                    evicted += 1
+                    if _katla(e, TraceSummary(
+                            niyet=_intent_of(trace, e),
+                            girdi=", ".join(f"{k}={v}" for k, v in
+                                            e.payload.get("args", {}).items()) or "-",
+                            sonuc="(keşif dizisine katlandı)", durum="ok",
+                            etki=f"→ bulgu: seq={run[-1].seq}"),
+                            f"keşif dizisine katlandı → bulgu seq={run[-1].seq}"):
+                        evicted += 1
+                        katlanan += 1
                 last = run[-1]
-                last.summary = TraceSummary(
-                    niyet="keşif dizisi", girdi=f"{len(run)} adım",
-                    sonuc=finding[:150], durum="ok",
-                    etki="keşif katlandı (bulgu korundu)")
-                last.evicted = True
-                evicted += 1
+                if _katla(last, TraceSummary(
+                        niyet="keşif dizisi", girdi=f"{len(run)} adım",
+                        sonuc=finding[:150], durum="ok",
+                        etki="keşif katlandı (bulgu korundu)"),
+                        f"keşif dizisi ({len(run)} adım) bulguya katlandı"):
+                    evicted += 1
+                    katlanan += 1
                 self.log.append(f"  keşif dizisi [{run[0].seq}..{run[-1].seq}] "
-                                 f"→ bulguya katlandı ({len(run)} adım)")
+                                 f"→ bulguya katlandı ({katlanan}/{len(run)} adım"
+                                 + ("" if katlanan == len(run)
+                                    else "; kalanlar ham bırakıldı — özet daha pahalı olurdu")
+                                 + ")")
 
         # --- Faz 5: kademeli — önce ACT, sonra EXPL (§5.2) ---
         # bütçe hâlâ aşılıyorsa yaşça eskiden başlayarak (son çare)
@@ -280,6 +322,7 @@ class TraceCompactor:
                                                 ev.payload.get("args", {}).items()),
                                 sonuc=note, durum=ev.status, etki=label)
                             ev.evicted = True
+                            ev.neden = f"LLM özeti · {label}"
                             self.log.append(f"  seq={ev.seq} → LLM özet")
                             evicted += 1
                         except Exception:
@@ -315,6 +358,7 @@ class TraceCompactor:
                         durum="ok",
                         etki=f"CWL episode eviction: {ep.name}")
                     ev.evicted = True
+                    ev.neden = f"CWL episode eviction — '{ep.name}' tamamlandı"
                     evicted += 1
                 self.log.append(f"  CWL episode '{ep.name}' [{len(live)} olay] "
                                  f"→ description: \"{ep.description}\"")

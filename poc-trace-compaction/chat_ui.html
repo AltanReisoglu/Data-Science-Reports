@@ -70,8 +70,10 @@
   .mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.5}
   .gfoot{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;justify-content:space-between}
   .chips{display:flex;flex-wrap:wrap;gap:5px;padding:11px 13px}
-  .chip{font-family:var(--mono);font-size:10px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
+  .chip{font-family:var(--mono);font-size:10px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);color:var(--dim);display:inline-flex;flex-direction:column;gap:2px;line-height:1.25}
   .chip .s{color:var(--muted)}
+  .chip .olay{font-size:8.5px;opacity:.72;display:flex;align-items:center;gap:3px}
+  .chip .olay .tp{padding:0 3px;border-radius:3px;border:1px solid currentColor;opacity:.85;font-size:7.5px;text-transform:uppercase}
   .chip.keep{background:var(--keepbg);border-color:var(--keep);color:var(--keep)}
   .chip.summary{background:var(--sumbg);border-color:var(--summary);color:var(--summary)}
   .chip.clear{background:var(--clrbg);border-color:var(--clear);color:var(--clear)}
@@ -82,6 +84,87 @@
   .ltab{width:100%;font-family:var(--mono);font-size:11px;border-collapse:collapse}
   .ltab td{padding:5px 13px;border-bottom:1px solid var(--line2);color:var(--dim)}
   .ltab td.st{text-align:right} .ltab td.stale{color:var(--clear)}
+
+  /* ── tool satırı: insan okunur (eski kriptik chip'in yerine) ── */
+  .tlist{display:flex;flex-direction:column}
+  .trow{display:flex;gap:9px;padding:9px 13px;border-bottom:1px solid var(--line2);align-items:flex-start}
+  .trow:last-child{border-bottom:none}
+  .trow .no{font-family:var(--mono);font-size:10px;color:var(--muted);padding-top:2px;min-width:20px}
+  .trow .body{flex:1;min-width:0}
+  .trow .nm{font-size:12.5px;font-weight:600;color:var(--ink);word-break:break-word}
+  .trow .ds{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:1px}
+  .trow .ar{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:3px;word-break:break-all}
+  .trow .rt{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fate{font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:2px 6px;border-radius:5px;
+    border:1px solid currentColor;white-space:nowrap;text-transform:uppercase}
+  .fate.keep{color:var(--keep);background:var(--keepbg)}
+  .fate.summary{color:var(--summary);background:var(--sumbg)}
+  .fate.clear{color:var(--clear);background:var(--clrbg)}
+  .tmeta{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;white-space:nowrap;padding-top:2px}
+  .tsrc{font-size:9.5px;opacity:.8;display:block;margin-top:3px;color:var(--signaldim)}
+
+  /* ── mantık karşılaştırma ekranı (tam sayfa) ── */
+  .ov{position:fixed;inset:0;background:var(--ground);z-index:40;display:none;flex-direction:column}
+  .ov.on{display:flex}
+  .ovh{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .ovh h2{font-family:var(--mono);font-size:14px;margin:0;font-weight:600}
+  .ovh .sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .ovb{flex:1;overflow-y:auto;padding:0 20px 40px}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;padding:13px 0 0;position:sticky;top:0;background:var(--ground);z-index:2}
+  .tb{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--line);border-bottom-color:transparent;border-radius:8px 8px 0 0;
+    padding:8px 13px;cursor:pointer;display:flex;flex-direction:column;gap:2px;line-height:1.3;text-align:left}
+  .tb:hover{color:var(--ink)}
+  .tb.on{color:var(--ink);background:var(--panel);border-color:var(--signaldim);border-bottom-color:var(--panel)}
+  .tb .g{font-size:9.5px;color:var(--signal);font-variant-numeric:tabular-nums}
+  .tb.off .g{color:var(--muted)}
+  .tpane{border:1px solid var(--line);border-radius:0 10px 10px 10px;background:var(--panel);padding:15px}
+  .tinfo{display:flex;gap:9px;flex-wrap:wrap;align-items:baseline;margin-bottom:4px}
+  .tinfo .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:2px 7px}
+  .tinfo .k.llm{color:var(--summary);border-color:var(--summary)}
+  .tdesc{font-size:13px;color:var(--dim);line-height:1.55;margin:0 0 14px}
+  .tsum{font-family:var(--mono);font-size:12px;color:var(--ink);margin-bottom:14px;
+    font-variant-numeric:tabular-nums}
+  .tsum b{color:var(--signal);font-size:15px}
+  .tsum .no{color:var(--muted);font-weight:400}
+  details.u{border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:var(--panel2)}
+  details.u>summary{list-style:none;cursor:pointer;padding:10px 13px;display:flex;gap:10px;align-items:flex-start}
+  details.u>summary::-webkit-details-marker{display:none}
+  details.u>summary::before{content:"▸";font-family:var(--mono);color:var(--muted);font-size:11px;padding-top:2px}
+  details.u[open]>summary::before{content:"▾"}
+  details.u>summary:hover{background:var(--panel)}
+  .u .head{flex:1;min-width:0}
+  .u .h1{font-size:13px;font-weight:600;color:var(--ink)}
+  .u .h1 .arg{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--dim)}
+  .u .h2{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
+  .u .num{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap;
+    font-variant-numeric:tabular-nums;text-align:right;padding-top:1px}
+  .u .num .g{display:block;color:var(--keep);font-size:10px}
+  .u .num .g.neg{color:var(--muted)}
+  .ubody{padding:0 13px 13px;display:flex;flex-direction:column;gap:11px}
+  .why{font-size:12px;color:var(--dim);border-left:3px solid var(--signaldim);
+    padding:6px 10px;background:var(--panel);border-radius:0 6px 6px 0;line-height:1.5}
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  @media(max-width:900px){.ba{grid-template-columns:1fr}}
+  .bx{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel);min-width:0}
+  .bx .bh{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    padding:7px 11px;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between;gap:8px}
+  .bx.once .bh{color:var(--muted)} .bx.sonra .bh{color:var(--keep)}
+  .bx pre{margin:0;padding:11px;font-family:var(--mono);font-size:11px;line-height:1.5;
+    color:var(--dim);white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto}
+  .bx pre.bos{color:var(--muted);font-style:italic}
+  .extra{border:1px solid var(--summary);border-radius:9px;background:var(--sumbg);padding:11px 13px;margin-top:14px}
+  .extra .eh{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--summary);margin-bottom:7px}
+  .extra pre{margin:0;font-family:var(--mono);font-size:11px;line-height:1.5;color:var(--dim);
+    white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
+  details.lg{margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  details.lg summary{cursor:pointer;padding:5px 0}
+  details.lg pre{margin:5px 0 0;padding:10px;background:var(--panel2);border:1px solid var(--line2);
+    border-radius:7px;white-space:pre-wrap;color:var(--dim);line-height:1.55}
+  .spin{font-family:var(--mono);font-size:12px;color:var(--muted);padding:26px 2px}
 </style>
 </head>
 <body>
@@ -92,6 +175,7 @@
     </div>
     <div class="grow"></div>
     <div class="badge" id="badge">domain: equity</div>
+    <button id="hk">⇄ mantık karşılaştır</button>
     <button id="reset">↺ sıfırla</button>
   </header>
   <div class="wrap">
@@ -114,8 +198,8 @@
         </div>
       </div>
       <div class="card">
-        <div class="ch"><span class="lbl">kader şeridi</span><span class="cnt" id="fatecnt"></span></div>
-        <div class="chips" id="chips"><span class="empty">henüz tool çağrısı yok</span></div>
+        <div class="ch"><span class="lbl">tool'lar · kaderi</span><span class="cnt" id="fatecnt"></span></div>
+        <div class="tlist" id="chips"><span class="empty">henüz tool çağrısı yok</span></div>
       </div>
       <div class="card">
         <div class="ch"><span class="lbl">playbook · öğrenilen</span><span class="cnt" id="pbcnt">0</span></div>
@@ -125,6 +209,24 @@
         <div class="ch"><span class="lbl">ledger</span></div>
         <table class="ltab"><tbody id="ledger"><tr><td class="empty">gözlem yok</td></tr></tbody></table>
       </div>
+    </div>
+  </div>
+
+  <div class="ov" id="ov">
+    <div class="ovh">
+      <div>
+        <div class="eb" style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+          text-transform:uppercase;color:var(--signal);font-weight:600">aynı trace · altı mantık</div>
+        <h2>Compaction mantığı karşılaştırma</h2>
+      </div>
+      <div class="grow" style="flex:1"></div>
+      <span class="sub" id="ovsub"></span>
+      <button id="hkyeni">↻ yeniden hesapla</button>
+      <button id="ovx">× kapat</button>
+    </div>
+    <div class="ovb">
+      <div class="tabs" id="hktabs"></div>
+      <div id="hkpane"></div>
     </div>
   </div>
 <script>
@@ -147,11 +249,26 @@ function panel(s,delta){
     if(delta.compactions)parts.push("compaction ×"+delta.compactions);
     if(delta.evicted)parts.push("evict "+delta.evicted);
     $("delta").innerHTML=parts.length?'· '+parts.join(" · "):'';}
-  // kader şeridi
+  // tool listesi — insan okunur (ne çağrıldı, ne için, ne döndü, ne oldu)
   const c=$("chips");
   if(!s.trace.length){c.innerHTML='<span class="empty">henüz tool çağrısı yok</span>';}
-  else{c.innerHTML=s.trace.map(e=>{const k=e.fate==="SİLİNDİ"?"clear":e.fate==="ÖZET"?"summary":"keep";
-    return `<span class="chip ${k}" title="${esc(e.args)}">#${e.seq} ${e.name.replace("get_","").replace("_"," ").slice(0,14)}</span>`;}).join("");}
+  else{c.innerHTML=s.trace.map(e=>{
+    const k=e.fate==="SİLİNDİ"?"clear":e.fate==="ÖZET"?"summary":"keep";
+    const cwl=e.kaynak==="cwl";
+    const kaynak=cwl?`ajan bildirdi · ${esc(e.olay||"")}`:`ledger · ${esc(e.tip||"—")}`;
+    return `<div class="trow">
+      <span class="no">${e.seq}</span>
+      <div class="body">
+        <div class="nm">${esc(insanAd(e.name))}</div>
+        ${e.aciklama?`<div class="ds">${esc(e.aciklama)}</div>`:""}
+        ${e.args?`<div class="ar">${esc(e.args)}</div>`:""}
+        ${e.dondu?`<div class="rt" title="${esc(e.dondu)}">↩ ${esc(e.dondu)}</div>`:""}
+        ${e.neden?`<div class="ds" style="color:var(--signaldim);margin-top:3px">${esc(e.neden)}</div>`:""}
+      </div>
+      <div class="tmeta"><span class="fate ${k}">${e.fate}</span>
+        <span class="tsrc">${e.tok} tok</span>
+        <span class="tsrc" title="${cwl?'ajan delimiter ile bildirdi (CWL episode)':'ledger otomatik kategori'}">${kaynak}</span></div>
+    </div>`;}).join("");}
   const kept=s.trace.filter(e=>e.fate==="TAM").length,su=s.trace.filter(e=>e.fate==="ÖZET").length,cl=s.trace.filter(e=>e.fate==="SİLİNDİ").length;
   $("fatecnt").textContent=`${kept} tam · ${su} özet · ${cl} sil`;
   // playbook
@@ -165,6 +282,91 @@ function panel(s,delta){
   else{lt.innerHTML=s.ledger.map(r=>`<tr><td>${esc(r.resource)}</td><td class="st ${r.stale?'stale':''}">v${r.version} · ${r.stale?'bayat':'taze'}</td></tr>`).join("");}
 }
 
+// get_key_financial_ratios → "Key financial ratios" gibi okunur bir ada çevir.
+// Tool adı makineye göre yazılmış; panelde insan okuyor.
+function insanAd(n){
+  const s=String(n||"").replace(/^(get|list|run|search)_/,"").replace(/_/g," ").trim();
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function tok(n){return Number(n||0).toLocaleString("tr");}
+
+// ───────── MANTIK KARŞILAŞTIRMA ─────────
+// Aynı trace altı compaction mantığından geçirilir; her tool için ÖNCE (ham) ve
+// SONRA (o mantığın context'te bıraktığı) KIRPILMADAN gösterilir.
+let HK=null, HKsec=0;
+
+async function hkYukle(){
+  $("hktabs").innerHTML="";
+  $("hkpane").innerHTML='<div class="spin">altı mantık koşuyor… (üçü gerçek LLM çağırıyor, birkaç saniye sürebilir)</div>';
+  try{
+    const r=await fetch("/harness",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    HK=await r.json();
+  }catch(e){ $("hkpane").innerHTML='<div class="spin">⚠ bağlantı hatası: '+esc(e.message)+'</div>'; return; }
+  if(HK.error){ $("hkpane").innerHTML='<div class="spin">⚠ '+esc(HK.error)+'</div>'; return; }
+  if(HK.bos){ $("hkpane").innerHTML='<div class="spin">Henüz tool çağrısı yok — önce sohbette bir şey sor, sonra buraya dön.</div>'; return; }
+  $("ovsub").textContent=`ham bağlam ${tok(HK.ham)} token · ${HK.tool_sayisi} tool birimi · bütçe ${tok(HK.budget)}`;
+  hkCiz();
+}
+
+function hkCiz(){
+  $("hktabs").innerHTML=HK.mantiklar.map((m,i)=>
+    `<button class="tb ${i===HKsec?"on":""} ${m.tetiklendi?"":"off"}" data-i="${i}">
+       <span>${esc(m.baslik)}</span>
+       <span class="g">${m.tetiklendi?`${tok(m.once)} → ${tok(m.sonra)} · %${m.pct}`:"tetiklenmedi"}</span>
+     </button>`).join("");
+  document.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{HKsec=+b.dataset.i;hkCiz();});
+  const m=HK.mantiklar[HKsec];
+  $("hkpane").innerHTML=`<div class="tpane">
+    <div class="tinfo"><span class="k">${esc(m.ekol)}</span>
+      <span class="k ${m.llm?"llm":""}">${m.llm?"LLM çağırır":"LLM'siz"}</span></div>
+    <p class="tdesc">${esc(m.ozet)}</p>
+    <div class="tsum">${!m.tetiklendi
+      ? `<span class="no">tetiklenmedi — bağlam (${tok(m.once)} tok) bütçenin altında, hiçbir birime dokunulmadı</span>`
+      : m.pct>0
+      ? `<b>${tok(m.once)} → ${tok(m.sonra)}</b> token · %${m.pct} kazanç`
+      : `<b>${tok(m.once)} → ${tok(m.sonra)}</b> <span class="no">— çalıştı ama hiçbir birime dokunmadı:
+          bu mantığın KENDİ eşikleri bu bağlamda aşılmadı (aşağıdaki loga bak)</span>`}</div>
+    ${m.toollar.map(hkTool).join("")||'<p class="tdesc">tool birimi yok</p>'}
+    ${(m.ek_mesajlar||[]).map(e=>`<div class="extra">
+       <div class="eh">bu mantığın ÜRETTİĞİ yeni metin · ${e.rol} · ${tok(e.tok)} token</div>
+       <pre>${esc(e.metin)}</pre></div>`).join("")}
+    ${(m.log||[]).length?`<details class="lg"><summary>compaction logu (${m.log.length} satır)</summary>
+       <pre>${esc(m.log.join("\n"))}</pre></details>`:""}
+  </div>`;
+}
+
+function hkTool(t){
+  const k=t.kader==="silindi"?"clear":t.kader==="tam"?"keep":"summary";
+  const dustu=(t.kader==="düştü"||t.kader==="birleşti");
+  const kaz=t.pct>0?`<span class="g">−%${t.pct}</span>`:`<span class="g neg">değişmedi</span>`;
+  return `<details class="u"><summary>
+    <div class="head">
+      <div class="h1">${esc(insanAd(t.ad))}
+        ${t.arg?`<span class="arg">(${esc(t.arg)})</span>`:""}</div>
+      <div class="h2">${esc(t.aciklama||t.ozet_satir||"")}</div>
+    </div>
+    <span class="fate ${k}">${esc(t.kader)}</span>
+    <span class="num">${tok(t.once_tok)} → ${tok(t.sonra_tok)}${dustu?"":kaz}</span>
+  </summary>
+  <div class="ubody">
+    ${t.neden?`<div class="why"><b>neden:</b> ${esc(t.neden)}</div>`:""}
+    <div class="ba">
+      <div class="bx once"><div class="bh"><span>önce · ham çıktı</span><span>${tok(t.once_tok)} tok</span></div>
+        <pre>${esc(t.once)||'<span class="bos">(boş)</span>'}</pre></div>
+      <div class="bx sonra"><div class="bh"><span>sonra · context'te kalan</span><span>${tok(t.sonra_tok)} tok</span></div>
+        ${t.sonra?`<pre>${esc(t.sonra)}</pre>`
+                 :`<pre class="bos">${t.kader==="birleşti"
+                     ? "Bu birim ayrı bir mesaj olarak KALMADI — aşağıdaki birleşik özete girdi."
+                     : "Bu birim context'ten tamamen ÇIKARILDI."}</pre>`}</div>
+    </div>
+  </div></details>`;
+}
+
+$("hk").onclick=()=>{$("ov").classList.add("on"); if(!HK) hkYukle();};
+$("ovx").onclick=()=>$("ov").classList.remove("on");
+$("hkyeni").onclick=()=>hkYukle();
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("ov").classList.remove("on");});
+
 async function sendMsg(){
   const text=inp.value.trim(); if(!text) return;
   inp.value=""; inp.style.height="auto"; send.disabled=true;
@@ -173,6 +375,7 @@ async function sendMsg(){
   try{
     const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
     const s=await r.json(); tp.remove();
+    HK=null;   // trace büyüdü → karşılaştırma bayat; ekran açılınca yeniden hesaplanır
     if(s.error){add("bot err","⚠ "+s.error);}
     else{
       add("bot",s.answer||"(boş yanıt)");

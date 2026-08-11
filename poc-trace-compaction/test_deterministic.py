@@ -6,7 +6,7 @@ Ledger + CWL araştırmasının "sıfır LLM" iddiasını doğrudan test eder.
 """
 from trace import Trace
 from ledger import ExecutionLedger
-from compactor import TraceCompactor, _detect_duplicate
+from compactor import TraceCompactor, _detect_duplicate, _raw_cost
 
 
 def _mk():
@@ -54,11 +54,14 @@ def test_eviction_preserves_window():
 def test_summary_has_five_fields():
     t, L = _mk()
     r = t.add_reasoning("portu bulmak için grep")
-    e = t.add_tool("grep", {"pattern": "PORT"}, "config.py:6: PORT=8080",
-                   intent_ref=r.seq, verbatim=True)
-    L.record("grep", {"pattern": "PORT"}, "config.py:6: PORT=8080", e.seq)
-    e2 = t.add_tool("grep", {"pattern": "PORT"}, "config.py:6: PORT=8080", intent_ref=r.seq)
-    L.record("grep", {"pattern": "PORT"}, "config.py:6: PORT=8080", e2.seq)
+    # Gerçekçi (uzun) grep çıktısı: 5-alan özet bundan belirgin küçük olur, böylece
+    # fayda freni özetlemeyi onaylar (kısa çıktıda özet=ham olur, bilinçli engellenir).
+    long_out = "\n".join(f"src/mod{i}.py:{i*3}: PORT_{i} = {8000+i}  # bağlantı ayarı"
+                         for i in range(20))
+    e = t.add_tool("grep", {"pattern": "PORT"}, long_out, intent_ref=r.seq, verbatim=True)
+    L.record("grep", {"pattern": "PORT"}, long_out, e.seq)
+    e2 = t.add_tool("grep", {"pattern": "PORT"}, long_out, intent_ref=r.seq)
+    L.record("grep", {"pattern": "PORT"}, long_out, e2.seq)
     comp = TraceCompactor(budget=5, protect_window=0)
     comp.compact(t, L, force=True)
     ev = next(e for e in t.tool_events() if e.evicted)
@@ -116,11 +119,21 @@ def test_exploration_folding():
     comp = TraceCompactor(budget=5, protect_window=0)
     comp.compact(t, L, force=True)
     evicted = [e for e in t.tool_events() if e.evicted]
-    assert len(evicted) == 3, "keşif dizisinin tamamı katlanmalı"
-    # bulgu (verbatim grep sonucu) son birimin özetinde korunmalı
+    # Dizinin SON birimi roll-up bulguyu taşır — asıl değişmez bu.
+    assert t.tool_events()[-1].evicted, "dizinin son birimi bulguya katlanmalı"
     finding = evicted[-1].summary.sonuc
     assert "config.py:5" in finding, "verbatim bulgu (grep) korunmalı — negatif bilgi kaybı yok"
-    print("✓ keşif katlama: dizi bulguya indi, verbatim bulgu korundu")
+
+    # FAYDA GÜVENCESİ: hiçbir birim sıkıştırma sonrası BÜYÜMEMELİ.
+    # Eskiden bu faz `_evict_event`'in fayda kontrolünü atlıyordu; 31 token'lık
+    # bir çıktı 32 token'lık "özete" çevrilebiliyordu. Sayı yerine bunu ölçüyoruz:
+    # kaç birimin katlandığı değil, katlamanın ZARARLI olmaması önemli.
+    for e in t.tool_events():
+        if e.evicted:
+            assert e.summary.token_cost() < _raw_cost(e), \
+                f"seq={e.seq} özet ham'dan büyük — sıkıştırma bağlamı büyütüyor"
+    print(f"✓ keşif katlama: dizi bulguya indi ({len(evicted)}/3 birim katlandı, "
+          f"kalanı ham bırakıldı), verbatim bulgu korundu, hiçbir birim büyümedi")
 
 
 def test_cwl_episode_eviction_respects_dependency():

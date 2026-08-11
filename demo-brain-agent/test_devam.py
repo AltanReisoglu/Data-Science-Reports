@@ -34,6 +34,12 @@ import orchestrator as O         # noqa: E402
 from taskboard import TaskBoard  # noqa: E402
 
 SONUC: dict = {}
+KONTROL: list = []
+
+
+def kontrol(ad: str, gecti: bool, detay: str = ""):
+    KONTROL.append({"ad": ad, "gecti": bool(gecti), "detay": detay})
+    print(f"    {'✓' if gecti else '✗'} {ad}" + (f"  · {detay}" if detay else ""))
 
 CAGRI: list = []
 _orij = F.call
@@ -119,11 +125,16 @@ def b_fonksiyon_ici():
 
     tekrarlandi = sayim("scan_patterns") >= 2
     print(f"\n  → İş TEKRARLANDI mı : {'✗ EVET, baştan koştu' if tekrarlandi else '✓ hayır'}")
-    print("\n  Yani: fonksiyon düğümünde checkpoint YAZILIYOR ama GERİ OKUNMUYOR.")
-    print("  Kod seviyesinde doğrulandı — checkpoint yalnız execute_task() içinde")
-    print("  (ajan düğümü) geri yükleniyor; fonksiyon dalı onu hiç okumuyor.")
-    print("  Fonksiyonlar deterministik ve kısa olduğu için pratik bedeli düşük,")
-    print("  AMA uzun süren ya da YAN ETKİLİ bir fonksiyon eklenirse iş tekrarlanır.")
+    if tekrarlandi:
+        print("\n  Fonksiyon düğümünde checkpoint YAZILIYOR ama GERİ OKUNMUYOR —")
+        print("  iş çökme öncesi bitmiş olsa bile baştan koşuyor.")
+    else:
+        print("\n  Fonksiyon düğümü de checkpoint'ten DEVAM ediyor: çökmeden önce iş")
+        print("  bitmiş ve sonucu checkpoint'e yazılmıştı; devralan worker onu yeniden")
+        print("  KOŞTURMUYOR, kayıtlı sonucu geri yüklüyor.")
+        print("  Önemi: yan etkili bir fonksiyon (e-posta, ödeme) iki kez çalışmaz.")
+    kontrol("fonksiyon düğümü çökme sonrası işi TEKRARLAMIYOR", not tekrarlandi,
+            f"{sayim('scan_patterns')} kez koştu")
     SONUC["fonksiyon_ici"] = {"checkpoint_yazildi": bool(ck and ck != "{}"),
                               "cagri": sayim("scan_patterns"),
                               "geri_okunuyor": not tekrarlandi}
@@ -214,14 +225,21 @@ def main():
     print(f"  {'seviye':<38}{'durum':<26}{'kaynak'}")
     print(f"  {'-' * 86}")
     print(f"  {'(A) tamamlanmış düğümler':<38}{'✓ TEKRAR KOŞMUYOR':<26}{'board (sonuç kalıcı)'}")
-    print(f"  {'(B) yarım kalan FONKSİYON düğümü':<38}{'✗ BAŞTAN koşuyor':<26}{'checkpoint yazılıyor, okunmuyor'}")
+    _b = SONUC.get("fonksiyon_ici", {}).get("geri_okunuyor")
+    print(f"  {'(B) yarım kalan FONKSİYON düğümü':<38}"
+          + (f"{'✓ checkpoint GERİ YÜKLENİR':<26}{'checkpoint (run_one_task)'}" if _b
+             else f"{'✗ BAŞTAN koşuyor':<26}{'checkpoint yazılıyor, okunmuyor'}"))
     print(f"  {'(C) yarım kalan AJAN düğümü':<38}{'✓ KALDIĞI TURDAN devam':<26}{'checkpoint (execute_task)'}")
     print()
     print("  Motor bazında: own / celery / temporal → ORTAK kod yolu, üçünde de aynı.")
     print("  airflow → bizim katmanda yürütmüyor; devam semantiği Airflow'un kendi")
     print("            task retry'ına kalıyor (düğüm içi checkpoint YOK).")
+    if KONTROL:
+        g = sum(1 for k in KONTROL if k["gecti"])
+        print(f"\n  KONTROLLER: {g}/{len(KONTROL)} geçti")
     (HERE / "test_devam_sonuc.json").write_text(
-        json.dumps(SONUC, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        json.dumps({"olcumler": SONUC, "kontroller": KONTROL},
+                   ensure_ascii=False, indent=1, default=str), encoding="utf-8")
 
 
 if __name__ == "__main__":

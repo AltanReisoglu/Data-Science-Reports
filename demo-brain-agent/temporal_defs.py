@@ -22,7 +22,7 @@ from temporalio.common import RetryPolicy
 
 # süreç-içi bağlam (worker aynı süreçte koştuğu için activity buradan okur)
 CTX: dict = {"board": None, "strategy": "hermes", "budget": 3000,
-             "fail_at": None, "compaction_events": []}
+             "fail_at": None, "node_sim": {}, "compaction_events": []}
 
 
 @activity.defn(name="next_ready_task")
@@ -70,7 +70,8 @@ async def execute_one_task(payload: str) -> str:
         # ORTAK yönlendirici: kind='function' → LLM'siz fonksiyon, 'agent' → LLM ajan
         kind, result, extra = orchestrator.run_one_task(
             task, board, CTX["strategy"], CTX["budget"],
-            fail_at=CTX["fail_at"], attempt=att)
+            fail_at=CTX["fail_at"], attempt=att,
+            node_sim=CTX.get("node_sim") or {})
     except Exception as e:
         board.fail(task["id"], str(e), claimer=task.get("claim_lock"))
         raise

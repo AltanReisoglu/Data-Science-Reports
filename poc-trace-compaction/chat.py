@@ -30,6 +30,21 @@ EQUITY_SYSTEM = (
     "- Aynı veriyi gereksiz tekrar çekme; sonunda kısa net bir sentez yaz.")
 
 
+PRODUCT_SYSTEM = (
+    "Sen bir kurumsal asistansın. Jira (yazılım iş takibi), NETA (proje "
+    "portföyü/bütçe), LDAP (kurumsal dizin), Confluence (wiki), ve doküman "
+    "üretimi (docx/pdf/pptx/xlsx) + veri analizi tool'larıyla soruları yanıtla.\n"
+    "- Serbest ad geçen projeyi/kişiyi ÖNCE resolve et (jira_resolve_project, "
+    "neta_resolve_project, ldap_resolve_person), sonra key/id isteyen tool'u çağır.\n"
+    "- Çok veri toplayacaksan ÖNCE delimiter(action='start', type='expl', "
+    "name='veri-toplama'); toplama bitince delimiter(action='end', "
+    "description='ne öğrendin').\n"
+    "- Doküman/grafik üretmeden ÖNCE delimiter(action='start', type='act', "
+    "name='rapor', dependencies=['veri-toplama']); üretim bitince delimiter(action='end').\n"
+    "- Bir tool hata dönerse (ör. eksik key) düzeltip AYNI tool'u doğru argümanla "
+    "tekrar çağır. Aynı veriyi gereksiz tekrar çekme; sonunda kısa net sentez yaz.")
+
+
 def make_agent(argv):
     compaction = "--no-compaction" not in argv
     if "--equity" in argv:
@@ -37,6 +52,11 @@ def make_agent(argv):
         return TracingAgent(compaction=compaction, schemas=eq.SCHEMAS,
                             dispatch=eq.DISPATCH, tool_meta=eq.TOOL_META,
                             system=EQUITY_SYSTEM), "equity"
+    if "--product" in argv:
+        import product_tools as pt
+        return TracingAgent(compaction=compaction, schemas=pt.SCHEMAS,
+                            dispatch=pt.DISPATCH, tool_meta=pt.TOOL_META,
+                            system=PRODUCT_SYSTEM, max_turns=20), "product"
     return TracingAgent(compaction=compaction), "file"
 
 

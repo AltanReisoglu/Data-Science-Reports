@@ -1,0 +1,84 @@
+{
+ "s1": {
+  "hermes type": {
+   "ok": true,
+   "sn": 0.02
+  },
+  "celery": {
+   "ok": true,
+   "sn": 12.23
+  },
+  "temporal": {
+   "ok": true,
+   "sn": 0.46
+  },
+  "airflow": {
+   "ok": null,
+   "sn": null
+  }
+ },
+ "s2": {
+  "hermes type": {
+   "toparladi": false,
+   "sn": 0.03
+  },
+  "celery": {
+   "toparladi": true,
+   "sn": 13.24
+  },
+  "temporal": {
+   "toparladi": true,
+   "sn": 0.49
+  }
+ },
+ "s3": {
+  "hermes type": {
+   "tamamlandi": false,
+   "sn": 0.03
+  },
+  "celery": {
+   "tamamlandi": false,
+   "sn": 13.23
+  },
+  "temporal": {
+   "tamamlandi": false,
+   "sn": 0.47
+  }
+ },
+ "s4": {
+  "hermes": "hiçbir şey kurtarılmıyor",
+  "celery": "task baştan",
+  "temporal": "biten activity atlanır",
+  "airflow": "task baştan"
+ },
+ "s5_s8": [
+  {
+   "soru": "S5 · 'şu an neredeyiz?'",
+   "hermes": "yok — bellekte, süreç ölünce gider",
+   "celery": "ZAYIF — chord bekliyor ama hangi adımda bilinmiyor",
+   "temporal": "VAR — event history, kutudan",
+   "airflow": "VAR — metadata DB + operatör UI"
+  },
+  {
+   "soru": "S6 · çalışma anında graf değişimi",
+   "hermes": "kodu değiştir (yeniden başlat)",
+   "celery": "canvas apply_async'te SABİTLENİR",
+   "temporal": "workflow kodu SABİT (determinizm şartı)",
+   "airflow": "parse zamanında SABİT"
+  },
+  {
+   "soru": "S7 · zamanlama (cron)",
+   "hermes": "YOK",
+   "celery": "Celery Beat (backfill yok)",
+   "temporal": "Temporal Schedules (+backfill)",
+   "airflow": "EN GÜÇLÜ (+catchup)"
+  },
+  {
+   "soru": "S8 · graf ifadesi",
+   "hermes": "fonksiyon çağrı sırası",
+   "celery": "canvas — İMZALARA SIZIYOR",
+   "temporal": "düz Python (gather/await) — en okunur",
+   "airflow": "dosyada `>>` — okunur ama DONMUŞ"
+  }
+ ]
+}

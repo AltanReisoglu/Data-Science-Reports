@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from agent import TracingAgent
+from config import estimate_tokens
 import chat as chatmod
 
 HERE = Path(__file__).parent
@@ -30,19 +31,40 @@ def new_agent(domain: str) -> TracingAgent:
         import equity_tools as eq
         ag = TracingAgent(compaction=True, schemas=eq.SCHEMAS, dispatch=eq.DISPATCH,
                           tool_meta=eq.TOOL_META, system=chatmod.EQUITY_SYSTEM, max_turns=16)
+    elif domain == "product":
+        import product_tools as pt
+        ag = TracingAgent(compaction=True, schemas=pt.SCHEMAS, dispatch=pt.DISPATCH,
+                          tool_meta=pt.TOOL_META, system=chatmod.PRODUCT_SYSTEM, max_turns=20)
     else:
         ag = TracingAgent(compaction=True, max_turns=16)
     ag.compactor.budget = 1200          # tarayıcıda compaction'ı görebilmek için
-    ag.compactor.target = 700
+    ag.compactor.target = 550           # daha agresif tool-çıktı sıkıştırma (0.46×budget)
     return ag
 
 
 def snapshot(ag) -> dict:
     """Arkadaki trace-compaction durumunu tarayıcıya JSON olarak ver."""
     evs = ag.trace.tool_events()
+
+    def _olay(seq):
+        """Bu tool olayı HANGİ olaya ait? Önce ajan-bildirimli CWL episode,
+        yoksa ledger'ın otomatik çıkardığı kategori."""
+        ep = ag.episodes.episode_of(seq)
+        if ep is not None:
+            return {"olay": ep.name, "tip": ep.type, "kaynak": "cwl"}
+        return {"olay": ag.ledger.category_of(seq), "tip": ag.ledger.category_of(seq),
+                "kaynak": "kategori"}
+
+    import harness_kiyas as HK
+    sozluk = HK.tool_sozlugu(getattr(ag, "schemas", None))
     trace = [{"seq": e.seq, "name": e.payload["name"],
-              "args": ", ".join(f"{k}={v}" for k, v in e.payload.get("args", {}).items())[:40],
-              "fate": "SİLİNDİ" if e.cleared else "ÖZET" if e.evicted else "TAM"} for e in evs]
+              "aciklama": sozluk.get(e.payload["name"], ""),
+              "args": HK.arg_metni(e.payload.get("args") or {}),
+              "dondu": HK.ilk_satir(str(e.payload.get("output", ""))),
+              "tok": estimate_tokens(str(e.payload.get("output", ""))),
+              "neden": e.neden,
+              "fate": "SİLİNDİ" if e.cleared else "ÖZET" if e.evicted else "TAM",
+              **_olay(e.seq)} for e in evs]
     L = ag.ledger
     seen = {}
     for o in L.observations:
@@ -87,6 +109,24 @@ class Handler(BaseHTTPRequestHandler):
             self._reply(200, b'{"ok":true}')
             return
 
+        # AYNI trace, ALTI mantık. Sohbet turunda değil TALEP ÜZERİNE koşuyor:
+        # üç harness (openclaw/codex/claude_code) gerçek LLM çağırıyor, her mesajda
+        # koşturmak sohbeti yavaşlatırdı.
+        if self.path == "/harness":
+            import harness_kiyas as HK
+            with LOCK:
+                ag = STATE["ag"]
+                if not ag._call_seq:
+                    self._reply(200, json.dumps(
+                        {"bos": True, "mantiklar": []}, ensure_ascii=False).encode())
+                    return
+                try:
+                    out = HK.kiyasla(ag, budget=data.get("budget") or None)
+                except Exception as e:
+                    out = {"error": f"{type(e).__name__}: {e}"}
+            self._reply(200, json.dumps(out, ensure_ascii=False).encode("utf-8"))
+            return
+
         if self.path == "/chat":
             msg = (data.get("message") or "").strip()
             if not msg:
@@ -116,7 +156,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     argv = sys.argv[1:]
-    STATE["domain"] = "file" if "--file" in argv else "equity"
+    STATE["domain"] = ("product" if "--product" in argv
+                       else "file" if "--file" in argv else "equity")
     port = 8000
     if "--port" in argv:
         port = int(argv[argv.index("--port") + 1])

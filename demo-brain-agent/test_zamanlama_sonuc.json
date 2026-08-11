@@ -1,0 +1,221 @@
+{
+ "kontroller": [
+  {
+   "ad": "her gün 08:00            0 8 * * *     ",
+   "gecti": true,
+   "detay": "11.08 08:00"
+  },
+  {
+   "ad": "15 dakikada bir          */15 * * * *  ",
+   "gecti": true,
+   "detay": "10.08 12:15"
+  },
+  {
+   "ad": "ayın 1'i 09:30           30 9 1 * *    ",
+   "gecti": true,
+   "detay": "01.09 09:30"
+  },
+  {
+   "ad": "pazar gece yarısı        0 0 * * 0     ",
+   "gecti": true,
+   "detay": "16.08 00:00"
+  },
+  {
+   "ad": "hafta içi 08:00          0 8 * * 1-5   ",
+   "gecti": true,
+   "detay": "11.08 08:00"
+  },
+  {
+   "ad": "bugün 12:00 GEÇTİ        0 12 * * *    ",
+   "gecti": true,
+   "detay": "11.08 12:00"
+  },
+  {
+   "ad": "Cuma'dan sonra hafta içi → PAZARTESİ",
+   "gecti": true,
+   "detay": "Monday 17.08"
+  },
+  {
+   "ad": "geçersiz reddedildi (dakika 99)",
+   "gecti": true,
+   "detay": "'99' alanı 0-59 aralığında olmalı"
+  },
+  {
+   "ad": "geçersiz reddedildi (4 alan)",
+   "gecti": true,
+   "detay": "cron 5 alan olmalı (dk sa gün ay hafta), 4 v"
+  },
+  {
+   "ad": "geçersiz reddedildi (harf)",
+   "gecti": true,
+   "detay": "invalid literal for int() with base 10: 'a'"
+  },
+  {
+   "ad": "geçersiz reddedildi (hafta 9)",
+   "gecti": true,
+   "detay": "'9' alanı 0-6 aralığında olmalı"
+  },
+  {
+   "ad": "geçersiz reddedildi (adım 0)",
+   "gecti": true,
+   "detay": "adım 1'den küçük olamaz: /0"
+  },
+  {
+   "ad": "next_run_at kayıtta dolu",
+   "gecti": true,
+   "detay": "12.08 08:00"
+  },
+  {
+   "ad": "cron'dan doğru türetilmiş",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "claim boş doğuyor",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "varsayılan etkin",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "insan okunur özet üretiliyor",
+   "gecti": true,
+   "detay": "her gün 08:00"
+  },
+  {
+   "ad": "geçersiz cron ile OLUŞTURULAMIYOR",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "TAM OLARAK BİR süreç claim aldı (at-most-once)",
+   "gecti": true,
+   "detay": "1 süreç aldı"
+  },
+  {
+   "ad": "claim damgası yazıldı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "1. worker claim aldı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "2. worker AYNI ANDA alamadı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "claim tazeyken due() onu aday GÖSTERMİYOR",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "kira dolmadan devralınamıyor",
+   "gecti": true,
+   "detay": "lease=900s"
+  },
+  {
+   "ad": "kira DOLUNCA due() bayat claim'i yeniden aday gösteriyor",
+   "gecti": true,
+   "detay": "ayrı bir recover_stale() süpürmesi çağrılmadı"
+  },
+  {
+   "ad": "kira DOLUNCA devralınıyor (tek atomik UPDATE)",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "devralan taze claim yazdı → tekrar aday değil",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "vakti gelen zamanlama due() ile bulundu",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "bir zamanlama koştu",
+   "gecti": true,
+   "detay": "1 koştu"
+  },
+  {
+   "ad": "claim serbest bırakıldı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "son durum 'ok'",
+   "gecti": true,
+   "detay": "durum=ok"
+  },
+  {
+   "ad": "takvim İLERLEDİ (sonraki koşu geleceğe alındı)",
+   "gecti": true,
+   "detay": "sonraki: 11.08 17:00"
+  },
+  {
+   "ad": "koşu geçmişine yazıldı",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "koşu kaydı tamamlandı olarak işaretli",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "düğüm sayıları kayıtta",
+   "gecti": true,
+   "detay": "5/5 düğüm · 0.01s · 5/5 düğüm · 0.0 sn"
+  },
+  {
+   "ad": "olmayan akış → durum 'hata'",
+   "gecti": true,
+   "detay": "hata"
+  },
+  {
+   "ad": "claim yine de serbest bırakıldı (kilitli kalmadı)",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "takvim yine de ilerledi (sonsuz yeniden deneme yok)",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "hata koşu geçmişinde açıklamalı",
+   "gecti": true,
+   "detay": "akış bulunamadı: p_yok_boyle_bir_sey"
+  },
+  {
+   "ad": "eksik upstream'li akış → 'hata', sistem ayakta",
+   "gecti": true,
+   "detay": "0/1 düğüm · 0.0 sn · ✗1 başarısız"
+  },
+  {
+   "ad": "kapalı zamanlama due()'da GÖRÜNMÜYOR",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "tur() onu koşturMUYOR",
+   "gecti": true,
+   "detay": ""
+  },
+  {
+   "ad": "tekrar açılınca aday oluyor",
+   "gecti": true,
+   "detay": ""
+  }
+ ],
+ "gecen": 43,
+ "toplam": 43
+}

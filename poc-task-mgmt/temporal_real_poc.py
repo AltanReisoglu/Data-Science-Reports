@@ -18,7 +18,12 @@ Kanıt olarak: her activity'nin GERÇEKTE kaç kez çalıştığı + workflow ev
 from __future__ import annotations
 import asyncio
 import logging
+import os
 from datetime import timedelta
+
+# ── AYARLAR (web arayüzünden env ile değiştirilebilir; varsayılanlar özgün senaryo)
+FAIL_TIMES = int(os.environ.get("POC_FAIL_TIMES", "1"))     # process ilk kaç denemede patlasın
+MAX_ATTEMPTS = int(os.environ.get("POC_MAX_RETRIES", "3"))  # activity'nin toplam deneme hakkı
 
 # Temporal, ilk-deneme activity hatasını WARNING/traceback olarak loglar; bu BEKLENEN
 # (retry tetikleyicisi). POC çıktısı temiz kalsın diye SDK loglarını kısıyoruz.
@@ -46,8 +51,8 @@ async def process(data: str) -> str:
     RUNS["process"] = RUNS.get("process", 0) + 1
     n = RUNS["process"]
     activity.logger.info(f"process çalıştı (#{n})")
-    if n == 1:
-        # İLK deneme: geçici hata → Temporal RetryPolicy devreye girer
+    if n <= FAIL_TIMES:
+        # İlk FAIL_TIMES deneme: geçici hata → Temporal RetryPolicy devreye girer
         raise RuntimeError("geçici hata (ödeme ağ geçidi timeout)")
     return f"{data}|işlendi"
 
@@ -73,7 +78,7 @@ class OrderWorkflow:
             start_to_close_timeout=timedelta(seconds=5),
             retry_policy=RetryPolicy(
                 initial_interval=timedelta(milliseconds=100),
-                maximum_attempts=3,
+                maximum_attempts=MAX_ATTEMPTS,
             ),
         )
         # 3) deliver
@@ -87,6 +92,7 @@ async def main():
     print("=" * 78)
     print("GERÇEK TEMPORAL ile TASK-MANAGEMENT POC  (temporalio SDK + gerçek dev server)")
     print("=" * 78)
+    print(f"ayarlar: process ilk {FAIL_TIMES} denemede patlar · activity deneme hakkı = {MAX_ATTEMPTS}")
     print("Ephemeral Temporal dev server başlatılıyor (ilk çalıştırmada indirilebilir)…")
 
     async with await WorkflowEnvironment.start_time_skipping() as env:
@@ -101,14 +107,24 @@ async def main():
                 OrderWorkflow.run, "4711",
                 id="order-4711", task_queue="orders",
             )
-            result = await handle.result()
+            try:
+                result = await handle.result()
+                failed = None
+            except Exception as e:
+                # deneme hakkı bitti → workflow başarısız. History YİNE DE durur (kanıt).
+                result, failed = None, str(e).splitlines()[0][:120]
 
         print("── SONUÇ " + "─" * 60)
-        print(f"  workflow sonucu: {result!r}")
+        if failed:
+            print(f"  workflow BAŞARISIZ: {failed}")
+            print(f"  → activity {MAX_ATTEMPTS} denemede de patladı; deneme hakkı bitti.")
+        else:
+            print(f"  workflow sonucu: {result!r}")
         print(f"\n── ACTIVITY'LER GERÇEKTE KAÇ KEZ KOŞTU " + "─" * 30)
         for name in ("fetch_data", "process", "deliver"):
-            print(f"  {name:<12} : {RUNS.get(name,0)} kez"
-                  + ("   ← 1 hata + 1 başarı = RetryPolicy devreye girdi" if name == "process" else ""))
+            n = RUNS.get(name, 0)
+            note = f"   ← {min(FAIL_TIMES, n)} hata → RetryPolicy devreye girdi" if name == "process" and n > 1 else ""
+            print(f"  {name:<12} : {n} kez{note}")
 
         # event-history: retry gerçekten kalıcı loglanmış mı?
         print(f"\n── EVENT HISTORY (durable log — retry kaydı) " + "─" * 22)
@@ -127,13 +143,28 @@ async def main():
                   "ACTIVITY_TASK_FAILED", "WORKFLOW_EXECUTION_COMPLETED"):
             if k in counts:
                 print(f"  {k:<30} × {counts[k]}")
-        print(f"  → 3 activity: her biri SCHEDULED→STARTED→COMPLETED. process'in başarısız")
-        print(f"    1. denemesi otomatik retry'landığı için history'ye YAZILMAZ (kompakt kalır);")
-        print(f"    retry kanıtı yukarıdaki RUNS sayacı (process=2). Attempt no, STARTED event'inde.")
+        print(f"  → Her activity: SCHEDULED→STARTED→COMPLETED. process'in başarısız")
+        print(f"    denemeleri otomatik retry'landığı için history'ye YAZILMAZ (kompakt kalır);")
+        print(f"    retry kanıtı yukarıdaki RUNS sayacı. Attempt no, STARTED event'inde.")
+
+        # ── web arayüzü için makine-okunur akış özeti
+        f, p, d = (RUNS.get("fetch_data", 0), RUNS.get("process", 0), RUNS.get("deliver", 0))
+        print("##FLOW## " + "|".join([
+            f"fetch:{f}:ok",
+            f"process:{p}:" + ("fail" if failed else ("retry" if p > 1 else "ok")),
+            f"deliver:{d}:" + ("skip" if not d else "ok"),
+        ]))
+        if failed:
+            print(f"##VERDICT## deneme hakkı ({MAX_ATTEMPTS}) bitti — ama fetch yine {f}× koştu; "
+                  f"history duruyor, iş kaldığı yerden sürdürülebilir")
+        else:
+            print(f"##VERDICT## process {p}× denendi ama pahalı fetch sadece {f}× koştu — "
+                  f"tamamlanan iş KORUNDU (replay atladı)")
 
     print("\n" + "=" * 78)
-    print("KANIT: process 2 kez koştu (1 hata→otomatik retry→başarı) ama fetch/deliver")
-    print("       1'er kez; workflow durable event-history ile exactly-once tamamlandı.")
+    print(f"KANIT: process {RUNS.get('process',0)} kez koştu (hata→otomatik retry) ama fetch "
+          f"{RUNS.get('fetch_data',0)} kez;")
+    print("       tamamlanan activity replay'de ATLANIR — exactly-once activity completion.")
     print("       Hepsi GERÇEK Temporal (temporalio SDK + gerçek server), simülasyon değil.")
     print("=" * 78)
 

@@ -47,7 +47,7 @@ BACKEND_INFO = {
         "task_yonetimi": "ajanın ürettiği task'lar board'da; FSM + DAG kapısı",
         "retry_recovery": "checkpoint'ten devam + otomatik recover_stale + breaker",
         "state_takibi": "SQLite satırı + olay günlüğü (tam görünür)",
-        "scheduling": "yok (dış cron eklenebilir)",
+        "scheduling": "cron (scheduler.py) — atomik claim + lease + koşu geçmişi",
         "concurrency": "CAS-claim ile çok worker (at-most-once)",
         "operasyonel": "ÇOK DÜŞÜK — tek dosya, ek servis yok",
         "dinamik_task": "TAM — ajan çalışma anında task üretir/bağlar",
@@ -139,6 +139,9 @@ class OrchestrationResult:
     tasks_spawned_runtime: int = 0
     fn_tasks_run: int = 0
     agent_tasks_run: int = 0
+    # kayıtlı akış id'si → board'un yeni id'si. Motorları kıyaslarken her koşu
+    # YENİ id üretiyor; arayüzün düğümleri hizalayabilmesi için bu harita şart.
+    idmap: dict = field(default_factory=dict)
 
 
 # ═══════════════════ 1) PLANLAMA TURU — ajan task ÜRETİR ═══════════════════
@@ -345,13 +348,60 @@ def execute_task(task: dict, strategy: str, budget: int, max_turns: int = 3,
     return state
 
 
+# ═══════════════════ DÜĞÜM BAZINDA SİMÜLASYON ═══════════════════
+# fail_at/crash_at tek bir GLOBAL string ve fonksiyon adı ya da başlık ALT-DİZESİYLE
+# eşleşiyor. Aynı fn iki düğümde kullanılırsa ikisi birden patlıyor; "sadece 3. düğüm
+# patlasın" demenin yolu yok. node_sim bunu id bazlı çözer:
+#
+#     node_sim = {"t_a1b2c3": {"mod": "kalici"}, "t_d4e5": {"mod": "yavas", "sn": 5}}
+#
+# Anahtar = board'daki GÜNCEL task id'si. Kayıtlı akıştan gelen eski id'ler
+# materialize() içinde yeni id'lere çevrilir (idmap zaten orada üretiliyor).
+
+SIM_MODLARI = ("normal", "gecici", "kalici", "sonra", "cokme", "yavas")
+
+SIM_ACIKLAMA = {
+    "normal": "değişiklik yok",
+    "gecici": "ilk denemede patlar, retry'da geçer",
+    "kalici": "her denemede patlar → breaker → failed + ardıllar cancelled",
+    "sonra":  "iş YAPILDIKTAN SONRA patlar (yan etki oluşur, sonuç yazılmaz)",
+    "cokme":  "iş biter, checkpoint yazılır, complete çağrılmadan worker ölür",
+    "yavas":  "N saniye bekler (lease/timeout gözlemi)",
+}
+
+
+def _sim_of(task: dict, node_sim: dict | None) -> dict:
+    """Bu düğüm için simülasyon ayarı. Yoksa boş sözlük."""
+    if not node_sim:
+        return {}
+    s = node_sim.get(task["id"]) or {}
+    return s if isinstance(s, dict) else {}
+
+
+def cevir_node_sim(node_sim: dict | None, idmap: dict) -> dict:
+    """Kayıtlı akış id'lerini board'un yeni id'lerine çevir.
+
+    Kullanıcı arayüzde kayıtlı düğüm id'sine tıklıyor; materialize() ise her koşuda
+    YENİ id üretiyor. Çeviri olmazsa ayar hiçbir düğüme denk gelmez (sessizce hiçbir
+    şey olmaz) — bu, en kolay gözden kaçacak hata olurdu.
+    """
+    if not node_sim:
+        return {}
+    out = {}
+    for eski, ayar in node_sim.items():
+        yeni = idmap.get(eski, eski)          # zaten yeni id verilmişse aynen geçir
+        out[yeni] = ayar
+    return out
+
+
 # ═══════════════════ ORTAK YÜRÜTÜCÜ — kind'a göre yönlendirir ═══════════════════
 # Dört backend de (own/temporal/celery/airflow) bunu çağırır: tek doğruluk kaynağı.
 
 def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
                  budget: int = 3000, fail_at: str | None = None, attempt: int = 0,
                  crash_after_turn: int | None = None, log: list | None = None,
-                 spawn_log: list | None = None, on_event=None) -> tuple[str, str, dict]:
+                 spawn_log: list | None = None, on_event=None,
+                 node_sim: dict | None = None) -> tuple[str, str, dict]:
     """Tek bir düğümü yürüt. Dönüş: (kind, result_json, extra)
 
     kind='function' → LLM YOK, kayıtlı fonksiyon çağrılır (upstream verisiyle)
@@ -370,7 +420,29 @@ def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
         #   fail_at="scan_patterns~"  → iş YAPILDIKTAN SONRA patlar → YAN ETKİ oluşur,
         #                               retry işi baştan koşturur (yan etki tekrarlanır)
         _vur = None
-        if fail_at:
+        _sim = _sim_of(task, node_sim)
+        _mod = _sim.get("mod", "normal")
+
+        if _mod != "normal":
+            # ── DÜĞÜM BAZLI (id ile eşleşir, fn adı/başlık değil) ──
+            if _mod == "yavas":
+                _sn = float(_sim.get("sn", 3))
+                if log is not None:
+                    log.append(f"          ⏳ simülasyon: {task['fn']}() {_sn} sn bekliyor")
+                time.sleep(_sn)
+            elif _mod in ("gecici", "kalici", "sonra"):
+                _kalici = _mod == "kalici"
+                _sonra = _mod == "sonra"
+                if _kalici or attempt == 0:
+                    _vur = RuntimeError(
+                        f"[simülasyon:{_mod}] {task['fn']}() başarısız "
+                        f"(attempt={attempt}, düğüm={task['id']}, "
+                        f"iş {'YAPILDIKTAN SONRA' if _sonra else 'YAPILMADAN'})")
+                    if not _sonra:
+                        raise _vur
+            # "cokme" aşağıda, iş bittikten sonra ele alınıyor
+        elif fail_at:
+            # ── ESKİ YOL (geriye dönük uyum) — fn adı ya da başlık alt-dizesi ──
             kalici = "!" in fail_at
             sonra = "~" in fail_at
             hedef = fail_at.replace("!", "").replace("~", "")
@@ -387,7 +459,8 @@ def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
         # yeniden koşturmak boşa iş — ve YAN ETKİLİ bir fonksiyonda işi İKİNCİ KEZ
         # yapmak demek (e-posta iki kez, ödeme iki kez). Varsa yeniden kullan.
         _ck = task.get("checkpoint") or {}
-        if isinstance(_ck, dict) and "fn_sonucu" in _ck and _vur is None:
+        _ck_devam = isinstance(_ck, dict) and "fn_sonucu" in _ck and _vur is None
+        if _ck_devam:
             out = _ck["fn_sonucu"]
             if log is not None:
                 log.append(f"          ↻ checkpoint'ten DEVAM: {task['fn']}() ZATEN "
@@ -400,7 +473,15 @@ def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
         # iş yapıldı, sonuç checkpoint'e yazıldı, ama complete() ÇAĞRILMADAN worker öldü.
         # (Önceden yalnız ajan düğümlerinde çalışıyordu → fonksiyon-öncelikli mimaride
         #  çökme/kurtarma yolu hiç test edilemiyordu.)
-        if crash_after_turn is not None:
+        # node_sim "cokme" modu da buraya düşer — böylece çökme DÖRT motorda da
+        # aynı yoldan geçer (crash_at yalnız own'da çalışıyordu, celery/temporal
+        # onu sessizce yok sayıyordu).
+        #
+        # TEK ATIŞ: "worker bir kez öldü" demek. `_ck_devam` doğruysa bu zaten
+        # çökme SONRASI devralan koşu — tekrar çökersek düğüm sonsuza dek ölür
+        # (ölçüldü: own'da 10 çökme üst üste, celery/temporal'da düğüm asılı kaldı).
+        # Checkpoint'in varlığı süreçler arası geçerli bir "bir kez çöktü" işareti.
+        if (crash_after_turn is not None or _mod == "cokme") and not _ck_devam:
             board.save_checkpoint(task["id"], {"fn_sonucu": out})
             if log is not None:
                 log.append(f"          fn {task['fn']}() koştu, sonuç checkpoint'e yazıldı")
@@ -409,7 +490,11 @@ def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
         _raw = F.raw_chars(out)
         _res_chars = len(json.dumps(out, ensure_ascii=False, default=str))
         if _raw and on_event:
-            on_event({"type": "reduction", "task": task["id"], "fn": task["fn"],
+            # kaynak="akis": bu düğümün çıktısı BOARD'a ve ardıl düğümlere gider,
+            # sohbet asistanının context'ine GİRMEZ. Tool-trace paneli yalnız
+            # kaynak="sohbet" olanları listeler (bkz. chat_server.py).
+            on_event({"type": "reduction", "kaynak": "akis",
+                      "task": task["id"], "fn": task["fn"],
                       "title": task["title"][:40], "args": task.get("fn_args") or {},
                       "raw_tokens": _raw // 4, "out_tokens": _res_chars // 4,
                       "pct": round((1 - _res_chars / _raw) * 100, 1) if _raw else 0,
@@ -434,7 +519,7 @@ def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
                     for k, v in up.items()]
         _r = compaction.compact(strategy, _up_msgs, budget=max(budget // 2, 400))
         if _r.triggered and on_event:
-            on_event({"type": "compaction", "task": task["id"],
+            on_event({"type": "compaction", "kaynak": "akis", "task": task["id"],
                       "title": f"upstream→{task['title'][:28]}",
                       "events": [{"strategy": _r.strategy, "before": _r.before,
                                   "after": _r.after, "saved": _r.saved,
@@ -452,7 +537,7 @@ def run_one_task(task: dict, board: TaskBoard, strategy: str = "hermes",
 
 def _dispatch_own(board: TaskBoard, res: OrchestrationResult, strategy: str, budget: int,
                   crash_at: str | None, fail_at: str | None, max_rounds: int = 12,
-                  on_event=None):
+                  on_event=None, node_sim: dict | None = None):
     """Kendi durable motorumuz: recompute_ready → claim → execute → complete/fail."""
     crashed_once = False
 
@@ -484,16 +569,21 @@ def _dispatch_own(board: TaskBoard, res: OrchestrationResult, strategy: str, bud
             f"[tur {rnd}] claim: {task['id']} '{task['title'][:44]}' (CAS+lease)")
 
         # çökmeyi task'ın ORTASINDA tetikle (1 tur bitip checkpoint yazıldıktan sonra)
+        # Düğüm bazlı "cokme" ayarı run_one_task içinde ele alınıyor; buradaki
+        # crash_at eski (başlık alt-dizesi) yolu, geriye dönük uyum için duruyor.
         crash_turn = None
         if crash_at and not crashed_once and crash_at.lower() in task["title"].lower():
             crash_turn = 1
+        elif _sim_of(task, node_sim).get("mod") == "cokme" and not (task.get("checkpoint") or {}):
+            crash_turn = 1                     # ajan düğümünde tur ortasında çökme
+            # boş checkpoint şartı = TEK ATIŞ; devralan koşuda tekrar çökmesin
 
         try:
             att = task.get("attempt", 0)
             kind, result, extra = run_one_task(
                 task, board, strategy, budget, fail_at=fail_at, attempt=att,
                 crash_after_turn=crash_turn, log=res.dispatch_log,
-                spawn_log=res.dispatch_log, on_event=on_event)
+                spawn_log=res.dispatch_log, on_event=on_event, node_sim=node_sim)
             if not board.complete(task["id"], result, claimer=task.get("claim_lock")):
                 # lease dolmuş, task devredilmiş → bu worker'ın yazması REDDEDİLDİ
                 res.dispatch_log.append("          ⚠ yazma reddedildi: claim devredilmiş "
@@ -508,7 +598,7 @@ def _dispatch_own(board: TaskBoard, res: OrchestrationResult, strategy: str, bud
                 _ce = extra.get("compaction_events", [])
                 res.compaction_events += _ce
                 if on_event and _ce:
-                    on_event({"type": "compaction", "task": task["id"],
+                    on_event({"type": "compaction", "kaynak": "akis", "task": task["id"],
                               "title": task["title"][:40], "events": _ce})
                 res.dispatch_log.append("          ✓ tamamlandı → done (LLM ajan)")
         except WorkerCrash as c:
@@ -555,7 +645,8 @@ def _dispatch_own(board: TaskBoard, res: OrchestrationResult, strategy: str, bud
 
 
 def _dispatch_celery(board: TaskBoard, res: OrchestrationResult, strategy: str, budget: int,
-                     crash_at: str | None, fail_at: str | None, on_event=None):
+                     crash_at: str | None, fail_at: str | None, on_event=None,
+                     node_sim: dict | None = None):
     """Celery: her ready task broker'a atılır, ayrı worker süreci çeker.
 
     NOT: Celery'nin kendi 'task' kavramı bizim A-seviyesi task'ımızla birebir örtüşür,
@@ -570,6 +661,8 @@ def _dispatch_celery(board: TaskBoard, res: OrchestrationResult, strategy: str, 
            "BRAIN_BOARD_DB": str(board.path),
            "BRAIN_STRATEGY": strategy, "BRAIN_BUDGET": str(budget),
            "BRAIN_FAIL_AT": fail_at or "",
+           # düğüm bazlı simülasyon worker sürecine JSON olarak taşınır
+           "BRAIN_NODE_SIM": json.dumps(node_sim or {}, ensure_ascii=False),
            "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH','')}"}
     res.dispatch_log.append(f"gerçek celery worker (ayrı süreç) + filesystem broker · {poc_dir}")
     worker = subprocess.Popen(
@@ -580,7 +673,7 @@ def _dispatch_celery(board: TaskBoard, res: OrchestrationResult, strategy: str, 
     try:
         os.environ.update({k: env[k] for k in
                            ("BRAIN_CELERY_DIR", "BRAIN_BOARD_DB", "BRAIN_STRATEGY",
-                            "BRAIN_BUDGET", "BRAIN_FAIL_AT")})
+                            "BRAIN_BUDGET", "BRAIN_FAIL_AT", "BRAIN_NODE_SIM")})
         import importlib
         import celery_worker
         importlib.reload(celery_worker)
@@ -619,7 +712,23 @@ def _dispatch_celery(board: TaskBoard, res: OrchestrationResult, strategy: str, 
                         on_event({"type": "log",
                                   "text": f"[tur {rnd}] worker ilerledi: {simdi} düğüm tamamlandı"})
                 elif time.time() - son_ilerleme > 25:
-                    # 25 sn'dir ilerleme yok → takıldı, boşuna bekleme
+                    # 25 sn'dir ilerleme yok → ÖNCE bayat claim'leri süpür.
+                    # Worker AYRI SÜREÇTE çöktüyse (WorkerCrash) task 'running'
+                    # asılı kalır ve Celery'nin bundan haberi olmaz — kimse
+                    # kurtarmazsa akış orada ölür (ölçüldü). own bunu WorkerCrash'i
+                    # yakalayıp yapıyor; celery'de sweep dispatcher'a düşüyor.
+                    n = board.recover_stale(force=True)
+                    if n:
+                        res.recovered += n
+                        res.crashes += n
+                        if on_event:
+                            on_event({"type": "log",
+                                      "text": f"[tur {rnd}] ⚠ {n} takılı düğüm bulundu → "
+                                              f"recover_stale ile geri kuyruğa (çöken worker)"})
+                        son_ilerleme = time.time()
+                        for t in board.list_tasks("ready"):
+                            celery_worker.run_task.delay(t["id"])
+                        continue
                     if on_event:
                         on_event({"type": "log",
                                   "text": f"[tur {rnd}] ⚠ 25 sn ilerleme yok — worker takıldı, "
@@ -640,7 +749,8 @@ def _dispatch_celery(board: TaskBoard, res: OrchestrationResult, strategy: str, 
 
 
 def _dispatch_temporal(board: TaskBoard, res: OrchestrationResult, strategy: str, budget: int,
-                       crash_at: str | None, fail_at: str | None, on_event=None):
+                       crash_at: str | None, fail_at: str | None, on_event=None,
+                       node_sim: dict | None = None):
     """Temporal: dispatch bir workflow, her task yürütmesi bir activity.
 
     Board yine bizim (bağımlılık + durum), Temporal ise durable yürütme motoru:
@@ -654,7 +764,8 @@ def _dispatch_temporal(board: TaskBoard, res: OrchestrationResult, strategy: str
     import temporal_defs
 
     temporal_defs.CTX.update({"board": board, "strategy": strategy, "budget": budget,
-                              "fail_at": fail_at, "compaction_events": []})
+                              "fail_at": fail_at, "node_sim": node_sim or {},
+                              "compaction_events": []})
 
     async def _go():
         async with await WorkflowEnvironment.start_time_skipping() as env:
@@ -678,7 +789,9 @@ def _dispatch_temporal(board: TaskBoard, res: OrchestrationResult, strategy: str
 
 
 def export_airflow_dag(board: TaskBoard, out_path: Path | None = None,
-                       dag_id: str = "brain_agent_plan", goal: str = "") -> Path:
+                       dag_id: str = "brain_agent_plan", goal: str = "",
+                       node_sim: dict | None = None, retry_delay_sn: int = 30,
+                       schedule: str | None = "0 8 * * *") -> Path:
     """Ajanın kurduğu grafı GERÇEK bir Airflow DAG'ına çevir.
 
     Artık düğümler DETERMİNİSTİK FONKSİYON olduğu için çeviri BİREBİR:
@@ -716,17 +829,48 @@ def export_airflow_dag(board: TaskBoard, out_path: Path | None = None,
         "",
         "default_args = {",
         '    "retries": 2,                       # DÜĞÜM bazında retry',
-        '    "retry_delay": timedelta(seconds=30),',
+        f'    "retry_delay": timedelta(seconds={int(retry_delay_sn)}),',
         "}",
+        "",
+        "# ── DÜĞÜM BAZLI SİMÜLASYON ──",
+        "# Airflow AYRI SÜREÇTE koşuyor; ortak bellek yok. Panelden gelen ayarlar",
+        "# DAG dosyasına GÖMÜLEREK taşınıyor (celery'de env, temporal'da CTX ile aynı iş).",
+        f"NODE_SIM = {dict(node_sim or {})!r}",
+        "_DENEME = {}",
+        "",
+        "",
+        "def _sim_uygula(task_id, asama):",
+        '    """asama: \'once\' (iş yapılmadan) | \'sonra\' (iş bittikten sonra)."""',
+        "    ayar = NODE_SIM.get(task_id) or {}",
+        "    mod = ayar.get('mod', 'normal')",
+        "    if mod == 'normal':",
+        "        return",
+        "    if mod == 'yavas':",
+        "        if asama == 'once':",
+        "            import time as _t; _t.sleep(float(ayar.get('sn', 3)))",
+        "        return",
+        "    if asama == 'once':",
+        "        _DENEME[task_id] = _DENEME.get(task_id, 0) + 1",
+        "    n = _DENEME.get(task_id, 1)",
+        "    if mod == 'gecici' and asama == 'once' and n == 1:",
+        "        raise RuntimeError(f'[simulasyon:gecici] {task_id} (deneme {n})')",
+        "    if mod in ('kalici', 'cokme') and asama == 'once':",
+        "        # Airflow'da 'çökme' ayrı bir kavram değil: düğüm ölür, retry devralır",
+        "        raise RuntimeError(f'[simulasyon:{mod}] {task_id} (deneme {n})')",
+        "    if mod == 'sonra' and asama == 'sonra' and n == 1:",
+        "        raise RuntimeError(f'[simulasyon:sonra] {task_id} - is yapildi, sonuc yazilmadi')",
         "",
         "",
         "def _run_fn(fn_name, args, parent_ids, **ctx):",
         '    """Kayıtlı deterministik fonksiyonu koştur; upstream veriyi XCom\'dan al."""',
         "    from functions import call",
+        "    _sim_uygula(ctx['ti'].task_id, 'once')",
         "    ti = ctx[\"ti\"]",
         "    up = {p: ti.xcom_pull(task_ids=p) for p in parent_ids}",
         "    up = {k: v for k, v in up.items() if v is not None}",
-        "    return call(fn_name, args, up)",
+        "    _sonuc = call(fn_name, args, up)",
+        "    _sim_uygula(ctx['ti'].task_id, 'sonra')",
+        "    return _sonuc",
         "",
         "",
         "def _run_agent(title, body, parent_ids, **ctx):",
@@ -742,7 +886,8 @@ def export_airflow_dag(board: TaskBoard, out_path: Path | None = None,
         "with DAG(",
         f'    dag_id="{dag_id}",',
         "    default_args=default_args,",
-        '    schedule="0 8 * * *",               # Airflow\'un asıl gücü: cron',
+        (f'    schedule={schedule!r},               # Airflow\'un asıl gücü: cron'
+         if schedule else "    schedule=None,"),
         "    start_date=datetime(2026, 1, 1),",
         "    catchup=False,",
         "    max_active_runs=1,",
@@ -974,7 +1119,7 @@ def materialize(board: TaskBoard, nodes: list, arg_overrides: dict | None = None
 def run_saved(nodes: list, backend: str = "own", strategy: str = "hermes",
               budget: int = 3_000, board: TaskBoard | None = None,
               crash_at: str | None = None, fail_at: str | None = None,
-              arg_overrides: dict | None = None,
+              arg_overrides: dict | None = None, node_sim: dict | None = None,
               on_event=None) -> OrchestrationResult:
     """Kayıtlı bir akışı PLANLAMADAN koştur (yeni koşu)."""
     t0 = time.time()
@@ -999,22 +1144,33 @@ def run_saved(nodes: list, backend: str = "own", strategy: str = "hermes",
         if on_event:
             on_event({"type": "log", "text": _o})
     res.tasks_created = len(idmap)
+    res.idmap = dict(idmap)
+    # Kayıtlı akış id'lerini board'un YENİ id'lerine çevir — yoksa ayar hiçbir
+    # düğüme denk gelmez ve sessizce hiçbir şey olmaz.
+    sim = cevir_node_sim(node_sim, idmap)
     if on_event:
         for old, new in idmap.items():
             t = board.get(new)
             lbl = t["fn"] if t["kind"] == "function" else "AJAN"
+            _s = (sim.get(new) or {}).get("mod")
             on_event({"type": "node_added",
-                      "text": f"AKIŞ düğümü: {new} = {lbl}({t.get('fn_args') or {}}) [{t['status']}]"})
+                      "text": f"AKIŞ düğümü: {new} = {lbl}({t.get('fn_args') or {}}) "
+                              f"[{t['status']}]" + (f"  ⚙ simülasyon: {_s}" if _s else "")})
         on_event({"type": "phase", "text": f"DISPATCH — {backend} motoru yürütüyor"})
 
     try:
         if backend == "own":
-            _dispatch_own(board, res, strategy, budget, crash_at, fail_at, on_event=on_event)
+            _dispatch_own(board, res, strategy, budget, crash_at, fail_at,
+                          on_event=on_event, node_sim=sim)
         elif backend == "airflow":
-            _dispatch_airflow(board, res, goal="(kayıtlı akış)")
+            _dispatch_airflow(board, res, goal="(kayıtlı akış)", node_sim=sim,
+                              on_event=on_event)
         else:
+            # on_event ARTIK geçiliyor — önceden geçilmediği için celery ve temporal
+            # koşularında arayüze hiç canlı log akmıyordu.
             {"celery": _dispatch_celery, "temporal": _dispatch_temporal}[backend](
-                board, res, strategy, budget, crash_at, fail_at)
+                board, res, strategy, budget, crash_at, fail_at,
+                on_event=on_event, node_sim=sim)
     except Exception as e:
         res.dispatch_log.append(f"✗ dispatch hatası: {type(e).__name__}: {str(e)[:200]}")
 

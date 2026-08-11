@@ -202,18 +202,21 @@ def t_veri():
 
 # ═══════════════ 8) SCHEDULING — dürüst tespit ═══════════════
 def t_scheduling():
-    print("\n── 8) SCHEDULING — sistemde var mı? ──")
     import inspect
-    kaynak = ""
-    for m in (TB, O):
-        kaynak += inspect.getsource(m)
-    # yorum/metin içindeki 'cron' kelimesini sayma — GERÇEK uygulama arıyoruz
-    kod = "\n".join(ln for ln in kaynak.splitlines()
-                    if not ln.strip().startswith("#") and '"' not in ln and "'" not in ln)
-    cron = any(k in kod for k in ("schedule_at", "next_run", "interval_sec", "crontab"))
-    kontrol("zamanlanmış koşu (cron/interval) UYGULANMIŞ mı", False, cron,
-            "→ HAYIR: scheduling bu sistemde hiç yok (koçun 6 ekseninden biri açık)")
-    kontrol("board'da zaman alanı (next_run/schedule) var mı", False,
+    print("\n── 8) SCHEDULING — sistemde var mı? ──")
+    # Bu kontrol daha önce "HAYIR" diye geçiyordu (koçun 6. ekseni açıktı).
+    # scheduler.py eklendikten sonra artık VARLIĞINI doğruluyor; ayrıntılı
+    # ölçüm test_zamanlama.py'de (cron, claim yarışı, lease, uçtan uca).
+    import scheduler as SCH
+    kontrol("zamanlanmış koşu (cron) UYGULANMIŞ mı", True,
+            hasattr(SCH, "sonraki_kosu") and hasattr(SCH, "Poller"),
+            "→ EVET: scheduler.py (cron + claim/lease + yoklayıcı)")
+    kontrol("zamanlama deposunda next_run_at alanı var mı", True,
+            "next_run_at" in SCH.SCHEMA)
+    kontrol("bayatlık kontrolü claim'in İÇİNDE (ayrı kurtarma adımı yok)", True,
+            "claimed_at IS NULL OR claimed_at <" in inspect.getsource(SCH.ScheduleStore.claim))
+    # board'ın kendisi hâlâ zamanlama tutmuyor — ayrı sorumluluk, bilinçli
+    kontrol("board zamanlama alanı tutMUYOR (ayrı sorumluluk)", False,
             "next_run" in TB.SCHEMA or "schedule" in TB.SCHEMA)
 
 

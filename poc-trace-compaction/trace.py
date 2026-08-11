@@ -34,6 +34,7 @@ class Event:
     summary: Optional["TraceSummary"] = None  # atıldıysa 5-alan özet burada
     cleared: bool = False              # B.11 context editing: içerik SİLİNDİ (özet değil)
     clear_note: str = ""               # silme yer tutucusundaki tek satırlık iz
+    neden: str = ""                    # HANGİ faz/gerekçe ile dokunuldu (arayüzde gösterilir)
 
     def token_cost(self) -> int:
         """Bu olayın bağlamda kapladığı tahmini token."""
@@ -84,6 +85,18 @@ class TraceSummary:
     def token_cost(self) -> int:
         return estimate_tokens(json.dumps(self.as_dict(), ensure_ascii=False))
 
+    def render(self) -> str:
+        """messages[]'teki tool mesajının içeriğine yazılacak tek satır metin.
+
+        Ham çıktının yerini alır — model bir sonraki turda bunu görür. Yapı
+        (tool_call_id eşleşmesi) korunur, yalnızca gövde küçülür.
+        """
+        parts = [f"niyet: {self.niyet}", f"girdi: {self.girdi}",
+                 f"sonuç: {self.sonuc}", f"durum: {self.durum}"]
+        if self.etki:
+            parts.append(f"etki: {self.etki}")
+        return "[özet] " + " · ".join(parts)
+
 
 # --- Trace: olayların dizisi ---------------------------------------------
 
@@ -118,6 +131,13 @@ class Trace:
 
     def tool_events(self) -> list[Event]:
         return [e for e in self.events if e.type == "tool"]
+
+    def by_seq(self, seq: int) -> Optional[Event]:
+        """seq'e karşılık gelen olay (messages[] köprüsü için)."""
+        for e in self.events:
+            if e.seq == seq:
+                return e
+        return None
 
     def total_tokens(self) -> int:
         return sum(e.token_cost() for e in self.events)

@@ -709,7 +709,7 @@ flowchart LR
 
 **3 · Placeholder trim** — History sığmazsa en eski **`function_call_output`**'lar teker teker placeholder'a çevrilir: içerik gider, **çağrı iskeleti kalır** — böylece `tool_call ↔ tool_result` zinciri kırılmaz.
 
-*Tool-trace dışı:* handoff özeti (`SUMMARIZATION_PROMPT`) · `CompactedItem` ile yeni pencere açma (windowing) — bunlar konuşma seviyesidir, tool iziyle sınırlı değildir.
+*Tool-trace dışı:* handoff özeti (`SUMMARIZATION_PROMPT`) · `CompactedItem` ile yeni pencere açma (windowing) — bunlar konuşma seviyesidir, tool iziyle sınırlı değildir.*
 
 ---
 

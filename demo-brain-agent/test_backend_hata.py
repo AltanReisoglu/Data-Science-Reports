@@ -144,9 +144,11 @@ def c_cokme():
         SONUC.setdefault("cokme", {})[be] = {
             "crashes": res.crashes, "recovered": res.recovered,
             "scan": r["scan"], "done": r["done"]}
-    print("\n  → Çökme simülasyonu YALNIZ kendi motorumuzda uygulanmış. celery ve temporal")
-    print("    'crash_at' parametresini KABUL EDİYOR ama kullanmıyor — sessizce yok sayılan")
-    print("    parametre. Çökme kurtarma bu iki motorda ÖLÇÜLMEDİ (yok değil, ölçülmedi).")
+    print("\n  → ESKİ `crash_at` string yolu yalnız kendi motorumuzda uygulanmış; celery ve")
+    print("    temporal onu kabul edip kullanmıyor (sessizce yok sayılan parametre).")
+    print("  → YENİ yol bu boşluğu kapattı: node_sim={'<id>':{'mod':'cokme'}} DÖRT motorda")
+    print("    da çalışıyor (test_node_sim.py'de ölçüldü: tek atış → kurtarma → 5/5).")
+    print("    Bu testteki 0'lar eski yolun ölçümüdür, çökme yeteneğinin yokluğu değil.")
 
 
 # ═══════════ D) YAPISAL FARKLAR ═══════════

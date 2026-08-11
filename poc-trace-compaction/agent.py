@@ -10,6 +10,21 @@ Endpoint OpenAI-uyumlu olduğu için openai SDK base_url ile kullanılır
 """
 from __future__ import annotations
 import json
+import re
+
+
+def _strip_tool_markup(text: str) -> str:
+    """Gemma bazen tool çağrısını düz metin olarak yayar (<|tool_call|>...);
+    kullanıcıya giden yanıttan bu markup'ı temizle."""
+    if not text:
+        return text
+    # tam blok: <|tool_call|> ... <tool_call|> (asimetrik kapanışa toleranslı)
+    text = re.sub(r'<\|?tool_call\|?>.*?<\|?tool_call\|?>', ' ', text, flags=re.S)
+    # kapanışsız açılış → sonuna kadar sil
+    text = re.sub(r'<\|?tool_call\|?>.*$', ' ', text, flags=re.S)
+    # kalan <|...|> / <|"> gibi işaretleri temizle
+    text = re.sub(r'<\|[^>]*>', '', text)
+    return text.strip()
 
 from config import (LLM_BASE_URL, LLM_API_KEY, LLM_MODEL_NAME,
                     TRACE_TOKEN_BUDGET, TRACE_PROTECT_WINDOW, estimate_tokens)
@@ -55,6 +70,7 @@ class TracingAgent:
                         "playbook_bullets": 0, "ptc_inner_saved": 0}
         self._client = None
         self.messages = None   # çok-turlu chat için kalıcı mesaj dizisi
+        self._call_seq: dict[str, int] = {}   # tool_call_id → trace olay seq (messages köprüsü)
 
     # --- LLM istemcisi (OpenAI-uyumlu) -----------------------------------
 
@@ -101,6 +117,27 @@ class TracingAgent:
             return "OK: episode kapandı"
         return "delimiter: action start|end olmalı"
 
+    def _maybe_apply_text_delimiter(self, content: str) -> None:
+        """Model delimiter'ı METİN olarak yaydıysa (tool_calls yerine), yine de
+        episode grafiğine uygula — böylece CWL episode text-format'ta da oluşur."""
+        if not content or "delimiter" not in content:
+            return
+        try:
+            for m in re.finditer(r'delimiter\s*[\({]?\s*\{?([^}]*)\}?', content):
+                body = m.group(1)
+                def fld(k):
+                    r = re.search(k + r'\s*[:=]\s*<\|">?\s*([^<]*?)\s*<', body) \
+                        or re.search(k + r'\s*[:=]\s*"?([A-Za-zçğıöşü0-9 ._-]+)', body, re.I)
+                    return (r.group(1).strip() if r else "")
+                action = fld("action")
+                if action == "end":
+                    self.episodes.end(self.trace._seq, description=fld("description"))
+                elif action == "start":
+                    self.episodes.start(name=fld("name") or f"ep{self.trace._seq}",
+                                        type=fld("type") or "expl", seq=self.trace._seq)
+        except Exception:
+            pass   # en kötü ihtimalle episode oluşmaz; yanıt yine temiz
+
     def _record_and_maybe_compact(self, name, args, output, status, intent_ref):
         """Tool sonucunu trace+ledger'a işle, gerekiyorsa sıkıştır."""
         verbatim = name in ("grep", "run_tests", "run_code")  # sonuç kritik (yol/port/bulgu)
@@ -122,13 +159,14 @@ class TracingAgent:
             self.metrics["playbook_bullets"] = self.playbook.stats()["active"]
         self.metrics["peak_trace_tokens"] = max(
             self.metrics["peak_trace_tokens"], self.trace.total_tokens())
-        return None
+        return ev.seq   # messages[] köprüsü: tool_call_id ile eşlemek için
 
     # --- ana döngü (ek-a §7) ---------------------------------------------
 
     def run(self, task: str) -> str:
         """Tek-atışlık: yeni bir sohbet başlatıp tek soruyu yanıtlar."""
         self.messages = [{"role": "system", "content": self.system}]
+        self._call_seq = {}
         return self.send(task)
 
     def send(self, user_msg: str) -> str:
@@ -156,9 +194,13 @@ class TracingAgent:
                 self.trace.events and self.trace.events[-1].type == "reasoning") else None
 
             if not msg.tool_calls:
-                self.trace.add_answer(msg.content or "")
-                self.messages.append({"role": "assistant", "content": msg.content or ""})
-                return msg.content or ""
+                # Gemma bazen tool çağrısını (ör. delimiter) düz METİN olarak yayar;
+                # yanıta sızmasın diye tool-markup'ı temizle.
+                answer = _strip_tool_markup(msg.content or "")
+                self._maybe_apply_text_delimiter(msg.content or "")  # text-format delimiter'ı yine de uygula
+                self.trace.add_answer(answer)
+                self.messages.append({"role": "assistant", "content": answer})
+                return answer
 
             # asistan turunu OLDUĞU GİBİ ekle (ek-a: tool_calls kaybolmasın)
             self.messages.append({"role": "assistant", "content": msg.content or "",
@@ -184,9 +226,10 @@ class TracingAgent:
                     res = self.ptc.run(args.get("code", ""))
                     output = res["output"]
                     self.metrics["ptc_inner_saved"] += res["inner_calls"]
-                    self._record_and_maybe_compact(
+                    seq = self._record_and_maybe_compact(
                         "run_code", {"inner_calls": res["inner_calls"]},
                         output, res["status"], intent_ref)
+                    self._call_seq[tc.id] = seq
                     self.messages.append({"role": "tool", "tool_call_id": tc.id,
                                           "content": output})
                     continue
@@ -198,21 +241,40 @@ class TracingAgent:
                     output = f"Hata: {e}"
                     status = "error"
 
-                self._record_and_maybe_compact(name, args, output, status, intent_ref)
+                seq = self._record_and_maybe_compact(name, args, output, status, intent_ref)
+                self._call_seq[tc.id] = seq
                 self.messages.append({"role": "tool", "tool_call_id": tc.id,
                                       "content": output})
 
         return "(max_turns aşıldı)"
 
     def _render_messages(self, messages: list[dict]) -> list[dict]:
-        """Trace katmanı sıkıştırdıysa, tool sonuçlarını sıkışık hâlleriyle gönder.
+        """messages[]'i modele göndermeden önce trace kaderini UYGULA.
 
-        evict edilmiş tool olaylarının içeriği, messages[]'teki ilgili tool
-        mesajında özetle değiştirilir — böylece modelin gördüğü bağlam küçülür.
+        Her tool mesajının içeriği, karşılık gelen trace olayının kaderine göre
+        yeniden yazılır (id↔seq köprüsü):
+          - cleared (B.11) → tek satır yer tutucu
+          - evicted (B.12) → 5-alan özet
+          - TAM            → ham çıktı (dokunulmaz)
+        tool_call_id AYNI kalır → tool_use/tool_result eşleşmesi bozulmaz (API 400 yok).
+        Böylece ölçtüğümüz sıkışma modelin GERÇEKTEN gördüğü bağlama yansır.
         """
         if not self.compaction:
             return messages
-        # ACE (K4): playbook'u bağlamın ÜSTÜNE enjekte et. Trace evict edilse de
+
+        # 1) tool sonuçlarını kadere göre yeniden yaz (kopya üzerinde — ham kaynak korunur)
+        rendered = []
+        for m in messages:
+            if m.get("role") == "tool" and m.get("tool_call_id") in self._call_seq:
+                ev = self.trace.by_seq(self._call_seq[m["tool_call_id"]])
+                if ev is not None and ev.cleared:
+                    m = {**m, "content": "[silindi] " + ev.clear_note}
+                elif ev is not None and ev.evicted and ev.summary is not None:
+                    m = {**m, "content": ev.summary.render()}
+            rendered.append(m)
+        messages = rendered
+
+        # 2) ACE (K4): playbook'u bağlamın ÜSTÜNE enjekte et. Trace evict edilse de
         # buradaki ders durur — öğrenilmiş bilgi sıkıştırmadan bağımsız yaşar.
         pb = self.playbook.render()
         if pb:
@@ -220,6 +282,18 @@ class TracingAgent:
             merged = dict(head)
             merged["content"] = head["content"] + "\n\n" + pb
             messages = [merged] + messages[1:]
-        # Not: evict edilmiş tool sonuçlarının messages[]'e geri yazılması bu
-        # POC'de basitleştirilmiştir; sıkışma trace.total_tokens ile ölçülür.
         return messages
+
+    def rendered_token_cost(self, messages: list[dict] = None) -> int:
+        """Modele GERÇEKTEN giden bağlamın tahmini token'ı (kader uygulanmış)."""
+        import json as _json
+        from config import estimate_tokens
+        msgs = self._render_messages(messages if messages is not None else (self.messages or []))
+        return sum(estimate_tokens(_json.dumps(m, ensure_ascii=False)) for m in msgs)
+
+    def raw_token_cost(self, messages: list[dict] = None) -> int:
+        """Sıkıştırma OLMASAYDI giden ham bağlamın token'ı (karşılaştırma için)."""
+        import json as _json
+        from config import estimate_tokens
+        msgs = messages if messages is not None else (self.messages or [])
+        return sum(estimate_tokens(_json.dumps(m, ensure_ascii=False)) for m in msgs)
