@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "gitmcp": {
+      "type": "http",
+      "url": "https://gitmcp.io/docs"
+    }
+  }
+}
