@@ -1,0 +1,93 @@
+{
+  "mod": "replay",
+  "desenler": [
+    {
+      "desen": "Desen 1 · RoundRobinGroupChat (sabit sıra)",
+      "sure_ms": 9,
+      "mesaj_sayisi": 9,
+      "llm_cagrisi": 6,
+      "arac_cagrisi": 2,
+      "prompt_token": 196,
+      "completion_token": 78,
+      "devir_sirasi": [
+        "Arastirmaci",
+        "Analist",
+        "Elestirmen",
+        "Yazar"
+      ],
+      "durma_nedeni": "Text 'RAPOR_TAMAM' mentioned",
+      "mod": "replay",
+      "toplam_token": 274
+    },
+    {
+      "desen": "Desen 2 · SelectorGroupChat (custom selector_func)",
+      "sure_ms": 6,
+      "mesaj_sayisi": 8,
+      "llm_cagrisi": 5,
+      "arac_cagrisi": 2,
+      "prompt_token": 141,
+      "completion_token": 63,
+      "devir_sirasi": [
+        "Arastirmaci",
+        "Analist",
+        "Yazar"
+      ],
+      "durma_nedeni": "Text 'RAPOR_TAMAM' mentioned",
+      "mod": "replay",
+      "toplam_token": 204
+    },
+    {
+      "desen": "Desen 3 · Swarm (handoff ile devir)",
+      "sure_ms": 9,
+      "mesaj_sayisi": 14,
+      "llm_cagrisi": 7,
+      "arac_cagrisi": 4,
+      "prompt_token": 258,
+      "completion_token": 76,
+      "devir_sirasi": [
+        "Triyaj",
+        "VeriUzmani",
+        "Yazar"
+      ],
+      "durma_nedeni": "Text 'RAPOR_TAMAM' mentioned",
+      "mod": "replay",
+      "toplam_token": 334
+    },
+    {
+      "desen": "Desen 4 · GraphFlow (paralel dal + join)",
+      "sure_ms": 8,
+      "mesaj_sayisi": 11,
+      "llm_cagrisi": 7,
+      "arac_cagrisi": 3,
+      "prompt_token": 193,
+      "completion_token": 77,
+      "devir_sirasi": [
+        "Arastirmaci",
+        "AnalistGelir",
+        "AnalistHata",
+        "Yazar"
+      ],
+      "durma_nedeni": "Digraph execution is complete",
+      "mod": "replay",
+      "toplam_token": 270
+    },
+    {
+      "desen": "Desen 5 · autogen_core aktör modeli (LLM yok)",
+      "sure_ms": 59,
+      "mesaj_sayisi": 9,
+      "llm_cagrisi": 0,
+      "arac_cagrisi": 0,
+      "prompt_token": 0,
+      "completion_token": 0,
+      "devir_sirasi": [
+        "ortalama",
+        "trend",
+        "bozuk(çöktü)",
+        "rapor(RPC)"
+      ],
+      "durma_nedeni": "runtime idle; 2 izole hata, 2 kalıcı kayıp",
+      "mod": "LLM'siz",
+      "toplam_token": 0
+    }
+  ]
+}
