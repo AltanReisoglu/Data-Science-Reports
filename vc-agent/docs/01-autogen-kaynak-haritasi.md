@@ -1,4 +1,4 @@
-# 15 — AutoGen Araştırma Projesi: Kaynak Haritası
+# 01 — AutoGen Araştırma Projesi: Kaynak Haritası
 
 *Hazırlanma: 2026-08-12 · Kapsam: starlanan repolar + `agentic_tuffs.md` taraması + birincil kaynak doğrulaması*
 
@@ -33,7 +33,7 @@ Bu bir sorun değil, **projenin çerçevesi**. Bir intern'in "AutoGen öğrendim
 2. **Neden yetmedi** — üretimde tıkanan yerler (durum yönetimi, tip güvenliği, telemetri, maliyet, güvenilirlik)
 3. **Halefi ne yaptı** — MAF bu derslerin hangisini nasıl içselleştirdi
 
-Yani projeyi "AutoGen tutorial" olarak değil, **"bir çok-ajan framework'ünün doğuşu, üretimde çarptığı duvar ve konsolidasyonu"** olarak kurgula. Aynı emekle çok daha güçlü bir çıktı olur ve zaten mevcut [14-agentic-mega-atlas.md](14-agentic-mega-atlas.md) çalışmanın doğal devamı.
+Yani projeyi "AutoGen tutorial" olarak değil, **"bir çok-ajan framework'ünün doğuşu, üretimde çarptığı duvar ve konsolidasyonu"** olarak kurgula. Aynı emekle çok daha güçlü bir çıktı olur ve zaten mevcut [14-agentic-mega-atlas.md](../../report/14-agentic-mega-atlas.md) çalışmanın doğal devamı.
 
 ---
 
@@ -96,7 +96,7 @@ Ama listende AutoGen projesinin **tez cümlesini besleyecek** satırlar var. Bun
 
 ## §3 — Mevcut atlas'ındaki AutoGen bölümü için düzeltme
 
-[14-agentic-mega-atlas.md](14-agentic-mega-atlas.md) dosyanda `## A.3 AutoGen / AG2` bölümü var (satır 157-190). İçeriği doğru ama **iki farklı framework'ü tek başlıkta birleştiriyor** ve anlattığı API aslında AG2'nin:
+[14-agentic-mega-atlas.md](../../report/14-agentic-mega-atlas.md) dosyanda `## A.3 AutoGen / AG2` bölümü var (satır 157-190). İçeriği doğru ama **iki farklı framework'ü tek başlıkta birleştiriyor** ve anlattığı API aslında AG2'nin:
 
 - `AutoPattern`, `AgentTarget`, `RevertToUserTarget` → bunlar **AG2** (v0.2 kolu) API'leri
 - `microsoft/autogen` v0.4+ ise `RoundRobinGroupChat`, `SelectorGroupChat`, `Swarm`, `Handoff` ve `autogen_core` runtime'ı kullanıyor — tamamen farklı bir API yüzeyi
@@ -127,7 +127,7 @@ Sıralama önem derecesine göre. Blog yazısı yerine bunlardan oku.
 | **AutoGen Studio: No-Code Developer Tool for Multi-Agent Systems** (EMNLP 2024) | [2408.15247](https://arxiv.org/abs/2408.15247) | Araç/DX tarafı |
 | **Why Do Multi-Agent LLM Systems Fail?** (Cemri, Pan et al., NeurIPS 2025) | [2503.13657](https://arxiv.org/abs/2503.13657) | **MAST taksonomisi** — 7 framework'ten 1600+ trace, 14 hata modu, 3 küme. Projenin eleştiri bölümü için en güçlü tek kaynak |
 
-MAST'ın bulgusu senin tezini doğrudan destekliyor: hataların **~%42'si sistem tasarımı/spesifikasyon**, **~%37'si ajanlar-arası koordinasyon**, **~%21'i doğrulama eksikliği** kaynaklı — yani model kalitesinden değil, **harness tasarımından**. Bu tam olarak [14-agentic-mega-atlas.md](14-agentic-mega-atlas.md) çalışmanın çıkış noktasıyla aynı.
+MAST'ın bulgusu senin tezini doğrudan destekliyor: hataların **~%42'si sistem tasarımı/spesifikasyon**, **~%37'si ajanlar-arası koordinasyon**, **~%21'i doğrulama eksikliği** kaynaklı — yani model kalitesinden değil, **harness tasarımından**. Bu tam olarak [14-agentic-mega-atlas.md](../../report/14-agentic-mega-atlas.md) çalışmanın çıkış noktasıyla aynı.
 
 ### Mimari: bilmen gereken üç katman
 
@@ -159,9 +159,19 @@ Intern seviyesi için "okudum-özetledim"in üstüne çıkacak, elindeki malzeme
 
 ---
 
+## §5a — El kitabı
+
+Bu haritanın uygulama karşılığı: **[02-autogen-el-kitabi.md](02-autogen-el-kitabi.md)**
+
+Kurulumdan dağıtık runtime'a kadar tüm API yüzeyi, 22 bölüm. İçindeki her sınıf
+ve parametre adı kurulu v0.7.5'ten introspection ile doğrulandı (72/72). MCP,
+Docker sandbox, bellek, kalıcılık, component config ("skill" karşılığı),
+InterventionHandler ve gRPC dahil — yani POC'un kapsam dışı bıraktığı her şey.
+Sonunda 15 adımlık "süper agent sistemi" kurulum sırası var.
+
 ## §5b — Çalışan POC
 
-§5'in 2. ve 3. adımı için iskelet hazır: **[../autogen/](../autogen/)**
+§5'in 2. ve 3. adımı için iskelet hazır: **[../poc/](../poc/)**
 
 AutoGen v0.7.5 ile yazıldı ve koşuldu. Aynı görevi beş farklı orkestrasyon
 deseniyle çözüp hepsini aynı metriklerle ölçüyor (mesaj, LLM çağrısı, tool
@@ -195,7 +205,7 @@ koşullarında yeniden üretilmiş hâli: hatanın kaynağı model değil, harne
 - [ ] MAST makalesini ([2503.13657](https://arxiv.org/abs/2503.13657)) oku, 14 hata modunu çıkar
 - [ ] `pip install "autogen-agentchat" "autogen-ext[openai]"` ile hello-world + bir `SelectorGroupChat` örneği çalıştır
 - [ ] Aynı görevi MAF ile kur, iki kod tabanını yan yana koy
-- [ ] [14-agentic-mega-atlas.md](14-agentic-mega-atlas.md) A.3'ü AutoGen / AG2 / MAF olarak üçe ayır
+- [ ] [14-agentic-mega-atlas.md](../../report/14-agentic-mega-atlas.md) A.3'ü AutoGen / AG2 / MAF olarak üçe ayır
 
 ---
 
@@ -266,4 +276,4 @@ Klasör şu an scratchpad'de duruyor. Repo kökündeki `autogen/` dizinin boş �
 
 ---
 
-*Bu dosyadaki repo istatistikleri ve README alıntısı 2026-08-12'de GitHub API'sinden doğrudan çekildi. Star taraması [../docs/github-starred-repos.md](../docs/github-starred-repos.md) ile aynı veri setine dayanıyor.*
+*Bu dosyadaki repo istatistikleri ve README alıntısı 2026-08-12'de GitHub API'sinden doğrudan çekildi. Star taraması [github-starred-repos.md](github-starred-repos.md) ile aynı veri setine dayanıyor.*

@@ -7,7 +7,7 @@ __pycache__/
 *.so
 *txt
 !requirements.txt
-!*/requirements.txt
+!**/requirements.txt
 *.csv
 # Distribution / packaging
 .Python

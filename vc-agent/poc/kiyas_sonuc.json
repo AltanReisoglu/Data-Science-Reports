@@ -3,7 +3,7 @@
   "desenler": [
     {
       "desen": "Desen 1 · RoundRobinGroupChat (sabit sıra)",
-      "sure_ms": 9,
+      "sure_ms": 10,
       "mesaj_sayisi": 9,
       "llm_cagrisi": 6,
       "arac_cagrisi": 2,
@@ -21,7 +21,7 @@
     },
     {
       "desen": "Desen 2 · SelectorGroupChat (custom selector_func)",
-      "sure_ms": 6,
+      "sure_ms": 9,
       "mesaj_sayisi": 8,
       "llm_cagrisi": 5,
       "arac_cagrisi": 2,
@@ -38,7 +38,7 @@
     },
     {
       "desen": "Desen 3 · Swarm (handoff ile devir)",
-      "sure_ms": 9,
+      "sure_ms": 14,
       "mesaj_sayisi": 14,
       "llm_cagrisi": 7,
       "arac_cagrisi": 4,
@@ -73,7 +73,7 @@
     },
     {
       "desen": "Desen 5 · autogen_core aktör modeli (LLM yok)",
-      "sure_ms": 59,
+      "sure_ms": 57,
       "mesaj_sayisi": 9,
       "llm_cagrisi": 0,
       "arac_cagrisi": 0,

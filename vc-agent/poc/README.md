@@ -4,7 +4,10 @@ AutoGen'in **beş farklı çok-ajan desenini** aynı görev üzerinde koşan, he
 metriklerle ölçen çalışır bir POC. Amaç tutorial tekrarı değil: aynı işi farklı
 orkestrasyon modelleriyle yaptırıp **farkın sayısal karşılığını** görmek.
 
-Bağlam ve kaynak haritası: [../report/15-autogen-arastirma-kaynak-haritasi.md](../report/15-autogen-arastirma-kaynak-haritasi.md)
+- **Baştan sona el kitabı:** [../docs/02-autogen-el-kitabi.md](../docs/02-autogen-el-kitabi.md)
+  — kurulum, tüm API yüzeyi, MCP, sandbox, bellek, kalıcılık, aktör modeli,
+  süper agent blueprint'i ve kaynakça
+- Bağlam ve kaynak haritası: [../docs/01-autogen-kaynak-haritasi.md](../docs/01-autogen-kaynak-haritasi.md)
 
 > **Sürüm notu:** AutoGen v0.7.5 ile yazıldı ve doğrulandı. AutoGen 2026 Nisan'dan beri
 > [bakım modunda](https://github.com/microsoft/autogen); halefi Microsoft Agent Framework.
