@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Mimarisi — Baştan Sona</title>
+<style>
+  :root{
+    --bg:#0c0f14; --panel:#141922; --panel2:#1b212c; --line:#28303d;
+    --ink:#e6ebf2; --dim:#9aa7ba; --faint:#67748a;
+    --acc:#5e7cff; --acc2:#38d39f; --warn:#f0a54a; --danger:#f0605d; --violet:#b98cff;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px 120px}
+  a{color:var(--acc);text-decoration:none}
+  code,.mono{font-family:var(--mono);font-size:.86em}
+  code{background:#0a0d12;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c9d4e6}
+
+  /* hero */
+  header.hero{padding:64px 22px 40px;text-align:center;
+    background:radial-gradient(1200px 400px at 50% -120px,rgba(94,124,255,.18),transparent 70%)}
+  .kick{font-family:var(--mono);font-size:12px;letter-spacing:.32em;color:var(--acc);text-transform:uppercase}
+  h1{font-size:44px;line-height:1.08;margin:14px 0 10px;letter-spacing:-.02em;font-weight:800}
+  .sub{color:var(--dim);max-width:660px;margin:0 auto;font-size:17px}
+  .meta{margin-top:18px;font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  /* sticky nav */
+  nav{position:sticky;top:0;z-index:50;background:rgba(12,15,20,.86);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:44px}
+  nav .wrap{padding:0 22px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  nav a{font-size:12.5px;color:var(--dim);padding:5px 11px;border-radius:20px;border:1px solid transparent}
+  nav a:hover{color:var(--ink);border-color:var(--line);background:var(--panel)}
+
+  section{margin:64px 0;scroll-margin-top:70px}
+  .snum{font-family:var(--mono);color:var(--acc);font-size:13px}
+  h2{font-size:27px;margin:6px 0 6px;letter-spacing:-.01em;font-weight:750}
+  .lead{color:var(--dim);max-width:760px;margin:0 0 24px}
+  h3{font-size:17px;margin:26px 0 10px;color:var(--ink)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 17px}
+  .card h4{margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;color:var(--dim);font-size:13.5px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:20px;
+    border:1px solid var(--line);color:var(--dim);background:var(--panel2)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--faint);font-weight:600;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+  td:first-child{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
+
+  /* hub diagram */
+  .hub{display:flex;flex-direction:column;align-items:center;gap:0;padding:8px 0}
+  .row-chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:720px}
+  .chip{font-family:var(--mono);font-size:11.5px;padding:5px 11px;border-radius:8px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .conn{width:2px;height:26px;background:linear-gradient(var(--line),var(--acc))}
+  .conn.up{background:linear-gradient(var(--acc),var(--line))}
+  .gw{border:1.5px solid var(--acc);background:linear-gradient(180deg,rgba(94,124,255,.14),rgba(94,124,255,.04));
+    border-radius:14px;padding:16px 30px;text-align:center;min-width:260px;box-shadow:0 0 40px rgba(94,124,255,.15)}
+  .gw b{font-size:18px}.gw .p{font-family:var(--mono);font-size:12px;color:var(--acc)}
+  .runtime{border:1px solid var(--acc2);background:rgba(56,211,159,.06);border-radius:12px;padding:12px 24px;text-align:center}
+  .runtime b{color:var(--acc2)}
+
+  /* flow steps */
+  .flow{counter-reset:step;position:relative;margin-top:8px}
+  .flow::before{content:"";position:absolute;left:18px;top:8px;bottom:8px;width:2px;background:var(--line)}
+  .step{position:relative;padding:0 0 20px 52px;counter-increment:step}
+  .step::before{content:counter(step);position:absolute;left:6px;top:-2px;width:26px;height:26px;border-radius:50%;
+    background:var(--panel2);border:1.5px solid var(--acc);color:var(--acc);
+    font-family:var(--mono);font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .step b{font-size:14.5px}.step p{margin:3px 0 0;color:var(--dim);font-size:13.5px}
+  .step .tag{font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+  /* a2a sequence */
+  .seq{display:grid;grid-template-columns:1fr;gap:10px}
+  .lane{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:start}
+  .lane .who{font-family:var(--mono);font-size:12px;color:var(--acc2);text-align:right;padding-top:9px}
+  .lane .msg{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--acc2);
+    border-radius:8px;padding:9px 13px;font-size:13px}
+  .lane.b .msg{border-left-color:var(--violet)} .lane.b .who{color:var(--violet)}
+  .lane .msg code{font-size:.85em}
+
+  .note{border-left:3px solid var(--warn);background:rgba(240,165,74,.07);padding:12px 16px;border-radius:0 10px 10px 0;font-size:13.5px;color:#f4d9b0}
+  .danger{border-left-color:var(--danger);background:rgba(240,96,93,.08);color:#f6c3c1}
+  .good{border-left-color:var(--acc2);background:rgba(56,211,159,.07);color:#bdf0dd}
+
+  ul.tight{margin:8px 0;padding-left:20px}ul.tight li{margin:4px 0;color:var(--dim);font-size:13.5px}
+  ul.tight li b,ul.tight li code{color:var(--ink)}
+
+  .layers{display:flex;flex-direction:column;gap:0}
+  .layer{border:1px solid var(--line);padding:11px 16px;font-size:13.5px;background:var(--panel);position:relative}
+  .layer:first-child{border-radius:10px 10px 0 0}.layer:last-child{border-radius:0 0 10px 10px}
+  .layer+.layer{border-top:none}
+  .layer .lt{font-weight:600}.layer .ld{color:var(--dim);font-size:12.5px}
+  .layer .n{font-family:var(--mono);font-size:11px;color:var(--faint);float:right}
+
+  footer{border-top:1px solid var(--line);padding:30px 0;color:var(--faint);font-size:12.5px;text-align:center}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:14px;font-size:12px;color:var(--dim)}
+  .legend span{display:flex;align-items:center;gap:6px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="kick">Teknik Mimari · Artefakt</div>
+  <h1>OpenClaw&nbsp;Mimarisi</h1>
+  <p class="sub">Kendi donanımında koşan, çok kanallı bir AI-agent işletim sistemi — Gateway'den agent döngüsüne, ajanlar-arası iletişimden sandbox'a kadar baştan sona.</p>
+  <div class="meta">v2026.7.1-2 · paket + resmi doküman temelli · 2026-08-14</div>
+</header>
+
+<nav><div class="wrap">
+  <a href="#ozet">Özet</a>
+  <a href="#mimari">Yüksek Seviye</a>
+  <a href="#gateway">Gateway</a>
+  <a href="#runtime">Agent Runtime</a>
+  <a href="#akis">Mesaj Akışı</a>
+  <a href="#oturum">Oturumlar</a>
+  <a href="#multi">Çok-Agent</a>
+  <a href="#a2a">Ajanlar-Arası</a>
+  <a href="#baglam">Bağlam/Compaction</a>
+  <a href="#bellek">Bellek</a>
+  <a href="#plugin">Plugin</a>
+  <a href="#node">Node</a>
+  <a href="#guvenlik">Güvenlik</a>
+  <a href="#deploy">Dağıtım</a>
+</div></nav>
+
+<div class="wrap">
+
+<!-- 0 -->
+<section id="ozet">
+  <div class="snum">00</div><h2>Özet — üç eksen</h2>
+  <p class="lead">OpenClaw bir "chatbot sarmalayıcısı" değil, <b>AI için bir işletim sistemidir</b>. Zeka modelden gelir; oturum, bellek, araç sandbox'ı, erişim kontrolü ve yönlendirme senin altyapında kalır.</p>
+  <div class="grid g3">
+    <div class="card"><h4><span class="dot" style="background:var(--acc)"></span>Gateway</h4><p>Kontrol düzlemi + taşıma. Tek WebSocket sunucusu; tüm kanallar, istemciler ve node'lar buraya bağlanır. <b>Host başına tek.</b></p></div>
+    <div class="card"><h4><span class="dot" style="background:var(--acc2)"></span>Agent Runtime</h4><p>Yürütme çekirdeği. Mesaj → bağlam → model çıkarımı → araç yürütme → akış → kalıcılık döngüsü.</p></div>
+    <div class="card"><h4><span class="dot" style="background:var(--violet)"></span>Plugin / Capability</h4><p>Genişletme. Kanallar, model sağlayıcıları, araçlar, bellek ve bağlam motorları hep yetenek sözleşmeleri üzerinden.</p></div>
+  </div>
+  <div class="note good" style="margin-top:16px">Kod: <b>TypeScript, pnpm monorepo</b>. Protokol <code>TypeBox</code> şemalarıyla tanımlanır; JSON Schema ve Swift modelleri bu tek kaynaktan üretilir → baştan sona tip güvenliği.</div>
+</section>
+
+<!-- 1 -->
+<section id="mimari">
+  <div class="snum">01</div><h2>Yüksek Seviye Mimari — hub &amp; spoke</h2>
+  <p class="lead">Merkezde tek bir Gateway; her şey ona ışınsal (spoke) bağlanır. Arayüz katmanı (mesaj nereden gelir) ile yürütme katmanı (zeka nerede koşar) kesin biçimde ayrılmıştır.</p>
+  <div class="panel">
+    <div class="hub">
+      <div class="row-chips">
+        <span class="chip">WhatsApp</span><span class="chip">Telegram</span><span class="chip">Discord</span>
+        <span class="chip">Slack</span><span class="chip">Signal</span><span class="chip">iMessage</span><span class="chip">Matrix …</span>
+      </div>
+      <div class="conn"></div>
+      <div class="gw"><b>GATEWAY</b><div class="p">tek süreç · WS :18789</div>
+        <div style="font-size:11.5px;color:var(--dim);margin-top:6px">doğrulama · erişim kontrolü · yönlendirme · presence · health · cron</div></div>
+      <div style="display:flex;gap:8px;margin:10px 0">
+        <span class="chip">CLI</span><span class="chip">Web Control UI</span><span class="chip">macOS app</span><span class="chip">iOS / Android node</span>
+      </div>
+      <div class="conn"></div>
+      <div class="runtime"><b>OpenClaw Agent Runtime</b><div style="font-size:12px;color:var(--dim)">oturum · bellek · araçlar · model</div></div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:16px"><b>Neden tek Gateway?</b> WhatsApp protokolü kesinlikle tek-cihaz — iki Gateway oturumu çakıştırır. Ayrıca oturum/presence/health/cron'un tek yerde yaşaması "hangi kopya doğru?" sorusunu tamamen ortadan kaldırır. Gateway = <b>tek doğruluk kaynağı</b>.</div>
+</section>
+
+<!-- 2 -->
+<section id="gateway">
+  <div class="snum">02</div><h2>Gateway — kontrol düzlemi</h2>
+  <p class="lead">OpenClaw'un tek kontrol düzlemi ve node taşıma katmanı. Her istemci WebSocket ile bağlanır, el sıkışmada bir <b>rol</b> ve <b>kapsam (scope)</b> bildirir. Güncel protokol <span class="pill">v4</span>.</p>
+  <div class="grid g2">
+    <div class="card"><h4>El sıkışma (handshake)</h4>
+      <ul class="tight">
+        <li>İlk çerçeve <b>mutlaka</b> <code>connect</code> olmalı; değilse sert kapatma.</li>
+        <li>Gateway bir <code>challenge</code> nonce yollar → istemci <code>connect</code> gönderir (protokol aralığı, rol, scope, caps, <b>imzalı cihaz kimliği</b>) → Gateway <code>hello-ok</code> döner.</li>
+        <li>Her bağlantı nonce'u <b>imzalar</b>; yeni cihaz = <b>pairing onayı</b> gerektirir.</li>
+        <li>Ön-kimlik çerçeveleri 64 KiB ile sınırlı (DoS koruması).</li>
+      </ul></div>
+    <div class="card"><h4>Roller &amp; kapsamlar</h4>
+      <ul class="tight">
+        <li><b>operator</b> — kontrol düzlemi istemcisi</li>
+        <li><b>node</b> — yetenek sunucusu (kamera/ekran/canvas/system.run)</li>
+        <li>Scope kapalı kümesi: <code>operator.read / write / admin / approvals / pairing / talk.secrets</code></li>
+        <li>Hassas metotlar (<code>config.*</code>, <code>update.*</code>) her zaman <code>operator.admin</code></li>
+      </ul></div>
+  </div>
+  <h3>Dört tasarım ilkesi</h3>
+  <div class="grid g2">
+    <div class="card"><h4><span class="dot" style="background:var(--acc)"></span>Tipli baştan sona</h4><p>Tüm WS çerçeveleri TypeBox→JSON Schema ile doğrulanır. Bozuk veri el sıkışmada yakalanır.</p></div>
+    <div class="card"><h4><span class="dot" style="background:var(--acc2)"></span>Event-driven</h4><p>İstemciler "yeni var mı?" diye sormaz; <code>agent</code>/<code>presence</code>/<code>health</code>/<code>tick</code> olaylarına abone olur.</p></div>
+    <div class="card"><h4><span class="dot" style="background:var(--violet)"></span>Idempotency key</h4><p>Yan etkili işlemler (<code>send</code>, <code>agent</code>) key ister → retry güvenli, dublicate yok.</p></div>
+    <div class="card"><h4><span class="dot" style="background:var(--warn)"></span>Fail-closed</h4><p>Bilinmeyen olay aileleri varsayılan reddedilir. Tanımadığını geçirmez, durdurur.</p></div>
+  </div>
+  <h3>Kimlik doğrulama modları</h3>
+  <table>
+    <tr><th>Mode</th><th>Anlamı</th></tr>
+    <tr><td><code>none</code></td><td>Paylaşımlı sır kontrolü kapalı — yalnızca özel/güvenilir ingress'te</td></tr>
+    <tr><td><code>token</code> / <code>password</code></td><td>Paylaşımlı sır: <code>connect.params.auth.token/.password</code></td></tr>
+    <tr><td><code>trusted-proxy</code></td><td>Auth istek başlıklarından (Tailscale Serve, non-loopback proxy)</td></tr>
+  </table>
+</section>
+
+<!-- 3 -->
+<section id="runtime">
+  <div class="snum">03</div><h2>Agent Runtime — yürütme çekirdeği</h2>
+  <p class="lead">OpenClaw <b>kendi runtime'ının sahibidir</b>. Döngü oturum başına <b>seri (serialized)</b> çalışır — aynı oturumda iki tur paralel koşmaz.</p>
+  <div class="grid g2">
+    <div class="card"><h4>Agent döngüsü</h4>
+      <ul class="tight">
+        <li><code>agent</code> RPC doğrular, oturumu çözer, <b>anında</b> <code>{runId}</code> döner (bloke olmaz).</li>
+        <li>Model + thinking/verbose çözülür, skills anlık görüntüsü yüklenir.</li>
+        <li><code>runEmbeddedAgent</code> çalıştırmayı kuyruklarla serileştirir, akıtır, timeout uygular.</li>
+        <li>Runtime olayları köprülenir: araç→<code>tool</code>, metin→<code>assistant</code>, yaşam döngüsü→<code>lifecycle</code>.</li>
+      </ul></div>
+    <div class="card"><h4>Eşzamanlılık &amp; kilit</h4>
+      <p>Çalıştırmalar oturum-başına "lane" + isteğe bağlı global lane ile serileştirilir (araç/oturum yarışlarını önler). Transcript yazımı ayrıca <b>süreç-farkında dosya kilidiyle</b> korunur (varsayılan 60 sn bekleme).</p></div>
+  </div>
+  <h3>Hook sistemi — iki katman</h3>
+  <table>
+    <tr><th>Hook</th><th>Ne zaman</th></tr>
+    <tr><td><code>before_model_resolve</code></td><td>Provider/model'i deterministik override etmek için</td></tr>
+    <tr><td><code>before_prompt_build</code></td><td>Bağlam / sistem promptu enjeksiyonu</td></tr>
+    <tr><td><code>before_agent_reply</code></td><td>LLM'den önce; turu üstlenip sentetik yanıt dönebilir veya susturabilir</td></tr>
+    <tr><td><code>before_tool_call</code> / <code>after_tool_call</code></td><td>Araç parametre/sonuçlarını yakalar · <code>{block:true}</code> terminaldir</td></tr>
+    <tr><td><code>message_received / sending / sent</code></td><td>Mesaj hook'ları · <code>{cancel:true}</code> terminaldir</td></tr>
+  </table>
+  <p style="color:var(--dim);font-size:13px"><code>NO_REPLY</code> sessiz token'ı giden yükten filtrelenir; mesajlaşma aracı dublikeleri kaldırılır.</p>
+</section>
+
+<!-- 4 -->
+<section id="akis">
+  <div class="snum">04</div><h2>Uçtan Uca Mesaj Akışı</h2>
+  <p class="lead">Bir WhatsApp mesajının yolculuğu — tüm bileşenlerin birlikte nasıl çalıştığını gösteren altı faz.</p>
+  <div class="panel">
+    <div class="flow">
+      <div class="step"><b>Alım (Ingestion)</b> <span class="tag">src/whatsapp/ · Baileys</span><p>WhatsApp'tan WS olayı gelir; adaptör metin, medya ve gönderen meta verisini çıkarır.</p></div>
+      <div class="step"><b>Erişim kontrolü + yönlendirme</b> <span class="tag">access control</span><p>Allowlist &amp; DM pairing kontrolü. Geçemezse mesaj <b>burada durur</b>. Geçerse oturum çözülür: operatör→<code>agent:main</code>, DM→<code>…:dm:+…</code>, grup→<code>…:group:…@g.us</code>.</p></div>
+      <div class="step"><b>Bağlam kurulumu</b> <span class="tag">PiEmbeddedRunner</span><p>Oturum diskten yüklenir; <code>AGENTS/SOUL/TOOLS.md</code> okunur, ilgili skill'ler enjekte edilir, <code>memory_search</code> anlamsal benzer geçmişi çeker.</p></div>
+      <div class="step"><b>Model çağrısı</b> <span class="tag">provider stream</span><p>Derlenen bağlam yapılandırılmış sağlayıcıya (Anthropic/OpenAI/Gemini/yerel) token-by-token akıtılır.</p></div>
+      <div class="step"><b>Araç yürütme</b> <span class="tag">tool loop</span><p>Model tool-call isterse runtime araya girer; non-main oturumsa Docker sandbox; tarayıcı istenirse CDP ile Chromium. Sonuç akışa geri beslenir.</p></div>
+      <div class="step"><b>Yanıt teslimi</b> <span class="tag">persist → JSONL</span><p>Parçalar Gateway'den geçer; adaptör markdown'ı dönüştürüp boyut limitine böler, Baileys ile gönderir. Runtime tüm turu transcript'e kalıcılaştırır.</p></div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:14px"><b>Yaklaşık gecikme</b> (ikincil kaynak, ortam bağımlı): erişim &lt;10&nbsp;ms · oturum yükleme &lt;50&nbsp;ms · prompt kurulumu &lt;100&nbsp;ms · ilk token 200–500&nbsp;ms · bash &lt;100&nbsp;ms · tarayıcı 1–3&nbsp;s.</div>
+</section>
+
+<!-- 5 -->
+<section id="oturum">
+  <div class="snum">05</div><h2>Oturum Yönetimi</h2>
+  <p class="lead">Gelen her mesaj kaynağına göre bir oturuma yönlendirilir; tüm oturum durumu Gateway'e aittir.</p>
+  <div class="grid g2">
+    <div class="card"><h4>Yönlendirme</h4>
+      <table style="margin:0">
+        <tr><td>DM</td><td>Varsayılan tek paylaşımlı oturum</td></tr>
+        <tr><td>Grup</td><td>Grup başına izole</td></tr>
+        <tr><td>Oda/kanal</td><td>Oda başına izole</td></tr>
+        <tr><td>Cron</td><td>Her çalıştırmada taze oturum</td></tr>
+        <tr><td>Webhook</td><td>Hook başına izole</td></tr>
+      </table></div>
+    <div class="card"><h4>Yaşam döngüsü &amp; durum</h4>
+      <ul class="tight">
+        <li><b>Günlük reset:</b> yerel saat (varsayılan 04:00)</li>
+        <li><b>Idle reset:</b> hareketsizlik sonrası — heartbeat/cron/exec oturumu canlı <b>tutmaz</b></li>
+        <li><b>Manuel:</b> <code>/new</code>, <code>/reset</code></li>
+        <li>Store: <code>sessions.json</code> · Transcript: <code>&lt;sessionId&gt;.jsonl</code></li>
+      </ul></div>
+  </div>
+  <div class="note good" style="margin-top:14px"><b>Oturum = güvenlik sınırı.</b> Kimlik hem sahipliği hem güven düzeyini kodlar: <code>agent:&lt;id&gt;:main</code> tam yetkili; <code>…:dm:…</code> / <code>…:group:…</code> varsayılan sandbox'lı. Çok-kullanıcı için <code>session.dmScope</code>: <code>main / per-peer / per-channel-peer / per-account-channel-peer</code>.</div>
+</section>
+
+<!-- 6 -->
+<section id="multi">
+  <div class="snum">06</div><h2>Çok-Agent Yönlendirme</h2>
+  <p class="lead">Tek Gateway sürecinde birden çok <b>izole agent</b> koşar — her biri kendi workspace, state dizini ve oturum deposuyla. Gelen mesajlar <b>bindings</b> ile doğru agent'a gider.</p>
+  <div class="grid g3">
+    <div class="card"><h4>Agent</h4><p>Tam persona kapsamı: workspace dosyaları, auth profilleri, model kaydı, oturum deposu.</p></div>
+    <div class="card"><h4>Binding</h4><p>Bir kanal hesabını (Slack workspace, WhatsApp numarası) bir agent'a eşler.</p></div>
+    <div class="card"><h4>accountId</h4><p>Kanal hesabı örneği — ör. WhatsApp <code>personal</code> vs <code>biz</code>.</p></div>
+  </div>
+  <h3>Yönlendirme kuralı — "en spesifik kazanır"</h3>
+  <div class="panel" style="font-family:var(--mono);font-size:12.5px;color:var(--dim);text-align:center;line-height:2.2">
+    exact peer → parent peer → peer wildcard → guild+roles → guild → team → account → channel → <span style="color:var(--acc)">default agent</span>
+  </div>
+  <p style="color:var(--dim);font-size:13px">Aynı kademede çok eşleşme varsa config sırasında ilk gelen kazanır. Match alanları <code>AND</code> semantiğiyle çalışır.</p>
+  <div class="note danger" style="margin-top:8px"><b>İki kural:</b> <code>agentDir</code> agent'lar arasında <b>asla</b> paylaşılmaz (auth/oturum çakışması). Ajanlar-arası mesajlaşma <b>varsayılan kapalıdır</b> — açıkça etkinleştirilip allowlist'lenmeli.</div>
+</section>
+
+<!-- 7 · A2A -->
+<section id="a2a">
+  <div class="snum">07</div><h2>Ajanlar-Arası İletişim (Agent-to-Agent)</h2>
+  <p class="lead">Etkinleştirildiğinde bir agent, oturumlar arası koordinasyon için <b>session araçlarını</b> kullanır. Böylece karmaşık işler bölünür, bir agent diğerine iş devreder — sen kopyala-yapıştır yapmadan.</p>
+  <div class="grid g2">
+    <div class="card"><h4><code>sessions_list</code></h4><p>Aktif oturumları/subagent'ları keşfeder — hangi agent müsait?</p></div>
+    <div class="card"><h4><code>sessions_send</code></h4><p>Başka bir oturuma mesaj yollar. <code>ANNOUNCE_SKIP</code> ile kullanıcıyı rahatsız etmeden sessiz iş devri.</p></div>
+    <div class="card"><h4><code>sessions_history</code></h4><p>Başka bir oturumun transcript'ini çeker — bağlam paylaşımı, karar için geçmiş.</p></div>
+    <div class="card"><h4><code>sessions_spawn</code> / <code>sessions_yield</code></h4><p>Programatik yeni <b>izole</b> oturum/subagent yaratır; <code>yield</code> ile tamamlanmayı bekler.</p></div>
+  </div>
+
+  <h3>Örnek akış — orkestratör &amp; alt-agent</h3>
+  <div class="panel">
+    <div class="seq">
+      <div class="lane"><div class="who">Orkestratör</div><div class="msg">Karmaşık görevi parçalara böler → <code>sessions_spawn</code> ile araştırma alt-agent'ı yaratır (izole oturum, ayrı workspace/model olabilir).</div></div>
+      <div class="lane b"><div class="who">Alt-agent</div><div class="msg">Kendi bağlamında çalışır: araçları kullanır, web'i tarar, sonucu üretir. Orkestratörün transcript'ini görmez (izole).</div></div>
+      <div class="lane"><div class="who">Orkestratör</div><div class="msg"><code>sessions_yield</code> ile bekler; alt-agent bitince tamamlanma olayı gelir.</div></div>
+      <div class="lane b"><div class="who">Alt-agent</div><div class="msg"><code>sessions_send</code> (opsiyonel <code>ANNOUNCE_SKIP</code>) ile sonucu orkestratöre iletir — kullanıcıya çift bildirim gitmez.</div></div>
+      <div class="lane"><div class="who">Orkestratör</div><div class="msg">Sonuçları birleştirir, gerekirse <code>sessions_history</code> ile ek bağlam çeker, nihai yanıtı kullanıcıya döner.</div></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--acc2)"></span>Orkestratör (main / üst oturum)</span>
+    <span><span class="dot" style="background:var(--violet)"></span>Alt-agent (izole subagent)</span>
+  </div>
+  <div class="note" style="margin-top:14px"><b>Güvenlik altı çizili:</b> her subagent <b>izole</b> oturumdur (kendi güven sınırı). İletişim varsayılan kapalı; açıkken de yalnızca allowlist'lenmiş hedeflere. Bu, "bir agent ele geçirilse bile blast radius sınırlı" ilkesini korur.</div>
+</section>
+
+<!-- 8 -->
+<section id="baglam">
+  <div class="snum">08</div><h2>Bağlam Motoru &amp; Compaction</h2>
+  <p class="lead">Her model çağrısında "hangi mesajlar, nasıl özetlenir, subagent sınırları nasıl yönetilir" sorusunu yanıtlayan katman. Varsayılan <code>legacy</code>; plugin'lerle değiştirilebilir.</p>
+  <div class="panel" style="text-align:center;font-family:var(--mono);font-size:13px;color:var(--dim)">
+    <span style="color:var(--acc2)">Ingest</span> &nbsp;→&nbsp; <span style="color:var(--acc)">Assemble</span> &nbsp;→&nbsp; <span style="color:var(--warn)">Compact</span> &nbsp;→&nbsp; After&nbsp;turn
+    <div style="font-size:11.5px;color:var(--faint);margin-top:8px">mesaj eklenince · her çalıştırma öncesi (token bütçesi) · pencere dolunca · tur sonrası</div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h4>Compaction incelikleri</h4>
+      <ul class="tight">
+        <li>Eski turlar özetlenir (kalıcı), güncel mesajlar korunur.</li>
+        <li>Araç çağrıları eşleşen sonuçlarıyla <b>birlikte</b> tutulur; bölme araç bloğuna düşerse sınır kaydırılır.</li>
+        <li>Overflow hatası dönünce compact + retry (düzinelerce sağlayıcının hata dizesi tanınır).</li>
+        <li><b>Memory flush:</b> compaction öncesi önemli notları diske yazan sessiz tur.</li>
+      </ul></div>
+    <div class="card"><h4>Dayanıklılık &amp; ayrım</h4>
+      <ul class="tight">
+        <li>Plugin motoru çökerse OpenClaw onu <b>karantinaya alıp</b> <code>legacy</code>'ye düşer — agent susmaz.</li>
+        <li><b>Compaction ≠ Pruning:</b> compaction sohbeti kalıcı özetler; pruning yalnızca eski araç sonuçlarını istek-başına bellekte kırpar.</li>
+        <li><code>ownsCompaction:true</code> → motor kendi compaction'ını yönetir.</li>
+      </ul></div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section id="bellek">
+  <div class="snum">09</div><h2>Bellek</h2>
+  <p class="lead">OpenClaw hatırlamayı <b>düz Markdown dosyalarıyla</b> yapar — gizli/opak durum yok, her şey okunabilir ve düzenlenebilir.</p>
+  <div class="grid g3">
+    <div class="card"><h4><code>MEMORY.md</code></h4><p>Uzun vadeli küratörlü bellek. Oturum başında yüklenir — yalnızca özel/main oturumlarda, grup sohbetine sızmaz.</p></div>
+    <div class="card"><h4><code>memory/YYYY-MM-DD.md</code></h4><p>Günlük ham notlar. <code>memory_search</code> için indekslenir; her turda prompt'a enjekte edilmez.</p></div>
+    <div class="card"><h4><code>DREAMS.md</code></h4><p>Opsiyonel — arka plan konsolidasyonu / "dreaming" özeti.</p></div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h4>Araçlar</h4><p><code>memory_search</code> (hibrit: vektör benzerliği + BM25 anahtar kelime) · <code>memory_get</code> (belirli dosya/satır). Aktif bellek plugin'i sağlar (varsayılan <code>memory-core</code>).</p></div>
+    <div class="card"><h4>Backend &amp; embedding</h4><p>SQLite (varsayılan) · QMD · Honcho · LanceDB. Embedding varsayılanı OpenAI; Gemini/Voyage/Mistral/Ollama seçilebilir. <b>Dreaming:</b> sinyalleri puanlar, eşiği geçeni <code>MEMORY.md</code>'ye terfi ettirir.</p></div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section id="plugin">
+  <div class="snum">10</div><h2>Plugin / Capability Sistemi</h2>
+  <p class="lead">Genişletmenin kalbi <b>yetenek (capability) modelidir</b>. Kilit ayrım: plugin bir sahiplik sınırıdır, capability bir çekirdek sözleşmedir.</p>
+  <div class="grid g2">
+    <div class="card"><h4>plugin = sahiplik sınırı</h4><p>Bir vendor'ın/özelliğin tüm yüzeyi tek plugin'de toplanır.</p></div>
+    <div class="card"><h4>capability = çekirdek sözleşme</h4><p>Birden çok plugin uygular veya tüketir. Yeni alan eklerken soru "kim hardcode etsin?" değil, "<b>çekirdek yetenek sözleşmesi nedir?</b>"</p></div>
+  </div>
+  <h3>Yetenek türleri (seçme)</h3>
+  <div class="panel" style="display:flex;gap:8px;flex-wrap:wrap">
+    <span class="chip">text inference</span><span class="chip">embeddings</span><span class="chip">speech / realtime voice</span>
+    <span class="chip">transcription</span><span class="chip">media understanding</span><span class="chip">image / music / video gen</span>
+    <span class="chip">web fetch / search</span><span class="chip">channel</span><span class="chip">gateway discovery</span>
+  </div>
+  <div class="note danger" style="margin-top:14px"><b>⚠ En kritik güvenlik uyarısı:</b> Native plugin'ler Gateway ile <b>aynı süreçte, sandbox'sız</b> çalışır. Kötü niyetli bir native plugin = OpenClaw sürecinde keyfi kod. Bundle'lar (çoğunlukla skills) daha güvenlidir; non-bundle plugin'ler için allowlist + açık yükleme yolları kullan.</div>
+</section>
+
+<!-- 11 -->
+<section id="node">
+  <div class="snum">11</div><h2>Node'lar — cihaz yetenekleri</h2>
+  <p class="lead">Node'lar aynı WS sunucusuna <code>role: node</code> ile bağlanır ve yetenek <b>iddialarını</b> bildirir. Telefonun agent'ın araç kutusuna dönüşür.</p>
+  <div class="grid g3">
+    <div class="card"><h4>caps</h4><p>Yüksek seviye kategoriler: <code>camera</code>, <code>canvas</code>, <code>screen</code>, <code>location</code>, <code>voice</code>, <code>talk</code>.</p></div>
+    <div class="card"><h4>commands</h4><p>Invoke allowlist'i: <code>camera.snap</code>, <code>canvas.navigate</code>, <code>screen.record</code>, <code>location.get</code>.</p></div>
+    <div class="card"><h4>permissions</h4><p>Granüler anahtarlar: <code>camera.capture</code>, <code>screen.record</code>.</p></div>
+  </div>
+  <div class="note good" style="margin-top:14px">Gateway bunları <b>iddia</b> kabul eder ve sunucu tarafı allowlist'lerle zorlar — telefon "yapabilirim" der ama Gateway izin vermezse olmaz. Offline node'lar için dayanıklı iş kuyruğu: <code>node.pending.enqueue/drain</code>.</div>
+</section>
+
+<!-- 12 · Security -->
+<section id="guvenlik">
+  <div class="snum">12</div><h2>Güvenlik &amp; Sandbox — katmanlı savunma</h2>
+  <p class="lead">Güvenlik prompt guardrail'ine değil, üst üste binen <b>hard control</b>'lere dayanır. Sandbox varsayılan kapalı; Gateway süreci <b>her zaman</b> host'ta kalır, yalnızca araç yürütmesi izole edilir.</p>
+  <div class="layers">
+    <div class="layer"><span class="n">1</span><span class="lt">Kanal erişim kontrolü</span> <span class="ld">— allowlist + DM pairing; mesaj daha agent'a ulaşmadan durur</span></div>
+    <div class="layer"><span class="n">2</span><span class="lt">Tool policy (allow/deny)</span> <span class="ld">— sandbox kurallarından <b>önce</b> uygulanır</span></div>
+    <div class="layer"><span class="n">3</span><span class="lt">Oturum güven sınırı</span> <span class="ld">— main host'ta tam yetkili; dm/group varsayılan sandbox'lı</span></div>
+    <div class="layer"><span class="n">4</span><span class="lt">Sandbox (Docker)</span> <span class="ld">— <code>network:none</code>, <code>readOnlyRoot</code>, <code>capDrop:ALL</code>; tehlikeli bind mount'lar bloklu</span></div>
+    <div class="layer"><span class="n">5</span><span class="lt">Exec approvals</span> <span class="ld">— insan onayı; prepare↔approve arası komut/cwd değişirse reddedilir</span></div>
+    <div class="layer"><span class="n">6</span><span class="lt">Audit ledger</span> <span class="ld">— yalnızca metadata; prompt/mesaj/araç argümanı <b>saklanmaz</b> (30g, 100k kayıt)</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card"><h4>Sandbox üç ayarı</h4>
+      <table style="margin:0">
+        <tr><td>Mode</td><td><code>off</code> / <code>non-main</code> / <code>all</code></td></tr>
+        <tr><td>Scope</td><td><code>agent</code> / <code>session</code> / <code>shared</code></td></tr>
+        <tr><td>Backend</td><td><code>docker</code> / <code>ssh</code> / <code>openshell</code></td></tr>
+      </table></div>
+    <div class="card"><h4>Prompt injection savunması</h4>
+      <p>Kullanıcı mesajı, sistem talimatı ve araç sonucu yapısal olarak ayrı tutulur ki saldırgan "araç çıktısını sistem talimatı gibi" enjekte edemesin. Bunlar <b>soft</b> guardrail — asıl zorlama yukarıdaki 6 katmandan gelir. <code>tools.elevated</code> açık bir kaçıştır: iki kapı da (global + per-agent) izin vermeli.</p></div>
+  </div>
+</section>
+
+<!-- 13 · Deploy -->
+<section id="deploy">
+  <div class="snum">13</div><h2>Dağıtım Mimarileri</h2>
+  <p class="lead">Mimari her yerde aynı; değişen tek şey Gateway'in <b>nerede koştuğu</b>. Güvenli varsayılan: loopback + SSH/Tailscale.</p>
+  <table>
+    <tr><th>Desen</th><th>Kurulum</th><th>Erişim</th></tr>
+    <tr><td>Yerel (mac/Linux)</td><td><code>pnpm dev</code> / <code>openclaw gateway</code>, <code>127.0.0.1:18789</code></td><td>Sadece localhost, auth yok</td></tr>
+    <tr><td>Üretim macOS</td><td>LaunchAgent + menü çubuğu app; iMessage + Voice Wake burada</td><td>Loopback; uzak için SSH/Tailscale</td></tr>
+    <tr><td>Linux / VPS</td><td><code>systemd</code>, loopback</td><td>SSH tüneli <code>-L 18789:127.0.0.1:18789</code> · veya Tailscale Serve</td></tr>
+    <tr><td>Fly.io</td><td>Docker + kalıcı volume <code>OPENCLAW_STATE_DIR=/data</code>, <code>--bind lan --port 3000</code></td><td>Public HTTPS — <b>güçlü auth şart</b></td></tr>
+  </table>
+  <div class="note" style="margin-top:12px"><b>Tailscale modları</b> (<code>gateway.tailscale.mode</code>): <code>serve</code> (tailnet-only HTTPS, loopback korunur) · <code>funnel</code> (public, <b>parola şart</b>) · <code>off</code>. <code>lan</code>/<code>tailnet</code>'e bind edince Gateway paylaşımlı sır ister.</div>
+
+  <h3>State yerleşimi</h3>
+  <table>
+    <tr><th>Yol</th><th>İçerik</th></tr>
+    <tr><td><code>openclaw.json</code></td><td>Config (JSON5 — yorum + trailing comma)</td></tr>
+    <tr><td><code>state/openclaw.sqlite</code></td><td>Paylaşımlı runtime state</td></tr>
+    <tr><td><code>agents/&lt;id&gt;/agent/openclaw-agent.sqlite</code></td><td>Per-agent auth profilleri (API key + OAuth)</td></tr>
+    <tr><td><code>agents/&lt;id&gt;/sessions/</code></td><td>Transcript'ler + <code>sessions.json</code></td></tr>
+    <tr><td><code>credentials/</code></td><td>Kanal kimlik bilgileri (0600)</td></tr>
+    <tr><td><code>workspace/</code></td><td>Varsayılan agent workspace</td></tr>
+  </table>
+</section>
+
+<footer>
+  OpenClaw Mimari Artefaktı · birincil kaynak: paket + resmi doküman (<span class="mono">v2026.7.1-2</span>) ·
+  ikincil: Perazzo, "OpenClaw Architecture, Explained" (Şub 2026, çakışan noktalarda paket-temelli kaynak esas alındı) ·
+  hazırlanma 2026-08-14
+</footer>
+
+</div>
+</body>
+</html>
