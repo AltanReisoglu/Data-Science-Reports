@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>AutoGen: vc-agent'ta ne kullanıldı</title>
+<style>
+:root{
+  --ink:#16191c; --ink2:#4a5158; --ink3:#767d84; --rule:#d9dcd6; --rule2:#b6bab2;
+  --paper:#ffffff; --panel:#f5f6f2; --panel2:#eceee8;
+  --ochre:#8a5208; --ochre-bg:#f7efe0; --green:#14594a; --green-bg:#e4efea;
+  --blue:#2c4a6b; --blue-bg:#e3eaf2; --mute:#62675f;
+  --mono:"DejaVu Sans Mono","Liberation Mono",Menlo,Consolas,monospace;
+  --sans:"DejaVu Sans","Liberation Sans",Helvetica,Arial,sans-serif;
+  --serif:"DejaVu Serif","Liberation Serif",Georgia,serif;
+}
+@page{ size:A4; margin:18mm 16mm 20mm; }
+@page:first{ margin:0; }
+*{box-sizing:border-box}
+html{font-size:10.5pt}
+body{margin:0;font-family:var(--serif);color:var(--ink);line-height:1.5;background:var(--paper)}
+h1,h2,h3,h4{font-family:var(--mono);font-weight:700;letter-spacing:-.02em;text-wrap:balance}
+h2{font-size:16pt;margin:0 0 .2em;padding-top:.3em;border-top:2px solid var(--ink);break-after:avoid}
+h3{font-size:11.5pt;margin:1.5em 0 .35em;break-after:avoid}
+h4{font-size:10pt;margin:1.1em 0 .3em;color:var(--ochre);break-after:avoid}
+p{margin:0 0 .62em;orphans:2;widows:2}
+code{font-family:var(--mono);font-size:.87em;background:var(--panel2);padding:.06em .28em;border-radius:2px}
+pre{font-family:var(--mono);font-size:8.2pt;line-height:1.42;background:var(--panel);border:1px solid var(--rule);
+    border-left:2.5px solid var(--rule2);padding:.6em .75em;margin:.55em 0 .8em;overflow:hidden;
+    white-space:pre-wrap;word-break:break-word;break-inside:avoid;border-radius:0 3px 3px 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:8.6pt;margin:.5em 0 .9em;break-inside:avoid}
+th{text-align:left;font-size:7.4pt;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);
+   border-bottom:1px solid var(--rule2);padding:0 .55em .25em 0;vertical-align:bottom}
+td{border-bottom:1px solid var(--rule);padding:.3em .55em .3em 0;vertical-align:top;color:var(--ink2)}
+td:first-child{color:var(--ink)}
+td code,th code{font-size:.92em}
+ul{margin:.2em 0 .7em;padding-left:1.1em}
+li{margin-bottom:.24em}
+blockquote{margin:.6em 0 .8em;padding:.5em .8em;background:var(--ochre-bg);border-left:3px solid var(--ochre);
+           font-family:var(--sans);font-size:9.2pt;break-inside:avoid}
+blockquote p:last-child{margin:0}
+.tag{font-family:var(--sans);font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+     padding:.12em .4em;border-radius:2px;vertical-align:.12em;white-space:nowrap}
+.t-m{background:var(--green-bg);color:var(--green)}
+.t-k{background:var(--blue-bg);color:var(--blue)}
+.t-t{background:var(--panel2);color:var(--mute);border:1px dashed var(--rule2)}
+.lead{font-size:11pt;color:var(--ink2);line-height:1.45}
+.note{font-size:8.8pt;color:var(--ink3);font-family:var(--sans)}
+.brk{break-before:page}
+
+/* cover */
+.cover{height:297mm;padding:34mm 22mm 20mm;display:flex;flex-direction:column;background:var(--panel)}
+.cover h1{font-size:34pt;line-height:.98;margin:0 0 10mm;letter-spacing:-.045em}
+.cover .sub{font-size:13pt;color:var(--ink2);max-width:120mm;line-height:1.35;font-family:var(--serif)}
+.eyebrow{font-family:var(--mono);font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:8mm}
+.cover .grid{margin-top:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:5mm;border-top:2px solid var(--ink);padding-top:5mm}
+.cover .grid div b{display:block;font-family:var(--mono);font-size:19pt;letter-spacing:-.03em}
+.cover .grid div span{font-family:var(--sans);font-size:7.6pt;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+.cover .foot{margin-top:6mm;font-family:var(--sans);font-size:8pt;color:var(--ink3)}
+
+/* module cards */
+.mod{break-inside:avoid;margin:0 0 1.1em;border:1px solid var(--rule);border-left:3px solid var(--ochre);
+     padding:.65em .85em;background:var(--panel)}
+.mod h4{margin:0 0 .25em;color:var(--ink);font-size:10.5pt}
+.mod .syms{font-family:var(--mono);font-size:8pt;color:var(--ochre);margin-bottom:.4em;line-height:1.5}
+.mod p{font-size:9.3pt;margin-bottom:.4em}
+.mod p:last-child{margin-bottom:0}
+
+svg{display:block;margin:.6em auto 1em;max-width:100%}
+.cap{font-family:var(--sans);font-size:7.8pt;color:var(--ink3);text-align:center;margin:-.5em 0 1.1em}
+</style></head><body>
+
+<section class="cover">
+  <div class="eyebrow">vc-agent · staj çalışması · 15 Ağustos 2026</div>
+  <h1>AutoGen:<br>ne kullanıldı,<br>nerede, neden</h1>
+  <p class="sub">Bir VC deal-flow sisteminin AutoGen üstünde kurulmuş hâli — kullanılan
+  her sembol, her modül, ve her tercihin ölçülmüş gerekçesi.</p>
+  <div class="grid">
+    <div><b>55</b><span>AutoGen sembolü</span></div>
+    <div><b>29</b><span>kullanan dosya</span></div>
+    <div><b>302</b><span>geçen test</span></div>
+    <div><b>16.650</b><span>satır kod</span></div>
+  </div>
+  <div class="foot">autogen-core / agentchat / ext 0.7.5 · mcp 1.29.0 · Python 3.12</div>
+</section>
+
+<h2>1 · Bu belge ne</h2>
+
+<p class="lead">Kod tabanı tarandı ve AutoGen'e dokunan her yer çıkarıldı: 29 dosya,
+55 farklı sembol. Aşağıda hepsi tek tek, hangi modülde ve <em>ne için</em>.</p>
+
+<p>İki şeyi ayrı tutuyorum. <strong>Ne yaptığı</strong> resmî kılavuzda yazıyor ve
+buraya kopyalanmasının değeri yok. <strong>Neden orada olduğu</strong> ve
+<strong>çalışırken ne yaptığı</strong> yazmıyor — bu belge onun için.</p>
+
+<p>Her ölçüm etiketli: <span class="tag t-m">ölçüldü</span> bu makinede koşturuldu,
+<span class="tag t-k">kaynak</span> birincil kaynakta yazıyor,
+<span class="tag t-t">teyitsiz</span> okundu ama doğrulanmadı.</p>
+
+<h3>Sistem bir cümlede</h3>
+
+<p>Halka açık kaynakları (Hacker News, SEC Form D, GitHub) tarayıp girişim keşfeden,
+maliyet gradyanlı bir huniden geçirip skorlayan, ve sonucu bir sohbet arayüzünden
+sorgulanabilir kılan çok-ajanlı bir sistem. Üstünde OpenClaw mimarisinde bir
+gateway: oturumlar, hook'lar, onay kapısı, bellek, cron.</p>
+
+<h2 class="brk">2 · Üç katman, ve hangisi nerede</h2>
+
+<svg viewBox="0 0 620 250" width="620" height="250" font-family="monospace">
+  <rect x="20" y="14" width="420" height="52" fill="#f5f6f2" stroke="#16191c" stroke-width="1"/>
+  <text x="34" y="38" font-size="14" font-weight="700">autogen-ext</text>
+  <text x="34" y="55" font-size="9.5" fill="#4a5158">OpenAIChatCompletionClient · ReplayChatCompletionClient · McpWorkbench</text>
+  <text x="452" y="45" font-size="9.5" fill="#767d84">engine.py · conversation.py</text>
+
+  <rect x="20" y="82" width="420" height="52" fill="#f5f6f2" stroke="#16191c" stroke-width="1"/>
+  <text x="34" y="106" font-size="14" font-weight="700">autogen-agentchat</text>
+  <text x="34" y="123" font-size="9.5" fill="#4a5158">AssistantAgent · GraphFlow · terminations · StructuredMessage</text>
+  <text x="452" y="113" font-size="9.5" fill="#767d84">agents/ · graph.py</text>
+
+  <rect x="20" y="150" width="420" height="62" fill="#f7efe0" stroke="#8a5208" stroke-width="2"/>
+  <text x="34" y="174" font-size="14" font-weight="700" fill="#8a5208">autogen-core</text>
+  <text x="34" y="191" font-size="9.5" fill="#4a5158">RoutedAgent · SingleThreadedAgentRuntime · TopicId · ClosureAgent</text>
+  <text x="34" y="205" font-size="9.5" fill="#4a5158">InterventionHandler · Workbench · ChatCompletionContext</text>
+  <text x="452" y="175" font-size="9.5" fill="#767d84">gateway/ · fanin.py</text>
+  <text x="452" y="189" font-size="9.5" fill="#767d84">observability.py</text>
+  <text x="452" y="203" font-size="9.5" fill="#767d84">context_engine.py</text>
+
+  <path d="M230 82 L230 66" stroke="#767d84" stroke-width="1" marker-end="url(#a)"/>
+  <path d="M230 150 L230 134" stroke="#767d84" stroke-width="1" marker-end="url(#a)"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6" fill="none" stroke="#767d84"/></marker></defs>
+
+  <text x="20" y="238" font-size="9.5" fill="#8a5208">Ağırlık zamanla aşağı kaydı: başta agentchat, sonunda core.</text>
+</svg>
+<div class="cap">Üç paket ve bu projede hangi dosyaların hangi katmana dayandığı</div>
+
+<p>Proje AgentChat'le başladı — <code>AssistantAgent</code>, <code>GraphFlow</code>,
+sonlandırma koşulları. Ölçüm yapıldıkça ağırlık <strong>core</strong>'a kaydı, çünkü
+ihtiyaç duyulan üç şey yalnız orada vardı:</p>
+
+<table>
+<thead><tr><th>ihtiyaç</th><th>core'daki karşılığı</th><th>nerede</th></tr></thead>
+<tbody>
+<tr><td>Dal kaybetmeden paralel toplama</td><td><code>ClosureAgent</code> + kuyruk</td><td><code>fanin.py</code></td></tr>
+<tr><td>Maliyet ve tool çağrısı ölçümü</td><td><code>EVENT_LOGGER_NAME</code> olay akışı</td><td><code>observability.py</code></td></tr>
+<tr><td>Teslimden önce durdurabilen kapı</td><td><code>InterventionHandler</code> + <code>DropMessage</code></td><td><code>observability.py</code></td></tr>
+<tr><td>Oturum başına izole ajan</td><td><code>TopicId</code> kaynağı → ajan anahtarı</td><td><code>gateway/sessions.py</code></td></tr>
+<tr><td>Token sayan bağlam + compaction</td><td><code>ChatCompletionContext</code> alt sınıfı</td><td><code>context_engine.py</code></td></tr>
+</tbody></table>
+
+<h2 class="brk">3 · Modül modül</h2>
+
+<p class="lead">29 dosyanın her biri, kullandığı sembollerle. Sıra: önce motor, sonra
+ajanlar, sonra gateway, sonra ölçüm POC'leri.</p>
+
+<h3>3.1 Motor ve ölçüm</h3>
+
+<div class="mod">
+  <h4>pipeline/engine.py</h4>
+  <div class="syms">ChatCompletionClient · CreateResult · ModelInfo · RequestUsage · OpenAIChatCompletionClient · ReplayChatCompletionClient</div>
+  <p>Model fabrikası ve maliyet defteri. Üç kademe (<code>cheap</code>/<code>mid</code>/<code>strong</code>)
+  huninin ekonomisini kodda temsil ediyor: hacim yukarıda ucuz modelde, kalite aşağıda pahalıda.</p>
+  <p><strong>İki istemci, iki dünya.</strong> <code>OpenAIChatCompletionClient</code>
+  canlı; <code>ReplayChatCompletionClient</code> kuru mod — yanıtlar önceden yazılı,
+  ağ yok, deterministik. Bütün test paketi kuru modda koşuyor.</p>
+  <p><code>ResilientClient</code> sarmalayıcısı model hatasını <em>exception değil metin</em>
+  yapıyor; <code>raw_client</code> ise sarmalamıyor, çünkü sohbette bir hata cevap gibi
+  görünmemeli.</p>
+</div>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <code>model_info</code> OpenAI-uyumlu
+her endpoint'te <strong>zorunlu</strong>. İlk canlı istekte patladı:
+<code>ValueError: model_info is required when model name is not a valid OpenAI model</code>.
+Ve bu bir <em>beyandır</em>, ölçüm değil — desteklenmeyen bir yeteneği iddia edersen
+hata huninin en sonunda, yapısal çıktı üreten skorlayıcıda çıkıyor.</p></blockquote>
+
+<div class="mod">
+  <h4>pipeline/observability.py</h4>
+  <div class="syms">EVENT_LOGGER_NAME · LLMCallEvent · LLMStreamEndEvent · ToolCallEvent · DefaultInterventionHandler · DropMessage</div>
+  <p>Maliyet ölçümünün tamamı burada — modele değil, <strong>olay akışına</strong> bakıyor.
+  <code>autogen_core</code> yapılandırılmış olayları ayrı bir logger'a yayıyor;
+  <code>EventCapture</code> bir <code>logging.Handler</code> olarak takılıp sayıyor.</p>
+  <p><code>AuditingInterventionHandler</code> ise mesaj yolunda <em>teslimden önce</em>
+  oturuyor. <code>DropMessage</code> döndürünce mesaj hiç gitmiyor.</p>
+</div>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <strong>İki olay, bir anlam.</strong>
+<code>create()</code> → <code>LLMCallEvent</code>; <code>create_stream()</code> →
+<code>LLMStreamEndEvent</code> ve <em>asla</em> ilki. Sohbete
+<code>model_client_stream=True</code> koyunca maliyet <strong>0</strong> raporlamaya
+başladı. Kod doğruydu; yanlış olayı dinliyordu.</p></blockquote>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <code>LLMCallEvent</code> alanlarını
+öznitelik yapıyor, <code>ToolCallEvent</code> ise hepsini <code>.kwargs</code> sözlüğünde
+tutuyor. <code>event.tool_name</code> yazınca <code>AttributeError</code> — ve o hata bir
+<code>logging.Handler</code> içinde oluştuğu için <code>handleError</code> tarafından
+<strong>yutuluyor</strong>. Olay hiç kaydedilmiyor, hata da görünmüyor.</p></blockquote>
+
+<p>Kapının asıl değeri şu cümlede: <strong>onay, ajanın uyum göstermeyi seçmesine değil,
+runtime'a dayanıyor.</strong> Model ne kadar ikna edilirse edilsin mesaj hattı onun altında.</p>
+<h3>3.2 Ajanlar — AgentChat katmanı</h3>
+
+<div class="mod">
+  <h4>pipeline/agents/triage.py · analysts.py · memo.py</h4>
+  <div class="syms">AssistantAgent · StructuredMessage</div>
+  <p>Huninin üç kademesi, üç farklı model kademesinde. <strong>Triyaj</strong> en ucuz
+  modelde ve en çok koşan yer; <strong>analistler</strong> (technical / market / team)
+  orta kademede paralel; <strong>not yazarı</strong> en pahalıda ve günde birkaç kez.</p>
+  <p><code>output_content_type</code> ile Pydantic şeması dayatılıyor — skorun
+  <code>missing_data</code> alanı <strong>zorunlu</strong>, yani "bakamadım" bilgisi
+  şemadan kaçamıyor.</p>
+</div>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <code>output_content_type</code>
+kullanan bir ajan takımın içindeyse tipi beyan etmen gerekiyor:
+<code>GraphFlow(..., custom_message_types=[StructuredMessage[Score]])</code>. Tek başına
+<code>agent.run()</code>'da gerekmiyor — sorun yalnız <em>yönlendirmede</em> çıkıyor:
+<code>ValueError: Message type StructuredMessage[Score] is not registered</code>.</p></blockquote>
+
+<div class="mod">
+  <h4>pipeline/graph.py</h4>
+  <div class="syms">GraphFlow · DiGraphBuilder · MaxMessageTermination · TaskResult · StructuredMessage · SingleThreadedAgentRuntime</div>
+  <p>Paralel zenginleştirme: üç analist dalı fan-out, sonra join. Graf
+  <code>DiGraphBuilder</code> ile çiziliyor, birleşme <code>activation_condition="all"</code>.</p>
+  <p>Runtime <strong>dışarıdan</strong> veriliyor — çünkü <code>InterventionHandler</code>
+  takmanın tek yolu bu. Ve o karar bir yan etki getiriyor:</p>
+</div>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <strong>Dış runtime verirsen çöken ajan
+fırlatmıyor, asıyor.</strong> Gömülü runtime'da <code>run_stream</code> exception
+fırlatıyor; dıştan verilende <em>hiç dönmüyor</em>. Gelmeyecek bir sonlanma mesajı
+bekleniyor ve <code>MaxMessageTermination</code> kurtaramıyor, çünkü yeni mesaj da gelmiyor.
+Duvar saati sınırı burada tedbir değil, <strong>doğruluk şartı</strong>.</p></blockquote>
+
+<div class="mod">
+  <h4>pipeline/fanin.py</h4>
+  <div class="syms">RoutedAgent · ClosureAgent · ClosureContext · SingleThreadedAgentRuntime · TopicId · TypeSubscription · MessageContext · message_handler</div>
+  <p><code>graph.py</code>'nin core seviyesindeki alternatifi, kılavuzun
+  <em>Concurrent Agents</em> deseninden birebir: işçiler sonucu bir topic'e
+  <strong>yayınlıyor</strong>, <code>ClosureAgent</code> bir <code>asyncio.Queue</code>'ya
+  boşaltıyor.</p>
+  <p>Fark tek cümlede: <strong>güvenilmeyecek bariyer yok, çünkü bariyer yok.</strong>
+  Dal sonucu ürettiği anda yayınlıyor ve kuyruk onu çoktan tutuyor.</p>
+  <p><code>BranchWorker</code>'ın disiplini bütün projeye yayıldı:
+  <em>"a failure is published, not raised."</em></p>
+</div>
+
+<table>
+<thead><tr><th>motor</th><th>temiz</th><th>sarmalayıcı arkasında</th><th>ham hata</th></tr></thead>
+<tbody>
+<tr><td><code>GraphFlow</code> (AgentChat)</td><td>3 dal</td><td>2 dal</td><td><strong>0–1 dal, süre sınırı dolar</strong></td></tr>
+<tr><td>pub/sub + <code>ClosureAgent</code> (core)</td><td>3 dal</td><td>2 dal</td><td><strong>2 dal, ~3 ms</strong></td></tr>
+</tbody></table>
+<div class="cap"><span class="tag t-m">ölçüldü</span> · aynı arıza enjeksiyonu · <code>pipeline/compare_fanin.py</code></div>
+
+<blockquote><p>Kaç dalın kaybolduğu <strong>deterministik değil</strong> — tekrarlı
+koşularda 0 ve 1. Ve bundan güçlü bir bulgu: <strong>resmî desenler bu konuda
+birbiriyle çelişiyor.</strong> <em>Concurrent Agents</em> kuyrukla topluyor,
+<em>Mixture of Agents</em> <code>asyncio.gather</code> ile — yani kaybın kaynağı olan yapıyla.</p></blockquote>
+
+<h3 class="brk">3.3 Sohbet ve bağlam</h3>
+
+<div class="mod">
+  <h4>pipeline/conversation.py</h4>
+  <div class="syms">AssistantAgent · FunctionTool · StaticWorkbench · McpWorkbench · StreamableHttpServerParams · CancellationToken</div>
+  <p>Oturum başına canlı ajan. On dört yerel tool, artı iki uzak MCP kaynağı
+  (DeepWiki, OpenClaw).</p>
+  <p><code>model_client_stream=True</code> ile token token akıyor;
+  <code>CancellationToken</code> durdurma düğmesi; <code>save_state</code>/<code>load_state</code>
+  sunucu yeniden başlayınca konuşmayı koruyor.</p>
+  <p><code>max_tool_iterations=6</code> — varsayılan <strong>1</strong>, yani zincirleme
+  tool çağrısı yok ve hata da vermiyor, ajan sadece erken susuyor.</p>
+</div>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <code>tools=</code> ile
+<code>workbench=</code> <strong>aynı ajana verilemiyor</strong>:
+<em>"Tools cannot be used with a workbench."</em> Yerel fonksiyonları
+<code>StaticWorkbench</code>'e sarıp <code>workbench</code>'e <strong>liste</strong> vermek
+gerekiyor. Workbench bir tool <em>kaynağı</em> — ajan yazılırken var olmayan tool'ları
+listeleyebiliyor, ki uzak sunucunun yaptığı tam olarak bu.</p></blockquote>
+
+<div class="mod">
+  <h4>pipeline/context_engine.py</h4>
+  <div class="syms">ChatCompletionContext · BufferedChatCompletionContext · LLMMessage · SystemMessage · UserMessage · AssistantMessage · FunctionExecutionResultMessage</div>
+  <p><code>ChatCompletionContext</code> alt sınıfı. Dört yaşam döngüsü noktası:
+  <strong>Ingest</strong> (<code>add_message</code>) → <strong>Assemble</strong>
+  (<code>get_messages</code>, token bütçesine göre) → <strong>Compact</strong> →
+  <strong>After turn</strong>.</p>
+  <p>Yazılma sebebi ölçülmüş bir kusur: <code>BufferedChatCompletionContext(24)</code>
+  <strong>mesaj sayıyor, token değil</strong>. Yirmi dört kısa soru ile yirmi dört tarama
+  sonucu ona aynı büyüklükte görünüyor.</p>
+  <p><strong>Compaction'ı doğru yapan kural:</strong> araç çağrısı ile sonucu bir bütün.
+  Bölme noktası bir araç bloğuna düşerse sınır kaydırılıyor — çağrısı özetlenip gitmiş bir
+  <code>FunctionExecutionResultMessage</code>, modelin göremediği bir sorunun cevabı ve
+  sağlayıcılar diziyi reddediyor.</p>
+</div>
+
+<pre>def _safe_boundary(messages, index):
+    """Kesme noktasını, araç çağrısını sonucundan ayırmayacak yere kaydır."""
+    cut = max(0, min(index, len(messages)))
+    while cut &lt; len(messages):
+        if _is_tool_result(messages[cut]):        cut += 1; continue
+        if cut &gt; 0 and _is_tool_call(messages[cut-1]): cut += 1; continue
+        break
+    return cut</pre>
+
+<p>Özetleyici çalışmazsa <strong>kırpıyor ve kırptığını söylüyor</strong>:
+<em>"…were dropped… They were not summarised, so anything only stated there is no longer
+available — ask again rather than assuming."</em></p>
+
+<h3>3.4 Gateway — OpenClaw mimarisi, core motoru</h3>
+
+<div class="mod">
+  <h4>pipeline/gateway/sessions.py</h4>
+  <div class="syms">RoutedAgent · TopicId · TypeSubscription · MessageContext · message_handler</div>
+  <p>Bu projedeki en değerli AutoGen eşlemesi. OpenClaw'ın "oturum anahtarı → izole ajan"
+  modeli, core'un <strong>topic kaynağı → ajan anahtarı</strong> mekanizmasının aynısı.</p>
+</div>
+
+<svg viewBox="0 0 560 150" width="560" height="150" font-family="monospace">
+  <rect x="24" y="16" width="330" height="42" fill="#ffffff" stroke="#16191c"/>
+  <text x="38" y="42" font-size="10.5">TopicId("turn", "agent:main:web:dm:alice")</text>
+  <path d="M189 58 L189 88" stroke="#8a5208" stroke-width="2" marker-end="url(#b)"/>
+  <text x="199" y="78" font-size="9" fill="#767d84">runtime · lazy</text>
+  <rect x="24" y="88" width="330" height="42" fill="#f7efe0" stroke="#8a5208" stroke-width="2"/>
+  <text x="38" y="114" font-size="10.5">AgentId("session", "agent:main:web:dm:alice")</text>
+  <text x="368" y="42" font-size="9.5" fill="#4a5158">TypeSubscription(</text>
+  <text x="376" y="56" font-size="9.5" fill="#4a5158">topic_type="turn",</text>
+  <text x="376" y="70" font-size="9.5" fill="#4a5158">agent_type="session")</text>
+  <text x="368" y="105" font-size="9.5" fill="#8a5208">oturum başına izole</text>
+  <text x="368" y="119" font-size="9.5" fill="#8a5208">örnek — bedava</text>
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6" fill="none" stroke="#8a5208"/></marker></defs>
+</svg>
+<div class="cap">Oturum kimliği elle tutulan bir sözlük anahtarı değil, runtime'ın kendi adresi</div>
+
+<p>Oturum kimlikleri zaten CloudEvents desenine (<code>^[\w\-\.\:\=]+\Z</code>) uyduğu
+için ara katman gerekmedi. <span class="tag t-m">ölçüldü</span>
+<code>test_session_agent.py</code> bunu iddia değil test olarak tutuyor: iki oturum → iki
+ajan örneği.</p>
+
+<div class="mod">
+  <h4>pipeline/gateway/runtime.py</h4>
+  <div class="syms">SingleThreadedAgentRuntime</div>
+  <p>Süreçteki <strong>tek</strong> runtime, uzun ömürlü. Üç kural, üçü de ölçülmüş bir
+  riske karşı:</p>
+  <p><strong>1.</strong> <code>stop_when_idle()</code> <em>hiç çağrılmıyor</em> — kaybın
+  kaynağı o bariyer. <strong>2.</strong> <code>SessionAgent</code> fırlatmıyor, yayınlıyor.
+  <strong>3.</strong> Transcript modelden önce yazılıyor, yani çöküş cevabı kaybettiriyor,
+  sorunun kaydını değil.</p>
+</div>
+
+<div class="mod">
+  <h4>pipeline/gateway/workbench.py</h4>
+  <div class="syms">Workbench · ToolResult · TextResultContent</div>
+  <p>Onay kapısının durduğu yer. <code>InterventionHandler</code> runtime'ın mesaj
+  yolunda oturuyor; çıplak bir <code>AssistantAgent</code>'ta öyle bir yol yok.
+  <code>Workbench</code> ise <strong>her</strong> tool çağrısının geçtiği nokta.</p>
+  <p>Sarmalayınca kural <strong>ajan yazılırken var olmayan</strong> tool'lar için de
+  geçerli oluyor — bir workbench'in tool <em>kaynağı</em> olmasının tüm sebebi bu.</p>
+  <p><strong>Bloklanan çağrı exception değil hata sonucu döndürüyor</strong>, çünkü ajanın
+  reddedildiğini söyleyebilmesi gerekiyor.</p>
+</div>
+
+<div class="mod">
+  <h4>pipeline/channels.py</h4>
+  <div class="syms">RoutedAgent · TypeSubscription · MessageContext · message_handler</div>
+  <p>Her kanal (<code>web</code>, <code>cli</code>, <code>openclaw</code>) bir
+  <code>ChannelAgent</code>, <code>reply.&lt;ad&gt;</code> topic'ine abone. Bir yüzey
+  eklemek "gönderenin bakacağı sözlüğe kaydet" değil, "topic'e abone et".</p>
+</div>
+<h3 class="brk">3.5 Ölçüm POC'leri</h3>
+
+<p>Beş orkestrasyon deseni, <strong>aynı görev, aynı ajanlar</strong> — değişen tek şey
+kimin konuşacağına nasıl karar verildiği.</p>
+
+<div class="mod">
+  <h4>poc/desen_1..5 · poc/kiyas.py · poc/motor.py · poc/araclar.py</h4>
+  <div class="syms">RoundRobinGroupChat · SelectorGroupChat · Swarm · GraphFlow · DiGraphBuilder · Handoff · RoutedAgent · AgentId · type_subscription · TextMentionTermination · MaxMessageTermination · BaseChatMessage · BaseAgentEvent · ToolCallRequestEvent · ToolCallExecutionEvent · FunctionTool</div>
+  <p>Bu sekiz dosya projenin <em>ölçüm zemini</em>. Desenler kıyaslanabilir olsun diye
+  motor (<code>motor.py</code>) ve tool'lar (<code>araclar.py</code>) ortak.</p>
+</div>
+
+<table>
+<thead><tr><th>desen</th><th>mesaj</th><th>LLM</th><th>tool</th><th>token</th><th>kimin kararı</th></tr></thead>
+<tbody>
+<tr><td><code>SelectorGroupChat</code></td><td>8</td><td>5</td><td>2</td><td><strong>204</strong></td><td>model — ya da <code>selector_func</code> ile Python</td></tr>
+<tr><td><code>GraphFlow</code></td><td>11</td><td>7</td><td>3</td><td>270</td><td>önceden çizilmiş graf</td></tr>
+<tr><td><code>RoundRobinGroupChat</code></td><td>9</td><td>6</td><td>2</td><td>274</td><td>sıra — kimseyi atlayamıyor</td></tr>
+<tr><td><code>Swarm</code></td><td>14</td><td>7</td><td>4</td><td><strong>334</strong></td><td>ajanın kendisi, devir tool'uyla</td></tr>
+<tr><td><code>autogen_core</code> aktör</td><td>9</td><td>0</td><td>0</td><td>0</td><td>abonelik</td></tr>
+</tbody></table>
+<div class="cap"><span class="tag t-m">ölçüldü</span> · <code>poc/kiyas.py</code> · en ucuzla en pahalı arasında <strong>%63,7</strong></div>
+
+<p>Ödenen şey zekâ değil, <strong>yönlendirme özerkliği</strong>. Selector yönlendirmeyi bir
+Python fonksiyonuyla yapıp gereksiz ajanı atlıyor; Swarm'da kararı ajan veriyor ve her
+devir bir tool çağrısı artı hiç iş üretmeyen bir LLM turu harcıyor.</p>
+
+<blockquote><p>Bunun framework karşılaştırmasına çevirisi şu: <strong>OpenAI Agents SDK'nın
+<em>tek</em> modeli olan handoff, AutoGen'in ölçülmüş en pahalı desenidir.</strong>
+"Hangi framework daha iyi" sorusu aslında "hangi yönlendirme maliyetini ödemeye razısın"
+sorusu.</p></blockquote>
+
+<div class="mod">
+  <h4>poc/desen_5_core_aktor.py — projenin en önemli bulgusu</h4>
+  <p>"Aktör modeli hata izolasyonu verir" iddiasını üç deneyle test ediyor. Çöken bir
+  handler <code>_process_publish</code> içindeki <code>asyncio.gather</code>'ı erken
+  döndürüyor, hemen ardından <code>task_done()</code> çağrılıyor, kuyruk kardeşler hâlâ
+  çalışırken "boşaldı" sayılıyor.</p>
+  <p><strong>Tamamlanmış kardeş sonuçlar sessizce kayboluyor</strong> — ne exception, ne
+  uyarı. Üç koşuda birebir tekrarlandı.</p>
+</div>
+
+<blockquote><p><strong>Aktör modeli runtime'ı koruyor, veriyi korumuyor.</strong>
+Bu cümle projenin bütün mimari kararlarının arkasında duruyor: bariyere güvenme,
+<em>beklenen sonuç sayısını say</em>.</p></blockquote>
+
+<h2 class="brk">4 · Sembol sözlüğü</h2>
+
+<p class="lead">55 sembolün tamamı, katmanına göre. Sağ sütun: bu projede ne işe yaradığı.</p>
+
+<h4>autogen_core — çekirdek</h4>
+<table>
+<thead><tr><th>sembol</th><th>bu projede</th></tr></thead>
+<tbody>
+<tr><td><code>RoutedAgent</code></td><td>Tipe göre yönlendiren ajan. Oturum, kanal ve fan-out işçisi.</td></tr>
+<tr><td><code>message_handler</code></td><td>Tip anotasyonundan yönlendirme. <em>Modül düzeyinde import şart.</em></td></tr>
+<tr><td><code>SingleThreadedAgentRuntime</code></td><td>Gateway'in tek runtime'ı; fan-in ve graf için ayrı örnekler.</td></tr>
+<tr><td><code>TopicId</code></td><td>Yayın adresi. <strong>Kaynağı ajan anahtarına dönüşüyor.</strong></td></tr>
+<tr><td><code>TypeSubscription</code></td><td>Topic tipi → ajan tipi. Oturum ve kanal yönlendirmesi.</td></tr>
+<tr><td><code>type_subscription</code></td><td>Dekoratör hâli; POC'ta sıralı iş akışında.</td></tr>
+<tr><td><code>AgentId</code></td><td><code>(tip, anahtar)</code> adresi. POC'ta doğrudan mesajlaşma.</td></tr>
+<tr><td><code>MessageContext</code></td><td>Handler'ın ikinci parametresi. <em>Adı zorunlu: <code>ctx</code>.</em></td></tr>
+<tr><td><code>ClosureAgent</code> · <code>ClosureContext</code></td><td>Sonuçları kuyruğa boşaltan toplayıcı — fan-in'in kalbi.</td></tr>
+<tr><td><code>DefaultInterventionHandler</code></td><td>Mesaj yolundaki kapı; denetim ve onay.</td></tr>
+<tr><td><code>DropMessage</code></td><td>Teslimi iptal eden dönüş değeri.</td></tr>
+<tr><td><code>EVENT_LOGGER_NAME</code></td><td>Yapılandırılmış olay akışı — maliyet ölçümünün kaynağı.</td></tr>
+<tr><td><code>CancellationToken</code></td><td>Akan bir turu durdurma; <code>/api/chat/stop</code>.</td></tr>
+<tr><td><code>FunctionCall</code></td><td>Tool çağrısı nesnesi; testlerde senaryo kurmak için.</td></tr>
+</tbody></table>
+
+<h4>autogen_core.logging · models · tools · model_context</h4>
+<table>
+<tbody>
+<tr><td><code>LLMCallEvent</code></td><td><code>create()</code>'in yaydığı kullanım olayı.</td></tr>
+<tr><td><code>LLMStreamEndEvent</code></td><td><code>create_stream()</code>'in yaydığı — <strong>ilkini asla yaymıyor</strong>.</td></tr>
+<tr><td><code>ToolCallEvent</code></td><td>Tool çağrısı denetimi. Alanları <code>.kwargs</code>'ta.</td></tr>
+<tr><td><code>ChatCompletionClient</code></td><td>Model arayüzü; <code>engine.py</code> bunu sarıyor.</td></tr>
+<tr><td><code>CreateResult</code> · <code>RequestUsage</code></td><td>Yanıt ve token sayacı.</td></tr>
+<tr><td><code>ModelInfo</code></td><td>Yetenek beyanı — OpenAI-uyumlu endpoint'te zorunlu.</td></tr>
+<tr><td><code>LLMMessage</code> · <code>SystemMessage</code> · <code>UserMessage</code> · <code>AssistantMessage</code></td><td>Bağlam motorunun taşıdığı mesaj tipleri.</td></tr>
+<tr><td><code>FunctionExecutionResultMessage</code> · <code>FunctionExecutionResult</code></td><td>Tool sonucu — compaction'da çağrısından ayrılmaması gereken yarı.</td></tr>
+<tr><td><code>ChatCompletionContext</code></td><td>Bağlam motorunun taban sınıfı.</td></tr>
+<tr><td><code>BufferedChatCompletionContext</code></td><td>Eski bağlam; artık yalnız fallback.</td></tr>
+<tr><td><code>FunctionTool</code></td><td>Python fonksiyonu → tool. Şema imzadan ve docstring'den.</td></tr>
+<tr><td><code>StaticWorkbench</code></td><td>Yerel fonksiyonları workbench'e sarma — <code>tools=</code> çatışmasının çözümü.</td></tr>
+<tr><td><code>Workbench</code></td><td>Onay kapısının sarmaladığı taban sınıf.</td></tr>
+<tr><td><code>ToolResult</code> · <code>TextResultContent</code></td><td>Reddi <em>sonuç</em> olarak döndürmek için.</td></tr>
+</tbody></table>
+
+<h4>autogen_agentchat</h4>
+<table>
+<tbody>
+<tr><td><code>AssistantAgent</code></td><td>11 yerde. Triyaj, üç analist, not yazarı, sohbet, POC'ler.</td></tr>
+<tr><td><code>GraphFlow</code> · <code>DiGraphBuilder</code></td><td>Paralel zenginleştirme grafı.</td></tr>
+<tr><td><code>RoundRobinGroupChat</code> · <code>SelectorGroupChat</code> · <code>Swarm</code></td><td>Yalnız POC'ta — ölçüm için.</td></tr>
+<tr><td><code>MaxMessageTermination</code></td><td>Sonsuz döngü sigortası. <strong>Her takımda var.</strong></td></tr>
+<tr><td><code>TextMentionTermination</code></td><td>POC'ta "TERMINATE" ile bitirme.</td></tr>
+<tr><td><code>Handoff</code></td><td>POC'ta Swarm devri. <em>Tool adı küçük harfe düşüyor.</em></td></tr>
+<tr><td><code>StructuredMessage</code></td><td>Pydantic çıktısı; takımda <code>custom_message_types</code> beyanı gerekiyor.</td></tr>
+<tr><td><code>TaskResult</code></td><td>Takım sonucu: <code>messages</code> + <code>stop_reason</code>.</td></tr>
+<tr><td><code>BaseChatMessage</code> · <code>BaseAgentEvent</code></td><td>İletişim/olay ayrımı — arayüzde tool satırlarını ayırmayı sağlıyor.</td></tr>
+<tr><td><code>ToolCallRequestEvent</code> · <code>ToolCallExecutionEvent</code></td><td>Akışta tool çağrısını göstermek.</td></tr>
+</tbody></table>
+
+<h4>autogen_ext</h4>
+<table>
+<tbody>
+<tr><td><code>OpenAIChatCompletionClient</code></td><td>Canlı model — <code>base_url</code> ile kendi endpoint'imiz.</td></tr>
+<tr><td><code>ReplayChatCompletionClient</code></td><td><strong>Kuru mod.</strong> 302 testin tamamı bunun üstünde.</td></tr>
+<tr><td><code>McpWorkbench</code></td><td>Uzak tool kaynağı — DeepWiki ve OpenClaw.</td></tr>
+<tr><td><code>StdioServerParams</code></td><td>OpenClaw köprüsü (<code>openclaw mcp serve</code>).</td></tr>
+<tr><td><code>StreamableHttpServerParams</code></td><td>DeepWiki bağlantısı.</td></tr>
+</tbody></table>
+
+<h2 class="brk">5 · Ölçülmüş tuzaklar</h2>
+
+<p class="lead">On üç madde, hepsi <strong>koşarken</strong> bulundu. Ortak örüntü:
+AutoGen'de arızalar gürültülü değil — exception fırlatmıyor, sıfır dönüyor, boş kalıyor,
+asılı kalıyor.</p>
+
+<table>
+<thead><tr><th>#</th><th>tuzak</th><th>nasıl görünüyor</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>tools</code> + <code>workbench</code></td><td><code>ValueError</code> — ikisi aynı ajana verilemiyor</td></tr>
+<tr><td>2</td><td><code>model_context</code> yok</td><td>Ajan turlar arası durumsuz; <code>save_state</code> de boş</td></tr>
+<tr><td>3</td><td><code>model_info</code> zorunlu</td><td>İlk canlı istekte patlıyor; ve bir <em>beyan</em></td></tr>
+<tr><td>4</td><td>Akışta olay değişiyor</td><td><strong>Maliyet 0 raporlanıyor</strong></td></tr>
+<tr><td>5</td><td><code>create_calls</code> yalnız replay'de</td><td>Modlardan birinde ölçüm sıfır, fark edilmiyor</td></tr>
+<tr><td>6</td><td><code>ToolCallEvent.kwargs</code></td><td><code>AttributeError</code> <code>logging.Handler</code>'da <strong>yutuluyor</strong></td></tr>
+<tr><td>7</td><td>Dış runtime + çöken ajan</td><td><code>run_stream</code> <strong>fırlatmıyor, asıyor</strong></td></tr>
+<tr><td>8</td><td>Paralel dalda çöküş</td><td>Kardeşlerin tamamlanmış işi <strong>sessizce gidiyor</strong></td></tr>
+<tr><td>9</td><td>Tanınmayan mesaj tipi</td><td>Takım yönlendirmiyor; <code>custom_message_types</code> şart</td></tr>
+<tr><td>10</td><td><code>max_tool_iterations=1</code></td><td>Ajan erken susuyor, hata vermiyor</td></tr>
+<tr><td>11</td><td><code>@message_handler</code> tip çıkarımı</td><td><strong>Kayıtta</strong> çıplak <code>NameError</code></td></tr>
+<tr><td>12</td><td><code>mcp&gt;=1.11</code> üst sınırsız</td><td>SDK 2.0 çıkınca <code>ImportError</code>, kurulum kırılıyor</td></tr>
+<tr><td>13</td><td><code>stop_when_idle()</code></td><td>Bariyer erken açılıyor — <strong>güvenme, say</strong></td></tr>
+</tbody></table>
+
+<blockquote><p><strong>11'in ayrıntısı öğretici.</strong> Tip çıkarımı
+<code>get_type_hints()</code> ile yapılıyor ve <code>from __future__ import annotations</code>
+varken anotasyonlar <em>modül genelinde</em> çözülüyor. <code>MessageContext</code>'i
+fonksiyon içinde import edersen kayıt sırasında patlıyor — handler'ın kendisinde değil.
+Üstelik parametre adları da bağlayıcı: <code>message</code> ve <code>ctx</code> olmak zorunda.</p></blockquote>
+<h2 class="brk">6 · Kullanılmayanlar, ve neden</h2>
+
+<p class="lead">Bir envanterin en çok bilgi taşıyan yarısı burası. AutoGen'in
+kullanmadığımız yüzeyleri, ve her biri için gerekçe.</p>
+
+<table>
+<thead><tr><th>yüzey</th><th>neden alınmadı</th></tr></thead>
+<tbody>
+<tr><td><code>GrpcWorkerAgentRuntime</code> — dağıtık runtime</td><td><code>grpcio</code> kurulu değil; tek süreç yetiyor. Hacim sorusu cevaplanınca ilk bakılacak yer.</td></tr>
+<tr><td><code>dump_component</code> / <code>load_component</code></td><td>Bildirimsel ajan tanımına ihtiyaç doğmadı; her şey kodda.</td></tr>
+<tr><td><code>CodeExecutorAgent</code>, kod yürütücüler</td><td>VC hattında kod çalıştırılmıyor. AutoGen'in en güçlü olduğu eksen, bize kapalı.</td></tr>
+<tr><td><code>Memory</code> protokolü (ChromaDB, mem0)</td><td>Bellek düz Markdown yapıldı — okunabilir, düzeltilebilir, sürüm kontrolüne girebilir.</td></tr>
+<tr><td><code>MagenticOneGroupChat</code></td><td>Genel amaçlı orkestratör; huninin şekli zaten belli.</td></tr>
+<tr><td><code>Swarm</code> / <code>Handoff</code> (pipeline'da)</td><td>POC'ta ölçüldü: <strong>en pahalı desen</strong>. Huni tek yönlü, devre ihtiyaç yok.</td></tr>
+<tr><td><code>SocietyOfMindAgent</code></td><td>Takım iç içe geçirme gerekmedi — ama hiyerarşi lazım olursa hazır.</td></tr>
+<tr><td>OpenTelemetry (<code>tracer_provider</code>)</td><td>Kalan işlerin en kolayı: runtime'ı zaten kendimiz kuruyoruz, tek satır.</td></tr>
+<tr><td><code>TokenLimitedChatCompletionContext</code></td><td>Kendi bağlam motorumuz yazıldı, çünkü compaction'da tool çifti kuralı gerekti.</td></tr>
+<tr><td>Sandbox</td><td>Model üretimi kod çalıştırmıyoruz.</td></tr>
+</tbody></table>
+
+<h2>7 · Üç cümlede özet</h2>
+
+<div class="mod" style="border-left-color:var(--green)">
+  <h4>1 · AutoGen'i ayıran şey üst katman değil, alt katman</h4>
+  <p><code>AssistantAgent</code> her framework'te var. <code>autogen_core</code> karşılığı
+  çoğunda yok — ve bu projenin işine yarayan her şey (izole oturum, olay akışı, müdahale
+  kapısı, kuyrukla toplama) orada.</p>
+</div>
+
+<div class="mod" style="border-left-color:var(--ochre)">
+  <h4>2 · Aktör modeli runtime'ı koruyor, veriyi korumuyor</h4>
+  <p>Ölçülmüş, tekrarlanmış, ve resmî desenlerin kendi arasında çeliştiği nokta. Bariyere
+  güvenilmiyor; <strong>beklenen sonuç sayısı sayılıyor</strong>.</p>
+</div>
+
+<div class="mod" style="border-left-color:var(--blue)">
+  <h4>3 · Taşınabilir olan şey desenler ve protokoller</h4>
+  <p>AutoGen bakım modunda. Ama CloudEvents, MCP, OTel ve dokuz tasarım deseni onun
+  <em>dışında</em> yaşıyor. Bu yüzden AutoGen burada ürün olarak değil,
+  <strong>desen kütüphanesi ve ölçüm zemini</strong> olarak kullanıldı.</p>
+</div>
+
+<h2>8 · Bu belgede ölçülmemiş olanlar</h2>
+
+<ul>
+<li><strong>Dağıtık runtime hiç çalıştırılmadı.</strong> <code>grpcio</code> yok; protokol
+bilgisi <code>.proto</code> descriptor'ından okundu — arayüz bilgisi, davranış değil.</li>
+<li><strong>Diğer framework'lerin fan-in davranışı ölçülmedi.</strong> Karşılaştırma yalnız
+AutoGen'in iki motorunu kapsıyor; "LangGraph daha iyi olurdu" diyemem, denemedim.</li>
+<li><strong>Token ölçümleri tek koşudan.</strong> <code>poc/kiyas.py</code> tekrar
+çalıştırılabilir ama sayılar tek örneklem; model sıcaklığı ve endpoint yükü etkiliyor.</li>
+<li><strong>Compaction canlı modelle denenmedi.</strong> Kuru modda kırpma yolu ve
+tool-çifti kuralı testli; <code>model_summariser</code> uzun bir gerçek sohbette koşmadı.</li>
+<li><strong>OTel dışa aktarımı kurulmadı.</strong> <code>gen_ai.*</code> sabitlerinin kodda
+olduğu görüldü; gerçek bir backend'e span gittiği görülmedi.</li>
+</ul>
+
+<p class="note" style="margin-top:2em;padding-top:.8em;border-top:1px solid var(--rule)">
+vc-agent · pipeline 15.589 satır · poc 1.061 satır · docs 27.232 satır · 302 test<br>
+Kaynak belgeler: <code>docs/05</code> ve <code>docs/08</code> (resmî kılavuzların tam metni) ·
+<code>docs/06</code> (ölçülmüş tuzaklar) · <code>docs/07</code> (kod rehberi) ·
+<code>docs/12</code>–<code>15</code> (uçtan uca anlatım, protokoller, gateway mimarisi)
+</p>
+
+</body></html>

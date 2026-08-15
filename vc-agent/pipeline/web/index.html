@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deal Flow Scan</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="chrome">
+    <div class="chrome__inner">
+      <div class="chrome__title">
+        <span class="chrome__eyebrow">Deal flow</span>
+        <strong id="scan-query">—</strong>
+      </div>
+      <span class="badge" id="mode-badge" hidden></span>
+      <div class="chrome__meta" id="scan-meta"></div>
+    </div>
+
+    <dl class="railstats" id="rail-stats" hidden></dl>
+
+    <div class="chrome__side">
+      <label class="visually-hidden" for="scan-pick">Choose a scan</label>
+      <select id="scan-pick" class="picker" aria-label="Choose a scan"></select>
+      <button type="button" class="primary" id="new-scan">New scan</button>
+      <button type="button" class="ghost" id="reset-chat" hidden>Reset chat</button>
+    </div>
+
+    <div class="chrome__foot">
+      <button type="button" class="ghost theme-toggle" id="theme-toggle"
+              aria-label="Switch between light and dark">Dark</button>
+    </div>
+  </header>
+
+  <main class="thread" id="thread" role="log" aria-live="polite" aria-label="Conversation"></main>
+
+  <div class="composer">
+    <div class="chips" id="chips"></div>
+    <form class="ask" id="ask" autocomplete="off">
+      <input id="q" name="q" type="text" placeholder="Ask about this scan…" aria-label="Ask about this scan">
+      <button type="submit" id="send">Ask</button>
+      <button type="button" id="stop" class="stop" hidden>Stop</button>
+    </form>
+    <p class="disclaimer" id="disclaimer">Connecting…</p>
+  </div>
+</div>
+
+<dialog class="sheet" id="scan-sheet" aria-label="Run a new scan">
+  <form method="dialog" class="sheet__inner" id="scan-form">
+    <h2>Run a new scan</h2>
+    <p class="sub">The collectors are keyless and rate limited. A seven-day window over
+      three sources usually takes under a minute.</p>
+    <div class="field">
+      <label for="f-query">Sector or topic</label>
+      <input id="f-query" name="query" type="text" value="ai infrastructure" required>
+    </div>
+    <div class="field field--row">
+      <span>
+        <label for="f-days">Window (days)</label>
+        <input id="f-days" name="days" type="number" min="1" max="90" value="7">
+      </span>
+      <span>
+        <label for="f-limit">Enrich at most</label>
+        <input id="f-limit" name="limit" type="number" min="1" max="25" value="5">
+      </span>
+    </div>
+    <div class="sheet__actions">
+      <button type="button" class="ghost" id="scan-cancel">Cancel</button>
+      <button type="submit" class="primary" id="scan-go">Start</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="tooltip" role="status" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+autogen-agentchat>=0.7.5
+autogen-core>=0.7.5
+autogen-ext[openai,mcp]>=0.7.5
+
+# ZORUNLU PİN: autogen-ext "mcp>=1.11.0" diyor, üst sınır koymamış.
+# MCP SDK 2.0 ile: ImportError: cannot import name 'RequestContext'
+mcp>=1.24,<2
+
+pydantic>=2.0
+
+# Collectors call HTTP directly. httpx arrives as a transitive dependency of
+# autogen-ext[openai], but the pipeline imports it by name, so it is declared.
+httpx>=0.27
