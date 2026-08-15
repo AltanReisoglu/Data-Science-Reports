@@ -128,6 +128,32 @@ Model kademelendirme AutoGen'de doğal: her `AssistantAgent` kendi
 `model_client`'ını alır. `ayarlar.py`'de üç kademe tanımlanır ve
 `motor.istemci(kademe)` fabrikası döndürür.
 
+### Fan-in'in iki yolu ölçüldü (2026-08-13)
+
+Core kılavuzunun **Concurrent Agents** deseni, AgentChat'in hiç sunmadığı bir
+toplama yolu gösteriyor: işçiler sonucu bir sonuç topic'ine **yayınlıyor**, bir
+`ClosureAgent` da onu çağıranın sahibi olduğu bir kuyruğa boşaltıyor.
+`pipeline/fanin.py` zenginleştirmeyi böyle kuruyor. Fark yalnız arıza altında
+görünüyor (`compare_fanin.py`, dry mod, 8 s sınır):
+
+| motor | temiz | `ResilientClient` arkasında hata | ham hata |
+|---|---:|---:|---:|
+| `graph.py` (GraphFlow) | 3 | 2 | **0–1, 8 s sınırı dolduruyor** |
+| `fanin.py` (pub/sub + kuyruk) | 3 | 2 | **2, ~3 ms** |
+
+Son sütun önemli: kendisiyle hiç ilgisi olmayan bir dalın çökmesi, AgentChat
+motorunda tamamlanmış kardeş dalların işini yok ediyor — ve **kaç tanesini yok
+ettiği deterministik değil** (tekrarlı koşularda 0 ve 1). Core motorunda yalnız
+çöken dal kayboluyor, çünkü sonuç var olduğu anda yayınlanmış ve kuyruk onu çoktan
+tutuyor. Güvenilmeyecek bir bariyer yok, çünkü bariyer yok.
+
+Not: resmî desenler bu konuda **birbiriyle çelişiyor**. Concurrent Agents kuyrukla
+topluyor; **Mixture of Agents** ise `asyncio.gather(...)` ile — yani POC'ta
+(`desen_5_core_aktor.py`) erken dönüşü sessiz kardeş kaybına yol açan yapı.
+
+`graph.py` varsayılan kalıyor (risk denetçisi + yapısal skorlayıcı orada);
+`fanin.py` rubriği değil **toplamayı** değiştiriyor.
+
 ### Neden Selector + GraphFlow birlikte
 
 POC ölçümü (aynı görev, aynı ajanlar):
@@ -150,30 +176,40 @@ konuşması Triyaj'ın bağlamını kirletmez (el kitabı §8).
 
 ## 4 — Dosya düzeni
 
+> **Not (2026-08-13):** Kod yazılırken kullanıcı isimlendirmenin İngilizce olmasını
+> istedi. Aşağıdaki ağaç **kurulu hâliyle** güncellendi; belgelerin geri kalanı
+> Türkçe kaldı. Türkçe↔İngilizce eşlemesi `pipeline/README.md` sonundaki tabloda.
+> `poc/` dokunulmadan Türkçe kaldı (commit'li).
+
 ```
 vc-agent/
 ├── .venv/                    ← kurulu (autogen 0.7.5, adk 2.6.3, mcp 1.29)
 ├── requirements.txt          ← mcp>=1.24,<2 pini ZORUNLU (§7)
 ├── docs/                     ← 01-04 belgeler
-├── poc/                      ← beş desenin ölçüm POC'u (referans)
+├── poc/                      ← beş desenin ölçüm POC'u (referans, Türkçe)
 └── pipeline/
-    ├── ayarlar.py            tez · eşikler · oran sınırları · model kademeleri
-    ├── semalar.py            §2 veri sözleşmesi
-    ├── politika.py           KaynakPolitikasi — robots · oran · kara liste · denetim
-    ├── motor.py              model fabrikası + Olcum   ← poc/motor.py'den
-    ├── toplayicilar/
-    │   ├── temel.py          cache · retry · UA · oran sınırı · politika kapısı
-    │   ├── hn.py  sec_edgar.py  github.py  arxiv.py  rss.py
+    ├── config.py             tez · eşikler · oran sınırları · model kademeleri
+    ├── schemas.py            §2 veri sözleşmesi
+    ├── policy.py             SourcePolicy — robots · oran · kara liste · denetim
+    ├── engine.py             model fabrikası + Ledger + ResilientClient  ← Olcum poc/motor.py'den
+    ├── collectors/
+    │   ├── base.py           cache · retry · UA · oran sınırı · politika kapısı
+    │   ├── hackernews.py  sec_edgar.py  github.py  arxiv.py
     ├── normalize.py          varlık çözümleme + dedup
-    ├── ajanlar/
-    │   ├── triyaj.py  teknik.py  pazar.py  ekip.py  risk.py
-    │   ├── skorlayici.py  not_yazari.py
-    ├── graf.py               GraphFlow: fan-out + join
-    ├── izleme.py             durum makinesi · diff · snapshot
-    ├── mcp_sunucu.py         pipeline'ı MCP tool'u olarak açar
-    ├── tara.py               CLI giriş noktası
-    ├── testler/              fixture'lı toplayıcı testleri
-    └── veri/                 SQLite + ChromaDB + cache   (gitignore)
+    ├── agents/
+    │   ├── triage.py         kural + ucuz LLM
+    │   ├── analysts.py       üç dal + risk denetçisi + skorlayıcı + not yazarı
+    │   ├── tools.py  memo.py
+    ├── graph.py              GraphFlow: fan-out + join + dal sayımı + süre sınırı
+    ├── fanin.py              aynı fan-out, autogen_core pub/sub + ClosureAgent kuyruğu
+    ├── compare_fanin.py      iki motoru aynı arıza enjeksiyonuyla ölçer
+    ├── observability.py      autogen_core olay yakalama + InterventionHandler
+    ├── scan.py               CLI giriş noktası
+    ├── tests/                fixture'lı testler (ağsız, 36 test)
+    ├── README.md
+    └── data/                 SQLite + cache + çıktı   (gitignore)
+
+    yazılmadı: izleme (monitor.py) · mcp_sunucu (mcp_server.py) · rss toplayıcı
 ```
 
 ---
@@ -215,6 +251,22 @@ Ajan tarafında `InterventionHandler` (el kitabı §17) mesaj hattına takılır
 her tool çağrısını denetim kaydına yazar → *"bu puan nereden geldi"* sorusu
 her zaman cevaplanabilir.
 
+**Uygulandı (2026-08-13), ama işi asıl yapan `InterventionHandler` değil.**
+Core kılavuzunu tarayınca daha doğrudan bir yol çıktı: `autogen_core` olayları
+`autogen_core.events` logger'ına basıyor ve `ToolCallEvent` tool adını,
+argümanları, sonucu ve (runtime içindeyse) çağıran ajanın kimliğini taşıyor.
+`observability.EventCapture` bunları denetim kaydına aynalıyor — yani denetim
+artık "toplayıcı ne çekti"nin yanına "**hangi ajan neyi çağırmayı seçti**"yi de
+yazıyor. `InterventionHandler` ise mesaj yönlendirmesini kaydediyor ve
+`DropMessage` ile **onay kapısını runtime seviyesinde** mümkün kılıyor; şu an
+gözlemci modda, çünkü buradaki bütün tool'lar salt-okunur.
+
+İkinci kazanç: `LLMCallEvent` token sayısını taşıyor ve **yalnız gerçek
+istemciler** yayıyor; `ReplayChatCompletionClient` yaymıyor. `Ledger`'ın
+`create_calls` sayacı ise tam tersi — sadece replay'de var. İkisi birleşince
+maliyet her iki modda da ölçülüyor; öncesinde canlı koşu **0 LLM çağrısı**
+raporlayacaktı.
+
 ---
 
 ## 7 — Bilinen tuzaklar (bu oturumda ölçüldü)
@@ -222,6 +274,9 @@ her zaman cevaplanabilir.
 | Tuzak | Karşılık |
 |---|---|
 | **Paralel dalda sessiz veri kaybı** — çöken bir handler `asyncio.gather`'ı erken döndürüyor, `task_done()` çağrılıyor, `stop_when_idle()` bariyeri kırılıyor, `close()` yarım kalanları iptal ediyor | Zenginleştirme sonrası **beklenen dal sayısı sayılır**; eksikse `eksik_veri`'ye yazılır. **Bariyere güvenilmez.** (POC `desen_5_core_aktor.py`, üç koşuda tekrarlandı) |
+| **Aynı kayıp AgentChat katmanında da var** (2026-08-13'te pipeline'da ölçüldü) — GraphFlow fan-out'unda bir dal exception fırlatınca `run()` takımı iptal ediyor ve **tamamlanmış kardeş dalların çıktısı da gidiyor**: üç dallı koşu bir dalla döndü. `run_stream`'e geçmek kısmen kurtarıyor, yeterli değil | `engine.ResilientClient` model çağrısındaki hatayı **mesaja çeviriyor** → join yine üç girdi alıyor, çöken dal `missing_data`'ya düşüyor. Her iki yön de `tests/test_graph.py`'de kilitli |
+| **Dış runtime verince hata semantiği değişiyor** (2026-08-13) — `InterventionHandler` takmak için runtime'ı kendin vermen gerekiyor; o zaman çöken bir ajan `run_stream`'i **fırlatmıyor, sonsuza kadar askıda bırakıyor** (gömülü runtime'da fırlatıyordu). `MaxMessageTermination` kurtaramıyor, çünkü yeni mesaj da gelmiyor | Şirket başına **duvar saati sınırı** (`THRESHOLDS.enrichment_timeout_seconds`) — burada tedbir değil doğruluk şartı. `stop_when_idle()` de sınırlı bekleniyor, ardından `stop()` |
+| **`ToolCallEvent` alanlarını öznitelikte tutmuyor** — `LLMCallEvent` `prompt_tokens`'ı öznitelik yapıyor ama `ToolCallEvent` her şeyi `.kwargs` sözlüğünde saklıyor; `event.tool_name` yazarsan sessizce `AttributeError` alıp log handler'ında kayboluyor | `event.kwargs["tool_name"]`. İçinde ayrıca `agent_id` var — ama yalnız runtime içindeki çağrılarda dolu (çıplak `agent.run()`'da `None`) |
 | `autogen-ext` `mcp>=1.11.0` üst sınırsız → MCP SDK 2.0 ile `ImportError: RequestContext` | `requirements.txt`'e **`mcp>=1.24,<2`** |
 | `Handoff` tool adı küçük harfe düşüyor (`transfer_to_veriuzmani`) | Elle yazma, `Handoff(target=X).name` ile üret |
 | Sonsuz ajan döngüsü = gerçek fatura | Her takımda `MaxMessageTermination` + `TokenUsageTermination` sigortası |
