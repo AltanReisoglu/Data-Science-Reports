@@ -127,12 +127,16 @@ class ApprovalGate:
             return {"approved": True}
 
         request = self.request(tool, arguments, session=session)
+        # The id is appended, never replaced by a caller's `reason`. It used to be
+        # part of the default text only, so a caller that explained the block in
+        # its own words silently dropped the one thing the operator needed: the
+        # UI reads the id back out of this sentence to decide whether to draw an
+        # Approve button, and with no id it drew "this has no approval path"
+        # instead — over a request that was sitting in the queue, approvable.
+        head = reason or f"{tool} reaches outside and needs approval."
         return {
             "block": True,
-            "reason": reason or (
-                f"{tool} reaches outside and needs approval. "
-                f"Approve request {request.id} to let it through."
-            ),
+            "reason": f"{head} Approve request {request.id} to let it through.",
             "approval_id": request.id,
         }
 

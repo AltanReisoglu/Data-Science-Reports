@@ -1,0 +1,1732 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>AutoGen ve OpenClaw — bütün yüzey</title>
+<style>
+:root{
+  --ink:#16191c; --ink2:#454c53; --ink3:#767d84; --rule:#dcdfd9; --rule2:#b6bab2;
+  --panel:#f6f7f3; --panel2:#eceee8;
+  --ochre:#8a5208; --ochre-bg:#f8f1e3; --green:#14594a; --green-bg:#e5f0ea;
+  --blue:#2c4a6b; --blue-bg:#e4ebf3; --red:#8c2f1d; --red-bg:#f7e8e4;
+  --mono:"DejaVu Sans Mono","Liberation Mono",monospace;
+  --sans:"DejaVu Sans","Liberation Sans",Arial,sans-serif;
+  --serif:"DejaVu Serif","Liberation Serif",Georgia,serif;
+}
+@page{size:A4;margin:17mm 15mm 18mm}
+@page:first{margin:0}
+*{box-sizing:border-box}
+html{font-size:10.4pt}
+body{margin:0;font-family:var(--serif);color:var(--ink);line-height:1.5;background:#fff}
+h1,h2,h3,h4,h5{font-family:var(--mono);font-weight:700;letter-spacing:-.02em;text-wrap:balance}
+h2{font-size:17pt;margin:0 0 .25em;padding-top:.25em;border-top:2.5px solid var(--ink);break-after:avoid}
+h3{font-size:12pt;margin:1.6em 0 .4em;break-after:avoid;color:var(--ochre)}
+h4{font-size:10.4pt;margin:1.2em 0 .3em;break-after:avoid}
+h5{font-size:9.4pt;margin:.9em 0 .25em;color:var(--ink2);break-after:avoid}
+p{margin:0 0 .6em;orphans:2;widows:2}
+code{font-family:var(--mono);font-size:.86em;background:var(--panel2);padding:.05em .28em;border-radius:2px}
+pre{font-family:var(--mono);font-size:8pt;line-height:1.45;background:var(--panel);border:1px solid var(--rule);
+    border-left:2.5px solid var(--rule2);padding:.55em .7em;margin:.5em 0 .8em;white-space:pre-wrap;
+    word-break:break-word;break-inside:avoid;border-radius:0 3px 3px 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:8.4pt;margin:.45em 0 .9em;break-inside:avoid}
+th{text-align:left;font-size:7.2pt;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);
+   border-bottom:1px solid var(--rule2);padding:0 .5em .22em 0;vertical-align:bottom}
+td{border-bottom:1px solid var(--rule);padding:.28em .5em .28em 0;vertical-align:top;color:var(--ink2)}
+td:first-child{color:var(--ink)}
+ul,ol{margin:.15em 0 .7em;padding-left:1.15em}
+li{margin-bottom:.22em}
+blockquote{margin:.55em 0 .8em;padding:.5em .75em;background:var(--ochre-bg);border-left:3px solid var(--ochre);
+           font-family:var(--sans);font-size:9pt;break-inside:avoid}
+blockquote p:last-child{margin:0}
+blockquote.g{background:var(--green-bg);border-left-color:var(--green)}
+blockquote.r{background:var(--red-bg);border-left-color:var(--red)}
+.tag{font-family:var(--sans);font-size:6.6pt;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     padding:.1em .38em;border-radius:2px;vertical-align:.12em;white-space:nowrap}
+.t-m{background:var(--green-bg);color:var(--green)}
+.t-k{background:var(--blue-bg);color:var(--blue)}
+.t-t{background:var(--panel2);color:var(--ink3);border:1px dashed var(--rule2)}
+.lead{font-size:10.8pt;color:var(--ink2);line-height:1.45}
+.note{font-size:8.6pt;color:var(--ink3);font-family:var(--sans)}
+.brk{break-before:page}
+svg{display:block;margin:.5em auto .3em;max-width:100%}
+.cap{font-family:var(--sans);font-size:7.6pt;color:var(--ink3);text-align:center;margin:0 0 1.1em}
+.card{break-inside:avoid;margin:0 0 .9em;border:1px solid var(--rule);border-left:3px solid var(--ochre);
+      padding:.6em .8em;background:var(--panel)}
+.card h4{margin:0 0 .25em}
+.card p:last-child{margin:0}
+.card.g{border-left-color:var(--green)} .card.b{border-left-color:var(--blue)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 1.2em}
+.cover{height:297mm;padding:32mm 20mm 18mm;display:flex;flex-direction:column;background:var(--panel)}
+.cover h1{font-size:33pt;line-height:1.0;margin:0 0 9mm;letter-spacing:-.045em}
+.cover .sub{font-size:12.5pt;color:var(--ink2);max-width:118mm;line-height:1.4;font-family:var(--serif)}
+.eyebrow{font-family:var(--mono);font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:7mm}
+.toc{margin-top:auto;border-top:2px solid var(--ink);padding-top:5mm;font-family:var(--sans);font-size:8.6pt;
+     display:grid;grid-template-columns:1fr 1fr 1fr;gap:4mm}
+.toc b{display:block;font-family:var(--mono);font-size:9.5pt;margin-bottom:1.5mm}
+.toc span{display:block;color:var(--ink3);line-height:1.5}
+</style></head><body>
+
+<section class="cover">
+  <div class="eyebrow">vc-agent · teknik kılavuz · 15 Ağustos 2026</div>
+  <h1>AutoGen ve<br>OpenClaw:<br>bütün yüzey</h1>
+  <p class="sub">İki agent sisteminin baştan sona anlatımı — AutoGen'in her katmanı
+  ve deseni, rakipleriyle yan yana, ve OpenClaw'un harness'ının tamamı.</p>
+  <div class="toc">
+    <div><b>I · AutoGen</b><span>üç katman · aktör modeli · iletişim · takımlar · beş bileşen · dokuz desen</span></div>
+    <div><b>II · Rakipler</b><span>LangGraph · CrewAI · Agents SDK · Google ADK · Agno · DeepAgents</span></div>
+    <div><b>III · OpenClaw</b><span>gateway · protokol v4 · agent loop · oturum · hook · bellek · node · sandbox · prompt · SOUL · kuyruk · delegate</span></div>
+  </div>
+</section>
+
+<h2>Bu belge nasıl okunur</h2>
+
+<p class="lead">Üç bölüm, üç ayrı soru. <strong>I</strong> AutoGen'in ne olduğunu ve her
+parçasının ne işe yaradığını anlatıyor. <strong>II</strong> aynı işi yapan diğer
+framework'lerle karşılaştırıyor. <strong>III</strong> OpenClaw'un harness'ını — yani
+bir agent'ı gerçekten çalıştırmak için gereken her şeyi — aynı ayrıntıda ele alıyor.</p>
+
+<p>Her iddia etiketli, çünkü hepsi aynı ağırlıkta değil:</p>
+
+<table>
+<tbody>
+<tr><td style="width:22%"><span class="tag t-m">ölçüldü</span></td><td>Bu makinede koşturuldu ya da kurulu pakete introspeksiyon yapıldı. Çıktı belgede.</td></tr>
+<tr><td><span class="tag t-k">kaynak</span></td><td>Birincil kaynakta yazıyor — resmî kılavuz, <code>.proto</code> dosyası, docstring, ya da reponun kendi kodu.</td></tr>
+<tr><td><span class="tag t-t">teyitsiz</span></td><td>Okundu, doğrulanmadı. Çoğunlukla bu ortamda kurulu olmayan bir paket hakkında.</td></tr>
+</tbody></table>
+
+<p>Bu ayrım süs değil. Bir agent framework'ünün belgeleri neyi <em>vaat ettiğini</em>
+yazıyor; bu belge nerede vaadin tutmadığını da yazıyor, ve ikisini karıştırmamak için
+etiket gerekiyor.</p>
+
+<h2 class="brk">I · 1 — AutoGen nedir</h2>
+
+<p class="lead">Microsoft'un çok-ajanlı uygulama framework'ü. Ama önemli olan şu:
+<strong>bugünkü AutoGen (v0.4+), 2023'teki AutoGen'in devamı değil — sıfırdan yeniden
+yazımı.</strong></p>
+
+<p>Gerekçeyi resmî göç kılavuzunun kendisi söylüyor <span class="tag t-k">kaynak</span>:</p>
+
+<blockquote><p><em>"…we built AutoGen v0.4, a <strong>from-the-ground-up rewrite adopting
+an asynchronous, event-driven architecture</strong> to address issues such as
+<strong>observability, flexibility, interactive control, and scale</strong>."</em></p></blockquote>
+
+<p>Bu cümledeki dört kelime — gözlemlenebilirlik, esneklik, etkileşimli kontrol, ölçek —
+tam olarak bir prototipin <em>üretime</em> geçerken çarptığı dört duvar. Bütün tasarımı
+açıklıyor: neden olay güdümlü, neden aktör modeli, neden müdahale kapısı var.</p>
+
+<h3>Üç paket, üç katman</h3>
+
+<svg viewBox="0 0 640 218" width="640" height="218" font-family="DejaVu Sans Mono, monospace">
+  <rect x="16" y="10" width="440" height="56" fill="#f6f7f3" stroke="#16191c"/>
+  <text x="30" y="33" font-size="13" font-weight="700">autogen-ext</text>
+  <text x="30" y="50" font-size="9" fill="#454c53">model istemcileri · tool'lar · MCP · kod yürütücüler · hazır ajanlar</text>
+  <text x="468" y="42" font-size="8.5" fill="#767d84">somut uygulamalar</text>
+
+  <rect x="16" y="80" width="440" height="56" fill="#f6f7f3" stroke="#16191c"/>
+  <text x="30" y="103" font-size="13" font-weight="700">autogen-agentchat</text>
+  <text x="30" y="120" font-size="9" fill="#454c53">AssistantAgent · takımlar · sonlandırma · yapısal çıktı</text>
+  <text x="468" y="106" font-size="8.5" fill="#767d84">tutorial'ların bittiği yer</text>
+
+  <rect x="16" y="150" width="440" height="56" fill="#f8f1e3" stroke="#8a5208" stroke-width="2"/>
+  <text x="30" y="173" font-size="13" font-weight="700" fill="#8a5208">autogen-core</text>
+  <text x="30" y="190" font-size="9" fill="#454c53">aktör modeli · event-driven runtime · pub/sub · gRPC · gözlem</text>
+  <text x="468" y="170" font-size="8.5" fill="#8a5208">asıl mühendislik</text>
+  <text x="468" y="184" font-size="8.5" fill="#8a5208">hikâyesi burada</text>
+
+  <path d="M236 80 L236 66" stroke="#767d84" marker-end="url(#ar)"/>
+  <path d="M236 150 L236 136" stroke="#767d84" marker-end="url(#ar)"/>
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6" fill="none" stroke="#767d84"/></marker></defs>
+</svg>
+<div class="cap">Üç paket. Yukarıdan aşağıya somuttan soyuta.</div>
+
+<p><strong>Karşılaştırmaların çoğunun atladığı nokta:</strong> AutoGen'i ayıran şey üst
+katman değil, alt katman. AgentChat'te gördüğün <code>AssistantAgent</code> her
+framework'te var. <code>autogen_core</code> karşılığı çoğunda <strong>yok</strong>.</p>
+
+<h3>Bir uyarı, baştan</h3>
+
+<blockquote class="r"><p><strong>AutoGen bakım modunda.</strong> Microsoft yeni işi
+Microsoft Agent Framework'e (MAF) taşıdı. Bunun ölçülmüş bir bedeli var
+<span class="tag t-m">ölçüldü</span>: <code>autogen-ext 0.7.5</code> bağımlılığı
+<code>mcp&gt;=1.11.0</code> diye <strong>üst sınırsız</strong> istiyor. MCP SDK 2.0
+çıkınca kurulum <code>ImportError</code> ile kırıldı. Aynı gün <code>google-adk</code>
+aynı bağımlılığı <code>mcp&gt;=1.24,&lt;2</code> diye sınırlamıştı. <em>Aktif proje
+sınır koyar, bakım modundaki koymaz — ve düzeltecek kimse yoktur.</em></p></blockquote>
+
+<p>Bu, AutoGen'i öğrenmenin değersiz olduğu anlamına gelmiyor. Aşağıdaki dokuz tasarım
+deseni ve protokol seçimleri AutoGen'in <em>dışında</em> yaşıyor. Ama üretime alacaksan
+bilerek al.</p>
+<h2 class="brk">I · 2 — autogen_core: aktör modeli</h2>
+
+<p class="lead">Bu bölüm AutoGen'in kalbi. Buradaki beş kavram anlaşılmadan üst
+katmanların neden öyle davrandığı anlaşılmıyor.</p>
+
+<h3>2.1 Ajan bir nesne değil, bir adres</h3>
+
+<p>Çoğu framework'te ajan bir Python nesnesidir: yaratırsın, değişkende tutarsın,
+metodunu çağırırsın. AutoGen core'da öyle değil. Ajanın kimliği bir <strong>çift</strong>:</p>
+
+<pre>AgentId(type, key)
+        │     └── hangi örnek   → "company-42", "alice", "session-7"
+        └──────── hangi rol/sınıf → "analyst", "session", "channel.web"</pre>
+
+<p>Ve sen sınıfı değil bir <strong>fabrikayı</strong> kaydediyorsun. Örneği runtime
+<strong>ilk mesaj geldiğinde</strong> yaratıyor — buna <em>lazy creation</em> deniyor:</p>
+
+<pre>await MyAgent.register(runtime, "my_agent", lambda: MyAgent("demo"))
+#                                ^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+#                                tip adı      fabrika (henüz çağrılmadı)</pre>
+
+<p><strong>Neden böyle:</strong> "şirket başına bir analist ajanı" gibi bir şey istiyorsan,
+elle sözlük tutup örnek yaratman gerekmiyor. Adres verirsin, runtime örneği bulur ya da
+yaratır. Binlerce ajan tanımlamak, bir ajan tanımlayıp binlerce anahtar kullanmak demek.</p>
+
+<h3>2.2 Runtime — mesajları yürüten şey</h3>
+
+<table>
+<thead><tr><th>tip</th><th>ne zaman</th><th>sınıf</th></tr></thead>
+<tbody>
+<tr><td>Standalone</td><td>Tek süreç, tek dil</td><td><code>SingleThreadedAgentRuntime</code></td></tr>
+<tr><td>Distributed</td><td>Çok süreç, çok makine, Python↔.NET</td><td><code>GrpcWorkerAgentRuntimeHost</code> + worker'lar</td></tr>
+</tbody></table>
+
+<p>Kritik vaat: <strong>ikisi aynı API'yi sunuyor.</strong> Ajan kodunu değiştirmeden
+tek süreçten dağıtık kuruluma geçebiliyorsun. <span class="tag t-t">teyitsiz</span>
+Dağıtık runtime bu ortamda koşturulmadı (<code>grpcio</code> kurulu değil), ama protokol
+tasarımı bunu destekliyor — §III'te göreceğiz ki taşınan <code>Payload</code> mesajı
+<code>data_type</code> + <code>data_content_type</code> + <code>data</code> taşıyor,
+yani dilden bağımsız.</p>
+
+<h5>Durdurmanın üç yolu, üç farklı anlamı <span class="tag t-k">kaynak</span></h5>
+<table>
+<tbody>
+<tr><td style="width:26%"><code>stop()</code></td><td>Hemen döner — <strong>devam eden mesaj işlemeyi iptal etmez</strong></td></tr>
+<tr><td><code>stop_when_idle()</code></td><td>İşlenmemiş mesaj kalmayana kadar <strong>bloklar</strong></td></tr>
+<tr><td><code>close()</code></td><td>Kapatır, kaynakları bırakır</td></tr>
+</tbody></table>
+
+<blockquote class="r"><p><span class="tag t-m">ölçüldü</span> <code>stop_when_idle()</code>
+bir <strong>bariyer</strong>, ve güvenilir değil. Çöken bir handler
+<code>_process_publish</code> içindeki <code>asyncio.gather</code>'ı erken döndürüyor,
+hemen ardından <code>task_done()</code> çağrılıyor, kuyruk kardeşler hâlâ çalışırken
+"boşaldı" sayılıyor — ve <strong>tamamlanmış sonuçlar sessizce kayboluyor.</strong>
+Ne exception, ne uyarı. Üç koşuda birebir tekrarlandı.</p></blockquote>
+
+<h3>2.3 İki iletişim biçimi — ve fark adresleme değil</h3>
+
+<p>Kılavuz net <span class="tag t-k">kaynak</span>: <em>"There are two types of
+communication in AutoGen core: <strong>Direct Messaging</strong>… and
+<strong>Broadcast</strong>."</em> Üçüncü bir şey yok.</p>
+
+<svg viewBox="0 0 640 250" width="640" height="250" font-family="DejaVu Sans Mono, monospace">
+  <!-- direct -->
+  <rect x="10" y="8" width="300" height="230" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="24" y="28" font-size="9" font-weight="700" fill="#14594a">DOĞRUDAN MESAJ</text>
+  <text x="24" y="45" font-size="8.5" fill="#454c53">send_message(msg, AgentId(...))</text>
+  <rect x="34" y="66" width="110" height="40" fill="#fff" stroke="#16191c"/>
+  <text x="60" y="90" font-size="9">OuterAgent</text>
+  <rect x="176" y="66" width="110" height="40" fill="#fff" stroke="#16191c"/>
+  <text x="204" y="90" font-size="9">InnerAgent</text>
+  <path d="M144 80 L176 80" stroke="#16191c" marker-end="url(#a2)"/>
+  <path d="M176 96 L144 96" stroke="#14594a" stroke-dasharray="3 2" marker-end="url(#a3)"/>
+  <text x="24" y="130" font-size="8" fill="#454c53">cevap: handler'ın dönüş değeri</text>
+  <text x="24" y="146" font-size="8" fill="#454c53">alıcı: tam bir tane</text>
+  <text x="24" y="162" font-size="8" fill="#454c53">bağ: sıkı — örneği biliyorsun</text>
+  <rect x="24" y="176" width="270" height="46" fill="#fff" stroke="#14594a"/>
+  <text x="36" y="194" font-size="9" font-weight="700" fill="#14594a">hata → çağırana FIRLATILIR</text>
+  <text x="36" y="210" font-size="8" fill="#454c53">"the exception will be propagated</text>
+  <text x="36" y="222" font-size="8" fill="#454c53"> back to the sender"</text>
+
+  <!-- broadcast -->
+  <rect x="330" y="8" width="300" height="230" fill="#f8f1e3" stroke="#8a5208"/>
+  <text x="344" y="28" font-size="9" font-weight="700" fill="#8a5208">YAYIN</text>
+  <text x="344" y="45" font-size="8.5" fill="#454c53">publish_message(msg, TopicId(...))</text>
+  <rect x="350" y="66" width="90" height="40" fill="#fff" stroke="#16191c"/>
+  <text x="368" y="90" font-size="9">publisher</text>
+  <rect x="500" y="58" width="86" height="26" fill="#fff" stroke="#16191c"/>
+  <text x="520" y="75" font-size="8.5">abone 1</text>
+  <rect x="500" y="90" width="86" height="26" fill="#fff" stroke="#16191c"/>
+  <text x="520" y="107" font-size="8.5">abone 2</text>
+  <path d="M440 82 L500 71" stroke="#8a5208" marker-end="url(#a4)"/>
+  <path d="M440 88 L500 103" stroke="#8a5208" marker-end="url(#a4)"/>
+  <text x="344" y="130" font-size="8" fill="#454c53">cevap: YOK — her zaman None</text>
+  <text x="344" y="146" font-size="8" fill="#454c53">alıcı: kaç abone varsa</text>
+  <text x="344" y="162" font-size="8" fill="#454c53">bağ: gevşek — kimse kimseyi tanımıyor</text>
+  <rect x="344" y="176" width="270" height="46" fill="#fff" stroke="#8a5208"/>
+  <text x="356" y="194" font-size="9" font-weight="700" fill="#8a5208">hata → loglanır, GİTMEZ</text>
+  <text x="356" y="210" font-size="8" fill="#454c53">"logged but will not be propagated</text>
+  <text x="356" y="222" font-size="8" fill="#454c53"> back to the publishing agent"</text>
+
+  <defs>
+    <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#16191c"/></marker>
+    <marker id="a3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#14594a"/></marker>
+    <marker id="a4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#8a5208"/></marker>
+  </defs>
+</svg>
+<div class="cap">İki biçim yan yana. Asıl fark alt satırda: hatanın nereye gittiği.</div>
+
+<p><strong>Bu tek fark her şeyi açıklıyor.</strong> Paralel dallarda sonuç kaybediyorsan
+sebebi bir bug değil — yayın seçtiysen hata zaten kimseye gitmiyor. Doğrudan mesajda
+seçseydin her çöküş elinde olurdu, ama paralellik ve gevşek bağ giderdi.</p>
+
+<h5>Yayının dört sessiz kuralı <span class="tag t-k">kaynak</span></h5>
+<table>
+<thead><tr><th>kural</th><th>pratikte</th></tr></thead>
+<tbody>
+<tr><td><em>"it will always return <code>None</code>"</em> — ama yine de <code>await</code> edilmeli</td><td>O <code>await</code> bir senkronizasyon, cevap değil</td></tr>
+<tr><td><em>"If a response is given… it will be <strong>thrown away</strong>"</em></td><td>Yayın handler'ından <code>return</code> yazan uyarı almaz</td></tr>
+<tr><td><em>"…will <strong>not receive</strong> the message it published"</em></td><td>Kendi yayınını duymazsın — sonsuz döngüye karşı, açıkça</td></tr>
+<tr><td><em>"…this will be <strong>logged</strong> but will not be propagated"</em></td><td>Çöküş kaybolmuyor; <strong>kontrol akışına girmiyor</strong></td></tr>
+</tbody></table>
+
+<p>Dördüncüsü en ince ayrım. "Yayında hata kaybolur" demek eksik: hata
+<code>MessageHandlerExceptionEvent</code> olarak <strong>olay akışına düşüyor</strong>.
+Gözlemlenebilir, ama eyleme dönüştürülemez — yayınlayan taraf bir şey öğrenmiyor, ancak
+bir dinleyici öğrenebiliyor.</p>
+
+<h3 class="brk">2.4 Topic ve abonelik — en atlanan sayfa</h3>
+
+<p>Yayının adresleme modeli. Bir topic'in iki parçası var: <strong>tip</strong>
+(kategori) ve <strong>kaynak</strong> (o kategorideki benzersiz kimlik).
+<code>TypeSubscription</code> bir topic <em>tipini</em> bir ajan <em>tipine</em>
+bağlıyor. Asıl incelik ise şu:</p>
+
+<svg viewBox="0 0 620 168" width="620" height="168" font-family="DejaVu Sans Mono, monospace">
+  <rect x="16" y="12" width="330" height="40" fill="#fff" stroke="#16191c"/>
+  <text x="30" y="37" font-size="10">TopicId("gorev", "sirket-42")</text>
+  <text x="360" y="26" font-size="8.5" fill="#454c53">TypeSubscription(</text>
+  <text x="368" y="39" font-size="8.5" fill="#454c53">topic_type="gorev",</text>
+  <text x="368" y="52" font-size="8.5" fill="#454c53">agent_type="analist")</text>
+
+  <path d="M181 52 L181 92" stroke="#8a5208" stroke-width="2" marker-end="url(#a5)"/>
+  <text x="192" y="76" font-size="8.5" fill="#767d84">runtime · lazy</text>
+
+  <rect x="16" y="92" width="330" height="40" fill="#f8f1e3" stroke="#8a5208" stroke-width="2"/>
+  <text x="30" y="117" font-size="10">AgentId("analist", "sirket-42")</text>
+  <text x="360" y="106" font-size="9" fill="#8a5208">şirket başına izole</text>
+  <text x="360" y="119" font-size="9" fill="#8a5208">ajan örneği — bedava</text>
+
+  <text x="16" y="156" font-size="9" fill="#8a5208" font-weight="700">Topic kaynağı, ajan anahtarına dönüşür.</text>
+  <defs><marker id="a5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#8a5208"/></marker></defs>
+</svg>
+<div class="cap">Çok kiracılı yapının hazır mekanizması — ve çoğu kişinin kaçırdığı yer</div>
+
+<p>Kılavuzun saydığı üç senaryo:</p>
+<table>
+<thead><tr><th>senaryo</th><th>nasıl</th></tr></thead>
+<tbody>
+<tr><td>Tek kiracı, tek topic</td><td>Hepsi aynı topic tipi, kaynak sabit <code>"default"</code></td></tr>
+<tr><td>Tek kiracı, çok topic</td><td>Ajan başına ayrı topic tipi, kaynak aynı</td></tr>
+<tr><td><strong>Çok kiracı</strong></td><td>Kaynak veriye bağlı — kiracı/oturum/kayıt başına izolasyon</td></tr>
+</tbody></table>
+
+<p><code>DefaultTopicId</code> kısayolu: topic tipi <code>"default"</code>, <strong>kaynak
+yayınlayan ajanın anahtarı</strong>. <code>@default_subscription</code> ile birlikte tek
+kapsamlı senaryoyu üç satıra indiriyor.</p>
+
+<h3>2.5 RoutedAgent — tipe göre yönlendirme</h3>
+
+<pre>class MyAgent(RoutedAgent):
+    @message_handler
+    async def handle_text(self, message: TextMessage, ctx: MessageContext) -> None: ...
+
+    @message_handler
+    async def handle_image(self, message: ImageMessage, ctx: MessageContext) -> None: ...</pre>
+
+<p>Hangi handler'ın çalışacağını <strong>tip anotasyonu</strong> belirliyor —
+<code>if</code> bloğu değil, tip sistemi. Bir ajanın birden çok handler'ı olabilir.</p>
+
+<h5>Aynı tipi ayırmak: <code>match</code> <span class="tag t-k">kaynak</span></h5>
+<pre>@message_handler(match=lambda msg, ctx: msg.source.startswith("user1"))
+async def on_user1(self, message: TextMessage, ctx: MessageContext) -> None: ...</pre>
+
+<p>Üç incelik, üçü de kolayca kaçıyor:</p>
+<ol>
+<li><code>match</code>, tip yönlendirmesine <strong>ikincil</strong> — önce tip, sonra koşul.</li>
+<li>Koşullar <strong>handler adlarının alfabetik sırasıyla</strong> deneniyor. Sırayı
+dosyadaki yazım değil, fonksiyon adı belirliyor.</li>
+<li><strong>Hiçbiri tutmazsa mesaj sessizce işlenmiyor.</strong> Kılavuzun kendi
+örneğinde dört mesajdan biri hiç ele alınmıyor ve çıktıda buna dair tek satır yok.</li>
+</ol>
+
+<blockquote class="r"><p><span class="tag t-m">ölçüldü</span> <strong>En sinsi tuzak
+burada.</strong> Tip çıkarımı <code>get_type_hints()</code> ile yapılıyor ve
+<code>from __future__ import annotations</code> varken anotasyonlar <em>modül
+genelinde</em> çözülüyor. <code>MessageContext</code>'i fonksiyon içinde import edersen
+<strong>kayıt sırasında</strong> çıplak bir <code>NameError</code> alırsın — handler'ın
+kendisinde değil. Ayrıca parametre adları bağlayıcı: <code>message</code> ve
+<code>ctx</code> olmak zorunda.</p></blockquote>
+
+<h3>2.6 Gözlemlenebilirlik — iki logger, altı olay</h3>
+
+<pre>logging.getLogger(EVENT_LOGGER_NAME)   # "autogen_core.events" — yapılandırılmış
+logging.getLogger(TRACE_LOGGER_NAME)   # insan okunur iz</pre>
+
+<table>
+<thead><tr><th>olay</th><th>ne zaman</th></tr></thead>
+<tbody>
+<tr><td><code>LLMCallEvent</code></td><td><code>create()</code> çağrıldığında</td></tr>
+<tr><td><code>LLMStreamEndEvent</code></td><td><code>create_stream()</code> bittiğinde — ve <strong>ilki asla</strong></td></tr>
+<tr><td><code>ToolCallEvent</code></td><td>Her <code>BaseTool</code> alt sınıfı çağrıldığında</td></tr>
+<tr><td><code>MessageEvent</code> · <code>MessageDroppedEvent</code></td><td>Mesaj yolu</td></tr>
+<tr><td><code>MessageHandlerExceptionEvent</code></td><td>Handler çöktüğünde</td></tr>
+</tbody></table>
+
+<blockquote class="r"><p><span class="tag t-m">ölçüldü</span> <strong>İki tuzak, ikisi de
+sessiz.</strong> (1) Akış kullanınca sadece <code>LLMCallEvent</code> dinlersen maliyet
+<strong>0</strong> raporlanır — kod doğrudur, yanlış olayı dinliyordur. (2)
+<code>LLMCallEvent</code> alanlarını öznitelik yapar ama <code>ToolCallEvent</code>
+hepsini <code>.kwargs</code> sözlüğünde tutar; <code>event.tool_name</code> yazarsan
+<code>AttributeError</code> alırsın ve o hata <code>logging.Handler</code> içinde
+oluştuğu için <code>handleError</code> tarafından <strong>yutulur</strong>. Olay hiç
+kaydedilmez, hata da görünmez.</p></blockquote>
+
+<h3>2.7 InterventionHandler — teslimden önceki kapı</h3>
+
+<pre>class TerminationHandler(DefaultInterventionHandler):
+    async def on_publish(self, message, *, message_context):
+        if isinstance(message, Termination):
+            self._value = message
+        return message          # ya da DropMessage
+
+runtime = SingleThreadedAgentRuntime(intervention_handlers=[TerminationHandler()])</pre>
+
+<p>Asıl kullanımı <code>DropMessage</code> döndürerek bir tool çağrısını
+<strong>engellemek</strong>. Neden değerli olduğu tek cümlede:</p>
+
+<blockquote class="g"><p><strong>Onay kapısı ajanın uyum göstermeyi seçmesine değil,
+runtime'a dayanır.</strong> Model ne kadar ikna edilirse edilsin mesaj hattı onun altında.</p></blockquote>
+
+<blockquote><p><span class="tag t-m">ölçüldü</span> <strong>Ama bir bedeli var.</strong>
+<code>InterventionHandler</code> takmanın tek yolu runtime'ı kendin kurmak — ve o anda
+hata semantiği değişiyor: gömülü runtime <code>run_stream</code>'den <em>exception
+fırlatıyor</em>, dıştan verilen <em>hiç dönmüyor</em>. Gelmeyecek bir sonlanma mesajı
+bekleniyor; <code>MaxMessageTermination</code> kurtaramıyor çünkü yeni mesaj da gelmiyor.
+Duvar saati sınırı burada tedbir değil, <strong>doğruluk şartı</strong>.</p></blockquote>
+<h2 class="brk">I · 3 — autogen_agentchat: günlük iş</h2>
+
+<p class="lead">Core mesajlaşma modelidir; AgentChat onun üstünde <em>konuşma</em>
+soyutlaması kurar. Çoğu uygulama buradan başlar ve çoğu tutorial burada biter.</p>
+
+<h3>3.1 AssistantAgent — bütün kılavuzun ana kahramanı</h3>
+
+<p>Parametreleri, kararların çoğunu içeriyor:</p>
+
+<table>
+<thead><tr><th>parametre</th><th>ne yapar</th><th>dikkat</th></tr></thead>
+<tbody>
+<tr><td><code>model_client</code></td><td>Hangi model</td><td><strong>Ajan başına ayrı olabilir</strong> — model kademelendirme buradan</td></tr>
+<tr><td><code>tools</code></td><td>Fonksiyonlar</td><td>Şema <strong>imzadan ve docstring'den</strong> üretilir</td></tr>
+<tr><td><code>workbench</code></td><td>Tool <em>kaynağı</em> (MCP dahil)</td><td><code>tools</code> ile <strong>birlikte verilemez</strong></td></tr>
+<tr><td><code>system_message</code></td><td>Rolü</td><td>—</td></tr>
+<tr><td><code>description</code></td><td>Takım içinde <strong>yönlendirme bunu okur</strong></td><td>Boş bırakılırsa seçici kör kalır</td></tr>
+<tr><td><code>model_context</code></td><td>Bellek</td><td>Yoksa ajan turlar arası <strong>durumsuz</strong></td></tr>
+<tr><td><code>output_content_type</code></td><td>Pydantic ile yapısal çıktı</td><td>Takımda <code>custom_message_types</code> beyanı gerekir</td></tr>
+<tr><td><code>reflect_on_tool_use</code></td><td>Tool sonucunu yorumlasın mı</td><td>—</td></tr>
+<tr><td><code>max_tool_iterations</code></td><td>Zincirleme tool çağrısı</td><td><strong>Varsayılan 1</strong></td></tr>
+<tr><td><code>model_client_stream</code></td><td>Token token akış</td><td>Kullanım olayını değiştirir (§2.6)</td></tr>
+<tr><td><code>handoffs</code></td><td>Devir hedefleri (Swarm)</td><td>Tool adı küçük harfe düşer</td></tr>
+</tbody></table>
+
+<blockquote class="r"><p><span class="tag t-m">ölçüldü</span> <strong>İki tuzak burada
+oturuyor.</strong> (1) <code>tools=</code> ile <code>workbench=</code> birlikte verilemez:
+<em>"Tools cannot be used with a workbench."</em> Çözüm, yerel fonksiyonları
+<code>StaticWorkbench</code>'e sarıp <code>workbench</code>'e <strong>liste</strong>
+vermek. (2) <code>max_tool_iterations</code> varsayılanı <strong>1</strong>: ajan bir
+tool çağırır, sonucu görür ve <em>susar</em>. "Önce ara, sonra bulduğunu incele"
+davranışı varsayılan ayarla imkânsız — ve hata vermiyor.</p></blockquote>
+
+<h3>3.2 İki mesaj ailesi</h3>
+
+<div class="two">
+<div>
+<h5>BaseChatMessage — <em>iletişim</em></h5>
+<p class="note">Ajanlar arasında gidip gelen.</p>
+<p><code>TextMessage</code> · <code>MultiModalMessage</code> ·
+<code>HandoffMessage</code> · <code>StopMessage</code> ·
+<code>ToolCallSummaryMessage</code> · <code>StructuredMessage[T]</code></p>
+</div>
+<div>
+<h5>BaseAgentEvent — <em>iç olaylar</em></h5>
+<p class="note">Ajanın yaptığı işin izi.</p>
+<p><code>ToolCallRequestEvent</code> · <code>ToolCallExecutionEvent</code> ·
+<code>ModelClientStreamingChunkEvent</code> · <code>MemoryQueryEvent</code> ·
+<code>UserInputRequestedEvent</code></p>
+</div>
+</div>
+
+<p>Ayrım pratikte şuna yarıyor: akışı dinlerken <em>"bu bir cevap mı, yoksa ajanın
+yaptığı bir iş mi"</em> sorusunu <strong>tip</strong> cevaplıyor. Bir arayüzde tool
+çağrılarının ayrı satır olarak görünmesi bu sayede.</p>
+
+<h3>3.3 Beş takım — kim konuşacağına kim karar veriyor</h3>
+
+<svg viewBox="0 0 640 260" width="640" height="260" font-family="DejaVu Sans Mono, monospace">
+  <!-- roundrobin -->
+  <text x="14" y="14" font-size="8.5" font-weight="700">RoundRobinGroupChat</text>
+  <circle cx="40" cy="46" r="13" fill="#fff" stroke="#16191c"/><text x="36" y="50" font-size="8">A</text>
+  <circle cx="86" cy="46" r="13" fill="#fff" stroke="#16191c"/><text x="82" y="50" font-size="8">B</text>
+  <circle cx="132" cy="46" r="13" fill="#fff" stroke="#16191c"/><text x="128" y="50" font-size="8">C</text>
+  <path d="M53 46 L73 46" stroke="#16191c" marker-end="url(#b1)"/>
+  <path d="M99 46 L119 46" stroke="#16191c" marker-end="url(#b1)"/>
+  <path d="M132 60 Q86 84 40 60" stroke="#16191c" fill="none" marker-end="url(#b1)"/>
+  <text x="14" y="98" font-size="7.5" fill="#767d84">sıra · kimseyi atlayamaz · 274 token</text>
+
+  <!-- selector -->
+  <text x="216" y="14" font-size="8.5" font-weight="700">SelectorGroupChat</text>
+  <rect x="256" y="30" width="56" height="22" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="264" y="45" font-size="7.5" fill="#14594a">seçici</text>
+  <circle cx="232" cy="82" r="13" fill="#fff" stroke="#16191c"/><text x="228" y="86" font-size="8">A</text>
+  <circle cx="284" cy="82" r="13" fill="#fff" stroke="#16191c"/><text x="280" y="86" font-size="8">B</text>
+  <circle cx="336" cy="82" r="13" fill="#fff" stroke="#16191c"/><text x="332" y="86" font-size="8">C</text>
+  <path d="M276 52 L240 70" stroke="#14594a" marker-end="url(#b2)"/>
+  <path d="M284 52 L284 68" stroke="#14594a" marker-end="url(#b2)"/>
+  <path d="M296 52 L328 70" stroke="#14594a" stroke-dasharray="2 2"/>
+  <text x="216" y="112" font-size="7.5" fill="#14594a">model ya da selector_func · 204 token</text>
+
+  <!-- swarm -->
+  <text x="440" y="14" font-size="8.5" font-weight="700">Swarm</text>
+  <circle cx="470" cy="46" r="13" fill="#fff" stroke="#16191c"/><text x="466" y="50" font-size="8">A</text>
+  <circle cx="536" cy="46" r="13" fill="#fff" stroke="#16191c"/><text x="532" y="50" font-size="8">B</text>
+  <circle cx="602" cy="46" r="13" fill="#fff" stroke="#16191c"/><text x="598" y="50" font-size="8">C</text>
+  <path d="M483 46 L523 46" stroke="#8a5208" marker-end="url(#b3)"/>
+  <path d="M549 46 L589 46" stroke="#8a5208" marker-end="url(#b3)"/>
+  <text x="486" y="38" font-size="6.5" fill="#8a5208">handoff</text>
+  <text x="440" y="98" font-size="7.5" fill="#8a5208">ajanın kendisi · devir bir tool · 334 token</text>
+
+  <!-- graphflow -->
+  <text x="14" y="150" font-size="8.5" font-weight="700">GraphFlow</text>
+  <circle cx="40" cy="184" r="13" fill="#fff" stroke="#16191c"/><text x="36" y="188" font-size="8">A</text>
+  <circle cx="104" cy="164" r="13" fill="#fff" stroke="#16191c"/><text x="100" y="168" font-size="8">B</text>
+  <circle cx="104" cy="206" r="13" fill="#fff" stroke="#16191c"/><text x="100" y="210" font-size="8">C</text>
+  <circle cx="168" cy="184" r="13" fill="#fff" stroke="#16191c"/><text x="164" y="188" font-size="8">D</text>
+  <path d="M53 180 L91 168" stroke="#16191c" marker-end="url(#b1)"/>
+  <path d="M53 190 L91 202" stroke="#16191c" marker-end="url(#b1)"/>
+  <path d="M117 170 L155 180" stroke="#16191c" marker-end="url(#b1)"/>
+  <path d="M117 200 L155 190" stroke="#16191c" marker-end="url(#b1)"/>
+  <text x="14" y="234" font-size="7.5" fill="#767d84">önceden çizili graf · fan-out + join · 270 token</text>
+
+  <!-- magentic -->
+  <text x="216" y="150" font-size="8.5" font-weight="700">MagenticOneGroupChat</text>
+  <rect x="252" y="164" width="80" height="24" fill="#e4ebf3" stroke="#2c4a6b"/>
+  <text x="258" y="180" font-size="7.5" fill="#2c4a6b">orkestratör</text>
+  <circle cx="240" cy="216" r="12" fill="#fff" stroke="#16191c"/>
+  <circle cx="292" cy="216" r="12" fill="#fff" stroke="#16191c"/>
+  <circle cx="344" cy="216" r="12" fill="#fff" stroke="#16191c"/>
+  <path d="M276 188 L246 204" stroke="#2c4a6b" marker-end="url(#b4)"/>
+  <path d="M292 188 L292 204" stroke="#2c4a6b" marker-end="url(#b4)"/>
+  <path d="M308 188 L338 204" stroke="#2c4a6b" marker-end="url(#b4)"/>
+  <text x="216" y="244" font-size="7.5" fill="#2c4a6b">genel amaçlı · plan + ilerleme defteri</text>
+
+  <rect x="430" y="150" width="200" height="96" fill="#f8f1e3" stroke="#8a5208"/>
+  <text x="442" y="170" font-size="8.5" font-weight="700" fill="#8a5208">%63,7 fark</text>
+  <text x="442" y="188" font-size="7.5" fill="#454c53">Aynı görev, aynı ajanlar.</text>
+  <text x="442" y="202" font-size="7.5" fill="#454c53">Değişen tek şey: yönlendirme.</text>
+  <text x="442" y="222" font-size="7.5" fill="#454c53">Ödenen şey zekâ değil,</text>
+  <text x="442" y="234" font-size="7.5" fill="#8a5208" font-weight="700">yönlendirme özerkliği.</text>
+
+  <defs>
+    <marker id="b1" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#16191c"/></marker>
+    <marker id="b2" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#14594a"/></marker>
+    <marker id="b3" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#8a5208"/></marker>
+    <marker id="b4" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#2c4a6b"/></marker>
+  </defs>
+</svg>
+<div class="cap"><span class="tag t-m">ölçüldü</span> Token sayıları <code>poc/kiyas.py</code>'den — aynı görev, aynı ajanlar</div>
+
+<p><code>SelectorGroupChat</code>'in iki kaçış kapısı önemli:
+<strong><code>selector_func</code></strong> ile seçimi Python'la yaparsın ve model hiç
+çağrılmaz — en ucuz yol; <strong><code>candidate_func</code></strong> ile modele sunulan
+aday listesini daraltırsın.</p>
+
+<h3>3.4 Sonlandırma — opsiyonel değil</h3>
+
+<table>
+<tbody>
+<tr><td style="width:32%"><code>MaxMessageTermination</code></td><td>N mesaj sonra</td></tr>
+<tr><td><code>TextMentionTermination</code></td><td>Bir metin geçince ("TERMINATE")</td></tr>
+<tr><td><code>TokenUsageTermination</code></td><td>Token sınırı</td></tr>
+<tr><td><code>TimeoutTermination</code></td><td>Süre</td></tr>
+<tr><td><code>HandoffTermination</code></td><td>Belirli bir hedefe devir olunca</td></tr>
+<tr><td><code>SourceMatchTermination</code></td><td>Belirli bir ajan konuşunca</td></tr>
+<tr><td><code>ExternalTermination</code></td><td>Dışarıdan <code>set()</code></td></tr>
+<tr><td><code>StopMessageTermination</code> · <code>FunctionCallTermination</code> · <code>FunctionalTermination</code></td><td>Mesaj tipi · tool adı · kendi fonksiyonun</td></tr>
+</tbody></table>
+
+<pre>MaxMessageTermination(10) | TextMentionTermination("TERMINATE")   # birleştirilebilir</pre>
+
+<blockquote class="r"><p><strong>Sonlandırma koşulu olmayan takım = sonsuz döngü =
+gerçek fatura.</strong> Bu bir stil tercihi değil; bir ajan diğerine cevap verdiği sürece
+döngü kendi kendine bitmiyor.</p></blockquote>
+
+<h3>3.5 Durum, bellek, insan</h3>
+
+<p><strong>Durum:</strong> <code>save_state()</code> / <code>load_state()</code>.
+Kaydedilen şey <strong><code>model_context</code>'in tuttuğudur</strong> — bağlam
+vermediysen kaydedilecek sohbet de yok. İkisi birlikte düşünülmeli.</p>
+
+<p><strong>Bellek:</strong> <code>Memory</code> protokolü; uygulamaları
+<code>autogen_ext.memory</code>'de — <code>chromadb</code>, <code>mem0</code>,
+<code>redis</code>, <code>canvas</code>.</p>
+
+<p><strong>İnsan döngüde:</strong> iki yol var, ve kılavuz ikincisini öneriyor.
+<code>UserProxyAgent</code> takımın içinde durup sırası gelince insana sorar — basit ama
+<em>takımı bloklar</em>. Diğer yol <code>HandoffTermination</code> ile çalışmayı bitirip
+geri dönmek: takım durur, sen cevabı alıp <code>run()</code>'ı tekrar çağırırsın. Uzun
+bir insan beklemesi sırasında takımı ayakta tutmak kırılgan.</p>
+
+<h2 class="brk">I · 4 — Components Guide: beş bileşen</h2>
+
+<p class="lead">Core kılavuzunun <em>Components Guide</em> başlığı altındaki beş sayfa.
+Bunlar "ajan nasıl düşünür"ün değil, <strong>"ajan neyle çalışır"ın</strong> cevabı:
+model, bağlam, araç, araç kaynağı, ve kod yürütücü.</p>
+
+<h3>4.1 Model Clients</h3>
+
+<p>Hepsi <code>ChatCompletionClient</code> protokolünü uyguluyor. Yerleşik olanlar:</p>
+
+<table>
+<thead><tr><th>istemci</th><th>ne için</th></tr></thead>
+<tbody>
+<tr><td><code>OpenAIChatCompletionClient</code></td><td>OpenAI modelleri <strong>ve OpenAI-uyumlu her endpoint</strong> (Gemini dahil)</td></tr>
+<tr><td><code>AzureOpenAIChatCompletionClient</code></td><td>Azure OpenAI</td></tr>
+<tr><td><code>AzureAIChatCompletionClient</code></td><td>GitHub Models ve Azure'da barınan modeller</td></tr>
+<tr><td><code>OllamaChatCompletionClient</code> <span class="note">(deneysel)</span></td><td>Yerel modeller</td></tr>
+<tr><td><code>AnthropicChatCompletionClient</code> <span class="note">(deneysel)</span></td><td>Anthropic</td></tr>
+<tr><td><code>SKChatCompletionAdapter</code></td><td>Semantic Kernel AI connector'ları</td></tr>
+<tr><td><code>ReplayChatCompletionClient</code></td><td><strong>Test:</strong> yanıtlar önceden yazılı, ağ yok, deterministik</td></tr>
+<tr><td><code>ChatCompletionCache</code></td><td>Herhangi bir istemciyi sarmalayıp yanıtları önbelleğe alır</td></tr>
+</tbody></table>
+
+<h5>Sayfanın kapsadığı altı konu</h5>
+<table>
+<tbody>
+<tr><td style="width:30%"><strong>Log Model Calls</strong></td><td><code>EVENT_LOGGER_NAME</code>'e <code>LLMCall</code> olayı düşüyor — maliyet ölçümünün resmî yolu</td></tr>
+<tr><td><strong>Call Model Client</strong></td><td><code>create()</code> ile tek çağrı; <code>UserMessage</code>/<code>SystemMessage</code> listesi verirsin</td></tr>
+<tr><td><strong>Streaming Tokens</strong></td><td><code>create_stream()</code> — parça parça <code>str</code>, sonda <code>CreateResult</code></td></tr>
+<tr><td><strong>Structured Output</strong></td><td><code>json_output=</code> parametresine Pydantic sınıfı verilir</td></tr>
+<tr><td><strong>Caching</strong></td><td><code>ChatCompletionCache</code> + bir <code>CacheStore</code> (disk ya da Redis)</td></tr>
+<tr><td><strong>Agent with a Model Client</strong></td><td>Model istemcisi olan bir <code>RoutedAgent</code>'ın en küçük hâli</td></tr>
+</tbody></table>
+
+<blockquote class="r"><p><span class="tag t-m">ölçüldü</span> <strong>OpenAI-uyumlu her
+endpoint'te <code>model_info</code> zorunlu.</strong> Model adı OpenAI kataloğunda yoksa:
+<code>ValueError: model_info is required when model name is not a valid OpenAI model</code>.
+Ve bu bir <em>beyandır</em>, ölçüm değil — <code>function_calling</code>,
+<code>json_output</code>, <code>structured_output</code>, <code>vision</code>,
+<code>family</code> alanlarını sen doldurursun. Desteklenmeyen bir yeteneği iddia edersen
+hata başlangıçta değil, <strong>yapısal çıktı isteyen ilk adımda</strong> çıkar.</p></blockquote>
+
+<h3>4.2 Model Context</h3>
+
+<p>Ajanın belleği: model istemcisine gönderilecek mesaj listesini yöneten nesne. Dört
+strateji, ve aralarındaki fark maliyeti doğrudan belirliyor:</p>
+
+<svg viewBox="0 0 620 126" width="620" height="126" font-family="DejaVu Sans Mono, monospace">
+  <text x="14" y="16" font-size="8" fill="#767d84">geçmiş →</text>
+  <g>
+    <text x="14" y="36" font-size="8">Unbounded</text>
+    <rect x="120" y="26" width="380" height="12" fill="#f8f1e3" stroke="#8a5208"/>
+    <text x="510" y="36" font-size="7.5" fill="#454c53">her şey</text>
+  </g>
+  <g>
+    <text x="14" y="58" font-size="8">Buffered(N)</text>
+    <rect x="120" y="48" width="270" height="12" fill="#fff" stroke="#dcdfd9"/>
+    <rect x="390" y="48" width="110" height="12" fill="#e5f0ea" stroke="#14594a"/>
+    <text x="510" y="58" font-size="7.5" fill="#454c53">son N MESAJ</text>
+  </g>
+  <g>
+    <text x="14" y="80" font-size="8">HeadAndTail</text>
+    <rect x="120" y="70" width="70" height="12" fill="#e4ebf3" stroke="#2c4a6b"/>
+    <rect x="190" y="70" width="220" height="12" fill="#fff" stroke="#dcdfd9"/>
+    <rect x="410" y="70" width="90" height="12" fill="#e4ebf3" stroke="#2c4a6b"/>
+    <text x="510" y="80" font-size="7.5" fill="#454c53">baş + son</text>
+  </g>
+  <g>
+    <text x="14" y="102" font-size="8">TokenLimited</text>
+    <rect x="120" y="92" width="230" height="12" fill="#fff" stroke="#dcdfd9"/>
+    <rect x="350" y="92" width="150" height="12" fill="#e5f0ea" stroke="#14594a"/>
+    <text x="510" y="102" font-size="7.5" fill="#14594a">token bütçesi</text>
+  </g>
+  <text x="14" y="120" font-size="7.5" fill="#8a5208">Buffered MESAJ sayar — 24 kısa soru ile 24 uzun tool sonucu ona aynı görünür.</text>
+</svg>
+<div class="cap">Dört strateji. Maliyeti sınırlayan yalnız sonuncusu.</div>
+
+<blockquote><p><strong>İki ince nokta.</strong> (1) <code>buffer_size</code>
+<em>mesaj</em> sayar, token değil — uzun bir sohbette maliyeti sınırlayan şey bu değildir.
+(2) <code>save_state()</code>'in kaydettiği şey <strong>bağlamın tuttuğudur</strong>:
+bağlam vermediysen kaydedilecek sohbet de yoktur. Bu ikisi hep birlikte düşünülmeli.</p></blockquote>
+
+<h3>4.3 Tools</h3>
+
+<p>Tool, modelin çalıştırabileceği bir kod parçası. AutoGen'de üç yol var:</p>
+
+<h5>Yerleşik tool'lar</h5>
+<p><code>PythonCodeExecutionTool</code> gibi hazır olanlar — bir kod yürütücüyü tool
+hâline getiriyor.</p>
+
+<h5>Custom Function Tools</h5>
+<pre>async def get_stock_price(ticker: str, date: Annotated[str, "YYYY/MM/DD"]) -> float:
+    """Get the stock price."""
+    return random.uniform(10, 200)
+
+tool = FunctionTool(get_stock_price, description="Get the stock price.")</pre>
+
+<blockquote class="g"><p><strong>Şema imzadan ve docstring'den üretiliyor.</strong> Bunun
+pratik sonucu şu: <em>docstring dokümantasyon değil, arayüz.</em> Modelin tool'u doğru
+çağırıp çağırmayacağını docstring'in netliği belirliyor. <code>Annotated[str, "..."]</code>
+ile parametre başına açıklama da eklenebiliyor.</p></blockquote>
+
+<h5>Calling Tools with Model Clients</h5>
+<p>Döngü elle de kurulabiliyor: modele tool şemalarını verirsin, model bir
+<code>FunctionCall</code> döndürür, sen çalıştırıp sonucu
+<code>FunctionExecutionResultMessage</code> olarak geri verirsin. Sayfa bunu adım adım
+gösteriyor — <code>AssistantAgent</code>'ın kapağın altında yaptığı şey bu.</p>
+
+<h5>Tool-Equipped Agent</h5>
+<p>Ve üçüncüsü: <code>ToolAgent</code>'a <strong>doğrudan mesajla</strong> tool çağrısı
+yollayıp cevabıyla bir <em>eylem-gözlem döngüsü</em> kurmak. Kılavuzun doğrudan
+mesajlaşma için verdiği kanonik örnek de bu (§2.3).</p>
+
+<h3>4.4 Workbench ve MCP</h3>
+
+<p>Tool bir <em>fonksiyon</em>; workbench bir <strong>tool kaynağı</strong>. Fark, tek
+metotta görünüyor:</p>
+
+<pre>await workbench.list_tools()          # "bana hangi tool'ların olduğunu söyle"
+await workbench.call_tool(name, args)</pre>
+
+<blockquote class="g"><p><strong>Neden bu önemli:</strong> bir workbench, <em>ajan
+yazılırken var olmayan</em> tool'ları listeleyebiliyor. Uzak bir MCP sunucusunun yaptığı
+tam olarak bu — sunucu yarın yeni bir tool eklerse ajan onu yeniden yazılmadan görüyor.
+Sabit bir <code>tools=[...]</code> listesi bunu yapamaz.</p></blockquote>
+
+<table>
+<thead><tr><th>sınıf</th><th>ne</th></tr></thead>
+<tbody>
+<tr><td><code>StaticWorkbench</code></td><td>Yerel fonksiyonları workbench arayüzüne sarar</td></tr>
+<tr><td><code>McpWorkbench</code></td><td>Bir MCP sunucusunun tamamı tek kaynak olarak</td></tr>
+<tr><td><code>StdioServerParams</code></td><td>Yerel süreç (komut + argümanlar)</td></tr>
+<tr><td><code>SseServerParams</code></td><td>Server-sent events</td></tr>
+<tr><td><code>StreamableHttpServerParams</code></td><td>Streamable HTTP</td></tr>
+<tr><td><code>mcp_server_tools</code></td><td>MCP tool'larını tek tek <code>FunctionTool</code>'a çevirir</td></tr>
+</tbody></table>
+
+<blockquote class="r"><p><span class="tag t-m">ölçüldü</span> <code>tools=</code> ile
+<code>workbench=</code> aynı ajana <strong>verilemiyor</strong>:
+<em>"Tools cannot be used with a workbench."</em> İkisini birleştirmenin yolu yerel
+fonksiyonları <code>StaticWorkbench</code>'e sarıp <code>workbench</code>'e
+<strong>liste</strong> vermek.</p></blockquote>
+
+<h3>4.5 Command Line Code Executors</h3>
+
+<p>En basit kod yürütme biçimi: her kod bloğu bir dosyaya yazılır ve o dosya çalıştırılır.
+<strong>Her blok yeni bir süreçte</strong> koşuyor. İki uygulama, üç kullanım:</p>
+
+<svg viewBox="0 0 620 168" width="620" height="168" font-family="DejaVu Sans Mono, monospace">
+  <rect x="12" y="16" width="192" height="92" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="24" y="36" font-size="9" font-weight="700" fill="#14594a">Docker</text>
+  <text x="24" y="52" font-size="7.5" fill="#454c53">DockerCommandLineCodeExecutor</text>
+  <text x="24" y="68" font-size="7.5" fill="#454c53">varsayılan imaj: python:3-slim</text>
+  <text x="24" y="82" font-size="7.5" fill="#454c53">gereken: sh + python</text>
+  <text x="24" y="98" font-size="7.5" fill="#14594a">önerilen yol</text>
+
+  <rect x="216" y="16" width="192" height="92" fill="#f7e8e4" stroke="#8c2f1d"/>
+  <text x="228" y="36" font-size="9" font-weight="700" fill="#8c2f1d">Local</text>
+  <text x="228" y="52" font-size="7.5" fill="#454c53">LocalCommandLineCodeExecutor</text>
+  <text x="228" y="68" font-size="7.5" fill="#454c53">doğrudan host'ta</text>
+  <text x="228" y="84" font-size="7.5" fill="#8c2f1d">kılavuzun kendi uyarısı:</text>
+  <text x="228" y="98" font-size="7.5" fill="#8c2f1d">izolesiz çalıştırmak riskli</text>
+
+  <rect x="420" y="16" width="188" height="92" fill="#fff" stroke="#16191c"/>
+  <text x="432" y="36" font-size="9" font-weight="700">Local + venv</text>
+  <text x="432" y="52" font-size="7.5" fill="#454c53">sanal ortam içinde</text>
+  <text x="432" y="68" font-size="7.5" fill="#454c53">bağımlılık izolasyonu var</text>
+  <text x="432" y="84" font-size="7.5" fill="#454c53">süreç izolasyonu YOK</text>
+
+  <rect x="12" y="122" width="596" height="34" fill="#f6f7f3" stroke="#dcdfd9"/>
+  <text x="24" y="142" font-size="8" fill="#454c53">Docker context manager olarak kullanılabiliyor; değilse <tspan font-family="monospace">atexit</tspan> konteyneri kapatıyor. <tspan font-family="monospace">auto_remove=False</tspan> ile inceleme için bırakılabiliyor.</text>
+</svg>
+<div class="cap">Üç seçenek, azalan izolasyon sırasıyla</div>
+
+<p>Sayfa ayrıca <strong>Docker içindeki bir uygulamanın Docker tabanlı yürütücü
+kullanması</strong> senaryosunu da anlatıyor — yani konteyner içinden konteyner
+başlatma.</p>
+
+<blockquote class="g"><p><strong>Bu sayfa AutoGen'in en ayırt edici yanı.</strong>
+Rakiplerin çoğunda kod çalıştırmak "bir tool"; AutoGen'de ayrı bir alt paket
+(<code>code_executors</code>), ayrı bir ajan (<code>CodeExecutorAgent</code>) ve
+kutudan çıkan bir onay kapısı (<code>approval_func</code>) var. Sebebi tarihsel:
+AutoGen'in kurucu makalesinin konusu kod yazma/çalıştırma döngüsüydü.</p></blockquote>
+
+<h2 class="brk">I · 5 — Dokuz çok-ajan deseni</h2>
+
+<p class="lead">Kılavuzun kendi ayrımı: akış <strong>önceden mi çizili</strong>, yoksa
+<strong>konuşmadan mı doğuyor</strong>. Ve bir uyarı — bunlar kütüphane değil,
+<em>desen</em>. <code>autogen_core</code>'la yeniden kurulabilir şeyler.</p>
+
+<h3>5.1 Concurrent Agents — ve toplama meselesi</h3>
+
+<p>Aynı topic'e abone ajanlar paralel koşar. Kritik parça <strong>sonuç toplama</strong>:</p>
+
+<pre>queue = asyncio.Queue[TaskResponse]()
+
+async def collect(_agent: ClosureContext, message: TaskResponse, ctx: MessageContext) -> None:
+    await queue.put(message)
+
+await ClosureAgent.register_closure(
+    runtime, "collector", collect,
+    subscriptions=lambda: [TypeSubscription(topic_type=RESULTS, agent_type="collector")],
+)</pre>
+
+<svg viewBox="0 0 620 158" width="620" height="158" font-family="DejaVu Sans Mono, monospace">
+  <rect x="14" y="56" width="70" height="30" fill="#fff" stroke="#16191c"/><text x="26" y="76" font-size="8">görev</text>
+  <rect x="150" y="14" width="86" height="26" fill="#fff" stroke="#16191c"/><text x="164" y="31" font-size="8">işçi 1</text>
+  <rect x="150" y="58" width="86" height="26" fill="#fff" stroke="#16191c"/><text x="164" y="75" font-size="8">işçi 2</text>
+  <rect x="150" y="102" width="86" height="26" fill="#f7e8e4" stroke="#8c2f1d"/><text x="160" y="119" font-size="8" fill="#8c2f1d">işçi 3 ✗</text>
+  <path d="M84 66 L150 27" stroke="#16191c" marker-end="url(#c1)"/>
+  <path d="M84 71 L150 71" stroke="#16191c" marker-end="url(#c1)"/>
+  <path d="M84 76 L150 115" stroke="#16191c" marker-end="url(#c1)"/>
+  <rect x="310" y="44" width="90" height="56" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="320" y="66" font-size="8" fill="#14594a">ClosureAgent</text>
+  <text x="326" y="82" font-size="8" fill="#14594a">→ Queue</text>
+  <path d="M236 27 L310 62" stroke="#14594a" marker-end="url(#c2)"/>
+  <path d="M236 71 L310 71" stroke="#14594a" marker-end="url(#c2)"/>
+  <path d="M236 115 L310 84" stroke="#8c2f1d" stroke-dasharray="3 2" marker-end="url(#c3)"/>
+  <text x="424" y="60" font-size="8.5" fill="#14594a" font-weight="700">2 sonuç kuyrukta</text>
+  <text x="424" y="76" font-size="8" fill="#454c53">3. dal çöktü ama</text>
+  <text x="424" y="90" font-size="8" fill="#454c53">1 ve 2 kaybolmadı</text>
+  <text x="14" y="148" font-size="8.5" fill="#14594a" font-weight="700">Güvenilmeyecek bariyer yok, çünkü bariyer yok.</text>
+  <defs>
+    <marker id="c1" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#16191c"/></marker>
+    <marker id="c2" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#14594a"/></marker>
+    <marker id="c3" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#8c2f1d"/></marker>
+  </defs>
+</svg>
+<div class="cap">Sonuç üretildiği anda yayınlanıyor; kuyruk onu çoktan tutuyor</div>
+
+<table>
+<thead><tr><th>motor</th><th>temiz</th><th>sarmalayıcı arkasında hata</th><th>ham hata</th></tr></thead>
+<tbody>
+<tr><td><code>GraphFlow</code> (AgentChat)</td><td>3 dal</td><td>2 dal</td><td><strong>0–1 dal · süre sınırı dolar</strong></td></tr>
+<tr><td>pub/sub + <code>ClosureAgent</code> (core)</td><td>3 dal</td><td>2 dal</td><td><strong>2 dal · ~3 ms</strong></td></tr>
+</tbody></table>
+<div class="cap"><span class="tag t-m">ölçüldü</span> aynı arıza enjeksiyonu · kaç dalın kaybolduğu <strong>deterministik değil</strong></div>
+
+<blockquote class="r"><p><strong>Ve bundan güçlü bir bulgu:</strong> resmî desenler bu
+konuda <em>birbiriyle çelişiyor</em>. <em>Concurrent Agents</em> kuyrukla topluyor;
+<em>Mixture of Agents</em> <code>asyncio.gather</code> ile — yani kaybın kaynağı olan
+yapıyla. Kılavuzun kendisi iki farklı arıza davranışı öneriyor.</p></blockquote>
+
+<h3>5.2 Diğer sekiz desen</h3>
+
+<div class="card">
+<h4>Sequential Workflow</h4>
+<p>Her ajan bir öncekinin çıktısını alır; <code>@type_subscription</code> ile her adım
+kendi topic tipini dinler. Kavram çıkar → yaz → biçimlendir.</p>
+<p class="note">AutoGen'in en zayıf temsil ettiği desen: ya <code>RoundRobinGroupChat</code>
+ya <code>GraphFlow</code> — ikisi de bu iş için ağır.</p>
+</div>
+
+<div class="card">
+<h4>Group Chat</h4>
+<p>Ortak thread + bir konuşmacı seçici. Mesaj tipleri <code>GroupChatMessage</code>
+(içerik) ve <code>RequestToSpeak</code> (sıra sende).</p>
+<p class="note">Kılavuzun kendi cümlesi: <em>"not meant to be used in real applications…
+a starting point."</em> Üretim sürümü <code>SelectorGroupChat</code>.</p>
+</div>
+
+<div class="card">
+<h4>Handoffs</h4>
+<p>OpenAI'ın Swarm desenine dayanıyor. Ajan bir <strong>devir tool'u</strong> çağırarak
+konuşmayı başkasına verir. Örnek: triyaj → onarım → insan.</p>
+<p class="note"><span class="tag t-m">ölçüldü</span> En pahalı desen: 334 token. Her devir
+bir tool çağrısı artı hiç iş üretmeyen bir LLM turu.</p>
+</div>
+
+<div class="card">
+<h4>Mixture of Agents</h4>
+<p>Katmanlı işçiler: her katmanın çıktıları birleştirilip sonrakine verilir, sonunda bir
+orkestratör toplar.</p>
+<p class="note">Orkestratör <code>asyncio.gather</code> kullanıyor — §5.1'deki kaybın
+kaynağı olan yapı.</p>
+</div>
+
+<div class="card">
+<h4>Multi-Agent Debate</h4>
+<p><strong>Seyrek topoloji:</strong> her çözücü yalnız birkaç komşusuna bağlı (dört ajan
+bir kare, her biri iki komşuya). Birkaç tur boyunca komşuların cevaplarını görüp kendi
+cevabını düzeltir; sonunda bir toplayıcı <strong>çoğunluk oyu</strong> alır.</p>
+<p class="note">Maliyeti N ajan × R tur. Ve oylama, aynı girdiye iki koşuda iki cevap
+verme riskini geri getirir.</p>
+</div>
+
+<div class="card">
+<h4>Reflection</h4>
+<p>Üretici + eleştirmen döngüsü: <code>CoderAgent</code> yazar,
+<code>ReviewerAgent</code> bir <code>CodeReviewResult</code> döndürür, onaylanana kadar
+döner.</p>
+<p class="note"><strong>Kılavuz durma ölçütü önermiyor.</strong> Döngü kurarsan faturayı
+sınırlayan tek şey kalmıyor — bu, deseni olduğu gibi almanın en riskli yeri.</p>
+</div>
+
+<div class="card">
+<h4>Code Execution</h4>
+<p>Group chat + kod yürütücü: model kod yazar, bir ajan çalıştırır, sonuç geri döner.
+AutoGen'in kurucu makalesinin konusu buydu.</p>
+<p class="note">Kod yürütme AutoGen'de <strong>birinci sınıf</strong>: ayrı alt paket
+(<code>code_executors</code>), ayrı ajan (<code>CodeExecutorAgent</code>), ve onay kapısı
+(<code>approval_func</code>). Rakiplerin çoğunda "bir tool".</p>
+</div>
+
+<div class="card b">
+<h4>Intro — desenlerin kendi sınıflandırması</h4>
+<p>Ana ayrım: <strong>önceden çizili</strong> (sequential, graph) ve <strong>konuşmadan
+doğan</strong> (group chat, handoff). Bu ayrım framework seçiminde de karşına çıkıyor —
+§II'ye bakın.</p>
+</div>
+
+<h2 class="brk">II · Rakiplerle karşılaştırma</h2>
+
+<p class="lead">Bir framework seçmek, aslında bir <strong>metafor</strong> seçmek. Her
+framework'ün bir dünya görüşü var ve o görüş bütün API'yi belirliyor.</p>
+
+<blockquote><p><span class="tag t-t">teyitsiz</span> <strong>Dürüstlük notu:</strong> bu
+bölümdeki framework'lerden yalnız <strong>Google ADK</strong> bu ortamda kurulu.
+LangGraph, CrewAI, Agents SDK, Agno ve DeepAgents hakkındaki satırlar ya okumaya ya da
+o repoların <em>kendi test/cookbook kodlarına</em> dayanıyor — API yüzeyi için
+<span class="tag t-k">kaynak</span> sayılır, davranış için sayılmaz.</p></blockquote>
+
+<h3>II · 1 — Metafor ekseni</h3>
+
+<table>
+<thead><tr><th>framework</th><th>metafor</th><th>temel primitif</th></tr></thead>
+<tbody>
+<tr><td><strong>AutoGen</strong></td><td><strong>Konuşma</strong></td><td>Ortak mesaj thread'i; ajanlar "conversable"</td></tr>
+<tr><td>LangGraph</td><td>Graf</td><td>Düğüm + kenar + state; checkpointer</td></tr>
+<tr><td>CrewAI</td><td>İnsan ekibi</td><td>Agent · <strong>Task</strong> · Crew (rol/backstory)</td></tr>
+<tr><td>OpenAI Agents SDK</td><td>Devir</td><td>Agent · Tool · Handoff · Guardrail</td></tr>
+<tr><td>Google ADK</td><td>Graf (derlenen)</td><td><code>Agent</code> + workflow ajanları</td></tr>
+<tr><td><strong>Agno</strong></td><td><strong>İşletim sistemi</strong></td><td><code>Agent</code>·<code>Team</code>·<code>Workflow</code> + <code>AgentOS</code></td></tr>
+<tr><td>DeepAgents</td><td>Alt ajan delegasyonu</td><td><code>create_deep_agent</code> + <code>task</code> tool'u</td></tr>
+</tbody></table>
+
+<p><strong>Pratik sonucu:</strong> AutoGen'de akış konuşmanın içinden doğuyor. Ajanlar
+birbirine mesaj <em>göndermiyor</em>, ortak bir thread'e yayın yapıyor ve herkes görüyor.
+"Kim konuşacak" kararı bir <strong>strateji nesnesi</strong> — değiştirilebilir.</p>
+
+<p>Bu yüzden AutoGen'de tek kütüphane içinde beş desen var. Diğerlerinde çoğu zaman
+<strong>desen = framework seçimi</strong>: graf istiyorsan LangGraph, devir istiyorsan
+Agents SDK.</p>
+
+<h3>II · 2 — Asıl soru: bir ajan başka bir ajana nasıl iş verir</h3>
+
+<table>
+<thead><tr><th>framework</th><th>birincil birim</th><th>ajan → ajan</th><th>hata nereye gider</th></tr></thead>
+<tbody>
+<tr><td><strong>AutoGen</strong></td><td>ajan</td><td><code>send_message</code> / <code>publish_message</code></td><td>doğrudan: çağırana · <strong>yayın: hiçbir yere</strong></td></tr>
+<tr><td>LangGraph</td><td>düğüm</td><td><code>Command(goto=...)</code> + paylaşılan state</td><td>graf yürütücüsüne</td></tr>
+<tr><td>Agents SDK</td><td>ajan</td><td><code>handoffs=[...]</code> → <strong>tool çağrısı</strong></td><td>çalıştıran döngüye</td></tr>
+<tr><td>CrewAI</td><td><strong>task</strong></td><td>task çıktısı → sonraki task</td><td>crew döngüsüne</td></tr>
+<tr><td>Google ADK</td><td>ajan ağacı</td><td><code>transfer_to_agent</code> tool'u</td><td>graf motoruna</td></tr>
+<tr><td>Agno</td><td>ajan / adım</td><td>takım lideri → üye</td><td><code>OnError</code> ilkeli</td></tr>
+<tr><td>DeepAgents</td><td>ajan</td><td><code>task</code> tool'u (alt ajan)</td><td>tool sonucuna</td></tr>
+</tbody></table>
+
+<p><strong>Tablodan iki ders çıkıyor.</strong></p>
+
+<p><strong>Birincisi:</strong> dördü (Agents SDK, ADK, DeepAgents ve AutoGen'in
+<code>Swarm</code>'ı) ajanlar arası geçişi <em>tool çağrısına</em> indirgemiş. Agents
+SDK'da handoff'lar tool'larla <strong>aynı dönüştürücüden</strong> geçiyor — modelin
+gözünde devir bir tool'dan ibaret. AutoGen'i ayıran şey, buna <em>ek olarak</em> bir
+mesaj otobüsü taşıması.</p>
+
+<p><strong>İkincisi ve daha keskini:</strong> son sütuna bakın.</p>
+
+<blockquote class="r"><p><strong>AutoGen, "hata nereye gider" sorusuna iki farklı cevap
+veren tek framework.</strong> Diğerlerinde tek yol var — o yüzden sessiz kayıp da yok.
+Esneklik burada bedava değil.</p></blockquote>
+
+<h3>II · 3 — DeepAgents'ın ters tercihi</h3>
+
+<p>Bir tanesi ayrıca dikkate değer. DeepAgents'ta alt ajan çağırmanın yolu
+<code>task</code> adında bir tool <span class="tag t-k">kaynak</span>; yanında
+<code>start_async_task</code> / <code>check_async_task</code> çifti var.</p>
+
+<p>Ne mesaj otobüsü var, ne graf, ne task listesi. Ana ajan bir tool çağırıyor, geriye
+<strong>bir metin</strong> alıyor. Amaç bağlam izolasyonu görünüyor: alt ajanın bütün ara
+adımları ana ajanın bağlamına girmiyor.</p>
+
+<blockquote><p>Bu, AutoGen'in ortak-thread modelinin <strong>tam tersi</strong> tercih.
+AutoGen'de herkes her şeyi görüyor — ve <code>poc/kiyas.py</code>'de ölçtüğümüz bağlam
+şişmesi tam oradan geliyor.</p></blockquote>
+<h3 class="brk">II · 4 — Eksen eksen matris</h3>
+
+<table style="font-size:7.6pt">
+<thead><tr><th>eksen</th><th>AutoGen</th><th>LangGraph</th><th>CrewAI</th><th>Agents SDK</th><th>Google ADK</th><th>Agno</th></tr></thead>
+<tbody>
+<tr><td>metafor</td><td>konuşma</td><td>graf</td><td>insan ekibi</td><td>devir</td><td>graf (derlenen)</td><td>işletim sistemi</td></tr>
+<tr><td>iletişim</td><td>pub/sub ortak thread</td><td>state + <code>Command</code></td><td>task zinciri</td><td>yalnız handoff</td><td>graf kenarları</td><td>lider → üye</td></tr>
+<tr><td>akış kararı</td><td><strong>strateji nesnesi</strong></td><td>kenarlar</td><td>manager</td><td>ajanın kendisi</td><td>kenarlar (derlenen)</td><td><code>Workflow</code> ilkelleri</td></tr>
+<tr><td>runtime</td><td><strong>aktör, dağıtılabilir</strong></td><td>graf yürütücü</td><td>Python döngüsü</td><td>tur döngüsü</td><td>graf motoru</td><td><code>AgentOS</code> sunucusu</td></tr>
+<tr><td>dağıtım protokolü</td><td><strong>gRPC + CloudEvents</strong></td><td>—</td><td>—</td><td>—</td><td><strong>A2A</strong></td><td><code>Remote*</code> + AG-UI</td></tr>
+<tr><td>tool protokolü</td><td>MCP (3 taşıyıcı)</td><td>MCP</td><td>MCP</td><td>MCP</td><td>MCP</td><td>MCP + geniş toolkit</td></tr>
+<tr><td>izleme</td><td><strong>OTel GenAI</strong></td><td>LangSmith + OTel</td><td>ayrı</td><td>ayrı</td><td><code>telemetry</code></td><td>mlflow</td></tr>
+<tr><td>bildirimsel tanım</td><td>yarım</td><td>—</td><td>YAML</td><td>—</td><td><strong>tam</strong></td><td><code>Registry</code></td></tr>
+<tr><td>hata ne zaman görünür</td><td>çalışma zamanı</td><td>çalışma zamanı</td><td>çalışma zamanı</td><td>çalışma zamanı</td><td><strong>graf kurulurken</strong></td><td>çalışma zamanı</td></tr>
+<tr><td>model arızası</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong><code>FallbackConfig</code></strong></td></tr>
+<tr><td>durability</td><td>zayıf</td><td><strong>checkpointer</strong></td><td>katmanlı bellek</td><td>session</td><td><code>Session</code></td><td><code>db=</code> vatandaş</td></tr>
+<tr><td>insan onayı</td><td>kod için hazır</td><td><code>interrupt()</code></td><td>—</td><td>—</td><td>—</td><td><strong>her ilkelde</strong></td></tr>
+<tr><td>kod yürütme</td><td><strong>birinci sınıf</strong></td><td>manuel</td><td>tool</td><td>tool</td><td><code>code_executors</code></td><td>bayrak</td></tr>
+<tr><td>desen çeşitliliği</td><td><strong>5 takım tipi</strong></td><td>supervisor/swarm</td><td>seq/hier</td><td>tek</td><td>workflow ajanları</td><td>Step/Parallel/Loop/…</td></tr>
+<tr><td>eval</td><td>ayrı araç</td><td>ayrı</td><td>ayrı</td><td>ayrı</td><td><strong>içinde</strong></td><td>ayrı</td></tr>
+<tr><td>deploy</td><td>senin işin</td><td>Platform</td><td>—</td><td>—</td><td>Vertex</td><td><strong><code>AgentOS</code></strong></td></tr>
+<tr><td>yaşam döngüsü</td><td><strong>bakım modu</strong></td><td>aktif</td><td>aktif</td><td>aktif</td><td>aktif</td><td>aktif</td></tr>
+</tbody></table>
+
+<h5>İki ince nokta</h5>
+<p><strong>1 · Graf konusunda taraflar yer değiştirdi.</strong> AutoGen grafı
+<code>GraphFlow</code> olarak <em>beş takım tipinden biri</em> diye ekledi; ADK grafı
+<strong>merkeze</strong> aldı ve konuşma modelini hiç benimsemedi.</p>
+<p><strong>2 · "ADK oturmuş" demek yanlış olur.</strong> ADK 2.0 kırıcı bir sürümdü ve
+1.x hattı paralel sürüyor. Bir yılda temel API'sini değiştirdi.</p>
+
+<h3>II · 5 — 2026'nın yakınsaması</h3>
+
+<p>Karşılaştırmaların çoğu farkları sayıp benzerlikleri atlıyor. Oysa bu alan ciddi
+biçimde yakınsadı ve artık şu sorular <strong>ayırt edici değil</strong>:</p>
+
+<table>
+<tbody>
+<tr><td style="width:34%">Tool çağırabiliyor mu?</td><td>Hepsi. Ve aynı biçimde: imza + docstring → JSON şema.</td></tr>
+<tr><td>MCP var mı?</td><td>Hepsinde.</td></tr>
+<tr><td>OpenTelemetry?</td><td>Hepsi o yöne gidiyor.</td></tr>
+<tr><td>Yapısal çıktı?</td><td>Hepsinde Pydantic.</td></tr>
+<tr><td>Bellek eklentisi, insan döngüde, uzak bileşen?</td><td>Hepsinde bir karşılığı var.</td></tr>
+</tbody></table>
+
+<p>Kalan üç gerçek fark:</p>
+<ol>
+<li><strong>Runtime modeli</strong> — aktör mü, graf yürütücü mü, düz döngü mü</li>
+<li><strong>Akış kararının nerede verildiği</strong> — konuşmadan mı doğuyor, önceden mi çizili</li>
+<li><strong>Operasyonel yüzey</strong> — eval, deploy, session kutunun içinde mi</li>
+</ol>
+
+<blockquote class="g"><p><strong>AutoGen birincide açık ara önde, üçüncüde açık ara
+geride.</strong> Bu tek cümle, "AutoGen'i ne zaman seçmeli" sorusunun çoğunu cevaplıyor.</p></blockquote>
+
+<h3>II · 6 — Ne zaman hangisi</h3>
+
+<table>
+<thead><tr><th>durum</th><th>tercih</th><th>gerekçe</th></tr></thead>
+<tbody>
+<tr><td>Tek ajan + birkaç tool</td><td>Agents SDK</td><td>AutoGen'in runtime'ı boşa yük</td></tr>
+<tr><td>Checkpoint / geri sarma şart</td><td>LangGraph</td><td>AutoGen'de durability zayıf</td></tr>
+<tr><td>Hazır deploy + eval + session</td><td>ADK</td><td>Kutunun içinde geliyor</td></tr>
+<tr><td>Sıralı/koşullu/döngülü akış + onay</td><td>Agno</td><td>Her ilkelde <code>HumanReview</code></td></tr>
+<tr><td>Sağlayıcı arızasına dayanıklılık</td><td>Agno</td><td><code>FallbackConfig</code> hata tipine göre yedek</td></tr>
+<tr><td>Öğrenme bütçesi düşük</td><td>CrewAI</td><td>En düşük giriş engeli</td></tr>
+<tr><td>Bağlam izolasyonu / uzun görevler</td><td>DeepAgents</td><td>Alt ajanın ara adımları bağlama girmiyor</td></tr>
+<tr><td>Başkasının ajanıyla konuşmak</td><td>ADK (A2A)</td><td>AutoGen bu problemi kapsamıyor</td></tr>
+<tr><td><strong>Çok makine, tek sistem</strong></td><td><strong>AutoGen</strong></td><td>gRPC + CloudEvents katmanı</td></tr>
+<tr><td><strong>Desenleri kıyaslamak</strong></td><td><strong>AutoGen</strong></td><td>Beşi aynı API'de; değişkeni izole edebiliyorsun</td></tr>
+<tr><td><strong>Kod yazma/çalıştırma döngüsü</strong></td><td><strong>AutoGen</strong></td><td>Kod yürütme birinci sınıf</td></tr>
+</tbody></table>
+
+<h2 class="brk">III · OpenClaw harness'ı</h2>
+
+<p class="lead">AutoGen bir framework; OpenClaw bir <strong>harness</strong> — yani bir
+agent'ı gerçekten çalıştırmak için gereken her şey. İkisi rakip değil, farklı katman:
+AutoGen "ajan nasıl düşünür" sorusunu, OpenClaw "ajan nasıl <em>yaşar</em>" sorusunu
+cevaplıyor.</p>
+
+<p>MIT lisanslı, TypeScript, pnpm monorepo. <strong>Kendi yerleşik agent runtime'ı
+var</strong> — harici bir framework'e bağımlı değil.</p>
+
+<h3>III · 1 — Yüksek seviye: tek Gateway</h3>
+
+<svg viewBox="0 0 640 290" width="640" height="290" font-family="DejaVu Sans Mono, monospace">
+  <text x="14" y="14" font-size="8" fill="#767d84">KANALLAR</text>
+  <rect x="14" y="22" width="120" height="80" fill="#fff" stroke="#16191c"/>
+  <text x="26" y="40" font-size="8">WhatsApp · Telegram</text>
+  <text x="26" y="54" font-size="8">Signal · Slack</text>
+  <text x="26" y="68" font-size="8">Discord · iMessage</text>
+  <text x="26" y="82" font-size="8">Matrix · WebChat</text>
+  <text x="26" y="96" font-size="7" fill="#767d84">kanal plugin'leri</text>
+
+  <rect x="196" y="22" width="150" height="80" fill="#f8f1e3" stroke="#8a5208" stroke-width="2"/>
+  <text x="230" y="48" font-size="12" font-weight="700" fill="#8a5208">GATEWAY</text>
+  <text x="214" y="66" font-size="8" fill="#454c53">tek süreç · WS :18789</text>
+  <text x="214" y="80" font-size="8" fill="#454c53">tek doğruluk kaynağı</text>
+  <path d="M134 62 L196 62" stroke="#16191c" marker-end="url(#d1)"/>
+
+  <text x="410" y="14" font-size="8" fill="#767d84">İSTEMCİLER (role: operator)</text>
+  <rect x="410" y="22" width="110" height="20" fill="#fff" stroke="#16191c"/><text x="420" y="36" font-size="7.5">CLI</text>
+  <rect x="410" y="46" width="110" height="20" fill="#fff" stroke="#16191c"/><text x="420" y="60" font-size="7.5">Web Control UI</text>
+  <rect x="410" y="70" width="110" height="20" fill="#fff" stroke="#16191c"/><text x="420" y="84" font-size="7.5">macOS uygulaması</text>
+  <path d="M410 32 L346 46" stroke="#767d84" marker-end="url(#d2)"/>
+  <path d="M410 56 L346 58" stroke="#767d84" marker-end="url(#d2)"/>
+  <path d="M410 80 L346 70" stroke="#767d84" marker-end="url(#d2)"/>
+
+  <text x="410" y="120" font-size="8" fill="#767d84">NODE'LAR (role: node)</text>
+  <rect x="410" y="128" width="110" height="20" fill="#e4ebf3" stroke="#2c4a6b"/><text x="420" y="142" font-size="7.5" fill="#2c4a6b">iOS / Android</text>
+  <rect x="410" y="152" width="110" height="20" fill="#e4ebf3" stroke="#2c4a6b"/><text x="420" y="166" font-size="7.5" fill="#2c4a6b">macOS · headless</text>
+  <text x="410" y="186" font-size="7" fill="#2c4a6b">camera · screen · location · canvas</text>
+  <path d="M410 138 L346 96" stroke="#2c4a6b" marker-end="url(#d3)"/>
+
+  <rect x="196" y="130" width="150" height="56" fill="#fff" stroke="#16191c"/>
+  <text x="210" y="152" font-size="9" font-weight="700">Agent Runtime</text>
+  <text x="210" y="168" font-size="7.5" fill="#454c53">oturum · bellek · araç</text>
+  <text x="210" y="180" font-size="7.5" fill="#454c53">model · compaction</text>
+  <path d="M271 102 L271 130" stroke="#8a5208" stroke-width="2" marker-end="url(#d4)"/>
+
+  <rect x="14" y="212" width="612" height="62" fill="#f6f7f3" stroke="#16191c"/>
+  <text x="26" y="232" font-size="8.5" font-weight="700">Temel ilke</text>
+  <text x="26" y="248" font-size="8" fill="#454c53">Gateway; oturumlar, yönlendirme ve kanal bağlantıları için tek doğruluk kaynağıdır.</text>
+  <text x="26" y="264" font-size="8" fill="#8a5208">Host başına yalnızca BİR Gateway çalışır — WhatsApp (Baileys) oturumu tekildir.</text>
+
+  <defs>
+    <marker id="d1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#16191c"/></marker>
+    <marker id="d2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#767d84"/></marker>
+    <marker id="d3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#2c4a6b"/></marker>
+    <marker id="d4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#8a5208"/></marker>
+  </defs>
+</svg>
+<div class="cap">Tek süreç, üç tür bağlantı: kanallar, operatörler, node'lar</div>
+
+<h3>III · 2 — Gateway protokolü v4</h3>
+
+<p>WebSocket, metin çerçeveleri, JSON yük. <strong>İlk çerçeve mutlaka
+<code>connect</code> isteği olmalı</strong> — aksi hâlde sert kapatma.</p>
+
+<pre>İstek : {type:"req",   id, method, params}
+Yanıt : {type:"res",   id, ok, payload|error}
+Olay  : {type:"event", event, payload, seq?, stateVersion?}</pre>
+
+<h5>El sıkışma — üç adım</h5>
+<ol>
+<li>Gateway ön-kimlik <strong>challenge</strong> yollar: <code>{nonce, ts}</code></li>
+<li>İstemci <code>connect</code> gönderir: protokol aralığı, <strong>rol</strong>,
+<strong>kapsamlar</strong>, caps, commands, auth, ve <strong>imzalı cihaz kimliği</strong></li>
+<li>Gateway <code>hello-ok</code> döner: features, snapshot, auth, policy</li>
+</ol>
+
+<p>Ön-kimlik çerçeveleri <strong>64 KiB</strong> ile sınırlı; el sıkışma sonrası
+varsayılan 25 MB. Yan etkili metotlar (<code>send</code>, <code>agent</code>) güvenli
+tekrar için <strong>idempotency key</strong> ister.</p>
+
+<h5>Roller ve kapsamlar</h5>
+<table>
+<tbody>
+<tr><td style="width:22%"><strong>operator</strong></td><td>Kontrol düzlemi istemcisi. Kapsamlar: <code>operator.read</code> · <code>.write</code> · <code>.admin</code> · <code>.approvals</code> · <code>.pairing</code> · <code>.talk.secrets</code></td></tr>
+<tr><td><strong>node</strong></td><td>Yetenek sunucusu — kamera, ekran, canvas, <code>system.run</code></td></tr>
+</tbody></table>
+
+<p>Rezerve çekirdek metot önekleri her zaman <code>operator.admin</code>'e çözülür:
+<code>config.*</code>, <code>exec.approvals.*</code>, <code>wizard.*</code>,
+<code>update.*</code>.</p>
+
+<blockquote><p><strong>Broadcast kapsam kapılama:</strong> sohbet/agent/tool-result
+çerçeveleri en az <code>operator.read</code> ister. <strong>Bilinmeyen olay aileleri
+varsayılan olarak fail-closed</strong> — yeni bir olay tipi, izin verilmiş sayılmıyor.</p></blockquote>
+
+<h5>RPC metot aileleri</h5>
+<table>
+<tbody>
+<tr><td style="width:26%">Sistem/kimlik</td><td><code>health</code> · <code>status</code> · <code>system-presence</code> · <code>gateway.identity.get</code></td></tr>
+<tr><td>Model/kullanım</td><td><code>models.list</code> · <code>usage.status</code> · <code>usage.cost</code> · <code>sessions.usage</code></td></tr>
+<tr><td>Kanallar</td><td><code>channels.status</code> · <code>channels.logout</code> · <code>web.login.start/wait</code></td></tr>
+<tr><td>Oturum</td><td><code>sessions.list/create/send/steer/abort/patch/reset/delete/compact</code> · <code>chat.*</code></td></tr>
+<tr><td>Agent</td><td><code>agents.list/create/update/delete</code> · <code>agent.wait</code> · <code>audit.list</code> · <code>tasks.*</code></td></tr>
+<tr><td>Node</td><td><code>node.pair.*</code> · <code>node.list/describe/invoke</code> · <code>node.pending.*</code></td></tr>
+<tr><td>Onaylar</td><td><code>exec.approval.*</code> · <code>plugin.approval.*</code></td></tr>
+<tr><td>Otomasyon</td><td><code>wake</code> · <code>cron.*</code> · <code>skills.*</code> · <code>tools.catalog/effective/invoke</code></td></tr>
+<tr><td>Sır/config</td><td><code>secrets.*</code> · <code>config.get/set/patch/apply/schema</code> · <code>update.run/status</code></td></tr>
+</tbody></table>
+
+<p>Sürüm sabitleri <code>packages/gateway-protocol</code>'de: <code>PROTOCOL_VERSION=4</code>,
+<code>MIN_NODE=3</code> — node'lar N-1 uyumluluk penceresi kullanabiliyor. Şemalar
+TypeBox'tan üretiliyor, oradan JSON Schema ve Swift modelleri.</p>
+<h3 class="brk">III · 3 — Agent loop: bir mesajın yolculuğu</h3>
+
+<p>Oturum başına <strong>seri</strong> çalışan süreç: alım → bağlam kurulumu → model
+çıkarımı → araç yürütme → akış → kalıcılık.</p>
+
+<svg viewBox="0 0 640 196" width="640" height="196" font-family="DejaVu Sans Mono, monospace">
+  <rect x="10" y="26" width="88" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="22" y="44" font-size="8" font-weight="700">1 · Alım</text>
+  <text x="20" y="58" font-size="7" fill="#454c53">kanal adaptörü</text>
+
+  <rect x="118" y="26" width="98" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="130" y="44" font-size="8" font-weight="700">2 · Erişim</text>
+  <text x="128" y="58" font-size="7" fill="#454c53">allowlist + oturum</text>
+
+  <rect x="236" y="26" width="98" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="248" y="44" font-size="8" font-weight="700">3 · Bağlam</text>
+  <text x="246" y="58" font-size="7" fill="#454c53">AGENTS.md · memory</text>
+
+  <rect x="354" y="26" width="88" height="44" fill="#f8f1e3" stroke="#8a5208"/>
+  <text x="366" y="44" font-size="8" font-weight="700" fill="#8a5208">4 · Model</text>
+  <text x="364" y="58" font-size="7" fill="#454c53">token token</text>
+
+  <rect x="462" y="26" width="88" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="474" y="44" font-size="8" font-weight="700">5 · Araç</text>
+  <text x="472" y="58" font-size="7" fill="#454c53">sandbox?</text>
+
+  <rect x="10" y="112" width="540" height="40" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="22" y="130" font-size="8" font-weight="700" fill="#14594a">6 · Yanıt teslimi</text>
+  <text x="22" y="144" font-size="7.5" fill="#454c53">markdown dönüşümü · boyut bölme · JSONL transcript'e kalıcılaştırma</text>
+
+  <path d="M98 48 L118 48" stroke="#16191c" marker-end="url(#e1)"/>
+  <path d="M216 48 L236 48" stroke="#16191c" marker-end="url(#e1)"/>
+  <path d="M334 48 L354 48" stroke="#16191c" marker-end="url(#e1)"/>
+  <path d="M442 48 L462 48" stroke="#16191c" marker-end="url(#e1)"/>
+  <path d="M506 70 Q506 92 280 92 L280 112" stroke="#14594a" fill="none" marker-end="url(#e2)"/>
+  <path d="M550 48 Q580 48 580 92 Q580 30 400 26" stroke="#767d84" fill="none" stroke-dasharray="3 2"/>
+  <text x="556" y="86" font-size="7" fill="#767d84">tool sonucu</text>
+  <text x="556" y="98" font-size="7" fill="#767d84">akışa döner</text>
+
+  <text x="10" y="176" font-size="7.5" fill="#767d84">Gecikme bütçesi (ikincil kaynak): erişim &lt;10ms · oturum &lt;50ms · prompt &lt;100ms · ilk token 200–500ms · tarayıcı 1–3s</text>
+  <defs>
+    <marker id="e1" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#16191c"/></marker>
+    <marker id="e2" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#14594a"/></marker>
+  </defs>
+</svg>
+<div class="cap">Altı faz. WhatsApp örneğinde ölçülen gecikme bütçesiyle</div>
+
+<h5>Kuyruklama — ve neden önemli</h5>
+<p>Çalıştırmalar <strong>oturum anahtarı başına</strong> (session lane) ve isteğe bağlı
+global lane üzerinden serileştiriliyor; bu araç/oturum yarışlarını önlüyor. Transcript
+yazımları ayrıca <strong>süreç-farkında, dosya-tabanlı bir yazma kilidiyle</strong>
+korunuyor (varsayılan bekleme 60 sn).</p>
+
+<h5>RPC'nin şekli</h5>
+<p><code>agent</code> RPC parametreleri doğrular, oturumu çözer, meta veriyi kalıcı hale
+getirir ve <strong>anında</strong> <code>{runId, acceptedAt}</code> döner.
+<code>agent.wait</code> ise bir <code>runId</code> üzerinde lifecycle end/error bekler ve
+<code>{status: ok|error|timeout}</code> döner.</p>
+
+<blockquote class="g"><p><strong>Bu ayrım kopyalanmaya değer.</strong> Akış, run'ın
+kendisi değil — <em>bir görünümü</em>. Bir MCP tool çağrısı ya da bir cron işi, dakikalarca
+açık bir stream tutamaz; ama bir <code>runId</code> alıp sonra sorabilir.</p></blockquote>
+
+<h3>III · 4 — Oturumlar</h3>
+
+<table>
+<thead><tr><th>kaynak</th><th>davranış</th></tr></thead>
+<tbody>
+<tr><td>Direkt mesajlar (DM)</td><td>Varsayılan olarak paylaşımlı tek oturum</td></tr>
+<tr><td>Grup sohbetleri</td><td>Grup başına izole</td></tr>
+<tr><td>Odalar / kanallar</td><td>Oda başına izole</td></tr>
+<tr><td><strong>Cron işleri</strong></td><td><strong>Her çalıştırmada taze oturum</strong></td></tr>
+<tr><td>Webhook'lar</td><td>Hook başına izole</td></tr>
+</tbody></table>
+
+<p><strong>DM izolasyonu</strong> çok kullanıcılı kurulumlarda kritik —
+<code>session.dmScope</code>: <code>main</code> (hepsi tek) · <code>per-peer</code> ·
+<code>per-channel-peer</code> (önerilen) · <code>per-account-channel-peer</code>.</p>
+
+<h5>Yaşam döngüsü — üç ayrı zaman damgası</h5>
+<table>
+<tbody>
+<tr><td style="width:30%"><code>sessionStartedAt</code></td><td><strong>Günlük reset</strong> — yapılandırılan yerel saatte (varsayılan 04:00)</td></tr>
+<tr><td><code>lastInteractionAt</code></td><td><strong>Idle reset</strong> — <code>idleMinutes</code> hareketsizlik sonrası</td></tr>
+<tr><td><code>updatedAt</code></td><td>Bookkeeping</td></tr>
+</tbody></table>
+
+<blockquote><p><strong>Üçünü birleştirmek ikisini birden bozar:</strong> uzun bir konuşma
+hiç yaşlanmaz, sessiz olan yanlış saatte resetlenir. Ayrıca <em>heartbeat/cron/exec sistem
+olayları oturumu canlı tutmaz</em> — yoksa bir zamanlayıcı, hiç konuşulmayan bir oturumu
+sonsuza kadar diri tutardı.</p></blockquote>
+
+<p><strong>Durum yeri:</strong> <code>~/.openclaw/agents/&lt;agentId&gt;/sessions/sessions.json</code>
+(indeks) + <code>&lt;sessionId&gt;.jsonl</code> (transcript). Bakım:
+<code>pruneAfter: 30d</code>, <code>maxEntries: 500</code>.</p>
+
+<h3>III · 5 — Hook sistemi: iki katman</h3>
+
+<p><strong>Dahili (Gateway) hook'ları</strong> olay güdümlü scriptler —
+<code>agent:bootstrap</code>, komut hook'ları (<code>/new</code>, <code>/reset</code>,
+<code>/stop</code>).</p>
+
+<p><strong>Plugin hook'ları</strong> ise boru hattının içinde:</p>
+
+<table>
+<thead><tr><th>hook</th><th>ne zaman çalışır</th></tr></thead>
+<tbody>
+<tr><td><code>before_model_resolve</code></td><td>Oturum öncesi; provider/model'i deterministik override</td></tr>
+<tr><td><code>before_prompt_build</code></td><td>Oturum yüklendikten sonra; <code>prependContext</code> enjekte</td></tr>
+<tr><td><code>before_agent_reply</code></td><td>LLM çağrısından önce; <strong>turu üstlenip sentetik yanıt dönebilir</strong></td></tr>
+<tr><td><code>agent_end</code></td><td>Tamamlanma sonrası, nihai mesaj listesiyle</td></tr>
+<tr><td><code>before_compaction</code> / <code>after_compaction</code></td><td>Compaction döngülerini gözler</td></tr>
+<tr><td><code>before_tool_call</code> / <code>after_tool_call</code></td><td>Araç parametrelerini/sonuçlarını yakalar</td></tr>
+<tr><td><code>tool_result_persist</code></td><td>Sonuçları transcript'e yazılmadan önce <strong>senkron</strong> dönüştürür</td></tr>
+<tr><td><code>message_received</code> / <code>message_sending</code> / <code>message_sent</code></td><td>Gelen/giden mesaj</td></tr>
+<tr><td><code>session_start</code> / <code>session_end</code> · <code>gateway_start</code> / <code>gateway_stop</code></td><td>Yaşam döngüsü sınırları</td></tr>
+</tbody></table>
+
+<blockquote class="g"><p><strong>Karar kuralları, ve neden bu ikisi:</strong>
+<code>before_tool_call → {block: true}</code> <strong>terminaldir</strong>;
+<code>message_sending → {cancel: true}</code> <strong>terminaldir</strong>. Gerisi
+katkı verir. Yani sistemde tam iki nokta "hayır" diyebiliyor — biri araç kullanımına,
+biri dış dünyaya. Bu, uzatılabilirlikle güvenliği aynı mekanizmada tutmanın yolu.</p></blockquote>
+
+<h3>III · 6 — Context Engine ve compaction</h3>
+
+<p>Her model çağrısında <em>hangi mesajlar, nasıl özetlenir, subagent sınırları arası
+nasıl yönetilir</em> sorularını cevaplayan katman. Dört yaşam döngüsü noktası:</p>
+
+<svg viewBox="0 0 620 96" width="620" height="96" font-family="DejaVu Sans Mono, monospace">
+  <rect x="10" y="18" width="130" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="26" y="38" font-size="8.5" font-weight="700">Ingest</text>
+  <text x="24" y="52" font-size="7" fill="#454c53">mesaj eklendiğinde</text>
+  <rect x="164" y="18" width="140" height="44" fill="#f8f1e3" stroke="#8a5208"/>
+  <text x="180" y="38" font-size="8.5" font-weight="700" fill="#8a5208">Assemble</text>
+  <text x="178" y="52" font-size="7" fill="#454c53">token bütçesine sığan set</text>
+  <rect x="328" y="18" width="130" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="344" y="38" font-size="8.5" font-weight="700">Compact</text>
+  <text x="342" y="52" font-size="7" fill="#454c53">pencere dolunca</text>
+  <rect x="482" y="18" width="128" height="44" fill="#fff" stroke="#16191c"/>
+  <text x="498" y="38" font-size="8.5" font-weight="700">After turn</text>
+  <text x="496" y="52" font-size="7" fill="#454c53">tur bitince</text>
+  <path d="M140 40 L164 40" stroke="#16191c" marker-end="url(#f1)"/>
+  <path d="M304 40 L328 40" stroke="#16191c" marker-end="url(#f1)"/>
+  <path d="M458 40 L482 40" stroke="#16191c" marker-end="url(#f1)"/>
+  <path d="M546 62 Q546 84 75 84 L75 62" stroke="#767d84" fill="none" stroke-dasharray="3 2" marker-end="url(#f2)"/>
+  <defs>
+    <marker id="f1" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#16191c"/></marker>
+    <marker id="f2" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#767d84"/></marker>
+  </defs>
+</svg>
+<div class="cap">Varsayılan motor <code>legacy</code>; eklenti motorlar farklı toplama/hatırlama davranışı verebiliyor</div>
+
+<h5>Compaction'ın kuralları</h5>
+<ul>
+<li>Eski turlar özetlenir, özet <strong>transcript'e kaydedilir</strong>, güncel mesajlar korunur.</li>
+<li><strong>Araç çağrıları eşleşen <code>toolResult</code> girişleriyle birlikte tutulur</strong>
+— bölme noktası bir araç bloğunun içine düşerse sınır kaydırılır.</li>
+<li>Auto-compaction varsayılan açık; limite yaklaşınca <em>veya</em> sağlayıcı overflow
+hatası dönünce (compact + retry) çalışır. OpenClaw düzinelerce sağlayıcıya özel overflow
+hata dizesini tanıyor.</li>
+<li><strong>Memory flush:</strong> compaction öncesi sessiz bir tur çalıştırıp önemli
+notları diske yazabiliyor.</li>
+</ul>
+
+<blockquote><p><strong>Compaction ≠ pruning.</strong> Compaction sohbeti özetler
+(kalıcı); pruning yalnız eski araç sonuçlarını kırpar (bellekte, istek başına).</p></blockquote>
+
+<p><code>ownsCompaction: true</code> diyen bir motor kendi compaction'ını yönetir ve
+yerleşik olan devre dışı kalır. <strong>Hata izolasyonu:</strong> seçili plugin motoru
+yüklenemez ya da çökerse OpenClaw onu o Gateway süreci için <em>karantinaya alır</em> ve
+<code>legacy</code>'ye düşer — <strong>agent susmaz</strong>.</p>
+
+<h3>III · 7 — Bellek</h3>
+
+<p>OpenClaw hatırlamayı <strong>workspace'te düz Markdown dosyaları yazarak</strong>
+yapıyor. Gizli durum yok.</p>
+
+<table>
+<thead><tr><th>dosya</th><th>ne zaman okunur</th><th>maliyet</th></tr></thead>
+<tbody>
+<tr><td><code>MEMORY.md</code></td><td><strong>Oturum başında, prompt'a</strong></td><td>Her turda ödenir → kısa kalmalı</td></tr>
+<tr><td><code>memory/YYYY-MM-DD.md</code></td><td>Yalnız arandığında</td><td>Büyümesi bedava</td></tr>
+<tr><td><code>DREAMS.md</code></td><td>Opsiyonel</td><td>"Dreaming" özeti</td></tr>
+</tbody></table>
+
+<p><strong>Araçlar:</strong> <code>memory_search</code> (hibrit: vektör benzerliği +
+anahtar kelime) ve <code>memory_get</code> (belirli dosya/satır aralığı).
+Backend'ler: builtin SQLite · QMD · Honcho · LanceDB.</p>
+
+<p><strong>Dreaming</strong> opsiyonel bir arka plan konsolidasyonu: kısa vadeli hatırlama
+sinyallerini toplar, puanlar, yalnız eşiği geçenleri <code>MEMORY.md</code>'ye terfi
+ettirir.</p>
+
+<blockquote class="g"><p><strong>Bu tasarımın değeri şu:</strong> okunabilen bellek
+düzeltilebilir, gözden geçirilebilir, silinebilir ve isterse sürüm kontrolüne girer.
+Okuyamadığın bir vektör deposu, yanlış bir olgunun sonsuza kadar yaşayabileceği yerdir.</p></blockquote>
+<h3 class="brk">III · 8 — Plugin ve capability sistemi</h3>
+
+<p class="lead">Genişletmenin kalbi <strong>capability (yetenek) modeli</strong>. Ve
+buradaki tek cümlelik ayrım, bütün sistemin uzatılabilirliğini açıklıyor.</p>
+
+<blockquote class="g"><p><strong>plugin = sahiplik sınırı</strong> (bir şirketin ya da
+özelliğin tüm yüzeyi tek plugin'de) · <strong>capability = çekirdek sözleşme</strong>
+(birden çok plugin uygular ya da tüketir)</p></blockquote>
+
+<p>Yeni bir alan eklenirken ilk soru <em>"hangi sağlayıcı bunu hardcode etsin?"</em>
+değil, <strong>"çekirdek yetenek sözleşmesi nedir?"</strong> olmalı. Katmanlama:</p>
+
+<pre>Core capability      orkestrasyon · politika · fallback · tipli sözleşme
+      ↑
+Vendor plugin        vendor API · auth · katalog
+      ↑
+Channel/feature      yüzeyde sunum</pre>
+
+<h5>Yetenek türleri</h5>
+<table>
+<thead><tr><th>yetenek</th><th>kayıt metodu</th><th>örnek</th></tr></thead>
+<tbody>
+<tr><td>Text inference</td><td><code>api.registerProvider</code></td><td>anthropic, openai</td></tr>
+<tr><td>CLI inference backend</td><td><code>api.registerCliBackend</code></td><td>anthropic, openai</td></tr>
+<tr><td>Embeddings</td><td><code>api.registerEmbeddingProvider</code></td><td>vektör plugin'leri</td></tr>
+<tr><td>Speech / Realtime voice / Transcription</td><td><code>registerSpeechProvider</code> vb.</td><td>elevenlabs, openai, google</td></tr>
+<tr><td>Media understanding</td><td><code>api.registerMediaUnderstandingProvider</code></td><td>google, openai</td></tr>
+<tr><td>Image / Music / Video generation</td><td><code>registerImage/Music/VideoGenerationProvider</code></td><td>fal, google, minimax</td></tr>
+<tr><td>Web fetch / search</td><td><code>registerWebFetchProvider</code> · <code>registerWebSearchProvider</code></td><td>firecrawl, brave, google</td></tr>
+<tr><td>Channel / messaging</td><td><code>api.registerChannel</code></td><td>matrix, msteams</td></tr>
+<tr><td>Gateway discovery</td><td><code>api.registerGatewayDiscoveryService</code></td><td>bonjour</td></tr>
+</tbody></table>
+
+<p><strong>Plugin şekilleri:</strong> <code>plain-capability</code> (tek yetenek) ·
+<code>hybrid-capability</code> (çok yetenek — ör. openai text+speech+media+image) ·
+<code>hook-only</code> · <code>non-capability</code> (araç/komut/servis/route ama yetenek yok).</p>
+
+<h5>Yükleme boru hattı — dört katman</h5>
+<pre>Manifest + keşif   openclaw.plugin.json + bundle manifestleri
+      ↓
+Etkinleştirme + doğrulama
+      ↓
+Runtime yükleme    native plugin'ler IN-PROCESS yüklenir, merkezi registry'ye kaydolur
+      ↓
+Yüzey tüketimi     araç · kanal · hook · route · CLI · servis</pre>
+
+<blockquote class="r"><p><strong>Güvenlik uyarısı, ve OpenClaw'un kendi belgesinden:</strong>
+native plugin'ler Gateway ile <strong>aynı süreçte, sandbox'sız</strong> çalışıyor.
+Yüklü bir native plugin çekirdek kodla aynı süreç-seviyesi güven sınırına sahip —
+kötü niyetli bir native plugin, OpenClaw süreci içinde <strong>keyfi kod yürütmeye
+eşdeğer</strong>. Bundle'lar (çoğunlukla skills) metadata/içerik paketi olarak daha
+güvenli.</p></blockquote>
+
+<h3>III · 9 — Node'lar: cihaz yetenekleri</h3>
+
+<p>Node'lar aynı WS sunucusuna <code>role: node</code> ile bağlanıp bağlantı anında
+yetenek <em>iddialarını</em> bildiriyor:</p>
+
+<table>
+<tbody>
+<tr><td style="width:22%"><strong>caps</strong></td><td>Yüksek seviye kategoriler — <code>camera</code> · <code>canvas</code> · <code>screen</code> · <code>location</code> · <code>voice</code> · <code>talk</code></td></tr>
+<tr><td><strong>commands</strong></td><td>Invoke allowlist'i — <code>camera.snap</code> · <code>canvas.navigate</code> · <code>screen.record</code> · <code>location.get</code></td></tr>
+<tr><td><strong>permissions</strong></td><td>Granüler anahtarlar — <code>camera.capture</code> · <code>screen.record</code></td></tr>
+</tbody></table>
+
+<p><strong>Gateway bunları iddia olarak alıyor ve sunucu tarafı allowlist'lerle
+zorluyor.</strong> Eşleştirme cihaz-tabanlı; onay device pairing store'da yaşıyor.</p>
+
+<p>Kamera örneği somut: <code>camera.list</code> · <code>camera.snap</code> (jpg, base64,
+<code>facing</code>/<code>maxWidth</code>/<code>quality</code>/<code>delayMs</code>) ·
+<code>camera.clip</code> (mp4, 0.25–60 sn). <strong>iOS/Android/macOS</strong> node'larda
+— ve her platformda kullanıcı ayarıyla kapatılabiliyor (<code>CAMERA_DISABLED</code>).
+iOS'ta yalnız <strong>ön planda</strong>.</p>
+
+<p>Offline node'lar için dayanıklı iş kuyruğu var: <code>node.pending.enqueue/drain</code>;
+bağlı node'lar için <code>node.pending.pull/ack</code>.</p>
+
+<h3>III · 10 — Güvenlik: katmanlı savunma</h3>
+
+<h5>Sandbox — varsayılan kapalı</h5>
+<table>
+<thead><tr><th>ayar</th><th>değerler</th><th>varsayılan</th></tr></thead>
+<tbody>
+<tr><td><code>sandbox.mode</code></td><td><code>off</code> · <code>non-main</code> · <code>all</code></td><td><code>off</code></td></tr>
+<tr><td><code>sandbox.scope</code></td><td><code>agent</code> · <code>session</code> · <code>shared</code></td><td><code>agent</code></td></tr>
+<tr><td><code>sandbox.backend</code></td><td><code>docker</code> · <code>ssh</code> · <code>openshell</code></td><td><code>docker</code></td></tr>
+</tbody></table>
+
+<p><strong>Gateway süreci her zaman host'ta kalıyor</strong>; yalnız araç yürütmesi
+sandbox'a taşınıyor. Docker backend varsayılanı sıkı: <code>network: "none"</code>
+(egress yok), <code>readOnlyRoot: true</code>, <code>capDrop: ["ALL"]</code>. Bind
+mount'larda tehlikeli kaynaklar (<code>/etc</code>, <code>/proc</code>,
+<code>~/.ssh</code>, <code>~/.aws</code>, docker soketleri) varsayılan bloklu.</p>
+
+<h5>Dört katman, sırayla</h5>
+<ol>
+<li><strong>Tool policy</strong> (allow/deny) — sandbox kurallarından <em>önce</em> uygulanıyor</li>
+<li><strong><code>tools.elevated</code></strong> — açık bir kaçış: <code>exec</code>'i
+sandbox dışında çalıştırır. Global + per-agent kapı, <em>ikisi de</em> izin vermeli</li>
+<li><strong>Exec approvals</strong> — bir exec onay gerektirdiğinde Gateway
+<code>exec.approval.requested</code> yayınlar; operatör <code>resolve</code> ile çözer.
+<strong>Prepare ile approve arasında komut/cwd değişirse çalıştırma reddedilir</strong></li>
+<li><strong>Audit ledger</strong> — <code>audit.list</code>: yalnız metadata.
+<em>Prompt, mesaj, araç argümanı ve çıktı saklanmaz.</em> 30 gün, 100.000 kayıt</li>
+</ol>
+
+<blockquote class="g"><p><strong>Üçüncü maddedeki ayrıntı iyi bir fikir:</strong> onay
+<em>bir plana</em> veriliyor, bir eyleme değil. Onaydan sonra komutu değiştirmek onayı
+geçersiz kılıyor — yoksa "şunu çalıştırayım mı" ile çalıştırılan şey aynı olmak zorunda
+değildi.</p></blockquote>
+
+<h5>Ağ güvenliği</h5>
+<p>Güvenli varsayılan: Gateway <strong>loopback'te</strong> kalır, uzak erişim SSH tüneli
+ya da Tailscale ile. <code>gateway.tailscale.mode</code>: <code>serve</code>
+(tailnet-only HTTPS) · <code>funnel</code> (public HTTPS, <strong>paylaşımlı parola
+şart</strong>) · <code>off</code>. <code>lan</code>/<code>tailnet</code>'e bind edilirse
+paylaşımlı sır zorunlu.</p>
+
+<h3 class="brk">III · 11 — Durum yerleşimi ve kontrol arayüzleri</h3>
+
+<table>
+<thead><tr><th>yol</th><th>içerik</th></tr></thead>
+<tbody>
+<tr><td><code>~/.openclaw/openclaw.json</code></td><td>Config</td></tr>
+<tr><td><code>state/openclaw.sqlite</code></td><td>Paylaşımlı runtime state</td></tr>
+<tr><td><code>agents/&lt;id&gt;/agent/openclaw-agent.sqlite</code></td><td>Per-agent auth profilleri (API key + OAuth)</td></tr>
+<tr><td><code>credentials/</code></td><td>Sağlayıcı/kanal kimlik bilgileri</td></tr>
+<tr><td><code>agents/&lt;id&gt;/sessions/</code></td><td>Transcript'ler + <code>sessions.json</code></td></tr>
+<tr><td><code>workspace/</code></td><td>Varsayılan agent workspace (MEMORY.md burada)</td></tr>
+</tbody></table>
+
+<p><strong>Dört kontrol arayüzü, hepsi aynı tipli WS API'sine bağlanıyor:</strong>
+Web Control UI (Gateway kendisi sunuyor, ayrı sunucu yok) · CLI (Commander.js) · macOS
+menü çubuğu uygulaması · mobil node'lar.</p>
+
+<h3>III · 12 — Çok-agent ve MCP köprüsü</h3>
+
+<p>Tek Gateway sürecinde birden çok <strong>izole agent</strong>: her biri kendi
+workspace, state dizini ve oturum deposuna sahip. Gelen mesajlar <strong>bindings</strong>
+ile doğru agent'a yönlendiriliyor.</p>
+
+<p><strong>Yönlendirme deterministik, en spesifik kazanır:</strong> exact peer → parent
+peer → peer wildcard → guild+roles → guild → team → account → channel → default agent.
+Aynı kademede birden çok eşleşme varsa config sırasında ilk olan kazanır.</p>
+
+<blockquote><p><code>agentDir</code> agent'lar arasında <strong>asla</strong>
+paylaşılmamalı (auth/oturum çakışması). Ve <strong>agent-to-agent mesajlaşma varsayılan
+kapalı</strong>, açıkça etkinleştirilip allowlist'lenmeli.</p></blockquote>
+
+<h5>MCP — iki ayrı rol</h5>
+<table>
+<thead><tr><th>komut</th><th>OpenClaw'un rolü</th><th>ne verir</th></tr></thead>
+<tbody>
+<tr><td><code>openclaw mcp serve</code></td><td><strong>MCP sunucusu</strong></td><td>Kanal konuşmalarını dışa açar (stdio)</td></tr>
+<tr><td><code>openclaw mcp add/set/…</code></td><td><strong>MCP istemci kaydı</strong></td><td>Üçüncü taraf sunucuları runtime'lara yansıtır</td></tr>
+</tbody></table>
+
+<p><span class="tag t-m">ölçüldü</span> <code>mcp serve</code>'ün gerçek yüzeyi dokuz
+tool: <code>conversations_list</code> · <code>conversation_get</code> ·
+<code>messages_read</code> · <code>messages_send</code> · <code>events_poll</code> ·
+<code>events_wait</code> · <code>attachments_fetch</code> ·
+<code>permissions_list_open</code> · <code>permissions_respond</code>.</p>
+
+<blockquote class="r"><p><strong>Sonuncusu dikkat ister.</strong>
+<code>permissions_respond</code>, OpenClaw'un <em>kendi</em> bekleyen izin isteklerini
+cevaplıyor — yani insanın vermesi gereken onayları. Bir ajana verilirse, iki bağımsız
+kapı bire iner. Adında "send" gibi bir fiil yok; tahminle yazılmış bir engelleme listesi
+onu geçirir.</p></blockquote>
+
+<p><strong>Ve stdio'nun iki sonucu:</strong> canlı olay kuyruğu bağlantıyla başlıyor ve
+<em>bağlantı kopunca yok oluyor</em> ("if the MCP client disconnects, there is no push
+target"); ayrıca her istemci kendi süreç kopyasını doğuruyor. Tek operatörlü bir araçta
+sorun değil, çok kullanıcılı bir üründe ölçeklenmiyor.</p>
+
+<h3 class="brk">III · 13 — Sistem promptu: üç katman, ve kim ne katabilir</h3>
+
+<p><strong>OpenClaw her ajan koşusu için kendi sistem promptunu kuruyor</strong> — çalışma
+zamanında varsayılan prompt yok. Kurulum üç katmanlı:</p>
+
+<table>
+<tbody>
+<tr><td style="width:34%"><code>buildAgentSystemPrompt</code></td><td>Saf renderer — açık girdilerden prompt üretir, <strong>global config'i doğrudan okumaz</strong></td></tr>
+<tr><td><code>resolveAgentSystemPromptConfig</code></td><td>Config'e bağlı düğmeler: sahip adı, TTS ipuçları, model alias'ları, bellek atıf modu, subagent delegasyonu</td></tr>
+<tr><td>Runtime adaptörleri</td><td>Canlı gerçekleri toplar: tool'lar, sandbox durumu, kanal yetenekleri, bağlam dosyaları, sağlayıcı katkıları</td></tr>
+</tbody></table>
+
+<p>Bu ayrımın amacı şu: <em>export/debug prompt yüzeyleri canlı koşularla hizalı kalıyor</em>
+— ve her runtime ayrıntısı tek bir dev builder'a dönüşmüyor.</p>
+
+<h5>Sağlayıcı katkıları — prompt cache sınırıyla birlikte</h5>
+<p>Bir sağlayıcı plugin'i, OpenClaw'ın sahip olduğu promptu <em>değiştirmeden</em> katkı
+yapabiliyor:</p>
+<ul>
+<li>Üç adlandırılmış çekirdek bölümden birini değiştirebilir: <code>interaction_style</code>,
+<code>tool_call_style</code>, <code>execution_bias</code></li>
+<li><strong>Prompt cache sınırının üstüne</strong> kararlı bir önek enjekte edebilir</li>
+<li><strong>Sınırın altına</strong> dinamik bir sonek enjekte edebilir</li>
+</ul>
+
+<blockquote class="g"><p><strong>Bu ayrım para demek.</strong> Prompt cache sınırının
+üstündeki kısım değişmediği sürece önbellekten okunuyor; altındaki her turda yeniden
+ödeniyor. Model ailesine özel ayarları "kararlı önek" olarak koymak, aynı içeriği dinamik
+sonekte taşımaya göre ölçülebilir biçimde ucuz.</p></blockquote>
+
+<p>Prompt'un sabit bölümleri: <strong>Tooling</strong> (yapılandırılmış tool'un tek
+doğruluk kaynağı olduğu hatırlatması) · <strong>Execution Bias</strong> (turda harekete
+geç, bitene ya da tıkanana kadar sürdür, zayıf tool sonucundan toparlan, değişken durumu
+canlı kontrol et, bitirmeden doğrula) · <strong>Safety</strong> (güç arayışına ve
+gözetimi atlatmaya karşı kısa bir koruma).</p>
+
+<h3>III · 14 — SOUL.md: sesin yaşadığı yer</h3>
+
+<p>Belgenin kendi cümlesi net: <em>"if your agent sounds bland, hedgy, or corporate, this
+is usually the file to fix."</em></p>
+
+<div class="two">
+<div>
+<h5>SOUL.md'ye ne girer</h5>
+<p>Ajanla konuşmanın <em>hissini</em> değiştiren şeyler: ton, görüşler, kısalık, mizah,
+sınırlar, varsayılan doğrudanlık seviyesi.</p>
+</div>
+<div>
+<h5>Ne girmez</h5>
+<p>Hayat hikâyesi, changelog, güvenlik politikası dökümü, ya da davranışsal etkisi
+olmayan bir "vibe" duvarı. <strong>Kısa uzunu, keskin belirsizi yener.</strong></p>
+</div>
+</div>
+
+<p>Gerekçe OpenAI'ın kendi prompt kılavuzuna dayandırılmış: yüksek seviye davranış, ton
+ve hedefler <em>yüksek öncelikli talimat katmanına</em> ait, kullanıcı turuna gömülmeye
+değil. OpenClaw için o katman <code>SOUL.md</code> — ve <strong>sürümlenmesi</strong>
+öneriliyor, bir kez yazılıp unutulması değil.</p>
+
+<h3>III · 15 — Workspace: ajanın evi</h3>
+
+<p>Workspace, dosya araçlarının kullandığı çalışma dizini ve bağlam kaynağı.
+<code>~/.openclaw/</code>'dan <strong>ayrı</strong> — orası config, kimlik bilgileri ve
+oturumlar için.</p>
+
+<blockquote class="r"><p><strong>Kritik uyarı, belgenin kendisinden:</strong> workspace
+<em>varsayılan cwd</em>'dir, <strong>sert bir sandbox değil</strong>. Araçlar göreli
+yolları workspace'e göre çözer, ama <strong>mutlak yollar hâlâ host'un başka yerlerine
+ulaşabilir</strong> — sandbox açık değilse. İzolasyon istiyorsan
+<code>agents.defaults.sandbox</code> gerekiyor.</p></blockquote>
+
+<p>Varsayılan <code>~/.openclaw/workspace</code>; profil varsa
+<code>workspace-&lt;profile&gt;</code>; <code>OPENCLAW_WORKSPACE_DIR</code> ikisini de
+ezer. Varsayılan olmayan ajanlar <code>&lt;state-dir&gt;/workspace-&lt;agentId&gt;</code>'ye
+düşüyor — <strong>paylaşılan workspace'e değil</strong>.</p>
+
+<h3>III · 16 — Kuyruk: lane'ler ve eşzamanlılık</h3>
+
+<p>OpenClaw gelen otomatik-yanıt koşularını (tüm kanallar) küçük bir süreç-içi kuyruktan
+serileştiriyor. Amaç iki tane: pahalı LLM çağrılarının çakışmasını önlemek, ve paylaşılan
+kaynaklar (oturum dosyaları, loglar, CLI stdin) için yarışmayı bitirmek.</p>
+
+<svg viewBox="0 0 620 150" width="620" height="150" font-family="DejaVu Sans Mono, monospace">
+  <text x="14" y="16" font-size="8" fill="#767d84">GELEN MESAJLAR</text>
+  <rect x="14" y="24" width="80" height="18" fill="#fff" stroke="#16191c"/><text x="24" y="37" font-size="7">alice · A</text>
+  <rect x="14" y="46" width="80" height="18" fill="#fff" stroke="#16191c"/><text x="24" y="59" font-size="7">alice · B</text>
+  <rect x="14" y="68" width="80" height="18" fill="#fff" stroke="#16191c"/><text x="24" y="81" font-size="7">bob · C</text>
+
+  <rect x="140" y="20" width="170" height="48" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="152" y="38" font-size="8" fill="#14594a">lane: session:alice</text>
+  <text x="152" y="54" font-size="7.5" fill="#454c53">concurrency = 1 (garantili)</text>
+
+  <rect x="140" y="76" width="170" height="30" fill="#e5f0ea" stroke="#14594a"/>
+  <text x="152" y="95" font-size="8" fill="#14594a">lane: session:bob</text>
+
+  <rect x="350" y="34" width="150" height="56" fill="#f8f1e3" stroke="#8a5208"/>
+  <text x="362" y="54" font-size="8" font-weight="700" fill="#8a5208">global lane</text>
+  <text x="362" y="70" font-size="7.5" fill="#454c53">main = 4 · subagent = 8</text>
+  <text x="362" y="84" font-size="7.5" fill="#454c53">maxConcurrent ile sınırlı</text>
+
+  <path d="M94 33 L140 36" stroke="#16191c" marker-end="url(#g1)"/>
+  <path d="M94 55 L140 48" stroke="#16191c" marker-end="url(#g1)"/>
+  <path d="M94 77 L140 88" stroke="#16191c" marker-end="url(#g1)"/>
+  <path d="M310 44 L350 54" stroke="#14594a" marker-end="url(#g2)"/>
+  <path d="M310 91 L350 72" stroke="#14594a" marker-end="url(#g2)"/>
+
+  <text x="516" y="58" font-size="7.5" fill="#454c53">alice'in iki turu</text>
+  <text x="516" y="70" font-size="7.5" fill="#454c53">sıraya girer;</text>
+  <text x="516" y="82" font-size="7.5" fill="#14594a">bob beklemez</text>
+
+  <text x="14" y="126" font-size="7.5" fill="#454c53">Yazma sırası beklerken bile <tspan font-weight="700">typing indicator hemen</tspan> tetikleniyor — kullanıcı deneyimi değişmiyor.</text>
+  <text x="14" y="140" font-size="7.5" fill="#767d84">Varsayılanlar: mode "steer" · debounceMs 500 · ~2sn'den uzun bekleyen koşular log'a not düşüyor.</text>
+  <defs>
+    <marker id="g1" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#16191c"/></marker>
+    <marker id="g2" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="none" stroke="#14594a"/></marker>
+  </defs>
+</svg>
+<div class="cap">Oturum başına garanti seri, oturumlar arası paralel — iki kademeli lane sistemi</div>
+
+<h3>III · 17 — Model failover: iki kademe</h3>
+
+<p>OpenClaw arızayı iki aşamada karşılıyor:</p>
+<ol>
+<li><strong>Auth profil rotasyonu</strong> — aynı sağlayıcı içinde, cooldown kurallarıyla</li>
+<li><strong>Model fallback</strong> — <code>agents.defaults.model.fallbacks</code>'taki sıradakine</li>
+</ol>
+
+<blockquote><p><strong>Ve bir ayrım var:</strong> yapılandırılmış varsayılanlar, cron
+işi primary'leri ve otomatik seçilmiş modeller fallback kullanabiliyor; ama
+<strong>kullanıcının açıkça seçtiği oturum modeli <em>strict</em></strong> — sessizce
+başka modele düşmüyor. "Ben bu modeli istedim" ile "bir model çalışsın yeter" farklı
+niyetler, ve sistem ikisini ayırıyor.</p></blockquote>
+
+<h3>III · 18 — Delegate ve commitments</h3>
+
+<div class="card b">
+<h4>Delegate — kurumsal mod</h4>
+<p>OpenClaw'ın varsayılanı <em>kişisel asistan</em>: bir insan, bir ajan.
+<strong>Delegate</strong> bunu kuruma taşıyor: ajanın <strong>kendi kimliği</strong>
+var (e-posta, görünen ad, takvim), insanların <em>adına</em> davranıyor ama
+<strong>asla onları taklit etmiyor</strong>.</p>
+<p>Yetki, kimlik sağlayıcısının verdiği açık izinlerden geliyor; sınırlar
+<code>AGENTS.md</code>'deki <em>standing orders</em>'da tanımlı — neyi kendi başına
+yapabilir, ne insan onayı ister.</p>
+<p class="note">Model, yönetici asistanının çalışma biçimi: kendi kimlik bilgileri,
+"on behalf of" gönderilen posta, ve tanımlı bir yetki kapsamı.</p>
+</div>
+
+<div class="card">
+<h4>Commitments — kısa ömürlü takip hatıraları</h4>
+<p>Bir konuşmanın gelecekte bir kontrol fırsatı yarattığını fark edip hatırlamak.
+<em>"Yarın mülakatın var"</em> → sonrasında sorabilir. <em>"Çok yorgunum"</em> → sonra
+uyuyup uyumadığını sorabilir.</p>
+<p><strong>Ne <code>MEMORY.md</code> gibi kalıcı olgu, ne de tam bir hatırlatıcı.</strong>
+Bellek ile otomasyon arasında duruyor: konuşmaya bağlı bir yükümlülük hatırlanıyor,
+heartbeat zamanı gelince teslim ediyor.</p>
+<p class="note">Varsayılan kapalı (<code>commitments.enabled: false</code>).</p>
+</div>
+
+<blockquote class="g"><p><strong>Commitments, bu belgede anlatılan her şeyin arasında
+en az kopyalanabilir ama en çok düşündüren fikir.</strong> Çoğu agent sistemi "sorulanı
+cevapla" ekseninde; bu, ajanın <em>kendi açtığı döngüleri kapatmasını</em> bir mekanizma
+hâline getiriyor.</p></blockquote>
+
+<h2 class="brk">Kapanış — üç cümle ve bir liste</h2>
+
+<div class="card g">
+<h4>1 · AutoGen'i ayıran şey üst katman değil, alt katman</h4>
+<p><code>AssistantAgent</code> her framework'te var. <code>autogen_core</code> karşılığı
+çoğunda yok — ve gerçek mühendislik problemlerini (izole oturum, olay akışı, müdahale
+kapısı, kuyrukla toplama) çözen orası.</p>
+</div>
+
+<div class="card">
+<h4>2 · Aktör modeli runtime'ı koruyor, veriyi korumuyor</h4>
+<p>Ölçüldü, tekrarlandı, ve resmî desenlerin kendi arasında çeliştiği nokta. Sonuç:
+bariyere güvenme, <strong>beklenen sonuç sayısını say</strong>.</p>
+</div>
+
+<div class="card b">
+<h4>3 · Harness, framework'ten daha uzun ömürlü</h4>
+<p>OpenClaw'un çözdüğü şeyler — oturum yaşam döngüsü, hook noktaları, onay kapısı,
+compaction, denetim — hiçbir framework'ün problemi değil ve hiçbiri cevaplamıyor.
+AutoGen bakım moduna girse de bu sorular duruyor.</p>
+</div>
+
+<h3>Bu belgede ölçülmemiş olanlar</h3>
+<ul>
+<li><strong>LangGraph, CrewAI, Agents SDK, Agno, DeepAgents kurulu değil.</strong>
+API yüzeyleri repo kodundan okundu; hiçbiri koşturulmadı.</li>
+<li><strong>Dağıtık AutoGen runtime'ı hiç çalıştırılmadı</strong> — <code>grpcio</code>
+yok. Protokol bilgisi <code>.proto</code> descriptor'ından, davranış değil.</li>
+<li><strong>OpenClaw'un sandbox'ı, node'ları, delegate modu ve dreaming'i denenmedi.</strong>
+Node listesi boş; kamera, prompt katmanları ve commitments belgeden okundu.</li>
+<li><strong>OpenClaw belgeleri 695 dosya; hepsi okunmadı.</strong> Bu bölüm
+<code>concepts/</code> ve <code>gateway/</code> altındaki ana konulara dayanıyor —
+<code>platforms/</code>, <code>providers/</code>, <code>channels/</code> ve
+<code>specs/</code> ağırlıkla dışarıda.</li>
+<li><strong>Token ölçümleri tek koşumdan.</strong> Model sıcaklığı ve endpoint yükü
+etkiliyor; <code>poc/kiyas.py</code> tekrar çalıştırılabilir.</li>
+<li><strong>Diğer framework'lerin fan-in davranışı ölçülmedi.</strong> "LangGraph bu
+durumda daha iyi olurdu" diyemem — denemedim.</li>
+</ul>
+
+<p class="note" style="margin-top:1.6em;padding-top:.7em;border-top:1px solid var(--rule)">
+Kaynaklar — AutoGen: resmî core ve AgentChat kılavuzlarının tam metni
+(<code>docs/05</code>, <code>docs/08</code>), ölçülmüş tuzaklar (<code>docs/06</code>),
+protokol analizi (<code>docs/14</code>). OpenClaw: v2026.7.1-2 paket dokümantasyonu ve
+kaynak yapısı (<code>docs/13</code>), artı Paolo Perazzo'nun mimari anlatısı.
+Ölçümler: <code>poc/kiyas.py</code>, <code>pipeline/compare_fanin.py</code>.
+</p>
+
+</body></html>

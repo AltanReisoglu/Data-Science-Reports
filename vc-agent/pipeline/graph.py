@@ -31,6 +31,7 @@ import time
 
 import config
 import engine
+import stages
 import observability
 from agents import analysts, triage
 from schemas import BranchResult, Company, Score, Source
@@ -127,12 +128,29 @@ async def enrich(
     run_error: str | None = None
     stop_reason = ""
 
+    stages.emit_line("graph_build", company=company.name,
+                     branches=sorted(EXPECTED_BRANCHES),
+                     termination="MaxMessageTermination")
+    stages.emit_line("intervention", handler="AuditingInterventionHandler",
+                     own_runtime=True)
+
+    seen_branches: set[str] = set()
+
     async def _stream() -> str:
         async for item in flow.run_stream(task=triage.describe(company)):
             if isinstance(item, TaskResult):
                 messages.clear()
                 messages.extend(item.messages)
                 return item.stop_reason or ""
+            # Each branch reports once. Announcing them as they land is what makes
+            # the fan-out visible: without this the panel would jump from "running"
+            # straight to "done" and the parallelism would never be seen.
+            speaker = str(getattr(item, "source", ""))
+            if speaker in EXPECTED_BRANCHES and speaker not in seen_branches:
+                seen_branches.add(speaker)
+                stages.emit_line("analysts", branch=speaker,
+                                 arrived=len(seen_branches),
+                                 expected=len(EXPECTED_BRANCHES))
             messages.append(item)
         return ""
 
@@ -140,6 +158,7 @@ async def enrich(
     # `ReplayChatCompletionClient` never emits `LLMCallEvent`.
     with observability.EventCapture() as events:
         runtime.start()
+        stages.emit_line("graph_run", company=company.name, streamed=True)
         try:
             stop_reason = await asyncio.wait_for(_stream(), timeout=deadline)
         except asyncio.TimeoutError:
@@ -165,6 +184,9 @@ async def enrich(
                 except Exception:
                     pass
             await runtime.close()
+            stages.emit_line("join", expected=len(EXPECTED_BRANCHES),
+                             arrived=len(seen_branches), stop_reason=stop_reason[:80])
+            stages.emit_line("runtime_stop", company=company.name)
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
 
@@ -226,6 +248,12 @@ async def enrich(
                 note = f"{branch.branch} branch produced no result"
                 if note not in score.missing_data:
                     score.missing_data.append(note)
+    stages.emit_line(
+        "count",
+        expected=len(EXPECTED_BRANCHES),
+        succeeded=sum(1 for b in branches if b.succeeded),
+        missing=list(score.missing_data) if score is not None else [],
+    )
 
     measurement = ledger.measurement(f"enrichment:{company.name}")
     measurement.sure_ms = elapsed_ms

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -40,6 +41,8 @@ import answers as answers_module  # noqa: E402
 import config  # noqa: E402
 import conversation as conversation_module  # noqa: E402
 import dashboard  # noqa: E402
+import openclaw_control  # noqa: E402
+import stages  # noqa: E402
 
 WEB = Path(__file__).resolve().parent / "web"
 
@@ -58,6 +61,9 @@ class ScanRun:
         self.lock = threading.Lock()
         self.process: subprocess.Popen | None = None
         self.lines: list[str] = []
+        # Core stages lifted out of the same stdout the log comes from. A scan is
+        # a subprocess, so there is no in-process queue to share — see `stages.py`.
+        self.stages: list[dict] = []
         self.started_at: float | None = None
         self.finished_at: float | None = None
         self.args: dict = {}
@@ -70,6 +76,7 @@ class ScanRun:
         if self.running:
             raise RuntimeError("a scan is already running")
         self.lines = []
+        self.stages = []
         self.started_at = time.time()
         self.finished_at = None
         self.args = {"query": query, "days": days, "limit": limit}
@@ -80,23 +87,40 @@ class ScanRun:
         self.process = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
+            # Ask the scan to narrate its core mechanisms. Only the server sets
+            # this: `python scan.py` by hand stays readable.
+            env={**os.environ, stages.STREAM_ENV: "1"},
         )
         threading.Thread(target=self._drain, daemon=True).start()
 
     def _drain(self) -> None:
         assert self.process and self.process.stdout
         for line in self.process.stdout:
+            text = line.rstrip("\n")
+            stage = stages.parse_line(text)
+            if stage is not None:
+                # Machine lines never reach the human log: the operator reading a
+                # scan should not have to skip past JSON to find the funnel.
+                with self.lock:
+                    self.stages.append(stage)
+                    if len(self.stages) > 500:
+                        del self.stages[:200]
+                continue
             with self.lock:
-                self.lines.append(line.rstrip("\n"))
+                self.lines.append(text)
                 # A scan is bounded; the log does not need to be.
                 if len(self.lines) > 4000:
                     del self.lines[:1000]
         self.process.wait()
         self.finished_at = time.time()
 
-    def snapshot(self) -> dict:
+    def snapshot(self, *, since: int = 0) -> dict:
         with self.lock:
             lines = list(self.lines)
+            # `since` lets the panel take only what it has not drawn yet; the log
+            # itself is still sent whole because the client renders it whole.
+            new_stages = self.stages[since:]
+            total = len(self.stages)
         return {
             "running": self.running,
             "args": self.args,
@@ -104,6 +128,8 @@ class ScanRun:
             "finished_at": self.finished_at,
             "exit_code": self.process.poll() if self.process else None,
             "lines": lines,
+            "stages": new_stages,
+            "stage_count": total,
         }
 
 
@@ -251,6 +277,13 @@ def script() -> PlainTextResponse:
     return PlainTextResponse((WEB / "app.js").read_text(encoding="utf-8"), media_type="text/javascript")
 
 
+@app.get("/rough.js", response_class=PlainTextResponse)
+def rough() -> PlainTextResponse:
+    """Hand-drawn SVG primitives for the mechanism panel — the browser half of
+    `docs/diagrams/rough.py`, so the screen and the PDF draw in the same hand."""
+    return PlainTextResponse((WEB / "rough.js").read_text(encoding="utf-8"), media_type="text/javascript")
+
+
 @app.get("/api/state")
 def state(scan: str | None = None, peer: str = "local") -> JSONResponse:
     _, conversation = _session(peer)
@@ -327,8 +360,9 @@ def start_scan(payload: ScanRequest) -> JSONResponse:
 
 
 @app.get("/api/scan")
-def scan_status() -> JSONResponse:
-    return JSONResponse(RUN.snapshot())
+def scan_status(since: int = 0) -> JSONResponse:
+    """The scan log, plus whichever core stages the caller has not seen yet."""
+    return JSONResponse(RUN.snapshot(since=since))
 
 
 class LiveRequest(BaseModel):
@@ -433,6 +467,203 @@ async def chat_reset(peer: str = "local") -> JSONResponse:
     record, _ = _session(peer)
     await CHAT.reset(record.id)
     return JSONResponse({"reset": True, "session": record.id})
+
+
+@app.get("/api/mechanisms")
+def mechanisms() -> JSONResponse:
+    """The mechanism catalogue, plus the core runtime's own counters.
+
+    The panel's labels come from here rather than from JavaScript so there is one
+    place to correct when the code moves. The counters come with them because the
+    core lane makes a claim — "this turn did not touch core" — and a claim like
+    that should be a reading, not a sentence somebody typed into a template.
+    """
+    from gateway.runtime import GATEWAY
+
+    return JSONResponse({
+        "mechanisms": stages.catalogue(),
+        "runs": stages.RUNS,
+        "core_idle_note": stages.CORE_IDLE_NOTE,
+        "runtime": GATEWAY.report(),
+    })
+
+
+class OpenClawLine(BaseModel):
+    line: str
+    peer: str = "local"
+
+
+def _openclaw_gate(plan: dict, session: str) -> dict | None:
+    """Hold a `/openclaw` line for approval, or `None` to let it run.
+
+    Reuses `approval_module.GATE` rather than a second gate: one queue, one set
+    of decisions, one place the UI reads pending work from. `require` is the
+    entry point that ignores the tool name, which is what this needs — the line
+    is not a tool call and its blast radius is in the text, not the name.
+    """
+    from gateway import approval as approval_module
+
+    mode, tier = plan["mode"], plan["tier"]
+    if plan["error"]:
+        # A line that did not parse has nothing to approve. Holding it would ask
+        # the operator to sign off on a typo, and hide the usage text that tells
+        # them what to type instead.
+        return None
+    if mode == "local" or (mode == "method" and tier in ("read", "forbidden")):
+        # `forbidden` goes through so `call` can refuse it in its own words. An
+        # approval prompt for something that has no approval path would be a lie.
+        return None
+
+    if mode == "sentence":
+        tool, args = "openclaw_ask", {"text": plan["text"]}
+        reason = (
+            "Bu satır OpenClaw'ın kendi ajanına gidiyor. O ajanın kabuk erişimi "
+            "var ve şu an onay sormadan çalıştırıyor (exec: mode=full, ask=off); "
+            "bizim kapımız içeride ne yapacağını görmez."
+        )
+    else:
+        tool, args = "openclaw_call", {"method": plan["method"], **(plan["params"] or {})}
+        reason = f"{plan['method']} OpenClaw'da bir şey değiştirir."
+
+    decision = approval_module.GATE.require(tool, args, session=session, reason=reason)
+    if decision.get("block"):
+        return {"ok": False, "held": True, "tier": tier or "chat",
+                "method": plan["method"] or "chat.send",
+                "reason": decision["reason"], "approval_id": decision["approval_id"]}
+    return None
+
+
+async def _openclaw_schedule(plan: dict, record) -> dict:
+    """`/openclaw schedule …` — the deterministic path to a job that exists.
+
+    Asking OpenClaw's agent in prose to "create a daily task" is a reasonable
+    thing to want and a bad way to get it: measured, it produced a clarifying
+    question rather than a job, and the answer to that question went to a
+    different agent because the follow-up line carried no prefix. Prose is the
+    right shape for asking and the wrong shape for something that must either
+    exist afterwards or say why not.
+
+    So this branch never asks anything. It parses, and either creates, lists,
+    removes, or refuses with the syntax spelled out.
+    """
+    import scheduler as scheduler_module
+
+    try:
+        command = scheduler_module.parse_command(plan["text"])
+    except scheduler_module.WhenError as exc:
+        return {"ok": False, "method": "schedule", "tier": "local", "error": str(exc)}
+
+    if command["action"] == "list":
+        listing = await scheduler_module.jobs()
+        return {"ok": True, "method": "schedule", "tier": "local", "result": listing}
+
+    if command["action"] == "remove":
+        held = _openclaw_gate(
+            {"mode": "method", "method": "cron.remove", "tier": "write",
+             "params": {"id": command["id"]}, "text": "", "error": ""},
+            record.id,
+        )
+        return held if held is not None else await scheduler_module.remove(command["id"])
+
+    try:
+        params = scheduler_module.build_job(
+            command["ask"][:60], command["when"], command["ask"], to=command["to"]
+        )
+    except scheduler_module.WhenError as exc:
+        return {"ok": False, "method": "schedule", "tier": "local", "error": str(exc)}
+
+    # Signed on what was typed, not on the resolved schedule: `"20dk sonra"` is a
+    # different timestamp every time it is parsed, and a digest over the result
+    # could never match the grant it had just been given.
+    held = _openclaw_gate(
+        {"mode": "method", "method": "cron.add", "tier": "write",
+         "params": {k: command[k] for k in ("when", "ask", "to")},
+         "text": "", "error": ""},
+        record.id,
+    )
+    if held is not None:
+        return held
+
+    outcome = await openclaw_control.call("cron.add", params)
+    outcome["when"] = scheduler_module.describe(params["schedule"])
+    if not command["to"]:
+        outcome["note"] = (
+            "Teslimat hedefi verilmedi: iş koşacak ama sonucu yalnız task kaydına "
+            "düşecek. Bir yere gitmesi için: … | … > telegram:<sohbet-id>"
+        )
+    return outcome
+
+
+@app.post("/api/openclaw")
+async def openclaw_line(payload: OpenClawLine) -> JSONResponse:
+    """One typed line to OpenClaw — a Gateway method, or a question for its agent.
+
+    The escape hatch, deliberately thin: no model of ours, no tools, no summary.
+    What OpenClaw returns is what the screen shows, because the reason to type
+    this instead of asking our agent is that you want to see the actual bytes.
+
+    Which of the two it is comes from the first word: a dot makes it a method
+    (`sessions.list`), anything else is a sentence and goes to OpenClaw's own
+    agent (`adın ne`). The route records which way it went, so a transcript never
+    leaves you guessing whether a line reached the control plane or the model.
+
+    It still belongs to a session. The line goes into the transcript *before* the
+    call runs and the answer after it, so a call that hangs or dies still leaves
+    evidence that it was made — the same rule the chat path follows.
+
+    **What the gate covers.** Read-class methods run straight through: the point
+    of this hatch is seeing the actual bytes, and asking for approval before every
+    `sessions.list` would retire it. A write-class method, and any sentence, is
+    held for approval first. The sentence matters most and is the least obvious:
+    it goes to OpenClaw's *own* agent, which on this host runs shell without
+    prompting (`tools.exec` measured at `mode=full, ask=off`), and our gate cannot
+    see what that agent does once the line arrives. So the approval text says so.
+    """
+    record, _ = _session(payload.peer)
+
+    line = payload.line.strip()
+    plan = openclaw_control.plan_line(payload.line)
+    to_agent = plan["mode"] == "sentence"
+
+    CHAT.sessions.record_turn(
+        record, "user", line, channel="openclaw-direct",
+        method="chat.send" if to_agent else plan["method"],
+        tier="chat" if to_agent else plan["tier"],
+    )
+
+    # `schedule` is answered here rather than by `run_line`, because it is the one
+    # subcommand that is not a Gateway call: it is our own translation plus a
+    # `cron.add`. Listing and refusals never reach the Gateway at all.
+    if plan["mode"] == "schedule":
+        outcome = await _openclaw_schedule(plan, record)
+        if outcome.get("held"):
+            CHAT.sessions.record_turn(
+                record, "assistant", outcome["reason"], channel="openclaw-direct", ok=False,
+            )
+            return JSONResponse({**outcome, "session": record.id}, status_code=202)
+        CHAT.sessions.record_turn(
+            record, "assistant", json.dumps(outcome, ensure_ascii=False)[:4000],
+            channel="openclaw-direct", ok=bool(outcome.get("ok")),
+        )
+        return JSONResponse({**outcome, "session": record.id})
+
+    held = _openclaw_gate(plan, record.id)
+    if held is not None:
+        CHAT.sessions.record_turn(
+            record, "assistant", held["reason"], channel="openclaw-direct", ok=False,
+        )
+        return JSONResponse({**held, "session": record.id}, status_code=202)
+
+    outcome = await openclaw_control.run_line(payload.line, peer=payload.peer)
+    answer = outcome.get("result", outcome.get("error", ""))
+    CHAT.sessions.record_turn(
+        record, "assistant",
+        (answer if isinstance(answer, str) else json.dumps(answer, ensure_ascii=False))[:4000],
+        channel="openclaw-direct", ok=bool(outcome.get("ok")),
+    )
+    if not outcome.get("ok") and not to_agent and "Usage" in str(outcome.get("error", "")):
+        outcome.setdefault("usage", f"{openclaw_control.PREFIX} <method> [json]  ·  or just ask")
+    return JSONResponse({**outcome, "session": record.id})
 
 
 # --------------------------------------------------------------------------- gateway
@@ -630,6 +861,73 @@ def approval_deny(request_id: str, payload: ApprovalDecision) -> JSONResponse:
     if not outcome["ok"]:
         raise HTTPException(404, outcome["reason"])
     return JSONResponse(outcome)
+
+
+class ScheduleJob(BaseModel):
+    name: str
+    when: str
+    ask: str
+    session: str = "isolated"
+
+
+@app.get("/api/schedule")
+async def schedule_list() -> JSONResponse:
+    """Scheduled jobs, as OpenClaw holds them.
+
+    We do not keep a second copy. A local list would drift the moment somebody
+    used `openclaw automations` directly, and a scheduler you cannot trust the
+    listing of is worse than none.
+    """
+    import scheduler as scheduler_module
+
+    return JSONResponse(await scheduler_module.jobs())
+
+
+@app.post("/api/schedule")
+async def schedule_create(payload: ScheduleJob) -> JSONResponse:
+    """Create a job. Goes through the same gate as any other write."""
+    import scheduler as scheduler_module
+
+    record, _ = _session("local")
+    try:
+        params = scheduler_module.build_job(
+            payload.name, payload.when, payload.ask, session=payload.session
+        )
+    except scheduler_module.WhenError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    # The gate signs what the *person* asked for, not the resolved schedule.
+    # `"5dk sonra"` becomes a different timestamp every time it is parsed, so a
+    # digest over `params` never matched the grant it had just been given and the
+    # approval could not be consumed — approve, retry, get asked again, forever.
+    # The three fields below are exactly what the approval card shows, which is
+    # the other half of the argument: you should be signing what you read.
+    held = _openclaw_gate(
+        {"mode": "method", "method": "cron.add", "tier": "write",
+         "params": {"name": payload.name, "when": payload.when, "ask": payload.ask},
+         "text": "", "error": ""},
+        record.id,
+    )
+    if held is not None:
+        return JSONResponse({**held, "session": record.id}, status_code=202)
+
+    outcome = await openclaw_control.call("cron.add", params)
+    return JSONResponse({**outcome, "when": scheduler_module.describe(params["schedule"])})
+
+
+@app.delete("/api/schedule/{job_id}")
+async def schedule_delete(job_id: str) -> JSONResponse:
+    import scheduler as scheduler_module
+
+    record, _ = _session("local")
+    held = _openclaw_gate(
+        {"mode": "method", "method": "cron.remove", "params": {"id": job_id},
+         "tier": "write", "text": "", "error": ""},
+        record.id,
+    )
+    if held is not None:
+        return JSONResponse({**held, "session": record.id}, status_code=202)
+    return JSONResponse(await scheduler_module.remove(job_id))
 
 
 def _runtime_report() -> dict:

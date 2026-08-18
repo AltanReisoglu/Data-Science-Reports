@@ -219,3 +219,12 @@ vc-agent/pipeline/data/
 
 # API keys for the pipeline's LLM endpoint — never committed.
 vc-agent/pipeline/.env
+
+# ── vc-agent ────────────────────────────────────────────────────────
+# Üçüncü taraf harness kaynakları: okumak için çekildi, bizim kodumuz
+# değil ve 189 MB. Yeniden çekilebilir, depoda tutulmasının değeri yok.
+vc-agent/sources_harness/
+
+# Kaynağa gömülü bir API anahtarı varsayılanı taşıyor (sk-live-…).
+# Anahtar .env'e taşınana kadar bu dosya depoya girmemeli.
+vc-agent/test.py
