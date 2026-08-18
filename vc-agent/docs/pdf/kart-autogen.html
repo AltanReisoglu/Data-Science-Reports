@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>AutoGen — hatırlatma kartı</title>
+<style>
+:root{
+  --ink:#16191c; --ink2:#3f474d; --ink3:#767f86;
+  --rule:#c9d0d4; --rule2:#e6eaec; --panel:#f4f6f7;
+  --accent:#0d5f6b; --accent-bg:#e3eef0;
+  --warn:#7a4a10; --warn-bg:#f6efe4;
+  --mono:"DejaVu Sans Mono","Liberation Mono",monospace;
+  --sans:"DejaVu Sans","Liberation Sans",Arial,sans-serif;
+  --serif:"DejaVu Serif","Liberation Serif",Georgia,serif;
+  --W:210mm; --H:297mm;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#2a2c28;color:var(--ink)}
+body{font-family:var(--sans);line-height:1.4}
+
+.page{
+  width:var(--W); height:var(--H); background:#fff; overflow:hidden;
+  padding:12mm 13mm 10mm; position:relative;
+}
+
+.hd{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:2px solid var(--ink);padding-bottom:1.8mm;margin-bottom:3.4mm;
+}
+.hd .t{font-family:var(--mono);font-size:14pt;font-weight:700;letter-spacing:-.02em}
+.hd .n{font-family:var(--mono);font-size:8.4pt;color:var(--ink3);letter-spacing:.1em;
+       text-transform:uppercase}
+
+.b{margin:0 0 3.6mm;padding:0 0 3.4mm;border-bottom:1px solid var(--rule2)}
+.b:last-child{border-bottom:0;margin-bottom:0}
+.b .lbl{
+  font-family:var(--mono);font-size:8pt;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:1.2mm;
+}
+.b.w .lbl{color:var(--warn)}
+.b .say{
+  font-family:var(--serif);font-size:13.4pt;line-height:1.3;color:var(--ink);margin:0;
+}
+.b .say + .say{margin-top:1.3mm}
+.b .why{font-size:9.8pt;line-height:1.36;color:var(--ink2);margin:1.3mm 0 0}
+.b .why + .why{margin-top:1mm}
+.b .why b{color:var(--ink)}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);padding:.05em .25em}
+
+.b.hi{background:var(--accent-bg);padding:2.4mm 2.8mm;border-left:2.5px solid var(--accent);
+      border-bottom:0}
+.b.w{background:var(--warn-bg);padding:2.4mm 2.8mm;border-left:2.5px solid var(--warn);
+     border-bottom:0}
+
+.nums{display:flex;flex-wrap:wrap;gap:0 4.6mm;margin:1.4mm 0 0}
+.nums div{font-family:var(--mono);font-size:9.4pt;color:var(--ink2)}
+.nums b{color:var(--ink);font-size:11pt}
+
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:9.6pt;
+      margin:1.4mm 0 0}
+td{padding:.7mm 0;border-bottom:1px solid var(--rule2);color:var(--ink2)}
+td.n{text-align:right;color:var(--ink);font-weight:700;width:16mm}
+tr:last-child td{border-bottom:0}
+
+.ft{position:absolute;left:13mm;right:13mm;bottom:5.5mm;
+    font-family:var(--mono);font-size:7.4pt;color:var(--ink3);
+    border-top:1px solid var(--rule);padding-top:1.1mm;
+    display:flex;justify-content:space-between}
+
+@media screen{
+  body{padding:16px}
+  .page{margin:0 auto 16px;box-shadow:0 2px 14px rgba(0,0,0,.4)}
+}
+@media print{
+  @page{size:210mm 297mm;margin:0}
+  html,body{background:#fff}
+  .page{page-break-after:always;box-shadow:none;margin:0}
+  .page:last-child{page-break-after:auto}
+}
+</style></head><body>
+<div class="page"><div class="hd"><span class="t">AutoGen · hatırlatma kartı</span><span class="n">1 / 2</span></div><div class="b hi"><div class="lbl">aç — omurga cümlesi</div><p class="say">“AutoGen bize bir motor veriyor ama kontrol düzlemi vermiyor.”</p><p class="why">Üç katman: <b>core</b> aktör modeli · <b>agentchat</b> günlük iş · <b>ext</b> dış dünya. Kural: yukarıdan başla.</p></div><div class="b"><div class="lbl">ilk 90 saniyede söyle — sonra söylersen gizlemiş olursun</div><p class="say">“AutoGen bakım modunda. Yeni özellik almayacak.”</p><p class="why">README'nin kendi cümlesi. Son sürüm <code>python-v0.7.5</code>. Halef <b>microsoft/agent-framework</b>, Nisan 2026'da 1.0 GA. Bizim maruziyet ölçülü — 2. sayfanın altına bak.</p></div><div class="b"><div class="lbl">en pahali tuzak — tek bir şey hatirlatacaksan bu</div><p class="say">“Model tool'u çağırıyor, sonuç dönüyor, ve tur orada bitiyor. Model o sonucu hiç görmüyor.”</p><p class="why"><code>max_tool_iterations</code> varsayılanı <b>1</b>. Hiçbir hata çıkmıyor: loga bakarsın, tool çağrılmış, sonuç dönmüş, cevap yine yanlış. Eksik olan çağrı değil, <b>ikinci model turu</b>.</p></div><div class="b"><div class="lbl">sessiz bellek kaybi</div><p class="say">“Source'u her istekte değiştirirseniz her istekte yeni bir ajan doğuyor. Öncekinin belleği silinmiyor — ulaşılamaz hale geliyor.”</p><p class="why"><code>topic.source → agent.key</code>, dönüşümsüz (core kılavuzu 05:670). Sistem çalışıyor, ajanlar cevap veriyor, hiçbiri bir öncekini hatırlamıyor.</p></div><div class="b"><div class="lbl">sessiz dal kaybi</div><p class="say">“Bir dal sessizce ölürse toplayıcı sonsuza kadar bekliyor.”</p><p class="why"><code>publish_message</code> hata fırlatmıyor, yalnız logluyor. Sıfır abone de geçerli sonuç. <b>Çözüm tek satır:</b> sayacı <code>finally</code> bloğunda artır.</p></div><div class="b hi"><div class="lbl">maliyet — sayiyi ezberle</div><p class="say">“Aynı görev, aynı ajanlar, aynı model. Yalnız orkestrasyon deseni değişiyor: 204 tokenden 334'e. Yüzde 63,7.”</p><table><tr><td>SelectorGroupChat</td><td class="n">204</td></tr><tr><td>GraphFlow</td><td class="n">270</td></tr><tr><td>RoundRobinGroupChat</td><td class="n">274</td></tr><tr><td>Swarm · handoff</td><td class="n">334</td></tr></table><p class="why"><code>poc/kiyas.py</code> · Ödenen şey zekâ değil <b>yönlendirme özerkliği</b>. Agents SDK'nın tek modeli olan handoff, AutoGen'in en pahalı deseni.</p></div><div class="b w"><div class="lbl">bunu bir kez yanliş yazdim — eski slayti gören olabilir</div><p class="why">“Turun %63,7'si sistem prompt'udur” diye yazmıştım. <b>Değil.</b> Bu orkestrasyon deseni farkı, bağlam kompozisyonu değil.</p></div><div class="ft"><span>deste: hap-autogen.pdf · 37 slayt</span><span>19 Ağustos 2026</span></div></div><div class="page"><div class="hd"><span class="t">AutoGen · hatırlatma kartı</span><span class="n">2 / 2</span></div><div class="b hi"><div class="lbl">vermediği üç şey — “hiç yok” deme; üçünün de yakini var, üçü de eksik</div><p class="why"><b>Kapı</b> · mesaj katmanında duruyor. Bir mesajı düşürebiliyor ama “bu ajan şu komutu şu argümanlarla çalıştırmak istiyor”u görmüyor, ve reddi ajana <b>gerekçesiz</b> dönüyor.</p><p class="why"><b>Onay</b> · <b>var</b>. <code>CodeExecutorAgent</code> içinde, deneysel, yalnız kod çalıştırmaya özel. Verilmezse sadece uyarı yazıp çalıştırıyor. Ve onaylı bir ajan <b>yapılandırmaya yazılamıyor</b> — kod <code>ValueError</code> fırlatıyor.</p><p class="why"><b>Denetim kaydı</b> · Python'ın <code>logging</code>'i. Teslim garantisi yok, kimlik yok, kurcalama kanıtı yok. Ve <code>LLMCallEvent</code> modelin <b>bütün mesajlarını</b> içine koyuyor.</p></div><div class="b"><div class="lbl">perdeyi bağlayan kanca — durakla, sonra söyle</div><p class="say">“Bunu aklınızda tutun. Birazdan OpenClaw'ın denetim kaydını anlatacağım, ve onun sorunu tam tersi olacak: hiç içerik tutmuyor. İkisi de bizim istediğimiz şey değil.”</p></div><div class="b"><div class="lbl">compaction yok</div><p class="say">“Dört bağlam sınıfının dördü de kırpıyor, özetlemiyor.”</p><p class="why"><code>Unbounded</code> · <code>Buffered</code> · <code>HeadAndTail</code> · <code>TokenLimited</code>. Özetleyerek sıkıştıran hazır uygulama <b>yok</b> — onu biz yazdık (<code>context_engine.py</code>).</p></div><div class="b"><div class="lbl">iki farkli cache — kariştirilmasi çok yaygin</div><p class="why"><b>ChatCompletionCache</b> · sha256 <b>tam eşleşmeli</b> cevap önbelleği. Aynı istek birebir tekrarlanırsa cevabı döndürüyor.</p><p class="why"><b>Sağlayıcı prompt cache</b> · <b>önek</b> tabanlı, baştan ilk farklı bayta kadar. Değişkeni başa koyarsan arkası düşer — tek bir tarih damgası sistem prompt'unu yakar.</p><p class="why"><code>RequestUsage</code>'da <code>cached_tokens</code> alanı <b>yok</b>: isabeti AutoGen'in ölçüm nesnesinden okuyamazsın.</p></div><div class="b"><div class="lbl">sekiz desen — “dokuz” diyen kaynak varsa o tasnif yazarin</div><p class="why">Concurrent Agents · Sequential Workflow · Group Chat · Handoffs · Mixture of Agents · Multi-Agent Debate · Reflection · Code Execution</p><p class="why">Yedisi orkestrasyon, sonuncusu bir <b>yetenek</b>. Kılavuzun kendi bölümlemesi, 05:3206. <b>Ben de bir kez dokuz yazdım, düzelttim</b> — bunu söylemek geri kalan sayıları güçlendiriyor.</p></div><div class="b"><div class="lbl">dört sessiz varsayilan — hiçbiri hata vermiyor</div><p class="why"><code>max_tool_iterations=1</code> tool sonucunu modelden saklıyor · <code>model_context</code> verilmezse ajanın belleği hiç olmuyor · <code>model_client_stream=False</code> ile token akışı çıkmıyor · sonlandırma koşulu yoksa takım tavansız koşuyor.</p></div><div class="b hi"><div class="lbl">bizde ne var — sorulmadan söyle</div><div class="nums"><div><b>12.892</b> satır</div><div><b>4.496</b> autogen’e dokunan</div><div><b>8.396</b> dokunmayan</div><div><b>381</b> test, hepsi geçiyor</div></div><p class="why">Kontrol düzlemini taşıyan altı gateway modülünde <b>sıfır</b> autogen importu. Motor değişirse o altı modül yerinde kalır.</p></div><div class="ft"><span>ölçüm: poc/kiyas.py · compare_fanin.py</span><span>autogen 0.7.5</span></div></div>
+</body></html>

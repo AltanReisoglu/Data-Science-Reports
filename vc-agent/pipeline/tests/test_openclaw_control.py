@@ -8,6 +8,7 @@ covering a hundred Gateway methods with its blast radius in an argument — so
 
 from __future__ import annotations
 
+import re
 import unittest
 
 import openclaw_control as oc
@@ -75,6 +76,28 @@ class GateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sessions.reset", outcome.reason)
         self.assertEqual(len(self.gate.pending()), 1)
 
+    async def test_a_gated_method_says_which_request_to_approve(self) -> None:
+        """The refusal text must carry the id, because the UI reads it back out.
+
+        `web/app.js` decides whether to draw an Approve button by running
+        `/Approve request ([0-9a-f]{6,})/` over this sentence. This hook passes its
+        own `reason`, and for a while that replaced the default text instead of
+        prefixing it — so the id vanished, the button was never drawn, and the
+        operator was told the call had "no approval path" while the request sat
+        pending in the queue. The assertion is the client's regex, not a paraphrase
+        of it: anything looser passes while the button stays missing.
+        """
+        outcome = await self.run_call("sessions.reset", params_json='{"id": "x"}')
+        self.assertTrue(outcome.blocked)
+
+        pending = self.gate.pending()
+        self.assertEqual(len(pending), 1)
+
+        found = re.search(r"Approve request ([0-9a-f]{6,})", outcome.reason)
+        self.assertIsNotNone(found, f"no approvable id in refusal: {outcome.reason!r}")
+        self.assertEqual(found.group(1), pending[0]["id"])
+        self.assertEqual(found.group(1), outcome.get("approval_id"))
+
     async def test_a_forbidden_method_has_no_approval_path(self) -> None:
         outcome = await self.run_call("config.set")
         self.assertTrue(outcome.blocked)
@@ -133,7 +156,10 @@ class CallTests(unittest.IsolatedAsyncioTestCase):
     def test_the_method_listing_shows_what_is_refused(self) -> None:
         listing = oc.methods()
         self.assertIn("sessions.list", listing["read"])
-        self.assertIn("cron.create", listing["write"])
+        # `cron.add`, not `cron.create`: measured against the running Gateway,
+        # which answers "unknown method" for the name the docs table implies.
+        self.assertIn("cron.add", listing["write"])
+        self.assertNotIn("cron.create", listing["write"])
         self.assertIn("secrets.", listing["forbidden_prefixes"])
         self.assertFalse(listing["admin_enabled"])
 

@@ -42,7 +42,7 @@ not an enforcement point.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from autogen_core.tools import TextResultContent, ToolResult, Workbench
 
@@ -62,6 +62,7 @@ class GatedWorkbench(Workbench):
         session_id: str = "",
         label: str = "",
         allow: Sequence[str] | None = None,
+        on_stage: Callable[..., None] | None = None,
     ) -> None:
         self._inner = inner
         self._registry = registry or hooks_module.REGISTRY
@@ -71,6 +72,20 @@ class GatedWorkbench(Workbench):
         # only carries these — see the note on gating vs filtering above.
         self._allow = set(allow) if allow else None
         self.blocked: list[dict[str, Any]] = []
+        # Optional reporter for the live mechanism panel. It lives here rather
+        # than in a hook because the hook chain *stops* at whichever hook blocks
+        # (`hooks.py:180`), so a probe registered after the gate would go silent
+        # on exactly the calls worth watching. See `stages.py`.
+        self._on_stage = on_stage
+
+    def _stage(self, stage_id: str, **meta: Any) -> None:
+        """Report a stage, if anyone is listening. Never affects the decision."""
+        if self._on_stage is None:
+            return
+        try:
+            self._on_stage(stage_id, **meta)
+        except Exception:  # noqa: BLE001 — a window must not hold up the work
+            pass
 
     # ------------------------------------------------------------ passthrough
 
@@ -119,6 +134,8 @@ class GatedWorkbench(Workbench):
             # A filtered tool is refused by name too. The list is a hint to the
             # model; this is the enforcement.
             self._record_block(name, arguments, "not offered by this workbench")
+            self._stage("gate", tool=name, blocked=True, workbench=self._label,
+                        reason="not offered by this workbench")
             return ToolResult(
                 name=name,
                 result=[TextResultContent(content=f"Refused: {name} is not available here.")],
@@ -129,6 +146,8 @@ class GatedWorkbench(Workbench):
         if decision.blocked:
             self.blocked.append({"tool": name, "reason": decision.reason, "by": decision.by})
             self._record_block(name, arguments, decision.reason)
+            self._stage("gate", tool=name, blocked=True, workbench=self._label,
+                        reason=decision.reason, by=decision.by)
             # An error result, not an exception: the agent needs to be able to
             # tell the person it was refused and why.
             return ToolResult(
@@ -137,6 +156,10 @@ class GatedWorkbench(Workbench):
                 is_error=True,
             )
 
+        self._stage("gate", tool=name, blocked=False, workbench=self._label,
+                    hooks=len(decision.ran))
+        self._stage("tool_exec", tool=name, workbench=self._label,
+                    kind=type(self._inner).__name__)
         result = await self._inner.call_tool(name, arguments, cancellation_token, call_id)
 
         after = await self._registry.run(

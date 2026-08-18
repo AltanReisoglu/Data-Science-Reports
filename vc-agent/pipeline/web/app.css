@@ -54,6 +54,124 @@
    rather than borrowing a reserved status colour. */
 .path--live .path__dot { background: var(--ink); }
 .path--docs .path__dot { background: var(--ink-muted); }
+.path--openclaw .path__dot { background: var(--bar); }
+
+/* ---------------------------------------------------------- mechanism panel
+   A strip between the conversation and the composer: what is running right now.
+   It sits above the input because that is where the eye already is while waiting
+   for an answer. */
+/* The composer is sticky, so whatever it grows by it also hides. `scrollToEnd`
+   uses `scrollIntoView`, which honours `scroll-margin-bottom` — so reserving the
+   panel's height here keeps the newest turn above it instead of behind it. */
+body.has-mech .turn { scroll-margin-bottom: 15rem; }
+body.has-mech.mech-collapsed .turn { scroll-margin-bottom: 6rem; }
+
+.mech {
+  max-width: 52rem;                 /* the composer's own measure, so it lines up */
+  margin: 0 auto 0.625rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem 0.4rem;
+  background: var(--paper-sunk, rgba(0, 0, 0, 0.025));
+}
+.mech__head {
+  display: flex; align-items: center; gap: 0.75rem;
+  font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.mech__title { font-weight: 600; }
+.mech__counts { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.mech__toggle { padding: 0.1rem 0.5rem; font-size: 0.6875rem; }
+/* The drawing keeps its own scrollbar so a narrow window never pushes the page
+   sideways — the composer underneath must stay exactly where it was. */
+.mech__canvas { overflow-x: auto; padding: 0.25rem 0; }
+.mech__canvas svg { display: block; }
+.mech__note {
+  margin: 0.15rem 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--ink-muted);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem;
+}
+.mech__note strong { color: var(--ink); }
+.mech__class {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.6875rem; background: var(--paper-sunk, rgba(0, 0, 0, 0.05));
+  padding: 0.05em 0.3em; border-radius: 3px; color: var(--ink);
+}
+.mech__ref { font-family: ui-monospace, monospace; font-size: 0.6875rem; opacity: 0.7; }
+/* The run header: team, pattern, message types. Constant for the whole run, so
+   it stays put while the figure underneath changes. */
+.mech__run {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem;
+  padding: 0 0 0.4rem; margin-bottom: 0.35rem;
+  border-bottom: 1px dashed var(--hairline);
+  font-size: 0.6875rem;
+}
+.mech__fact { display: flex; align-items: baseline; gap: 0.3rem; min-width: 0; }
+.mech__factkey {
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted);
+  font-size: 0.625rem;
+}
+.mech__factval {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.6875rem; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Which file is doing this. "What ran" should be answerable without grepping. */
+.mech__mod {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.6875rem; color: var(--ink-muted); opacity: 0.85;
+}
+/* How long the current mechanism has been running. A model call can sit for
+   several seconds; without this the panel reads as stuck rather than busy. */
+.mech__clock {
+  font-family: ui-monospace, monospace; font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums; color: var(--bar); font-weight: 600;
+  min-width: 3.2em;
+}
+
+/* The node currently doing the work breathes; the arrow the work is travelling
+   along marches. Both are CSS on the drawn `<g>`, so the SVG is never redrawn
+   just to animate — a repaint would re-seed nothing but would still cost. */
+@keyframes mech-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+@keyframes mech-march {
+  to { stroke-dashoffset: -14; }
+}
+.mech-pulse { animation: mech-breathe 1.1s ease-in-out infinite; }
+.mech-flow path {
+  stroke-dasharray: 5 3;
+  animation: mech-march 0.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mech-pulse, .mech-flow path { animation: none; }
+}
+.mech__say { flex: 1 1 20rem; min-width: 0; }
+.mech__meta { width: 100%; color: var(--ink); font-weight: 600; }
+/* Which layer a mechanism belongs to. `ours` is deliberately distinct: the gate
+   and the compacting context are not AutoGen features, and colouring them like
+   `ToolCallRequestEvent` would teach that they are. */
+.mech__lane {
+  font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 0.1em 0.4em; border-radius: 3px; font-weight: 600;
+}
+.mech__lane--agentchat { background: rgba(25, 113, 194, 0.14); color: #1971c2; }
+.mech__lane--core      { background: rgba(95, 61, 196, 0.14); color: #5f3dc4; }
+.mech__lane--ours      { background: rgba(232, 89, 12, 0.16); color: #e8590c; }
+
+/* Raw Gateway output. Monospace and scrollable in its own box: this is the one
+   place in the interface that promises the bytes are untouched, so it must not
+   wrap, reflow or prettify them, and a wide frame must not push the page
+   sideways. */
+.raw {
+  margin: 0; padding: 0.75rem; border-radius: 6px;
+  background: var(--paper-sunk, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--hairline);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem; line-height: 1.5; color: var(--ink);
+  white-space: pre; overflow-x: auto; max-height: 28rem; overflow-y: auto;
+}
 .bubble__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 
 .prose { font-size: 0.9375rem; color: var(--ink); white-space: pre-wrap; margin: 0 0 1rem; }
@@ -198,3 +316,51 @@
   color: var(--ink-3, #7c837f);
   font-variant-numeric: tabular-nums;
 }
+
+
+/* ── the running trace ────────────────────────────────────────────────────
+   One line per stage, newest at the bottom, capped and scrolled. Monospace
+   and dim on purpose: this is a log, not a headline — readable when you look
+   for it, ignorable when you do not.
+
+   The lane colours are the panel's own (`.mech__lane--*`), not new ones: the
+   badge above and the line below must agree about what "core" looks like. */
+.mech__trace {
+  list-style: none; margin: 0.5rem 0 0; padding: 0.4rem 0 0;
+  border-top: 1px solid var(--hairline);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem; line-height: 1.55;
+  max-height: 8.4rem; overflow-y: auto; overscroll-behavior: contain;
+}
+.mech__trace li {
+  display: grid; grid-template-columns: 3.4rem 4.8rem 1fr auto;
+  gap: 0.5rem; padding: 0.05rem 0; color: var(--ink-muted);
+  white-space: nowrap;
+}
+.mech__trace li.is-live { color: var(--ink); }
+.mech__trace .t-at { text-align: right; font-variant-numeric: tabular-nums; }
+.mech__trace .t-lane { text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.6rem; }
+.mech__trace .t-what { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+.mech__trace li.is-live .t-what { color: var(--ink); font-weight: 600; }
+.mech__trace .t-meta { color: var(--ink-muted); font-size: 0.62rem; }
+.mech__trace .lane-agentchat { color: #1971c2; }
+.mech__trace .lane-core      { color: #5f3dc4; }
+.mech__trace .lane-gateway   { color: #e8590c; }
+.mech__trace li.is-block .t-what,
+.mech__trace li.is-block .t-meta { color: #c92a2a; }
+
+
+/* ── scheduled jobs ───────────────────────────────────────────────────────
+   Same register as the trace: small, monospace, ignorable. The warning line is
+   the exception and is meant to be read once. */
+.mech__cron {
+  margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px solid var(--hairline);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem;
+  line-height: 1.6; color: var(--ink-muted);
+}
+.mech__cron b { color: var(--ink-2); font-weight: 600; }
+.mech__cron .cron-row { display: grid; grid-template-columns: 1fr auto auto;
+                        gap: 0.6rem; white-space: nowrap; }
+.mech__cron .cron-when { color: var(--ink-2); }
+.mech__cron .cron-warn { color: #e8590c; margin-top: 0.3rem; white-space: normal; }
+.mech__cron .cron-off  { color: #c92a2a; }

@@ -55,6 +55,7 @@ from autogen_core import (  # noqa: E402
 
 import config
 import engine
+import stages
 import observability
 from agents import analysts, triage
 from schemas import BranchResult, Company, Score
@@ -87,6 +88,9 @@ class BranchWorker(RoutedAgent):
 
     @message_handler
     async def handle(self, message: BranchTask, ctx: MessageContext) -> None:
+        # `self.id.key` is the topic's source, handed over by the runtime — the
+        # mapping the guide spends a page on and nobody reads.
+        stages.emit_line("branch", branch=self._branch, key=self.id.key)
         try:
             result = await self._agent.run(task=message.company_brief)
             text = str(getattr(result.messages[-1], "content", ""))
@@ -142,6 +146,8 @@ async def enrich(
 
     async def collect(_ctx: ClosureContext, message: BranchOutcome, _mc: MessageContext) -> None:
         await results.put(message)
+        stages.emit_line("collect", branch=message.branch,
+                         ok=message.succeeded, queued=results.qsize())
 
     started = time.perf_counter()
     with observability.EventCapture() as events:
@@ -152,6 +158,8 @@ async def enrich(
             await runtime.add_subscription(
                 TypeSubscription(topic_type=TASK_TOPIC, agent_type=branch)
             )
+        stages.emit_line("subscribe", topic=TASK_TOPIC,
+                         agents=sorted(branch_agents), company=company.name)
 
         await ClosureAgent.register_closure(
             runtime,
@@ -163,10 +171,15 @@ async def enrich(
         )
 
         runtime.start()
+        stages.emit_line("runtime_start", company=company.name,
+                         intervention="AuditingInterventionHandler")
+        stages.emit_line("intervention", handler="AuditingInterventionHandler")
         await runtime.publish_message(
             BranchTask(company_brief=triage.describe(company)),
             topic_id=TopicId(TASK_TOPIC, source="default"),
         )
+        stages.emit_line("publish", topic=TASK_TOPIC, source="default",
+                         subscribers=len(branch_agents))
 
         collected: dict[str, BranchOutcome] = {}
         try:
@@ -180,6 +193,8 @@ async def enrich(
             timed_out = False
         except asyncio.TimeoutError:
             timed_out = True
+        stages.emit_line("join", expected=len(branch_agents),
+                         collected=len(collected), timed_out=timed_out)
 
         try:
             await asyncio.wait_for(runtime.stop_when_idle(), timeout=5.0)
@@ -189,6 +204,7 @@ async def enrich(
             except Exception:
                 pass
         await runtime.close()
+        stages.emit_line("runtime_stop", company=company.name)
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
 

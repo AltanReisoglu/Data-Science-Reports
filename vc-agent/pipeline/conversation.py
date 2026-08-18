@@ -53,6 +53,7 @@ from typing import Any, AsyncIterator
 import config
 import engine
 import observability
+import stages as stages_module
 from gateway import approval as approval_module
 from gateway import hooks as hooks_module
 from gateway import sessions as sessions_module
@@ -133,6 +134,12 @@ class Conversation:
         self.mcp_status = "not attempted"
         self.openclaw = None
         self.lock = asyncio.Lock()
+        # What the interface draws while a turn runs. Emitted from here and from
+        # the gate; drained by `stream`. Nothing downstream depends on it, so a
+        # missing or slow reader cannot affect an answer.
+        self._stages = stages_module.StageBus()
+        self._tool_count = 0
+        self._workbench_kinds: list[str] = []
 
     # ------------------------------------------------------------ construction
 
@@ -206,9 +213,14 @@ class Conversation:
                 registry=self._registry,
                 session_id=self.session_id,
                 allow=config.OPENCLAW_TOOLS if source is openclaw_wb else None,
+                # The gate reports its own decisions: it is the only place that
+                # sees a filtered name, a hook block, and an allowed call alike.
+                on_stage=self._stages.emit,
             )
             for source in raw
         ]
+        self._tool_count = len(local) + sum(1 for _ in raw[1:])
+        self._workbench_kinds = [type(source).__name__ for source in raw]
 
         self._ledger = engine.Ledger()
         self._context = self._build_context()
@@ -255,11 +267,26 @@ class Conversation:
             # applies to it too.
             summariser = context_engine.model_summariser(self._ledger.raw_client("cheap"))
         return context_engine.CompactingChatCompletionContext(
-            summariser=summariser,
-            on_compaction=lambda event: self._store.append(
-                self.session_id,
-                {"event": "compaction", "method": event.method, "summarised": event.summarised},
-            ),
+            summariser=summariser, on_compaction=self._on_compaction
+        )
+
+    def _on_compaction(self, event) -> None:
+        """Record a compaction, and show it.
+
+        Compaction fires from inside `get_messages()`, which the agent calls
+        before every model run — so it lands mid-turn, between the context stage
+        and the model stage. That is exactly where the panel draws it.
+        """
+        self._store.append(
+            self.session_id,
+            {"event": "compaction", "method": event.method, "summarised": event.summarised},
+        )
+        self._stages.emit(
+            "compaction",
+            method=event.method,
+            summarised=event.summarised,
+            before=getattr(event, "before_tokens", 0),
+            after=getattr(event, "after_tokens", 0),
         )
 
     # ------------------------------------------------------------ streaming
@@ -278,15 +305,45 @@ class Conversation:
 
         final = ""
         capture = observability.EventCapture()
+        # The turn's opening frame: what this agent was built with. Sent before
+        # any model work so the panel has something to draw during the first wait,
+        # which is the longest one.
+        self._stages.emit(
+            "context",
+            tools=self._tool_count,
+            workbenches=self._workbench_kinds,
+            budget=getattr(self._context, "token_budget", 0),
+            max_tool_iterations=6,
+        )
+        self._stages.emit("model", streaming=True)
+        streamed = False
         try:
             with capture:
                 async for event in self._agent.run_stream(
                     task=question, cancellation_token=self._token, output_task_messages=False
                 ):
+                    # Drained *before* the event is translated: the gate runs
+                    # underneath a tool call this loop is still awaiting, so its
+                    # stages are already queued by the time the tool's own event
+                    # surfaces. Draining afterwards would print the decision after
+                    # the thing it decided.
+                    for stage in self._stages.drain():
+                        yield stage
+
                     kind = type(event).__name__
                     if kind == "ModelClientStreamingChunkEvent":
+                        if not streamed:
+                            streamed = True
+                            self._stages.emit("stream")
+                            for stage in self._stages.drain():
+                                yield stage
                         yield {"type": "chunk", "text": str(event.content)}
                     elif kind == "ToolCallRequestEvent":
+                        self._stages.emit(
+                            "tool_request", tools=[c.name for c in event.content]
+                        )
+                        for stage in self._stages.drain():
+                            yield stage
                         for call in event.content:
                             yield {"type": "tool", "name": call.name,
                                    "arguments": str(call.arguments)[:200]}
@@ -294,14 +351,42 @@ class Conversation:
                         for result in event.content:
                             yield {"type": "tool_result", "name": result.name,
                                    "preview": str(result.content)[:180]}
+                        # A tool result means the loop is going back to the model
+                        # — the behaviour `max_tool_iterations=1` would have made
+                        # impossible.
+                        self._stages.emit(
+                            "tool_result", tools=[r.name for r in event.content]
+                        )
+                        self._stages.emit("loop", limit=6)
+                        self._stages.emit("model", streaming=True)
+                        for stage in self._stages.drain():
+                            yield stage
                     elif kind == "TaskResult":
                         last = event.messages[-1] if event.messages else None
                         final = str(getattr(last, "content", ""))
+                        self._stages.emit(
+                            "done",
+                            stop_reason=event.stop_reason or "",
+                            llm_calls=capture.totals.llm_calls,
+                            tokens=capture.totals.total_tokens,
+                            tool_calls=len(capture.totals.tool_calls),
+                        )
+                        for stage in self._stages.drain():
+                            yield stage
                         yield {"type": "done", "text": final,
                                "stop_reason": event.stop_reason or ""}
         except asyncio.CancelledError:
+            for stage in self._stages.drain():
+                yield stage
             yield {"type": "cancelled"}
         except Exception as e:
+            # Stages are drained before each AutoGen event, so a turn that dies
+            # before its first event — an unreachable endpoint is the common
+            # case — leaves everything already emitted stuck in the queue and
+            # the panel blank. Blank is the wrong answer here: the interesting
+            # question about a failed turn is exactly how far it got.
+            for stage in self._stages.drain():
+                yield stage
             yield {"type": "error", "message": f"{type(e).__name__}: {e}"}
         finally:
             self._token = None

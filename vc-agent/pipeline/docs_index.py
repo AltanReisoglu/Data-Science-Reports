@@ -53,6 +53,9 @@ PROVENANCE = {
     "12-autogen-bastan-sona.md": "our end-to-end AutoGen walkthrough",
     "14-autogen-protokoller-ve-farklar.md": "our protocol + framework analysis",
     "15-vc-gateway-mimarisi.md": "our gateway architecture (OpenClaw shape, AutoGen engine)",
+    "16-openclaw-enterprise-ilham.md": "our enterprise reading of OpenClaw (what transfers, what does not)",
+    "17-autogen-openclaw-sirket-plani.md": "our build/borrow/deploy decision for the company",
+    "18-task-manager-ve-dayanikli-yurutme.md": "our reading of OpenClaw's scheduler, task ledger, flow engine and concurrency model",
     "github-starred-repos.md": "starred-repo inventory",
 }
 
@@ -186,9 +189,25 @@ def build_corpus(paths: list[Path]) -> tuple[list[Section], dict[str, float]]:
     return sections, idf
 
 
+def _indexable() -> list[Path]:
+    """The project's own numbered documents, and only those.
+
+    `docs/` is also where reading material lands — a saved article, a scraped
+    page, notes pasted in to be read later. Those are legitimately there and are
+    not documentation of this system, and indexing them changes the answers: a
+    63 KB blog dump shifted enough idf weight to push our own measured-gotchas
+    page out of the top four for a query it should own. The test caught it, which
+    is the only reason it did not just quietly degrade search.
+
+    So the corpus is the numbered series. Anything else in `docs/` is a source to
+    read, not a document to be searched.
+    """
+    return sorted(p for p in DOCS.glob("*.md") if p.name[:2].isdigit())
+
+
 @lru_cache(maxsize=1)
 def _corpus() -> tuple[list[Section], dict[str, float]]:
-    return build_corpus(sorted(DOCS.glob("*.md")))
+    return build_corpus(_indexable())
 
 
 def sections() -> list[Section]:

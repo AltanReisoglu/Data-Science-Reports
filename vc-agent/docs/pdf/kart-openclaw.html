@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>OpenClaw — hatırlatma kartı</title>
+<style>
+:root{
+  --ink:#16191c; --ink2:#3f474d; --ink3:#767f86;
+  --rule:#c9d0d4; --rule2:#e6eaec; --panel:#f4f6f7;
+  --accent:#0d5f6b; --accent-bg:#e3eef0;
+  --warn:#7a4a10; --warn-bg:#f6efe4;
+  --mono:"DejaVu Sans Mono","Liberation Mono",monospace;
+  --sans:"DejaVu Sans","Liberation Sans",Arial,sans-serif;
+  --serif:"DejaVu Serif","Liberation Serif",Georgia,serif;
+  --W:210mm; --H:297mm;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#2a2c28;color:var(--ink)}
+body{font-family:var(--sans);line-height:1.4}
+
+.page{
+  width:var(--W); height:var(--H); background:#fff; overflow:hidden;
+  padding:12mm 13mm 10mm; position:relative;
+}
+
+.hd{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:2px solid var(--ink);padding-bottom:1.8mm;margin-bottom:3.4mm;
+}
+.hd .t{font-family:var(--mono);font-size:14pt;font-weight:700;letter-spacing:-.02em}
+.hd .n{font-family:var(--mono);font-size:8.4pt;color:var(--ink3);letter-spacing:.1em;
+       text-transform:uppercase}
+
+.b{margin:0 0 3.6mm;padding:0 0 3.4mm;border-bottom:1px solid var(--rule2)}
+.b:last-child{border-bottom:0;margin-bottom:0}
+.b .lbl{
+  font-family:var(--mono);font-size:8pt;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:1.2mm;
+}
+.b.w .lbl{color:var(--warn)}
+.b .say{
+  font-family:var(--serif);font-size:13.4pt;line-height:1.3;color:var(--ink);margin:0;
+}
+.b .say + .say{margin-top:1.3mm}
+.b .why{font-size:9.8pt;line-height:1.36;color:var(--ink2);margin:1.3mm 0 0}
+.b .why + .why{margin-top:1mm}
+.b .why b{color:var(--ink)}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);padding:.05em .25em}
+
+.b.hi{background:var(--accent-bg);padding:2.4mm 2.8mm;border-left:2.5px solid var(--accent);
+      border-bottom:0}
+.b.w{background:var(--warn-bg);padding:2.4mm 2.8mm;border-left:2.5px solid var(--warn);
+     border-bottom:0}
+
+.nums{display:flex;flex-wrap:wrap;gap:0 4.6mm;margin:1.4mm 0 0}
+.nums div{font-family:var(--mono);font-size:9.4pt;color:var(--ink2)}
+.nums b{color:var(--ink);font-size:11pt}
+
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:9.6pt;
+      margin:1.4mm 0 0}
+td{padding:.7mm 0;border-bottom:1px solid var(--rule2);color:var(--ink2)}
+td.n{text-align:right;color:var(--ink);font-weight:700;width:16mm}
+tr:last-child td{border-bottom:0}
+
+.ft{position:absolute;left:13mm;right:13mm;bottom:5.5mm;
+    font-family:var(--mono);font-size:7.4pt;color:var(--ink3);
+    border-top:1px solid var(--rule);padding-top:1.1mm;
+    display:flex;justify-content:space-between}
+
+@media screen{
+  body{padding:16px}
+  .page{margin:0 auto 16px;box-shadow:0 2px 14px rgba(0,0,0,.4)}
+}
+@media print{
+  @page{size:210mm 297mm;margin:0}
+  html,body{background:#fff}
+  .page{page-break-after:always;box-shadow:none;margin:0}
+  .page:last-child{page-break-after:auto}
+}
+</style></head><body>
+<div class="page"><div class="hd"><span class="t">OpenClaw · hatırlatma kartı</span><span class="n">1 / 2</span></div><div class="b hi"><div class="lbl">aç — omurga cümlesi</div><p class="say">“Ajan runtime'ı kimliği, yetkiyi ve denetimi bilmiyor. Hepsi ajan döngüsünün dışında — ve tam bu yüzden değiştirilebilir.”</p><p class="why">Solda kanallar, sağda yetenekler, ortada <b>Gateway</b>. Ajan motorunu söküp yerine başkasını koyabilirsin; kontrol düzlemi yerinde kalır.</p></div><div class="b"><div class="lbl">üç kontrol ekseni — en yaygin yapilandirma hatasi</div><p class="why"><b>sandbox</b> nerede koşuyor · <b>tool policy</b> hangisi çağrılabiliyor · <b>elevated</b> kutudan çıkış var mı</p><p class="say">“‘Write'ı kapattık, artık salt-okunur' cümlesi yanlıştır.”</p><p class="why">Tool politikası tool'u yalnız <b>adına</b> göre filtreliyor, <code>exec</code>'in içindeki yan etkiye bakmıyor. Kabuk serbestse yazmak zaten mümkün.</p></div><div class="b hi"><div class="lbl">kurumsal izleyicinin slayti — burada yavaşla</div><p class="say">“Onayladığınız şey bir cümle değil, <b>donmuş bir plan</b>: çalışma dizini, tam argüman listesi, sabitlenmiş yol.”</p><p class="why">Onaydan sonra <b>saklanan planı</b> çalıştırıyor, çağıranın sonradan gönderdiğini değil. Onay bir dosyaya bağlıysa ve dosya değiştiyse koşuyu <b>reddediyor</b>.</p></div><div class="b"><div class="lbl">diş içerik — prompt injection</div><p class="say">“Sınırın kimliği rastgele. Sabit olsaydı içerik kendi kapanış etiketini yazıp kutudan çıkardı.”</p><p class="why">Şüpheli desenler yalnızca <b>loglanıyor</b>, engellenmiyor — çünkü desen eşleştirmeyle injection engellenemez. Bunu açıkça söylemeleri güvenilirlik işareti; aksini iddia eden ürünler var.</p></div><div class="b"><div class="lbl">belleğin güvenlik siniri</div><p class="say">“Savunma ‘kötü belleği sonradan bul' değil, ‘kötü bellek terfi edemesin'.”</p><p class="why">Köken sınıfı <b>kapalı bir küme</b> ve SQLite sütununda — modelin düzyazıyla yazamayacağı yerde. Kökeni belirlenemeyen dışsal içerik <code>untrusted</code>, <b>asla owner değil</b>.</p></div><div class="b"><div class="lbl">kademeli açiğa çikarma — %93 tasarruf</div><p class="why">74 skill kurulu ama prompt'a yalnız <b>indeksleri</b> giriyor: ad ve tek satır açıklama. Gövde talep üzerine çekiliyor. Kazanç yalnız token değil <b>isabet</b> — model 74 talimatı aynı anda görmüyor.</p></div><div class="b"><div class="lbl">üç eksen — “iş başarisiz oldu” demenin bedeli</div><p class="say">“Yürütme, teslimat ve nihai sonuç <b>ayrı tipler</b>. Karıştırmak mümkün değil — tip sistemi hatırlatıyor.”</p><p class="why"><b>Somut senaryo:</b> alt-ajan işini bitirdi, ama sonucu vereceği oturum kapanmıştı. Bu iş <code>blocked</code>, <code>failed</code> <b>değil</b>. <code>failed</code> deseydin biri gelip yapılmış işi ikinci kez koştururdu; <code>blocked</code> diyorsan çözüm yeniden koşturmak değil, teslimatı düzeltmek.</p></div><div class="ft"><span>deste: hap-openclaw.pdf · 19 slayt · niş 17</span><span>19 Ağustos 2026</span></div></div><div class="page"><div class="hd"><span class="t">OpenClaw · hatırlatma kartı</span><span class="n">2 / 2</span></div><div class="b hi"><div class="lbl">kkb için en önemli blok — en çok zamani buraya ayir</div><p class="say">“Denetim kaydı içerik tutmuyor. Ve sınırını kendisi söylüyor: <i>bu korelasyondur, anonimleştirme değildir</i>.”</p><p class="say">“Kayıt best-effort: kuyruk dolarsa satır düşüyor, koşu devam ediyor.”</p><p class="say">“Bizim için tersi gerekiyor: kayıpsız, senkron, fail-closed. Yazılamıyorsa koşu düşmeli.”</p><p class="why"><b>KİLİT CÜMLE ·</b> Alacağımız şey mekanizma değil, <b>ayrım</b>: operasyonel hat ile uyum hattı farklı garantiler ister, ve tek bir log ikisini birden karşılayamaz.</p></div><div class="b"><div class="lbl">durable execution — “dayanikli” kelimesi yanliş anlaşiliyor</div><p class="say">“Dayanıklı <i>durum</i> var, dayanıklı <i>yürütme</i> değil.”</p><p class="say">“Kurtarma bir replay değil — modele yazılan bir cümle: ‘önceki turun kesildi, mevcut transkriptten devam et.'”</p><p class="why">Deterministik replay yok, tamamlanmış adımların memoizasyonu yok. Yan etkili bir tool çağrıldıktan sonra çökülürse ikinci kez çağrılmasını <b>mekanik olarak engelleyen hiçbir şey yok</b>; tek koruma modelin transkripti okuması.</p></div><div class="b"><div class="lbl">zamanlayici çekirdeği — yalniz sorulursa aç</div><p class="why">Tek kendini yeniden kuran timer, tavan <b>60 sn</b> · her tikte diskten tazele · vadesi geleni <code>queuedAtMs</code> damgası <b>ve</b> rezervasyon kimliğiyle rezerve et, <i>sonra</i> koş · <code>p-map</code> havuzu, eşzamanlılık sabit <b>8</b> (ayar emekli edilmiş) · backoff 30sn → 60sn → 5dk → 15dk → 60dk</p></div><div class="b"><div class="lbl">sayilar</div><div class="nums"><div><b>51</b> tool kaynakta</div><div><b>44</b> canlı kurulumda</div><div><b>22</b> paket</div><div><b>5</b> zamanlama türü</div><div><b>8</b> kapsam</div><div><b>5</b> bellek katmanı</div></div><p class="why">Zamanlama türleri: <code>at</code> · <code>every</code> · <code>cron</code> · <code>on-exit</code> · <code>stream</code>. Son ikisi zamana <b>hiç</b> bakmıyor, onlar olay kaynağı.</p></div><div class="b hi"><div class="lbl">kapaniş — bu cümleyi ezberle</div><p class="say">“Mekanizmaları al, güven modelini yeniden kur.”</p><p class="why">OpenClaw <b>tek bir güvenilen operatörün</b> etrafında tasarlanmış. Belgelerindeki bütün “bu bir güvenlik sınırı değildir” cümleleri buradan geliyor. Birbirine güvenmeyen departmanların olduğu bir kurumda aynı cümleler birer <b>açık</b> olur.</p><p class="why"><b>Ölçtüğüm somut örnek:</b> bu makinede exec politikası <code>mode=full · security=full · ask=off</code>. Ajanın kabuk erişimi var ve onay sormuyor.</p></div><div class="b w"><div class="lbl">“atlas olarak kuralim mi” sorusu gelirse</div><p class="why">Üç ayrı ilişki: AutoGen'i <b>gömüyoruz</b> · OpenClaw'ı <b>öğreniyoruz</b> · OpenClaw'ı mühendislik takımında <b>araç olarak kullanıyoruz</b>. Atlas'ın yerine OpenClaw <b>kurmuyoruz</b>.</p></div><div class="ft"><span>docs/16 · docs/17 · docs/18</span><span>openclaw @ 01cc7106</span></div></div>
+</body></html>
