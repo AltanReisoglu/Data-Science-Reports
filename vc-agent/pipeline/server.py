@@ -657,13 +657,15 @@ async def maf_run(payload: MafTurn):
 # Sunumda gösterilecek desteler. Beyaz liste, çünkü ad bir yol parçası:
 # `docs/pdf` altındaki her şeyi açmak, istemcinin seçtiği bir dizeyi dosya
 # yoluna çevirmek demek olurdu. `shots.py`'deki aynı disiplin.
+# Etiketler KISA: deste sütunu 32 rem ve dört sekme + kapat düğmesi tek satıra
+# sığmalı. Uzun adlarda "Kapat ×" alt satıra düşüyor ve bant iki kat oluyor.
 DECKS = {
-    "autogen": ("hap-autogen.pdf", "AutoGen · hap"),
-    "openclaw": ("hap-openclaw.pdf", "OpenClaw · hap"),
-    "openclaw-nis": ("hap-openclaw-nis.pdf", "OpenClaw · niş"),
+    "autogen": ("hap-autogen.pdf", "AutoGen"),
+    "openclaw": ("hap-openclaw.pdf", "OpenClaw"),
+    "openclaw-nis": ("hap-openclaw-nis.pdf", "niş"),
     # Uzun rehber: hap desteler "ne" diye sorana, bu "hangisi, neden" diye
     # sorana cevap veriyor. Sunumda soru gelince açılacak yer burası.
-    "rehber": ("rehber-cerceveler.pdf", "Rehber · çerçeveler"),
+    "rehber": ("rehber-cerceveler.pdf", "Rehber"),
 }
 
 
@@ -712,8 +714,12 @@ def deck(deck_id: str) -> Response:
     path = Path(__file__).resolve().parent.parent / "docs" / "pdf" / entry[0]
     if not path.exists():
         raise HTTPException(404, "deck not built")
+    # Sayfa değişimi URL'i değiştiriyor (bkz. `app.js` — hash tek başına
+    # gezindirmiyor), yani PDF her seferinde yeniden isteniyor. Önbellek başlığı
+    # olmadan bu, her tıklamada yüz kilobaytların tekrar inmesi demek.
     return Response(path.read_bytes(), media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{entry[0]}"'})
+                    headers={"Content-Disposition": f'inline; filename="{entry[0]}"',
+                             "Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/api/maf")

@@ -285,7 +285,13 @@
     if (!deckFrame || !deckState.id) { return; }
     var n = Math.min(Math.max(1, page), deckState.pages);
     deckState.page = n;
-    deckFrame.src = '/deck/' + encodeURIComponent(deckState.id) +
+    // ÖLÇÜLDÜ: yalnız hash'i değiştirmek görüntüleyiciyi hareket ettirmiyor —
+    // PDF eklentisi hash'i YÜKLEME anında okuyor, sonra bir daha bakmıyor.
+    // Sayfa göstergesi ilerliyor, slayt yerinde kalıyordu.
+    //
+    // Çözüm: URL'i gerçekten değiştir. Sorgu parametresi tarayıcı için farklı
+    // bir adres, yani yeni bir yükleme — ve yükleme anında hash okunuyor.
+    deckFrame.src = '/deck/' + encodeURIComponent(deckState.id) + '?p=' + n +
                     '#page=' + n + '&view=Fit&navpanes=0&toolbar=0';
     if (deckPage) {
       deckPage.hidden = false;
