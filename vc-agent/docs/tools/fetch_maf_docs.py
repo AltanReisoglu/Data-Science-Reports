@@ -45,12 +45,21 @@ from pathlib import Path
 
 DOCS = Path(__file__).resolve().parent.parent
 
-# Learn kılavuzunun bize lazım olan bölümleri. `integrations/` (63 dosya, sağlayıcı
-# başına tekrar eden bağlantı ayrıntısı) ve `support/` dışarıda: ikisi de referans
-# malzemesi, kavram anlatmıyor.
+# Learn kılavuzunun **tamamı**, soldaki gezinme ağacındaki sırayla.
+#
+# `integrations/` ve `support/` bir tur dışarıda bırakılmıştı — "sağlayıcı başına
+# tekrar eden bağlantı ayrıntısı" diye. Bu yanlış bir kesimdi: `support/upgrade/`
+# altında **2026'nın kırıcı değişiklikleri** duruyor, ki MAF'ın hızının bedelini
+# ölçen tek birincil kaynak o; ve `integrations/by-component/middleware/purview.md`
+# yönetişim tarafını anlatıyor — bir bankaya sunum yapılırken atlanacak son şey.
+#
+# Sıra bilinçli: yeni bölümler **sona** ekleniyor, böylece `22-maf-turkce.md`'nin
+# `20:satır` atıfları kaymıyor. Bir belgenin satır numarası verdiği anda o
+# numaralar arayüz olur.
 GUIDE_SECTIONS = (
     "overview", "get-started", "concepts", "agents",
     "workflows", "journey", "migration-guide", "hosting",
+    "integrations", "support",
 )
 
 ZONE_OPEN = re.compile(r'^::: *zone +pivot="([^"]+)"\s*$')

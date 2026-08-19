@@ -1,6 +1,6 @@
 # 22 — Microsoft Agent Framework: Türkçe rehber
 
-*Kaynaklar: [20-maf-user-guide.md](20-maf-user-guide.md) (Learn kılavuzu, 106 sayfa)
+*Kaynaklar: [20-maf-user-guide.md](20-maf-user-guide.md) (Learn kılavuzunun **tamamı**, 177 sayfa)
 ve [21-maf-tasarim-kararlari.md](21-maf-tasarim-kararlari.md) (ADR'ler + depo
 belgeleri). Başlıklardaki `20:NNNN` / `21:NNNN` o dosyalardaki satır numarasıdır —
 iddiayı doğrulamak için oradan gir.*
@@ -28,12 +28,12 @@ kayıtları `microsoft/agent-framework@26b9200c214f`, ikisi de 2026-08-19'da çe
 
 # BÖLÜM 0 — Başlamadan bilinmesi gerekenler
 
-## Üç isim, iki depo · `20:21978`
+## Üç isim, iki depo · `20:22049`
 
 MAF, **AutoGen ve Semantic Kernel'in birleşimi**. Kılavuzun kendi cümlesiyle:
 *"developed by the core AutoGen and Semantic Kernel teams at Microsoft, and is
 designed to be a new foundation for building AI applications going forward"*
-(`20:21990`) [kaynak].
+(`20:22061`) [kaynak].
 
 Birleşmenin henüz tamamlanmadığının en somut kanıtı belgenin **kendi adresinde**:
 MAF'ın kullanıcı kılavuzu `microsoft/agent-framework` deposunda **yok**. Learn'de
@@ -98,11 +98,11 @@ MAF ayrı bir `.venv-maf` içinde yaşıyor ve alt süreç olarak konuşuluyor
 
 # BÖLÜM 1 — Ajan
 
-## `Agent`: tek çalıştırma yüzeyi · `20:6060`
+## `Agent`: tek çalıştırma yüzeyi · `20:6131`
 
 AutoGen'de `AssistantAgent` (agentchat) ile `RoutedAgent` (core) iki ayrı
 dünyaydı. MAF'ta tek bir `Agent` var; sınıf yazmak istersen `BaseAgent`'ten
-türetiyorsun ama arayüz aynı kalıyor (`20:1841`).
+türetiyorsun ama arayüz aynı kalıyor (`20:1912`).
 
 ```python
 from agent_framework import Agent
@@ -112,7 +112,7 @@ agent = Agent(client=OpenAIChatClient(), instructions="…", tools=[my_tool])
 result = await agent.run("Görev")
 ```
 
-Göç kılavuzunun kendi karşılaştırması (`20:22003`) [kaynak]:
+Göç kılavuzunun kendi karşılaştırması (`20:22074`) [kaynak]:
 
 ```python
 # AutoGen
@@ -133,7 +133,7 @@ Yüzey neredeyse aynı. **Davranış değil.**
 [ölçüldü — iki kurulu paketten okundu.] Microsoft bunu göç kılavuzunda da yazıyor:
 *"`AssistantAgent` is single-turn unless you increase `max_tool_iterations`.
 `Agent` is multi-turn by default and keeps invoking tools until it can return a
-final answer"* (`20:22019`) [kaynak].
+final answer"* (`20:22090`) [kaynak].
 
 Bu, [06-autogen-incelikleri.md](06-autogen-incelikleri.md)'deki 4. tuzağın
 Microsoft tarafından teyididir: AutoGen'de ajan bir tool çağırır, sonucu görür ve
@@ -144,7 +144,7 @@ kimse durdurmazsa 40 tur döner, ve 40 tur gerçek bir faturadır.
 > açıkça set ediyor. Her iki çerçevede de bu satırı yazmayan proje, varsayılanın
 > hangi yöne kaydığını fark etmeden yanlış davranış alıyor.
 
-## `AgentSession`: durum artık ajanın içinde değil · `20:1564`
+## `AgentSession`: durum artık ajanın içinde değil · `20:1635`
 
 MAF ajanları **varsayılan olarak durumsuz**. Çok turlu konuşma istiyorsan oturumu
 sen taşıyorsun:
@@ -163,7 +163,7 @@ serileştirmek (`SessionStore`, `FileSessionStore`) çerçevenin işi.
 > (`05:670`). MAF'ta bu bir dil özelliği; bizde bir desen. İkisi de çalışıyor,
 > ama MAF'ınkini yanlış yazmak daha zor.
 
-## Boru hattı: bir turun içinde ne oluyor · `20:672`
+## Boru hattı: bir turun içinde ne oluyor · `20:743`
 
 MAF bir çalıştırmanın aşamalarını isimlendiriyor — ve bu isimler bizim akış
 ekranımızdaki kutularla birebir örtüşüyor:
@@ -179,18 +179,18 @@ ve mesaj bazlı. MAF'ta katman ajan / sohbet / fonksiyon seviyelerine ayrılmı�
 
 ---
 
-# BÖLÜM 2 — Middleware: AutoGen'de olmayan katman · `20:4081`
+# BÖLÜM 2 — Middleware: AutoGen'de olmayan katman · `20:4152`
 
 Bu, MAF'ın AutoGen'e eklediği en yapısal şey. Beş alt başlık ve her birinin ayrı
 kılavuz sayfası var:
 
 | Sayfa | Ne çözüyor |
 |---|---|
-| Ajan / çalıştırma kapsamı · `20:2172` | Ara katman ajanın tamamına mı, tek çağrıya mı |
-| Sohbet ara katmanı · `20:2799` | Model isteğine dokunmak |
-| Sonuç değiştirme · `20:4818` | Tool sonucunu **yerine geçerek** döndürmek |
-| Paylaşılan durum · `20:5489` | Katmanlar arası veri taşımak |
-| Sonlandırma ve korkuluk · `20:5652` | Turu ortada kesmek |
+| Ajan / çalıştırma kapsamı · `20:2243` | Ara katman ajanın tamamına mı, tek çağrıya mı |
+| Sohbet ara katmanı · `20:2870` | Model isteğine dokunmak |
+| Sonuç değiştirme · `20:4889` | Tool sonucunu **yerine geçerek** döndürmek |
+| Paylaşılan durum · `20:5560` | Katmanlar arası veri taşımak |
+| Sonlandırma ve korkuluk · `20:5723` | Turu ortada kesmek |
 
 `MiddlewareTermination` — turu ara katmandan kesme yeteneği — AutoGen'de
 `DropMessage`'ın yaptığı işin genelleştirilmiş hâli, ama **tool seviyesinde**.
@@ -205,13 +205,13 @@ kılavuz sayfası var:
 
 # BÖLÜM 3 — Bağlam yönetimi
 
-## Context provider · `20:1296`
+## Context provider · `20:1367`
 
 Ajana her çalıştırmada **ek talimat, ek tool ve ek bellek** enjekte eden nesne.
 AutoGen'in `Memory` protokolüne benziyor ama daha geniş: bellek de, todo listesi
 de, çalışma kipi de aynı arayüzden geliyor.
 
-## Compaction · `20:869` · karar kaydı `21:11358`
+## Compaction · `20:940` · karar kaydı `21:11358`
 
 Bağlam penceresi dolduğunda ne yapılacağı. MAF dört strateji sunuyor
 (`ContextWindowCompactionStrategy`, `ToolResultCompactionStrategy`,
@@ -239,9 +239,9 @@ karşılığı olmayan bir belge türü.
 
 AutoGen `FunctionTool(func, description=…)` sarmalayıcısı istiyor; MAF `@tool`
 dekoratörüyle şemayı imzadan ve `Annotated` açıklamalarından **kendisi çıkarıyor**
-(`20:14185`) [kaynak]. Docstring hâlâ arayüz — ama sarmalama yükü yok.
+(`20:14256`) [kaynak]. Docstring hâlâ arayüz — ama sarmalama yükü yok.
 
-## Onay: `approval_mode` · `20:14990` · karar kaydı `21:2782`
+## Onay: `approval_mode` · `20:15061` · karar kaydı `21:2782`
 
 ```python
 @tool(approval_mode="always_require")
@@ -254,7 +254,7 @@ MAF'ta onay bir **tool özelliği**. Üç kip var, ve `ToolApprovalMiddleware`
 ADR `0006` (`21:2782`) kararın gerekçesini veriyor [kaynak].
 
 > **Bizim itirazımız aynen duruyor.** Harness'te *tool approval* varsayılan olarak
-> **açık** ve "standing approvals" ile geliyor (`20:6479`) [kaynak]. Bizim
+> **açık** ve "standing approvals" ile geliyor (`20:6550`) [kaynak]. Bizim
 > kapımızda onay **bir kez tüketilir** ve imza kodun/argümanların kendisi
 > üstündedir; aynı çağrı ikinci kez geldiğinde yeniden sorar. Bu daha yorucu, ve
 > bilinçli olarak öyle: "bir daha sorma", ajanın bir sonraki sefer *aynı adı
@@ -279,9 +279,9 @@ Yani **ada göre otomatik onay, insan onay sınırını atlatabiliyor** ve bunu
 
 # BÖLÜM 5 — Workflow: en büyük mimari fark
 
-## Kontrol akışından veri akışına · `20:22698`
+## Kontrol akışından veri akışına · `20:22769`
 
-Göç kılavuzunun kendi tanımı (`20:22778`) [kaynak]:
+Göç kılavuzunun kendi tanımı (`20:22849`) [kaynak]:
 
 * **GraphFlow (AutoGen):** *control-flow based* — kenarlar geçiş, mesajlar
   **herkese yayınlanıyor**, geçişler yayınlanan içeriğe göre koşullanıyor.
@@ -299,15 +299,15 @@ bariyer erken açılabiliyor; MAF'ta kenar tipli ve yürütücü girdisi hazır 
 > topluyor. MAF'ın veri akışı modeli üçüncü bir cevap ve bunu **ölçmedik**
 > [teyitsiz]. Ölçülmeye değer.
 
-## Checkpoint · `20:15957`
+## Checkpoint · `20:16028`
 
 Workflow durumu diske yazılıp geri yüklenebiliyor (`FileCheckpointStorage`,
 `InMemoryCheckpointStorage`). AutoGen'de takım seviyesinde `save_state` /
 `load_state` var ama **iş ortasında** duraklama-devam etme yok.
 
-## Request/response: insan döngüde, çerçevenin içinde · `20:18077`
+## Request/response: insan döngüde, çerçevenin içinde · `20:18148`
 
-Kılavuzun cümlesi (`20:23264`) [kaynak]: *"AutoGen's `Team` abstraction runs
+Kılavuzun cümlesi (`20:23335`) [kaynak]: *"AutoGen's `Team` abstraction runs
 continuously once started and doesn't provide built-in mechanisms to pause
 execution for human input. Any human-in-the-loop functionality requires custom
 implementations outside the framework."*
@@ -315,20 +315,20 @@ implementations outside the framework."*
 Bizim onay kapımız tam olarak o "custom implementation outside the framework".
 MAF'ta `ctx.request_info()` + `@response_handler` ile çerçevenin içinde.
 
-## Beş orkestrasyon · `20:19624`
+## Beş orkestrasyon · `20:19695`
 
 | AutoGen takımı | MAF karşılığı | Kılavuz |
 |---|---|---|
-| `RoundRobinGroupChat` | `SequentialBuilder` | `20:19993` |
-| — (bizde `fanin.py`) | `ConcurrentBuilder` | `20:18434` |
-| `SelectorGroupChat` | `GroupChatBuilder(selection_func=…)` | `20:18769` |
-| `Swarm` | `HandoffBuilder` | `20:19092` |
-| `MagenticOneGroupChat` | `MagenticBuilder` | `20:19652` |
-| `GraphFlow` | `WorkflowBuilder` | `20:7313` |
+| `RoundRobinGroupChat` | `SequentialBuilder` | `20:20064` |
+| — (bizde `fanin.py`) | `ConcurrentBuilder` | `20:18505` |
+| `SelectorGroupChat` | `GroupChatBuilder(selection_func=…)` | `20:18840` |
+| `Swarm` | `HandoffBuilder` | `20:19163` |
+| `MagenticOneGroupChat` | `MagenticBuilder` | `20:19723` |
+| `GraphFlow` | `WorkflowBuilder` | `20:7384` |
 
 ## Ve burada kılavuz bayat
 
-Göç kılavuzu "Future Patterns" başlığı altında şunu diyor (`20:23251`) [kaynak]:
+Göç kılavuzu "Future Patterns" başlığı altında şunu diyor (`20:23322`) [kaynak]:
 
 > *"The Agent Framework roadmap includes several AutoGen patterns currently in
 > development: **Swarm pattern**, **SelectorGroupChat**."*
@@ -343,9 +343,9 @@ kaynağa güvenmenin bedeli: kılavuz "yok" diyor, paket "var" diyor, ve doğru 
 
 ---
 
-# BÖLÜM 6 — Harness: Microsoft bunu kavram yaptı · `20:6438`
+# BÖLÜM 6 — Harness: Microsoft bunu kavram yaptı · `20:6509`
 
-Kılavuzun tanımı (`20:6453`) [kaynak]:
+Kılavuzun tanımı (`20:6524`) [kaynak]:
 
 > *"An agent harness is the runtime scaffolding that turns a language model into
 > an agent that can perform work. It drives model and tool calls, manages
@@ -356,7 +356,7 @@ Bu, [13-openclaw-teknik-analiz.md](13-openclaw-teknik-analiz.md)'in baştan beri
 anlattığı şeyin Microsoft tarafından yazılmış tanımı. **Harness artık resmî bir
 kavram.**
 
-## Yetenek matrisi — ve bizim karşılıklarımız · `20:6476`
+## Yetenek matrisi — ve bizim karşılıklarımız · `20:6547`
 
 | MAF harness yeteneği | Varsayılan | Bizde |
 |---|---|---|
@@ -392,11 +392,11 @@ haritasında duruyor.
 
 ---
 
-# BÖLÜM 7 — FIDES: bankanın soracağı soru · `20:12073` · `21:14943`
+# BÖLÜM 7 — FIDES: bankanın soracağı soru · `20:12144` · `21:14943`
 
 MAF'ın AutoGen'de karşılığı **hiç olmayan** en ciddi mekanizması.
 
-**Sorun** (`20:12077`) [kaynak]: prompt enjeksiyonu OWASP LLM Top 10'un birincisi,
+**Sorun** (`20:12148`) [kaynak]: prompt enjeksiyonu OWASP LLM Top 10'un birincisi,
 ve üretimdeki ajanların çoğu ona iki sezgiyle karşılık veriyor — savunmacı sistem
 prompt'u ya da elle yazılmış izin listesi. İkisi de **deterministik değil**.
 
@@ -405,7 +405,7 @@ prompt'u ya da elle yazılmış izin listesi. İkisi de **deterministik değil**
 çağrıları boyunca **kendiliğinden yayılıyor**; ve politika hassas bir tool
 çalışmadan **önce** zorlanıyor.
 
-Dört parça (`20:12128`) [kaynak]:
+Dört parça (`20:12199`) [kaynak]:
 
 | Parça | Ne yapıyor |
 |---|---|
@@ -414,7 +414,7 @@ Dört parça (`20:12128`) [kaynak]:
 | `PolicyEnforcementFunctionMiddleware` | Her tool çağrısını etikete karşı kontrol eder |
 | `quarantined_llm` + `ContentVariableStore` | Güvenilmez içeriği, ham baytları ana modele hiç göstermeden ayrı ve tool'suz bir modelle işler |
 
-Kılavuzun kendi cümlesi meselenin özü (`20:12099`): *"The model is still in charge
+Kılavuzun kendi cümlesi meselenin özü (`20:12170`): *"The model is still in charge
 of deciding what to do, but the framework is in charge of deciding what is allowed
 to happen."*
 
@@ -432,7 +432,7 @@ to happen."*
 
 ---
 
-# BÖLÜM 8 — Beceriler (Agent Skills) · `20:12500` · `21:12733`
+# BÖLÜM 8 — Beceriler (Agent Skills) · `20:12571` · `21:12733`
 
 AutoGen'de **"skill" diye bir soyutlama yok**; en yakın karşılığı
 `dump_component`/`load_component` idi (`11:249`). MAF'ta beceri birinci sınıf:
@@ -456,18 +456,18 @@ becerileri de böyle çalışıyor.
 
 # BÖLÜM 9 — Gözlemlenebilirlik ve barındırma
 
-## OTel: aynı sözleşme, daha az kurulum · `20:11151` · `20:23548`
+## OTel: aynı sözleşme, daha az kurulum · `20:11222` · `20:23619`
 
 İkisi de OTel GenAI sözleşmesini konuşuyor. Fark kurulum yükünde: AutoGen'de
 `SingleThreadedAgentRuntime(tracer_provider=…)` diye elle veriyorsun; MAF'ta
 `OTEL_EXPORTER_OTLP_ENDPOINT` ortam değişkeni yetiyor, ve workflow seviyesi de
-kapsanıyor (`20:18288`).
+kapsanıyor (`20:18359`).
 
 > **Bizde:** [pipeline/telemetry.py](../pipeline/telemetry.py) span'leri bellekte
 > toplayıp akış ekranına basıyor. Dışarı bir toplayıcıya göndermiyoruz; sunumda
 > ikinci bir servis istemedik.
 
-## Barındırma: MAF'ın açık ara önde olduğu yer · `20:26240`
+## Barındırma: MAF'ın açık ara önde olduğu yer · `20:26311`
 
 Azure Functions + Durable, Foundry hosted agents, kendi kendine barındırma,
 OpenAI Responses uçları, MCP sunucusu olarak yayınlama, A2A, hatta Telegram.
@@ -484,8 +484,8 @@ Göç kılavuzunun kendi tablosundan ve kurulu paketten:
 
 | Yetenek | AutoGen | MAF |
 |---|---|---|
-| Dağıtık runtime (gRPC, çok makine) | var (`autogen_ext.runtimes.grpc`, `[grpc]` ekstrası) | **yok** — "planned" (`20:22021`) [ölçüldü: `agent_framework`'te tek `Grpc*` adı yok] |
-| Model yanıtı önbelleği | `ChatCompletionCache` | **yok** — "🚧 Planned" (`20:22036`) [ölçüldü] |
+| Dağıtık runtime (gRPC, çok makine) | var (`autogen_ext.runtimes.grpc`, `[grpc]` ekstrası) | **yok** — "planned" (`20:22092`) [ölçüldü: `agent_framework`'te tek `Grpc*` adı yok] |
+| Model yanıtı önbelleği | `ChatCompletionCache` | **yok** — "🚧 Planned" (`20:22107`) [ölçüldü] |
 | Aktör modeli / topic aboneliği | `autogen-core` | **yok** — workflow modeli yerine geçti |
 | Anthropic / Ollama istemcisi | var | ayrı paketlerde, **`beta`** |
 
@@ -496,7 +496,77 @@ yetmez.
 
 ---
 
-# BÖLÜM 11 — Bizim PoC'ta MAF
+# BÖLÜM 11 — Kırıcı değişiklikler: hızın faturası · `20:36236`
+
+Bölüm 0'da "4 ayda 14 sürüm" dedik. O hızın öbür yüzünü Microsoft **kendisi
+yayımlıyor**: `support/upgrade/python-2026-significant-changes.md`, her değişikliği
+🔴 *kırıcı* ya da 🟡 *özellik* diye işaretliyor.
+
+Sayım [ölçüldü — sayfanın kendi işaretlerinden]:
+
+| aralık | sürüm | 🔴 kırıcı | 🟡 özellik |
+|---|---:|---:|---:|
+| 2026'nın tamamı (beta dâhil) | 25 | **63** | 48 |
+| **1.0 GA sonrası** (2 Nis → 4 Haz) | 10 | **15** | 28 |
+
+**GA'dan sonra iki ayda on beş kırıcı değişiklik.** "1.0" etiketi burada
+"API dondu" demek değil. Birkaç örnek, hepsi `20:36236` sonrasında:
+
+* `Message(..., text=...)` **tamamen kaldırıldı**
+* Orkestrasyon çıktıları `AgentResponse` olarak standartlaştırıldı
+* Telemetri **varsayılan olarak açıldı** — kendi boru hattın varsa çakışabilir
+* `FileCheckpointStorage` ve `CosmosCheckpointStorage` pickle çözümlemesini
+  kısıtladı (güvenlik sertleştirmesi — ama eski checkpoint'ler okunmuyor)
+* Beceri (Skills) API'si **dört kez** değişti; biri komple yeniden yapılandırma
+
+### Ve sayfanın kendisi geride
+
+Bu kılavuz **1.8.0'da (4 Haziran) bitiyor.** Kurulu sürüm 1.14.0 (14 Ağustos)
+[ölçüldü]. Yani "önemli değişiklikler" rehberi **altı sürüm ve iki buçuk ay
+geride** — 1.9 ile 1.14 arasında ne kırıldığını bu sayfadan öğrenemiyorsun.
+
+> **Sunumda söylenecek cümle:** "AutoGen'in riski donmuş olması: bulduğun hatayı
+> düzeltecek kimse yok. MAF'ın riski tersi: GA'dan sonra iki ayda on beş kırıcı
+> değişiklik, ve değişiklik rehberi bile güncel değil. İkisi de maliyet;
+> hangisinin ucuz olduğu **ne kadar süre dokunmadan durmasını istediğine** bağlı."
+
+Bu, bakım penceresi olan bir kurum için soyut bir risk değil: bağımlılığı
+sabitlemezsen kırılıyorsun, sabitlersen güvenlik yamasını kaçırıyorsun.
+
+---
+
+# BÖLÜM 12 — Purview: uyum tarafı · `20:28890`
+
+Bu sayfa `integrations/` altındaydı ve ilk turda **atlamıştım** — sağlayıcı
+ayrıntısı sanmıştım. Yanlış kesimdi: bir bankaya sunum yapılırken atlanacak son
+başlık bu.
+
+`PurviewPolicyMiddleware`, prompt'ları ve yanıtları **ara katmanda yakalayıp**
+kurumun Microsoft Purview politikalarına karşı denetliyor. Sayfanın kendi
+gerekçesi [kaynak]:
+
+* **DLP** — hassas içerik satır içinde **engelleniyor**, sonradan tespit değil
+* **Yönetişim** — AI etkileşimleri Audit, Communication Compliance, Insider Risk
+  Management, eDiscovery ve Data Lifecycle Management'a kaydediliyor
+* Sayfanın kendi cümlesi: *"Enterprise customers require compliance for AI apps.
+  Purview integration unblocks deployment."*
+
+Bunlar bir bankanın uyum ekibinin **zaten kullandığı** kelimeler. AutoGen'de bu
+kelimelerin hiçbirinin karşılığı yok.
+
+**Dürüst bedel:** Azure aboneliği **ve** M365 **E5 lisansı** + kullandıkça öde
+faturalandırması gerekiyor. Yani bu bir kütüphane özelliği değil, bir **Microsoft
+yığını taahhüdü**. Slaytta bu satır olmadan Purview'ü göstermek yanıltıcı olur.
+
+> **Bizde:** yok, ve olamaz — Purview bir Microsoft servisi. Bizim karşılığımız
+> [pipeline/policy.py](../pipeline/policy.py)'deki alan adı bloklaması ve
+> [observability.py](../pipeline/observability.py)'deki olay kaydı: aynı *soruyu*
+> cevaplıyor (ne çıktı, nereye gitti), ama kurumsal bir denetim sistemine
+> bağlanmıyor. Kıyaslarken bunu söylemek gerekiyor.
+
+---
+
+# BÖLÜM 13 — Bizim PoC'ta MAF
 
 [pipeline/maf.py](../pipeline/maf.py) + [pipeline/maf_runner.py](../pipeline/maf_runner.py),
 toplam 284 satır. Ekranın sağ üstündeki düğme AutoGen ↔ MAF kipini değiştiriyor.
