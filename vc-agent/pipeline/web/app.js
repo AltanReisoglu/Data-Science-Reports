@@ -10,6 +10,12 @@
   var deckHost = document.getElementById('deck');
   var deckBar = document.getElementById('deck-bar');
   var deckFrame = document.getElementById('deck-frame');
+  var deckZones = document.getElementById('deck-zones');
+  var deckPage = document.getElementById('deck-page');
+  /* Hangi destede kaçıncı sayfadayız. Sayfa sayısı sunucudan geliyor: sınır
+     bilinmezse "ileri" son slayttan sonra da basılabiliyor ve görüntüleyici
+     sessizce yerinde kalıyor — tıklamanın çalışmadığı sanılıyor. */
+  var deckState = { id: null, page: 1, pages: 1 };
   var form = document.getElementById('ask');
   var input = document.getElementById('q');
   var chips = document.getElementById('chips');
@@ -199,6 +205,28 @@
     });
   }
 
+  if (deckZones) {
+    document.getElementById('deck-prev').addEventListener('click', function () {
+      deckGo(deckState.page - 1);
+    });
+    document.getElementById('deck-next').addEventListener('click', function () {
+      deckGo(deckState.page + 1);
+    });
+  }
+
+  /* Klavye de gezinsin — sunumda uzaktan kumanda çoğu zaman ok tuşu gönderiyor.
+     Soru kutusundayken devre dışı: orada ok tuşu imleci taşımalı. */
+  document.addEventListener('keydown', function (event) {
+    if (!deckHost || deckHost.hidden) { return; }
+    var tag = (event.target && event.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { return; }
+    if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+      deckGo(deckState.page + 1); event.preventDefault();
+    } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+      deckGo(deckState.page - 1); event.preventDefault();
+    }
+  });
+
   if (teamButton) {
     teamButton.addEventListener('click', function () {
       var q = (input.value || '').trim();
@@ -249,25 +277,46 @@
     }
   }
 
+  /* Sayfaya git. `#page=N` ile: aynı kaynağa yalnız hash değişerek gidildiğinde
+     tarayıcı PDF'i yeniden indirmiyor, sayfaya atlıyor. `src` yazmak yerine
+     `contentWindow.location.hash` denenmiyor — görüntüleyici bir eklenti
+     belgesi ve ona erişim sürümden sürüme değişiyor. */
+  function deckGo(page) {
+    if (!deckFrame || !deckState.id) { return; }
+    var n = Math.min(Math.max(1, page), deckState.pages);
+    deckState.page = n;
+    deckFrame.src = '/deck/' + encodeURIComponent(deckState.id) +
+                    '#page=' + n + '&view=Fit&navpanes=0&toolbar=0';
+    if (deckPage) {
+      deckPage.hidden = false;
+      deckPage.textContent = n + ' / ' + deckState.pages;
+    }
+  }
+
   function pickDeck(id) {
     if (!deckFrame) { return; }
     if (id === 'chat') { showDeck(false); return; }
     // `view=Fit` SAYFANIN TAMAMINI çerçeveye sığdırıyor. `FitH` genişliğe
-    // sığdırıyordu ve geniş bir ekranda slayt %123'e çıkıp taşıyordu — bir
-    // slaytta okunması gereken şey sayfanın bütünü, bir satırın genişliği değil.
-    // `navpanes=0` küçük resim şeridini kapatıyor; sunumda yer kaplıyor.
-    deckFrame.src = '/deck/' + encodeURIComponent(id) + '#view=Fit&navpanes=0';
+    // sığdırıyordu ve geniş bir ekranda slayt taşıyordu — bir slaytta okunması
+    // gereken şey sayfanın bütünü. `navpanes=0` küçük resim şeridini kapatıyor.
+    deckState.id = id;
+    deckState.pages = (deckMeta[id] && deckMeta[id].pages) || 1;
+    deckGo(1);
+    if (deckZones) { deckZones.hidden = false; }
     showDeck(true);
     [].forEach.call(deckBar.querySelectorAll('.deck__tab'), function (b) {
       b.classList.toggle('is-on', b.dataset.deck === id);
     });
   }
 
+  var deckMeta = {};
+
   function loadDecks() {
     if (!deckBar) { return; }
     fetch('/api/decks').then(function (r) { return r.json(); }).then(function (d) {
       deckBar.textContent = '';
       (d.decks || []).forEach(function (deck) {
+        deckMeta[deck.id] = deck;
         var b = el('button', 'deck__tab', deck.label);
         b.type = 'button';
         b.dataset.deck = deck.id;

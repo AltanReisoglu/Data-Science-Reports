@@ -721,6 +721,78 @@ B.append(card(
     cap_mm=46,
     foot="Ayrıntı: docs/16 (ne alınır, ne alınmaz) · docs/17 (şirket planı) · docs/18 (task manager)"))
 
+# ─────────────────────────────────────────────────────────── hap seçimi
+#
+# AutoGen destesi 43 slayta çıkmıştı ve bir "hap" deste için bu uzun. Kaynaktan
+# silmek yerine burada SEÇİYORUZ: uzun deste (`slaytlar.pdf`) her şeyi taşımaya
+# devam ediyor, hap deste yalnız bu listeyi basıyor.
+#
+# Seçim ilkesi: **şema taşıyan slayt kalır, tekrar eden anlatım düşer.** Düşen
+# slaytların hepsinin karşılığı ya uzun destede ya belgelerde var; hiçbiri
+# yalnızca burada anlatılmıyordu.
+KEEP_AUTOGEN = [
+    # core — mekanizmanın kendisi
+    "Üç katman",
+    "Aktör modeli",
+    "Kimlik: bir şey değil, iki şey",
+    "İki iletişim biçimi, iki asimetri",
+    "Topic: kanal adı değil, iki parçalı adres",
+    "Fan-out / fan-in",
+    # agentchat — günlük iş
+    "AssistantAgent ve tool döngüsü",
+    "Beş takım — sırayı kim belirliyor",
+    "GraphFlow — boru hattını çizmek",
+    "Durmayı öğretmek",
+    "Dört sessiz varsayılan",
+    # bileşenler — dördü, altısı değil
+    "Model Clients",
+    "Model Context",
+    "Tools",
+    "Workbench (ve MCP)",
+    # sekiz desen — destenin şema yükü burada, hepsi kalıyor
+    "Concurrent Agents",
+    "Sequential Workflow",
+    "Group Chat",
+    "Handoffs",
+    "Mixture of Agents",
+    "Multi-Agent Debate",
+    "Reflection",
+    "Code Execution",
+    # halef
+    "Microsoft Agent Framework — halef geldi",
+    "Kılavuzun kendi saydığı dört fark",
+    "“AutoGen Limitations” — üreticinin kendi başlığı",
+    "Onay: aynı kelime, farklı disiplin",
+]
+
+
+def condense(slides: list[str], keep: list[str]) -> list[str]:
+    """Kapağı ve seçilen başlıkları, ÖZGÜN sırasıyla döndür.
+
+    Başlığa göre süzüyor çünkü indise göre süzmek, kaynağa bir slayt eklendiğinde
+    sessizce yanlış slaytı keserdi. Listede olup destede bulunmayan bir başlık
+    varsa uyarı basılıyor: sessizce eksilen bir slayt, fark edilmeyen bir kayıp.
+    """
+    import re as _re
+
+    wanted = set(keep)
+    out, seen = [], set()
+    for html in slides:
+        if 'class="slide cover"' in html:
+            out.append(html)
+            continue
+        m = _re.search(r"<h2>(.*?)</h2>", html, _re.S)
+        title = _re.sub(r"<[^>]+>", "", m.group(1)).strip() if m else ""
+        if title in wanted:
+            out.append(html)
+            seen.add(title)
+    missing = [t for t in keep if t not in seen]
+    if missing:
+        print("  ! seçim listesinde olup destede bulunamayan başlık:",
+              " · ".join(missing))
+    return out
+
+
 if __name__ == "__main__":
     PDF_DIR.mkdir(parents=True, exist_ok=True)
     # The third deck lives in its own file: it is implementation detail rather
@@ -733,6 +805,8 @@ if __name__ == "__main__":
         exec(compile(_src, _f, "exec"), globals())  # noqa: S102 — our own files
 
     print("hap desteler:")
-    build_deck(A, "AutoGen — ve halefi MAF", "hap-autogen.html")
+    print(f"  (AutoGen: {len(A)} slayttan seçiliyor)")
+    build_deck(condense(A, KEEP_AUTOGEN), "AutoGen — ve halefi MAF",
+               "hap-autogen.html")
     build_deck(B, "OpenClaw, on sekiz şemada", "hap-openclaw.html")
     build_deck(C, "OpenClaw harness'ı, içeriden", "hap-openclaw-nis.html")

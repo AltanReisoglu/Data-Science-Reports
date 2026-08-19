@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -660,6 +661,9 @@ DECKS = {
     "autogen": ("hap-autogen.pdf", "AutoGen · hap"),
     "openclaw": ("hap-openclaw.pdf", "OpenClaw · hap"),
     "openclaw-nis": ("hap-openclaw-nis.pdf", "OpenClaw · niş"),
+    # Uzun rehber: hap desteler "ne" diye sorana, bu "hangisi, neden" diye
+    # sorana cevap veriyor. Sunumda soru gelince açılacak yer burası.
+    "rehber": ("rehber-cerceveler.pdf", "Rehber · çerçeveler"),
 }
 
 
@@ -672,8 +676,26 @@ def decks() -> JSONResponse:
         path = base / filename
         if path.exists():
             out.append({"id": key, "label": label,
+                        "pages": _page_count(path),
                         "size_kb": round(path.stat().st_size / 1024)})
     return JSONResponse({"decks": out, "default": "autogen"})
+
+
+def _page_count(path: Path) -> int:
+    """Sayfa sayısı, PDF kütüphanesi olmadan.
+
+    İki yol birden okunuyor ve büyüğü alınıyor: `/Type /Page` girdileri sıkıştırılmış
+    nesne akışlarının içinde kalabiliyor, `/Count` ise sayfa ağacının kökünde duruyor
+    ama iç düğümlerde de geçiyor. Üç destede ikisi de aynı sayıyı verdi (43 · 19 · 17);
+    ayrışsalardı gezinme yanlış yerde durur, hata vermezdi.
+    """
+    try:
+        data = path.read_bytes()
+        pages = len(re.findall(rb"/Type\s*/Page[^s]", data))
+        counts = [int(m) for m in re.findall(rb"/Count\s+(\d+)", data)]
+        return max([pages] + counts) or 1
+    except Exception:  # noqa: BLE001 — sayfa sayısı bir gösterge, koşuyu düşüremez
+        return 1
 
 
 @app.get("/deck/{deck_id}")
