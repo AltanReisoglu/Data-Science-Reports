@@ -714,9 +714,8 @@ def deck(deck_id: str) -> Response:
     path = Path(__file__).resolve().parent.parent / "docs" / "pdf" / entry[0]
     if not path.exists():
         raise HTTPException(404, "deck not built")
-    # Sayfa değişimi URL'i değiştiriyor (bkz. `app.js` — hash tek başına
-    # gezindirmiyor), yani PDF her seferinde yeniden isteniyor. Önbellek başlığı
-    # olmadan bu, her tıklamada yüz kilobaytların tekrar inmesi demek.
+    # Deste bir kez yükleniyor ve gezinmeyi tarayıcının görüntüleyicisi
+    # yapıyor; önbellek başlığı sekmeler arası geçişi bedavaya getiriyor.
     return Response(path.read_bytes(), media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{entry[0]}"',
                              "Cache-Control": "public, max-age=3600"})

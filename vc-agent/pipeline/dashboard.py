@@ -739,28 +739,29 @@ body.deck-open.term-open .app { grid-template-columns: 28rem minmax(22rem, 1fr) 
     grid-template-columns: 15.5rem 1fr; }
   .deck { grid-column: 2; grid-row: 1; border-left: 0; }
 }
-/* Sahne: iframe ile tıklama katmanı üst üste. */
-.deck__stage { position: relative; flex: 1; min-height: 0; }
-.deck__frame { position: absolute; inset: 0; width: 100%; height: 100%;
-               border: 0; background: var(--plane); }
-/* Tıklama bölgeleri. Şeffaf ve kenarlıksız: görünen şey slayt olmalı, üstündeki
-   düzenek değil. Sol üçte bir geri, sağı ileri — sunumda parmak sağa gidiyor. */
-.deck__zones { position: absolute; inset: 0; display: flex; }
-.deck__zones[hidden] { display: none; }
-.deck__zone { border: 0; background: transparent; padding: 0; cursor: pointer; }
-.deck__zone--prev { flex: 0 0 32%; cursor: w-resize; }
-.deck__zone--next { flex: 1; cursor: e-resize; }
-/* Üstüne gelince hangi yarıda olduğun belli olsun — görünmez bir düğmeye
-   basmak, basılıp basılmadığını bilmemek demek. */
-.deck__zone:hover { background: rgba(0, 0, 0, 0.035); }
-.deck__page {
-  position: absolute; right: 0.6rem; bottom: 0.6rem; z-index: 2;
-  padding: 0.1rem 0.45rem; border-radius: 999px; pointer-events: none;
-  background: var(--surface, var(--plane)); border: 1px solid var(--hairline);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.68rem; color: var(--ink-2); font-variant-numeric: tabular-nums;
+.deck__frame { flex: 1; width: 100%; border: 0; min-height: 0;
+               background: var(--plane); }
+.deck__bar {
+  display: flex; gap: 0.3rem; padding: 0.5rem 0.7rem 0.4rem;
+  border-bottom: 1px solid var(--hairline); flex-wrap: wrap;
 }
-.deck__page[hidden] { display: none; }
+.deck__tab {
+  font: inherit; font-size: 0.75rem; padding: 0.22rem 0.6rem; cursor: pointer;
+  border: 1px solid var(--hairline); border-radius: 999px;
+  background: transparent; color: var(--ink-2);
+}
+.deck__tab:hover { border-color: var(--ink-2); color: var(--ink); }
+.deck__tab.is-on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.deck__tab--chat { margin-left: auto; }
+/* Dar ekranda üçüncü sütun yok: slayt ile sohbeti 900 px'e sıkıştırmak
+   ikisini birden okunmaz yapıyor. */
+@media (max-width: 78rem) {
+  body.deck-open .app, body.deck-open.term-open .app {
+    grid-template-columns: 15.5rem 1fr; }
+  .deck { grid-column: 2; grid-row: 1; border-left: 0; }
+}
+.deck__frame { flex: 1; width: 100%; border: 0; min-height: 0;
+               background: var(--plane); }
 /* Çerçeve anahtarı. Sağ üstte ve her zaman görünür: bir tur ayarı değil,
    bütün sistemin hangi çerçevede koştuğu. Rengi de o yüzden farklı — AutoGen
    mavi, MAF mor; ekranın başka hiçbir yerinde bu iki renk yan yana durmuyor. */

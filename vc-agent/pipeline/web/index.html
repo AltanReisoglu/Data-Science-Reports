@@ -66,19 +66,10 @@
        geçiyor, çünkü cevabı göremeyen bir sohbet kutusu işe yaramaz. -->
   <section class="deck" id="deck" aria-label="Sunum destesi">
     <div class="deck__bar" id="deck-bar"></div>
-    <!-- Tıklama katmanı iframe'in ÜSTÜNDE. PDF görüntüleyici tarayıcının kendi
-         eklentisi; içine olay dinleyici koyulamıyor. Sol üçte bir geri, sağı
-         ileri — sunumda parmağın nereye giderse oraya. -->
-    <div class="deck__stage">
-      <iframe class="deck__frame" id="deck-frame" title="Slayt destesi"></iframe>
-      <div class="deck__zones" id="deck-zones" hidden>
-        <button type="button" class="deck__zone deck__zone--prev" id="deck-prev"
-                aria-label="Önceki slayt"></button>
-        <button type="button" class="deck__zone deck__zone--next" id="deck-next"
-                aria-label="Sonraki slayt"></button>
-      </div>
-      <div class="deck__page" id="deck-page" hidden></div>
-    </div>
+    <!-- Gezinme Chrome'un kendi PDF görüntüleyicisinde: araç çubuğu, sayfa
+         numarası, yakınlaştırma ve arama onda hazır. Kendi tıklama katmanımız
+         aynı işi daha kötü yapıyordu. -->
+    <iframe class="deck__frame" id="deck-frame" title="Slayt destesi"></iframe>
   </section>
 
   <main class="thread" id="thread" role="log" aria-live="polite" aria-label="Conversation"></main>

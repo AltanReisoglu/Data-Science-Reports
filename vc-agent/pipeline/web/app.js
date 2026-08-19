@@ -10,12 +10,7 @@
   var deckHost = document.getElementById('deck');
   var deckBar = document.getElementById('deck-bar');
   var deckFrame = document.getElementById('deck-frame');
-  var deckZones = document.getElementById('deck-zones');
-  var deckPage = document.getElementById('deck-page');
-  /* Hangi destede kaçıncı sayfadayız. Sayfa sayısı sunucudan geliyor: sınır
-     bilinmezse "ileri" son slayttan sonra da basılabiliyor ve görüntüleyici
-     sessizce yerinde kalıyor — tıklamanın çalışmadığı sanılıyor. */
-  var deckState = { id: null, page: 1, pages: 1 };
+  var deckState = { id: null };
   var form = document.getElementById('ask');
   var input = document.getElementById('q');
   var chips = document.getElementById('chips');
@@ -205,28 +200,6 @@
     });
   }
 
-  if (deckZones) {
-    document.getElementById('deck-prev').addEventListener('click', function () {
-      deckGo(deckState.page - 1);
-    });
-    document.getElementById('deck-next').addEventListener('click', function () {
-      deckGo(deckState.page + 1);
-    });
-  }
-
-  /* Klavye de gezinsin — sunumda uzaktan kumanda çoğu zaman ok tuşu gönderiyor.
-     Soru kutusundayken devre dışı: orada ok tuşu imleci taşımalı. */
-  document.addEventListener('keydown', function (event) {
-    if (!deckHost || deckHost.hidden) { return; }
-    var tag = (event.target && event.target.tagName) || '';
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { return; }
-    if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
-      deckGo(deckState.page + 1); event.preventDefault();
-    } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-      deckGo(deckState.page - 1); event.preventDefault();
-    }
-  });
-
   if (teamButton) {
     teamButton.addEventListener('click', function () {
       var q = (input.value || '').trim();
@@ -277,28 +250,6 @@
     }
   }
 
-  /* Sayfaya git. `#page=N` ile: aynı kaynağa yalnız hash değişerek gidildiğinde
-     tarayıcı PDF'i yeniden indirmiyor, sayfaya atlıyor. `src` yazmak yerine
-     `contentWindow.location.hash` denenmiyor — görüntüleyici bir eklenti
-     belgesi ve ona erişim sürümden sürüme değişiyor. */
-  function deckGo(page) {
-    if (!deckFrame || !deckState.id) { return; }
-    var n = Math.min(Math.max(1, page), deckState.pages);
-    deckState.page = n;
-    // ÖLÇÜLDÜ: yalnız hash'i değiştirmek görüntüleyiciyi hareket ettirmiyor —
-    // PDF eklentisi hash'i YÜKLEME anında okuyor, sonra bir daha bakmıyor.
-    // Sayfa göstergesi ilerliyor, slayt yerinde kalıyordu.
-    //
-    // Çözüm: URL'i gerçekten değiştir. Sorgu parametresi tarayıcı için farklı
-    // bir adres, yani yeni bir yükleme — ve yükleme anında hash okunuyor.
-    deckFrame.src = '/deck/' + encodeURIComponent(deckState.id) + '?p=' + n +
-                    '#page=' + n + '&view=Fit&navpanes=0&toolbar=0';
-    if (deckPage) {
-      deckPage.hidden = false;
-      deckPage.textContent = n + ' / ' + deckState.pages;
-    }
-  }
-
   function pickDeck(id) {
     if (!deckFrame) { return; }
     if (id === 'chat') { showDeck(false); return; }
@@ -306,9 +257,13 @@
     // sığdırıyordu ve geniş bir ekranda slayt taşıyordu — bir slaytta okunması
     // gereken şey sayfanın bütünü. `navpanes=0` küçük resim şeridini kapatıyor.
     deckState.id = id;
-    deckState.pages = (deckMeta[id] && deckMeta[id].pages) || 1;
-    deckGo(1);
-    if (deckZones) { deckZones.hidden = false; }
+    // Gezinme Chrome'un kendi PDF görüntüleyicisinde: araç çubuğu, sayfa
+    // numarası, yakınlaştırma, arama ve kaydırma onda zaten var. Kendi tıklama
+    // katmanımız aynı işi daha kötü yapıyordu — her sayfa değişiminde PDF
+    // yeniden yükleniyor ve göz kırpıyordu.
+    // `view=Fit` sayfanın tamamını sığdırıyor; `navpanes=0` dar sütunda yer
+    // kaplayan küçük resim şeridini kapatıyor (araç çubuğundan geri açılabilir).
+    deckFrame.src = '/deck/' + encodeURIComponent(id) + '#view=Fit&navpanes=0';
     showDeck(true);
     [].forEach.call(deckBar.querySelectorAll('.deck__tab'), function (b) {
       b.classList.toggle('is-on', b.dataset.deck === id);
