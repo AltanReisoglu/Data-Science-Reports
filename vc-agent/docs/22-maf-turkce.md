@@ -571,16 +571,34 @@ yığını taahhüdü**. Slaytta bu satır olmadan Purview'ü göstermek yanılt
 [pipeline/maf.py](../pipeline/maf.py) + [pipeline/maf_runner.py](../pipeline/maf_runner.py),
 toplam 284 satır. Ekranın sağ üstündeki düğme AutoGen ↔ MAF kipini değiştiriyor.
 
-**Var:** `Agent`, `FunctionTool(approval_mode=…, max_invocations=…)`,
-`ToolApprovalMiddleware`, `AgentSession`, `WorkflowBuilder`,
-`FileCheckpointStorage` — ve hepsi akış ekranında sekiz mekanizma olarak çiziliyor.
+**Var — beş API yüzeyi** [ölçüldü, `maf_runner.py`'den sayıldı]:
+`Agent` · `FunctionTool(approval_mode=…, max_invocations=…)` ·
+`ToolApprovalMiddleware` · `AgentSession` · `OpenAIChatClient`. Akış ekranında
+sekiz mekanizma olarak çiziliyorlar (`MAF_FLOW`, [stages.py:400](../pipeline/stages.py#L400)).
 
-**Yok:** harness (`create_harness_agent`), FIDES, beceriler, orkestrasyon
-builder'ları, barındırma.
+**Yok:** harness (`create_harness_agent`), FIDES, beceriler, beş orkestrasyon
+builder'ının hiçbiri, `WorkflowBuilder`, checkpoint, barındırma.
 
-**Açık uç:** tool kullanan turlarda `response.text` boş dönüyor; cevap
-`messages` içinde ama metin içeriği olmayan bir biçimde. Sohbet balonunda bu
-dürüstçe gösteriliyor ama çözülmedi.
+Yani MAF kipi **kapsam olarak dar**: kıyas yüzeyi, ikinci bir boru hattı değil.
+Sunumda bu cümle kurulmalı, yoksa "MAF'ı da yaptık" gibi duyulur ve ilk soruda
+düşer. Doğru cümle: *"Aynı soruyu ikinci bir çerçevede koşturup farkı ekranda
+gösteriyoruz — MAF'ta bir tool, bir onay, bir oturum."*
+
+**Ölçülmüş üç davranış farkı** (AutoGen tarafında karşılığı olmayan):
+
+* `approval_mode` **tool'un kendi alanı**. Bizde kapıyı workbench'i sarmalayarak
+  kuruyoruz; MAF'ta bir parametre.
+* `max_invocations` yine tool başına — AutoGen'in `max_tool_iterations`'ı **ajan**
+  başına, tool başına değil.
+* `ToolApprovalMiddleware` **oturum istiyor**: oturumsuz koşuda
+  `RuntimeError: ToolApprovalMiddleware requires an AgentSession` [ölçüldü].
+  Yani onay, kimlikli bir oturuma bağlı — mimari bir tercih, kolaylık değil.
+
+**Bilinen kusur:** tool çağrılan turlarda `AgentResponse.text` **boş** dönüyor;
+cevap `messages` içinde. `maf_runner.py` bunu mesajlardan geri okuyarak telafi
+ediyor ve `maf_done` aşamasında `from_messages=True` diye işaretliyor — yani
+gizlenmiyor, **ölçülüyor**. Ama kök nedeni bulunmadı; yalnız `text`'e bakan bir
+arayüz tool kullanan her turda boş ekran gösterir.
 
 ---
 

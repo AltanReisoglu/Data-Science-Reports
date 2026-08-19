@@ -758,11 +758,17 @@ KEEP_AUTOGEN = [
     "Multi-Agent Debate",
     "Reflection",
     "Code Execution",
-    # halef
+    # halef — sekizi de kalıyor. Bu bölüm artık destenin en çok ölçüm taşıyan
+    # yeri, ve sunumun en kırılgan sorusunu ("neden ölü bir çerçeve?") kapatan
+    # tek yer. Kısaltılacak bir şey aranıyorsa desenlerden aranmalı.
     "Microsoft Agent Framework — halef geldi",
     "Kılavuzun kendi saydığı dört fark",
+    "Tool döngüsü: halef varsayılanı değiştirmiş",
     "“AutoGen Limitations” — üreticinin kendi başlığı",
+    "Harness Agent — tanıdık bir liste",
     "Onay: aynı kelime, farklı disiplin",
+    "Hızın faturası — GA'dan sonra 15 kırıcı değişiklik",
+    "“Build your own claw” — Microsoft'un kendi örneği",
 ]
 
 
