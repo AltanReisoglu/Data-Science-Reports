@@ -424,6 +424,14 @@ def plan_line(line: str) -> dict[str, Any]:
     if first == "schedule":
         return {"mode": "schedule", "method": "cron.add", "params": {},
                 "text": text[len(first):].strip(), "tier": "write", "error": ""}
+    # `foto` is the same decision as `schedule`, for the same reason. Asking in
+    # prose works — OpenClaw's agent has a shell and would take the picture — but
+    # *it* would choose where the file lands, and a path chosen by a model is one
+    # we can only recover by parsing prose or scanning a directory. So we name the
+    # file and write the command; the agent's only job is to run it.
+    if first in ("foto", "photo"):
+        return {"mode": "foto", "method": "exec", "params": {},
+                "text": text[len(first):].strip(), "tier": "write", "error": ""}
     if text and not looks_like_a_method(first):
         return {"mode": "sentence", "method": "", "params": {}, "text": text,
                 "tier": "", "error": ""}

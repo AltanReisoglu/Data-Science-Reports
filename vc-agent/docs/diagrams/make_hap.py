@@ -127,10 +127,12 @@ def card(part: str, title: str, svg: str, key: str, say: str, foot: str = "",
 
 A: list[str] = [cover(
     "hap deste · 1/2",
-    "AutoGen, on altı şemada",
-    "Aktör modelinden tool döngüsüne: her slaytta bir mekanizma, "
-    "nasıl çalıştığı ve neden önemli olduğu.",
-    "autogen-core · agentchat · ext v0.7.5<br>uzun anlatım: docs/pdf/slaytlar.pdf",
+    "AutoGen — ve halefi",
+    "Aktör modelinden tool döngüsüne: her slaytta bir mekanizma, nasıl çalıştığı "
+    "ve neden önemli olduğu. Son altı slayt, AutoGen'in vermediklerini halefi "
+    "Microsoft Agent Framework'ün ne yaptığı.",
+    "autogen-core · agentchat · ext v0.7.5  ·  MAF 1.0 GA Nisan 2026"
+    "<br>uzun anlatım: docs/pdf/slaytlar.pdf",
 )]
 
 A.append(card(
@@ -248,18 +250,21 @@ A.append(card(
 A.append(card(
     "AutoGen · agentchat", "AssistantAgent ve tool döngüsü",
     f_tool_loop(),
-    "max_tool_iterations — varsayılan 1",
-    "Model bir tool çağırıyor, tool koşuyor, sonuç dönüyor. Ve varsayılan "
-    "ayarda tur <b>tam orada bitiyor</b>. "
-    "Yani model, tool'un bulduğu sonucu <b>hiç görmüyor</b>. Kullanıcıya giden "
-    "cevap, tool çağrılmamış gibi yazılmış oluyor. "
-    "Hiçbir hata çıkmıyor. Loga bakarsın: tool çağrılmış, sonuç dönmüş, her şey "
-    "yolunda görünüyor. Ama cevap yanlış, çünkü eksik olan çağrı değil, "
-    "<b>ikinci model turu</b>. "
-    "Zincirleme davranış — \"ara, bulduğunu oku, ona göre ikinci aramayı yap\" — "
-    "bu ayarla sessizce imkânsız. "
-    "Bu destedeki en pahalı tek satır bilgi bu.",
-    cap_mm=48))
+    "iki ayrı anahtar: max_tool_iterations=1  ·  reflect_on_tool_use=False",
+    "Model tool'u çağırıyor, tool koşuyor, sonuç dönüyor — ve varsayılanda tur "
+    "orada bitiyor. Modele giden ikinci bir tur yok, dolayısıyla cevabı da model "
+    "yazmıyor: kullanıcıya <b>ham tool çıktısı</b> gidiyor "
+    "(<code>ToolCallSummaryMessage</code>). "
+    "<b>Ölçtük.</b> İki adımlı bir işte — önce id bul, sonra o id ile detay çek — "
+    "\"çalışan sayısı kaç\" sorusuna dönen cevap <code>{\"id\": \"KA-9931\"}</code> "
+    "oldu. İkinci tool <b>hiç çağrılmadı</b>, ve bunu söyleyen hiçbir şey yok: "
+    "log'da tek başarılı çağrı var, hata yok. Sessiz olan ham çıktı değil, "
+    "<b>duran zincir</b>. "
+    "İki anahtar karıştırılıyor: <code>max_tool_iterations</code> zincirlemeyi "
+    "açıyor, <code>reflect_on_tool_use</code> modelin sonucu okuyup cevabı "
+    "yazmasını.",
+    cap_mm=40,
+    foot="reflect_on_tool_use, output_content_type verildiğinde True'ya döner — yani yapılandırılmış çıktı istemek davranışı değiştirir."))
 
 A.append(card(
     "AutoGen · agentchat", "Beş takım — sırayı kim belirliyor",
@@ -720,11 +725,14 @@ if __name__ == "__main__":
     PDF_DIR.mkdir(parents=True, exist_ok=True)
     # The third deck lives in its own file: it is implementation detail rather
     # than concept, and keeping it apart lets the first two stay teachable.
-    for _f in ("hap_autogen_derin.py", "hap_nis.py"):
+    # Sıra önemli: `hap_maf.py` en sona yükleniyor çünkü halef bölümü destenin
+    # kuyruğu — önce mekanizma, sonra sınırı, en sonda o sınırın kapanıp
+    # kapanmadığı.
+    for _f in ("hap_autogen_derin.py", "hap_maf.py", "hap_nis.py"):
         _src = (Path(__file__).resolve().parent / _f).read_text(encoding="utf-8")
         exec(compile(_src, _f, "exec"), globals())  # noqa: S102 — our own files
 
     print("hap desteler:")
-    build_deck(A, "AutoGen, on altı şemada", "hap-autogen.html")
+    build_deck(A, "AutoGen — ve halefi MAF", "hap-autogen.html")
     build_deck(B, "OpenClaw, on sekiz şemada", "hap-openclaw.html")
     build_deck(C, "OpenClaw harness'ı, içeriden", "hap-openclaw-nis.html")

@@ -382,5 +382,25 @@ OUTBOUND_TOOLS = tuple(
 # blast radius is acceptable. There is no middle setting that is honest.
 ALLOW_OUTBOUND = _flag("VC_ALLOW_OUTBOUND", False)
 
+# ── modelin yazdığı kodu çalıştırmak ────────────────────────────────────────
+#
+# `ALLOW_OUTBOUND` ile aynı gerekçe, aynı şekil: yıkım yarıçapını kabul etmek
+# bilinçli bir karar olmalı, ve "kısmen açık" diye dürüst bir ara ayar yok.
+# Kapalıyken tool listeye hiç girmiyor — `gateway/workbench.py`'deki *gating vs
+# filtering* ayrımının "meşru kullanımı yok" tarafı.
+#
+# Açıkken bile kod, çalışmadan önce onay kapısından geçiyor: adı hiçbir outbound
+# markerına uymadığı için `codeexec.make_gate_hook()` onu adına göre değil, ne
+# olduğuna göre yakalıyor.
+ALLOW_CODE_EXEC = _flag("VC_ALLOW_CODE_EXEC", False)
+
+# Konteyner imajı. `python:3-slim` ~130 MB; yerelde yoksa ilk koşu onu indirir,
+# ki bir sunum sırasında yapılacak en kötü şeydir. `docker pull` önceden.
+CODE_EXEC_IMAGE = os.getenv("VC_CODE_EXEC_IMAGE", "python:3-slim")
+
+# Tek bir kod bloğunun üst sınırı. Yürütücü bunu kendi koşusuna uyguluyor;
+# sonsuza kadar koşan bir döngü turu değil, yalnız bu çağrıyı yakar.
+CODE_EXEC_TIMEOUT = int(os.getenv("VC_CODE_EXEC_TIMEOUT", "60"))
+
 REQUEST_TIMEOUT = 20.0
 CACHE_TTL_SECONDS = 6 * 3600

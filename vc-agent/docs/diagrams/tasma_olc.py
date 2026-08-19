@@ -48,7 +48,11 @@ PROBE = """
   // Deste slaytı da hatırlatma kartı sayfası da aynı kısıtı taşıyor: sabit
   // yükseklik + overflow:hidden. Seçici ona göre otomatik.
   var SEL = document.querySelector('.slide') ? '.slide' : '.page';
-  var BODY = SEL === '.slide' ? '.bd, .bd *' : '.b, .b *';
+  // Üç ayrı düzen var ve her biri gövdesini başka bir sınıfa koyuyor:
+  // deste slaytı `.bd`, hatırlatma kartı `.b`, akış kartı `.r`/`.act`.
+  // Seçici tutmazsa ölçüm sessizce "sayfa bomboş" der — yani tam da
+  // yakalaması gereken hatayı gizler. O yüzden hepsi birden aranıyor.
+  var BODY = SEL === '.slide' ? '.bd, .bd *' : '.b, .b *, .r, .r *, .act';
   var out = [];
   document.querySelectorAll(SEL).forEach(function(s, i){
     var h2 = s.querySelector('h2') || s.querySelector('.hd .t');

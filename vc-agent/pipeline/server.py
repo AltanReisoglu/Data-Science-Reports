@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import FastAPI, HTTPException  # noqa: E402
 from fastapi.responses import (  # noqa: E402
-    HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse,
+    HTMLResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse,
 )
 from pydantic import BaseModel  # noqa: E402
 
@@ -212,11 +212,22 @@ async def _start_gateway() -> None:
         )
     await gateway.start()
 
+    # The code-exec container belongs to the process, not to a call: bringing it
+    # up costs two or three seconds and the user would pay that on the first
+    # question. Starting it here also means a broken Docker shows up at boot
+    # rather than in the middle of a demo.
+    import codeexec as codeexec_module
+
+    if await codeexec_module.start():
+        print(f"  code exec: açık · {config.CODE_EXEC_IMAGE}", flush=True)
+
 
 @app.on_event("shutdown")
 async def _stop_gateway() -> None:
+    import codeexec as codeexec_module
     from gateway import runtime as runtime_module
 
+    await codeexec_module.stop()
     await runtime_module.GATEWAY.close()
     await CHAT.close()
 
@@ -594,6 +605,98 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
     return outcome
 
 
+async def _openclaw_foto(plan: dict, record) -> dict:
+    """`/openclaw foto` — OpenClaw çeker, dosyayı biz adlandırırız.
+
+    Cümle yolu (“fotoğrafımı çek”) bugün de çalışıyor, ama dosyanın nereye
+    düştüğüne model karar veriyor. Burada kimliği ve yolu biz üretip komutu tam
+    metin olarak veriyoruz; ajana kalan tek iş onu çalıştırmak. Onay kartında
+    görünen metin, çalışacak komutun kendisi — `docs/16 §2.2`'deki “onaylanan şey
+    donmuş bir plandır” ilkesinin küçük hâli.
+
+    Gateway ulaşılamazsa kare yine de alınıyor: `shots.local_capture` aynı yola
+    aynı adla yazıyor, ve sunma tarafı ikisini ayırt etmiyor.
+    """
+    import shots as shots_module
+
+    body = (plan["text"] or "").strip().lower()
+    if body in ("sil", "temizle", "clear"):
+        return {"ok": True, "method": "foto", "tier": "local",
+                "result": {"cleared": shots_module.clear()}}
+    if body in ("liste", "list", "ls"):
+        return {"ok": True, "method": "foto", "tier": "local",
+                "result": {"shots": shots_module.recent()}}
+
+    device, size = shots_module.DEFAULT_DEVICE, shots_module.DEFAULT_SIZE
+
+    # Signed on the *stable* part of the request, not on the generated sentence.
+    # Every call mints a fresh frame id, so a digest over the sentence would be
+    # different every time and the grant could never be consumed — the same bug
+    # `schedule` had with `"5dk sonra"`, found the same way. The operator still
+    # sees the exact command, because it goes in the reason.
+    held = _openclaw_gate(
+        {"mode": "method", "method": "camera.capture", "tier": "write",
+         "params": {"device": device, "size": size}, "text": "", "error": ""},
+        record.id,
+    )
+    if held is not None:
+        held["reason"] = (
+            f"Kamerandan tek kare alınacak ({device}, {size}) ve panele basılacak. "
+            "Komutu OpenClaw'ın ajanı çalıştıracak; o ajanın kabuğu var ve onay "
+            "sormuyor (exec: mode=full, ask=off). " + held["reason"]
+        )
+        return held
+
+    shot_id = shots_module.new_id()
+    sentence = shots_module.sentence(shot_id, device=device, size=size)
+    outcome = await openclaw_control.ask(sentence, peer="local")
+    if not shots_module.exists(shot_id):
+        # OpenClaw cevap vermiş olabilir ama dosya yoksa çekim olmamıştır. Kota,
+        # kapalı gateway, izin — hangisi olursa olsun cevabı beklemek yerine
+        # kareyi burada alıyoruz, ve bunu gizlemiyoruz.
+        local = shots_module.local_capture(shot_id, device=device, size=size)
+        if not local["ok"]:
+            return {"ok": False, "method": "foto", "tier": "write",
+                    "error": local["error"],
+                    "note": "OpenClaw kare üretmedi ve yerel çekim de başarısız."}
+        return {"ok": True, "method": "foto", "tier": "write",
+                "result": {"id": shot_id, "url": f"/api/shot/{shot_id}", "by": "local"},
+                "note": "OpenClaw kare üretmedi; kare yerel ffmpeg ile alındı."}
+
+    shots_module.prune()
+    return {"ok": True, "method": "foto", "tier": "write",
+            "result": {"id": shot_id, "url": f"/api/shot/{shot_id}", "by": "openclaw",
+                       "said": outcome.get("result") if isinstance(outcome, dict) else ""}}
+
+
+@app.get("/api/shot/{shot_id}")
+def shot(shot_id: str) -> Response:
+    """Bir kareyi **kimlikle** ver. İstekten gelen metin hiç yol olmuyor.
+
+    `shots.path_for` önce biçimi doğruluyor, sonra birleştiriyor, sonra çözülmüş
+    yolun dizinin içinde kaldığını kontrol ediyor. Bir web sunucusunda dosya
+    sunan kodun tek ciddi arızası yol kaçışı, ve o kontrol tek yerde duruyor.
+    """
+    import shots as shots_module
+
+    try:
+        data = shots_module.read(shot_id)
+    except shots_module.ShotError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.get("/api/shots")
+def shots_list() -> JSONResponse:
+    import shots as shots_module
+
+    return JSONResponse({"shots": shots_module.recent(), "keep": shots_module.KEEP})
+
+
 @app.post("/api/openclaw")
 async def openclaw_line(payload: OpenClawLine) -> JSONResponse:
     """One typed line to OpenClaw — a Gateway method, or a question for its agent.
@@ -634,8 +737,11 @@ async def openclaw_line(payload: OpenClawLine) -> JSONResponse:
     # `schedule` is answered here rather than by `run_line`, because it is the one
     # subcommand that is not a Gateway call: it is our own translation plus a
     # `cron.add`. Listing and refusals never reach the Gateway at all.
-    if plan["mode"] == "schedule":
-        outcome = await _openclaw_schedule(plan, record)
+    if plan["mode"] in ("schedule", "foto"):
+        outcome = await (
+            _openclaw_schedule(plan, record) if plan["mode"] == "schedule"
+            else _openclaw_foto(plan, record)
+        )
         if outcome.get("held"):
             CHAT.sessions.record_turn(
                 record, "assistant", outcome["reason"], channel="openclaw-direct", ok=False,
@@ -844,12 +950,29 @@ class ApprovalDecision(BaseModel):
 
 
 @app.post("/api/approvals/{request_id}/approve")
-def approval_approve(request_id: str, payload: ApprovalDecision) -> JSONResponse:
+async def approval_approve(request_id: str, payload: ApprovalDecision) -> JSONResponse:
+    """Onayla — ve onaylanan şey kodsa, **onu** koştur.
+
+    Kapının reddi turu bitiriyor: ajan reddedildiğini söyleyip devam ediyor. Onay
+    o turu geri getiremiyor, ve modelden kodu yeniden yazmasını beklemek işe
+    yaramıyor — ölçüldü, aynı soru iki farklı program üretti, dolayısıyla iki
+    farklı imza. Onaylananla çalışanın aynı olmasının tek yolu, çalıştırılacak
+    olanın `Request.payload`'da **saklanan metin** olması.
+    """
+    import codeexec as codeexec_module
     from gateway import approval as approval_module
 
+    request = approval_module.GATE.get(request_id)
     outcome = approval_module.GATE.approve(request_id, note=payload.note)
     if not outcome["ok"]:
         raise HTTPException(404, outcome["reason"])
+
+    if request is not None and request.tool == codeexec_module.TOOL_NAME:
+        code = str((request.payload or {}).get("code", ""))
+        run = await codeexec_module.run_approved(code)
+        # Grant tüketiliyor: onay bu koşuyu kapsıyor, sonraki her benzerini değil.
+        approval_module.GATE._granted.discard(request.digest)  # noqa: SLF001
+        outcome["ran"] = {"code": code, **run}
     return JSONResponse(outcome)
 
 

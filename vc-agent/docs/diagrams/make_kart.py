@@ -160,11 +160,16 @@ A1 = "".join([
 
     blok(
         "en pahali tuzak — tek bir şey hatirlatacaksan bu",
-        s("“Model tool'u çağırıyor, sonuç dönüyor, ve tur orada bitiyor. Model o "
-          "sonucu hiç görmüyor.”"),
-        w("<code>max_tool_iterations</code> varsayılanı <b>1</b>. Hiçbir hata "
-          "çıkmıyor: loga bakarsın, tool çağrılmış, sonuç dönmüş, cevap yine "
-          "yanlış. Eksik olan çağrı değil, <b>ikinci model turu</b>.")),
+        s("“Tool koşuyor, sonuç dönüyor, tur orada bitiyor. Cevabı model yazmıyor "
+          "— kullanıcıya <b>ham tool çıktısı</b> gidiyor.”"),
+        w("<b>Ölçtük:</b> iki adımlı bir işte (önce id bul, sonra detay çek) "
+          "“çalışan sayısı kaç” sorusuna dönen cevap <code>{\"id\":\"KA-9931\"}</code> "
+          "oldu. İkinci tool hiç çağrılmadı, log'da tek başarılı çağrı var, hata "
+          "yok. <b>Sessiz olan ham çıktı değil, duran zincir.</b>"),
+        w("<b>İki ayrı anahtar var:</b> <code>max_tool_iterations</code> (varsayılan "
+          "1) zincirlemeyi açıyor · <code>reflect_on_tool_use</code> (varsayılan "
+          "False) modelin sonucu okuyup cevabı yazmasını. İkincisi "
+          "<code>output_content_type</code> verilince True'ya döner.")),
 
     blok(
         "sessiz bellek kaybi",

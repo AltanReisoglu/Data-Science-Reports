@@ -27,6 +27,19 @@
       <button type="button" class="ghost" id="reset-chat" hidden>Reset chat</button>
     </div>
 
+    <!-- The terminal. Hidden until the model actually runs code, because an
+         empty console on every screen teaches nothing and takes the room the
+         rail needs. Read-only by design: it shows what ran, it does not run. -->
+    <section class="term" id="term" hidden aria-label="Kod yürütme terminali">
+      <div class="term__head">
+        <span class="term__title">Terminal</span>
+        <span class="term__meta" id="term-meta">docker</span>
+        <button type="button" class="term__close" id="term-close"
+                aria-label="Terminali kapat">×</button>
+      </div>
+      <pre class="term__body" id="term-body" tabindex="0"></pre>
+    </section>
+
     <div class="chrome__foot">
       <button type="button" class="ghost theme-toggle" id="theme-toggle"
               aria-label="Switch between light and dark">Dark</button>
