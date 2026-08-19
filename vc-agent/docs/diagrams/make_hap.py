@@ -15,6 +15,14 @@ drawn, it does not get a slide here; it stays in the long deck. That is why thes
 skip several genuinely important things (the funnel, the four principles, the
 enterprise decision tables) — they are prose, and prose belongs elsewhere.
 
+**And the rule now has one deliberate exception: `hap_kiyas.py`.** Six slides
+there carry tables, which the paragraph above forbids. The reason is that the
+rule's premise does not hold for them: a comparison of six frameworks is not a
+mechanism, and it has no diagram — drawing it would mean inventing a picture
+that carries less than the rows do. The exception is fenced (one file, one
+section, at the end) and stated here rather than discovered later, because a
+rule broken silently stops being a rule for the next slide too.
+
 The deck engine — page geometry, the viewer script, print CSS — is imported from
 `make_slides.py`, so all three decks stay one design rather than three that drift.
 """
@@ -60,11 +68,53 @@ EXTRA_CSS = """
 .hapkey{font-family:var(--mono);font-size:10.4pt;color:var(--ochre);
         letter-spacing:-.01em;margin:0 0 2.5mm}
 .slide h2{font-size:21pt}
+/* Kıyas slaytları tablo taşıyor ve tablolar şemadan dar okunuyor. Altı sütunlu
+   yetenek matrisi 10,6pt'te sayfadan taşıyordu; başlık satırı ve hücre dolgusu
+   kısıldı, gövde yazısı korundu — tabloyu küçültmek, anlatıyı küçültmekten iyi. */
+.slide table{font-size:9.4pt;margin:3mm 0 4mm}
+.slide table th{padding:1.4mm 2mm;font-size:8.6pt;letter-spacing:.02em}
+.slide table td{padding:1.4mm 2mm;vertical-align:top}
+.slide table code{font-size:8.6pt}
+/* Sayfa sayacı başlığa YAPIŞIYORDU: "AUTOGEN · KIYAS36 / 38". `.hd` zaten
+   `space-between` ama slayt ölçeklenmiş bir kapta duruyor ve genişlik çöküyor;
+   `margin-left:auto` bunu ölçekten bağımsız olarak sağa itiyor. Basılan
+   başlığa bakmadan görünmüyor — HTML'de iki ayrı span, gözle bitişik. */
+.hd{gap:6mm}
+.hd .n{margin-left:auto;white-space:nowrap}
 """
+
+
+def check_balance(slides: list[str]) -> None:
+    """Her slaytta vurgu etiketleri kapanmış mı — açılmayan biri komşularına sızar.
+
+    Ölçüldü: `hap_maf.py`'de bir alıntı `<i>` ile açılıp `</b>` ile kapanmıştı.
+    Tarayıcı `<i>`'yi kapatmayıp SONRAKİ bütün slaytları onun içine aldı; başlık
+    satırının iki `<span>`'ı tek bir `<i>` çocuğuna dönüştü, `space-between`
+    dağıtacak bir şey bulamadı ve sayfa sayacı başlığa yapıştı
+    (“AUTOGEN · KIYAS36 / 38”). On dört slayt eğik basılıyordu ve kimse fark
+    etmedi, çünkü HTML kaynağı doğru görünüyor — kusur ancak *render edilmiş*
+    DOM ölçülünce çıkıyor.
+
+    Bu yüzden kontrol üretim zamanında: bir sonraki dengesiz etiket, PDF'e
+    ulaşmadan burada patlasın.
+    """
+    import re as _re
+
+    for i, s in enumerate(slides, 1):
+        for tag in ("i", "b", "code", "span"):
+            o = len(_re.findall(rf"<{tag}[ >]", s))
+            c = s.count(f"</{tag}>")
+            if o != c:
+                h = _re.search(r"<h2>(.*?)</h2>", s, _re.S)
+                title = _re.sub("<[^>]+>", "", h.group(1)) if h else "?"
+                raise SystemExit(
+                    f"slayt {i} ({title!r}): <{tag}> {o} açık, {c} kapalı. "
+                    f"Kapanmayan etiket sonraki slaytlara sızıyor.")
 
 
 def build_deck(slides: list[str], title: str, out_name: str) -> Path:
     """Render one deck. `slides` is already-rendered HTML sections."""
+    check_balance(slides)
     body = "".join(slides)
     html = (
         '<!doctype html>\n<html lang="tr"><head><meta charset="utf-8">\n'
@@ -769,6 +819,15 @@ KEEP_AUTOGEN = [
     "Onay: aynı kelime, farklı disiplin",
     "Hızın faturası — GA'dan sonra 15 kırıcı değişiklik",
     "“Build your own claw” — Microsoft'un kendi örneği",
+    # kıyas — destenin tek tablo ağırlıklı bölümü. Şema yerine tablo, çünkü
+    # burada anlatılan şey bir mekanizma değil bir KARŞILAŞTIRMA, ve altı
+    # çerçeveyi yan yana koymanın şeması yok.
+    "Beş desenin faturası — aynı görev, tek değişen sıra",
+    "Altı çerçeve, altı varsayılan — 1'den sınırsıza",
+    "Bakım modu bir söylenti değil — 323 güne karşı 13",
+    "Yetenek matrisi — ve AutoGen'in tek başına tuttuğu şey",
+    "Sorulacak altı soru — ve hazır cevapları",
+    "Ölçmediklerimiz — ve neden burada yazıyor",
 ]
 
 
@@ -806,7 +865,7 @@ if __name__ == "__main__":
     # Sıra önemli: `hap_maf.py` en sona yükleniyor çünkü halef bölümü destenin
     # kuyruğu — önce mekanizma, sonra sınırı, en sonda o sınırın kapanıp
     # kapanmadığı.
-    for _f in ("hap_autogen_derin.py", "hap_maf.py", "hap_nis.py"):
+    for _f in ("hap_autogen_derin.py", "hap_maf.py", "hap_kiyas.py", "hap_nis.py"):
         _src = (Path(__file__).resolve().parent / _f).read_text(encoding="utf-8")
         exec(compile(_src, _f, "exec"), globals())  # noqa: S102 — our own files
 

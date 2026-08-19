@@ -27,7 +27,7 @@ kendi geçiş kılavuzu GraphFlow bilenin işinin kolay olacağını yazıyor.
 """
 
 A.append(card(
-    "AutoGen · halef 1/8", "Microsoft Agent Framework — halef geldi",
+    "AutoGen · halef", "Microsoft Agent Framework — halef geldi",
     f_layers(),
     "learn.microsoft.com/agent-framework · 1.0 GA Nisan 2026",
     "AutoGen'in README'si nereye gideceğini söylüyor, ve o yer artık gerçek bir "
@@ -36,14 +36,14 @@ A.append(card(
     "Belgesinin kendi cümlesi: <i>“Agent Framework, AutoGen'in basit ajan "
     "soyutlamalarını Semantic Kernel'in kurumsal özellikleriyle — oturum tabanlı "
     "durum yönetimi, tip güvenliği, middleware, telemetri — birleştiriyor ve "
-    "üstüne graf tabanlı iş akışları ekliyor.”</b> "
+    "üstüne graf tabanlı iş akışları ekliyor.”</i> "
     "Dört alanı var: <b>Agents</b> · <b>Harness Agent</b> · <b>Workflows</b> · "
     "<b>Integrations</b>. Üç dil: .NET, Python, Go (Go önizlemede).",
     cap_mm=42,
     foot="Artık [ölçüldü]: MAF 1.14.0 ayrı bir .venv-maf içinde kurulu. Aynı ortama girmiyorlar — pip ikisini on dakikada çözemedi, ve PoC bu yüzden alt süreç kullanıyor."))
 
 A.append(card(
-    "AutoGen · halef 2/8", "Kılavuzun kendi saydığı dört fark",
+    "AutoGen · halef", "Kılavuzun kendi saydığı dört fark",
     f_components(),
     "migration-guide/from-autogen · “Key Differences”",
     "<b>① Orkestrasyon.</b> AutoGen: olay-güdümlü core + üstünde <code>Team</code>. "
@@ -59,7 +59,7 @@ A.append(card(
     foot="Yani dağıtık runtime, AutoGen'in MAF'ta henüz karşılığı olmayan yeteneği."))
 
 A.append(card(
-    "AutoGen · halef 3/8", "Tool döngüsü: halef varsayılanı değiştirmiş",
+    "AutoGen · halef", "Tool döngüsü: halef varsayılanı değiştirmiş",
     f_tool_loop(),
     "“single-turn unless you increase max_tool_iterations”",
     "Destenin dokuzuncu slaytında anlattığımız tuzağı Microsoft kendi geçiş "
@@ -78,7 +78,7 @@ A.append(card(
     foot="[ölçüldü] .venv → autogen_agentchat 0.7.5 · .venv-maf → agent_framework 1.14.0 (_tools.py:95)."))
 
 A.append(card(
-    "AutoGen · halef 4/8", "“AutoGen Limitations” — üreticinin kendi başlığı",
+    "AutoGen · halef", "“AutoGen Limitations” — üreticinin kendi başlığı",
     f_gotchas(),
     "geçiş kılavuzunda iki kez birebir bu başlık var",
     "<b>İnsan müdahalesi yok.</b> <i>“AutoGen'in <code>Team</code> soyutlaması "
@@ -96,7 +96,7 @@ A.append(card(
     foot="Bu dördü, destenin 18. slaytında “vermediği şey” diye saydığımız listenin üretici tarafından yazılmış hâli."))
 
 A.append(card(
-    "AutoGen · halef 5/8", "Harness Agent — tanıdık bir liste",
+    "AutoGen · halef", "Harness Agent — tanıdık bir liste",
     f_tool_catalog(),
     "concepts/harness · “opinionated, batteries-included”",
     "MAF'ın dört alanından biri doğrudan <b>harness</b>. Belgenin tanımı: "
@@ -113,7 +113,7 @@ A.append(card(
     foot="Sınır: create_harness_agent yayında, ama arka plan ajanları / dosya erişimi / looping deneysel, kabuk aracı ön-sürüm."))
 
 A.append(card(
-    "AutoGen · halef 6/8", "Onay: aynı kelime, farklı disiplin",
+    "AutoGen · halef", "Onay: aynı kelime, farklı disiplin",
     f_frozen_plan(),
     "standing approvals VARSAYILAN AÇIK — bizim tersimiz",
     "MAF'ın onayı çağrının <b>adını ve argümanlarını</b> gösteriyor, yani "
@@ -131,7 +131,7 @@ A.append(card(
     foot="Kurumsal fark burada: “bir daha sorma” bir kolaylık kararıdır, ve düzenlenmiş bir kurumda varsayılanı açık olmamalıdır."))
 
 A.append(card(
-    "AutoGen · halef 7/8", "Hızın faturası — GA'dan sonra 15 kırıcı değişiklik",
+    "AutoGen · halef", "Hızın faturası — GA'dan sonra 15 kırıcı değişiklik",
     f_gotchas(),
     "support/upgrade/python-2026-significant-changes · 🔴/🟡 işaretleri Microsoft'un",
     "Halef hızlı — ve hızın faturasını <b>üreticinin kendisi yayımlıyor</b>. "
@@ -148,7 +148,7 @@ A.append(card(
     foot="İki risk, ikisi de gerçek: AutoGen donmuş — düzeltecek kimse yok. MAF hareketli — sabitlemezsen kırılıyorsun, sabitlersen yamayı kaçırıyorsun."))
 
 A.append(card(
-    "AutoGen · halef 8/8", "“Build your own claw” — Microsoft'un kendi örneği",
+    "AutoGen · halef", "“Build your own claw” — Microsoft'un kendi örneği",
     f_tool_catalog(),
     "samples/02-agents/harness/build_your_own_claw · devblogs blog serisi",
     "Microsoft'un harness örneğinin adı <b>“build your own claw”</b>, bir blog "

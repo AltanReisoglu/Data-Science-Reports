@@ -1,0 +1,110 @@
+{
+  "çekildi": "2026-08-19",
+  "hız": {
+    "autogen-agentchat": {
+      "sürüm": "0.7.5",
+      "tarih": "2025-09-30",
+      "yaş_gün": 323,
+      "sürüm_sayısı": 54
+    },
+    "agent-framework": {
+      "sürüm": "1.14.0",
+      "tarih": "2026-08-14",
+      "yaş_gün": 5,
+      "sürüm_sayısı": 55
+    },
+    "langgraph": {
+      "sürüm": "1.2.11",
+      "tarih": "2026-08-11",
+      "yaş_gün": 8,
+      "sürüm_sayısı": 276
+    },
+    "crewai": {
+      "sürüm": "1.15.16",
+      "tarih": "2026-08-14",
+      "yaş_gün": 5,
+      "sürüm_sayısı": 414
+    },
+    "openai-agents": {
+      "sürüm": "0.22.0",
+      "tarih": "2026-08-19",
+      "yaş_gün": 0,
+      "sürüm_sayısı": 119
+    },
+    "google-adk": {
+      "sürüm": "2.7.1",
+      "tarih": "2026-08-17",
+      "yaş_gün": 2,
+      "sürüm_sayısı": 89
+    },
+    "semantic-kernel": {
+      "sürüm": "1.44.1",
+      "tarih": "2026-08-06",
+      "yaş_gün": 13,
+      "sürüm_sayısı": 137
+    },
+    "ag2": {
+      "sürüm": "1.0.2",
+      "tarih": "2026-08-15",
+      "yaş_gün": 4,
+      "sürüm_sayısı": 88
+    }
+  },
+  "çerçeveler": {
+    "langgraph": {
+      "sürüm": "1.2.11",
+      "döngü_tavanı": {
+        "değer": "10007",
+        "kaynak": "recursion_limit"
+      },
+      "yetenekler": {
+        "checkpoint": "InMemorySaver",
+        "insan döngüde": "interrupt",
+        "bellek": "InMemoryStore",
+        "graf kurucu": "StateGraph",
+        "dağıtık runtime": "bu adlarla yok"
+      }
+    },
+    "crewai": {
+      "sürüm": "1.15.16",
+      "döngü_tavanı": {
+        "değer": "25",
+        "kaynak": "Agent.max_iter"
+      },
+      "yetenekler": {
+        "ajan/görev/ekip": "Crew",
+        "akış (flow)": "Flow",
+        "kod yürütücü": "Agent.allow_code_execution=False safe",
+        "dağıtık runtime": "bu adlarla yok"
+      }
+    },
+    "openai-agents": {
+      "sürüm": "0.22.0",
+      "döngü_tavanı": {
+        "değer": "10",
+        "kaynak": "Runner.run(max_turns=)"
+      },
+      "yetenekler": {
+        "devir (handoff)": "handoff",
+        "korkuluk": "input_guardrail",
+        "oturum": "SQLiteSession",
+        "izleme": "trace",
+        "dağıtık runtime": "bu adlarla yok"
+      }
+    },
+    "google-adk": {
+      "sürüm": "2.7.1",
+      "döngü_tavanı": {
+        "değer": "None",
+        "kaynak": "LoopAgent.max_iterations"
+      },
+      "yetenekler": {
+        "akış tipleri": "SequentialAgent",
+        "oturum": "InMemorySessionService",
+        "bellek": "InMemoryMemoryService",
+        "kod yürütücü": "BuiltInCodeExecutor",
+        "dağıtık runtime": "bu adlarla yok"
+      }
+    }
+  }
+}
