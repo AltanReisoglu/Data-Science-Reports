@@ -112,33 +112,180 @@ icadımız değil — satıcının kendi yol haritasında, aynı alanda."*
 
 ---
 
-## §4 · Ekran koreografisi
+## §4 · Demo koreografisi — sekiz durak
 
-Sunum boyunca ekranda **üç şey** var ve geçişleri önceden bilinmeli:
+*Bu bölüm 19 Ağustos'ta bu makinede **koşturularak** yazıldı; aşağıdaki her sayı
+o koşudan geliyor. Sunum günü sayıları ekrandan oku, buradan değil.*
 
-| Perde | Sol ekran | Sağ panel |
-|---|---|---|
-| 0 · Açılış | — | `hap-autogen.pdf` kapak |
-| 1 · Motor | slayt | AutoGen destesi, sen ilerletirsin |
-| 1b · Halef | slayt | aynı deste, son dört slayt |
-| 2 · Kuşatma | slayt | `hap-openclaw.pdf` |
-| 3 · **Canlı** | **PoC sohbet + akış ekranı** | deste **kapalı** |
-| 4 · Kapanış | — | — |
+### Sıfırıncı kural: sıra zorunlu
 
-Perde 3'ün koreografisi — ölçülmüş sırayla:
+`Akış ↗` düğmesi **kayıtlı bir tur yoksa kapalı**. Sunucu yeni açıldıysa
+`/api/runs` boş döner ve düğmeye basamazsın. Yani **önce soru, sonra akış** —
+tersi çalışmaz. Sunumdan önce bir soru sor ve düğmenin açıldığını gör.
 
-1. Soruyu yaz: **`search_docs ile durable execution konusunda ne dediğimizi bul`**
-   *(üç ölçülmüş sorudan biri; başkasını seçme — model tool çağırmayabiliyor ve
-   şerit dört aşamada bitiyor)*
-2. Şerit dolarken **renkleri söyle**: turuncu = bizim yazdığımız, mor = `autogen_core`,
-   mavi = `autogen_agentchat`
-3. Üstteki özeti oku: `2 LLM · 1 TOOL · 19775 TOKEN`
-4. **Takım düğmeleri** → aynı soru, dört desen, canlı token farkı
-5. **Onay kapısı** → kod yürütme sorusu, kartı göster, **reddet**, turun çökmediğini göster
-6. **Sağ üst MAF düğmesi** → *"motor değişti"*
-7. Akış ekranını aç → telemetri, iki bant, mekanizma isimleri
+### Durak 1 · Ekranı tanıt — 20 saniye
 
----
+Slayt kapalı değil: sağdaki panelde deste açık duruyor. Bu bilinçli.
+
+> *"Solda ajan, sağda slayt. Ekran değiştirmiyorum — söylediğim her şeyin
+> karşılığı aynı pencerede."*
+
+Göster: sağ üstteki **`AutoGen`** rozeti. *"Şu an hangi çerçevede koştuğumuz
+başlıkta yazıyor. Birazdan buna basacağım."*
+
+### Durak 2 · Soruyu sor — ölçülmüş olanlardan
+
+```
+search_docs ile durable execution konusunda ne dediğimizi bul
+```
+
+**Başka soru seçme.** Model tool çağırıp çağırmayacağına kendisi karar veriyor;
+"docs'ta şunu ara" gibi bir cümle bağlamdan cevaplanabiliyor ve şerit dört
+aşamada bitiyor — anlatacak bir şey kalmıyor. Ölçülmüş üç soru:
+
+```
+search_docs ile durable execution konusunda ne dediğimizi bul
+scan_facts ile son taramanın özetini ver
+docs içinde durable execution ne diyoruz, arama yap
+```
+
+### Durak 3 · Şerit dolarken — 10 aşama, 7,6 saniye
+
+Renkleri **söyle**, çünkü sunumun tamamındaki ayrım ekranda renk olarak duruyor:
+
+> *"Turuncu bizim yazdığımız. Mor `autogen_core`. Mavi `autogen_agentchat`."*
+
+Ölçülen sıra ve zamanlar:
+
+| +sn | şerit | aşama |
+|---:|---|---|
+| 0,00 | turuncu | Bağlam kuruluyor — `CompactingChatCompletionContext` |
+| 0,00 | mor | Model çağrısı |
+| 3,62 | mavi | **Model bir tool istedi** — `ToolCallRequestEvent` |
+| 3,62 | **turuncu** | **Kapı** — `before_tool_call → GatedWorkbench` |
+| 3,62 | mor | Tool koşuyor |
+| 3,88 | mavi | Sonuç döndü · Döngü devam ediyor (`max_tool_iterations=6`) |
+| 3,88 | mor | Model çağrısı — **ikinci kez** |
+| 6,06 | mavi | Token akışı |
+| 7,64 | mavi | Tur bitti |
+
+Duracağın tek yer **dördüncü satır**:
+
+> *"Tool çağrısı modelden çıktı ama henüz çalışmadı. Arada turuncu bir satır var —
+> orası bizim kapımız. Ve bu bir davranış kuralı değil: model 'lütfen' dese de
+> geçemez."*
+
+Ve ikinci model çağrısını göster:
+
+> *"AutoGen'in varsayılanı **bir** tur. Bu satırın var olması için o varsayılanı
+> elle değiştirmemiz gerekti — yazmasaydık ajan tool sonucunu görür ve **susardı**."*
+
+### Durak 4 · Özet satırı
+
+Ekranda: **`2 LLM · 1 TOOL · 8143 TOKEN · 14,6 sn`**
+
+> ⚠️ 19'daki metinde `19775 TOKEN` yazıyor — **o sayı eski**. Ekrandan oku.
+> Ezberlenmiş bir sayıyı ekrandaki başka bir sayının üstüne söylemek, sunumun
+> geri kalanındaki bütün rakamları şüpheli yapar.
+
+### Durak 5 · Akış ekranı — `Akış ↗`
+
+Yeni sekmede açılıyor; ikinci ekran varsa açık kalsın.
+
+Dört şey göster, bu sırayla:
+
+**① İki bant.** Üst bant `AJAN · AgentChat`, alt bant `GATEWAY · bizim hat`.
+> *"Üstte olan şey çerçevenin işi. Altta olan şey bizim işimiz. Bu ayrım
+> sunumun tamamının konusu ve burada çizili."*
+
+**② Kenarların üstündeki mesaj türleri.** Ölçülen dördü:
+`TextMessage` → `ToolCallRequestEvent` → `ToolCallExecutionEvent` → `TaskResult`
+> *"Ok değil, tür. Hangi sınıfın hangi yönde gittiği yazıyor."*
+
+**③ Sekiz desen — ve hepsinin `kullanılmadı` demesi.** Bu şaşırtıcı görünür,
+açıkla:
+> *"Resmî sekiz desenden **hiçbiri** koşmadı, ve ekran bunu her biri için ayrı
+> gerekçeyle söylüyor: 'bu turda tek ajan vardı, dallanma yok.' Bu tur bir tool
+> döngüsü — desen değil. Sistemin kendi hakkında yanlış konuşmamasını istedik."*
+
+**④ Sekiz bileşen.** `AssistantAgent` · `CompactingChatCompletionContext` ·
+`StaticWorkbench` · `McpWorkbench` · `GatedWorkbench` ·
+`OpenAIChatCompletionClient` · `SingleThreadedAgentRuntime` ·
+`PythonCodeExecutionTool + Docker`
+
+### Durak 6 · Takımlar — beş tip, gerçekten koşuyor
+
+`Takım tipi` seçicisi + `Takımla sor`. Kadro: **Planner · Researcher · Critic**.
+
+| id | sırayı kim belirliyor |
+|---|---|
+| `roundrobin` | sırayla |
+| `selector` | model seçer |
+| `swarm` | handoff |
+| `magenticone` | planlayıcı |
+| `graphflow` | DAG |
+
+İkisini koştur — **`selector`** ve **`swarm`** — çünkü ölçülmüş uçlar onlar:
+
+> *"Aynı görev, aynı ajanlar, tek değişen sırayı kimin belirlediği.
+> Selector 204 token, Swarm 334. **%63,7 fark.** Ve ödediğin şey zekâ değil,
+> **yönlendirme özerkliği** — 'kime devredeceğine sen karar ver' dediğinde fatura
+> bu kadar artıyor."*
+
+Sonra bağla: *"Agents SDK'nın tek modeli handoff. Yani AutoGen'in en pahalı
+deseni, başka bir çerçevenin tek seçeneği."*
+
+### Durak 7 · Onay kapısı — ve **reddet**
+
+Kod isteyen bir soru sor (`VC_ALLOW_CODE_EXEC=1` açık, `python:3-slim` yerelde
+hazır [ölçüldü]):
+
+```
+şu üç şirketin skorlarının standart sapmasını hesapla
+```
+
+Onay kartı çıkıyor ve **çalışacak kodun kendisi** görünüyor.
+
+> *"Onay 'kod çalıştırılsın mı' demiyor. **Bu kodu** çalıştırayım mı diyor. İmza
+> kodun üstünde — kod değişirse onay tutmaz."*
+
+**Reddet.** Bu demonun en önemli tıklaması:
+
+> *"Reddettim. Ve dikkat edin — tur çökmedi. Ajan gerekçeyi okudu ve size
+> söyledi. Kapı bir istisna fırlatmıyor, bir **cevap** üretiyor."*
+
+Sonra onayla → sol sütun genişliyor, terminal açılıyor, çıktı düşüyor.
+
+> *"Terminal salt okunur. İçine komut yazılamıyor. Yeni bir yetenek açmıyor, var
+> olanı görünür kılıyor."*
+
+Ve dürüst sınırı **sen** söyle:
+
+> *"Konteyner izole ama **ağ erişimi var**. Yukarı akış bir parametre vermiyor.
+> 'Sandbox güvenli' demiyorum — 'kapı gerçek' diyorum."*
+
+### Durak 8 · MAF düğmesi — perdenin kapanışı
+
+Sağ üstteki rozete bas. `AutoGen` → `MAF`.
+
+> *"Motor değişti. Kodun %72,5'i bunu fark etmedi."*
+
+Tool'suz bir soru sor — MAF kipinde tool çağrılan turlarda `AgentResponse.text`
+boş dönüyor ve cevap mesajlardan geri okunuyor. Çalışıyor ama demoda riske girme.
+
+Akış ekranında MAF'ın **sekiz mekanizması** çiziliyor: `MAF kuruldu` ·
+`Tool tanımlandı` · `Kapı çerçevede` · `Ajan kuruldu` · `Oturum açıldı` ·
+`Ajan koşuyor` · `Onay istendi` · `MAF turu bitti`.
+
+Üçüncüsünde dur:
+
+> *"'Kapı çerçevede.' AutoGen'de kapıyı biz workbench'i sarmalayarak kurduk.
+> MAF'ta bir parametre. Halefin çözdüğü şey tam olarak bu."*
+
+Ve kapsamı **kendin daralt**, biri sormadan:
+
+> *"MAF kipi dar: bir tool, bir onay, bir oturum. İkinci bir boru hattı değil,
+> bir kıyas yüzeyi. 'MAF'ı da yaptık' demiyorum."*
 
 ## §5 · Üç liste: göster / değin / atla
 
