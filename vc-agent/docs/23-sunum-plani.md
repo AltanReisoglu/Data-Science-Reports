@@ -133,21 +133,38 @@ Slayt kapalı değil: sağdaki panelde deste açık duruyor. Bu bilinçli.
 Göster: sağ üstteki **`AutoGen`** rozeti. *"Şu an hangi çerçevede koştuğumuz
 başlıkta yazıyor. Birazdan buna basacağım."*
 
-### Durak 2 · Soruyu sor — ölçülmüş olanlardan
+### Durak 2 · Soruyu sor — **ve önce `Reset chat`**
+
+> ⚠️ **Sunumdan önce `Reset chat`.** Ölçüldü: 15 turluk bir oturumda aynı soru
+> `search_docs`'u **hiç çağırmıyor** — ajan bağlamdan cevaplayıp `memory_search`
+> ile idare ediyor, tur 5,8 saniyede bitiyor ve anlatacak bir şey kalmıyor.
+> Kirli oturum, demoyu sessizce boşaltıyor.
+
+Ve bu belgede daha önce yazılı olan soru **yanlıştı**. Tarayıcıyı gerçekten
+sürüp ölçtüm; üçü de temiz oturumda koştu:
+
+| soru | adım | tool çağrısı | süre |
+|---|---:|---|---:|
+| ~~`search_docs ile durable execution konusunda ne dediğimizi bul`~~ | **39** | `search_docs` ×3 + `memory_search` ×2 + `memory_get` | 33,1 sn |
+| **`dokümanlarda workbench nedir, docs araması yap`** | **10** | `search_docs` ×1 | 17,6 sn |
+| `search_docs tool'unu kullanarak dokümanlarda GraphFlow'u ara` | **10** | `search_docs` ×1 | 16,1 sn |
+
+Eski soru **otuz dokuz adım** üretiyor. Bu belgenin Durak 3'te anlattığı on
+aşamalık şerit onunla hiç çıkmıyor: ekranda altı tool çağrısı akıyor, sen on
+aşama anlatıyorsun, ve dinleyici hangisinin doğru olduğunu bilmiyor.
+
+**Kullan:**
 
 ```
-search_docs ile durable execution konusunda ne dediğimizi bul
+dokümanlarda workbench nedir, docs araması yap
 ```
 
-**Başka soru seçme.** Model tool çağırıp çağırmayacağına kendisi karar veriyor;
-"docs'ta şunu ara" gibi bir cümle bağlamdan cevaplanabiliyor ve şerit dört
-aşamada bitiyor — anlatacak bir şey kalmıyor. Ölçülmüş üç soru:
+Tam on adım, tek `search_docs`, ~17 saniye. Yedek:
+`search_docs tool'unu kullanarak dokümanlarda GraphFlow'u ara`.
 
-```
-search_docs ile durable execution konusunda ne dediğimizi bul
-scan_facts ile son taramanın özetini ver
-docs içinde durable execution ne diyoruz, arama yap
-```
+**Neden soru seçimi bu kadar önemli:** model tool çağırıp çağırmayacağına
+kendisi karar veriyor. "ne dediğimizi bul" cümlesi ona *hafıza* gibi
+okunuyor ve `memory_search`'e uzanıyor — tool adını cümlede yazmış olsan bile.
 
 ### Durak 3 · Şerit dolarken — 10 aşama, 7,6 saniye
 
@@ -189,6 +206,21 @@ Ekranda: **`2 LLM · 1 TOOL · 8143 TOKEN · 14,6 sn`**
 > geri kalanındaki bütün rakamları şüpheli yapar.
 
 ### Durak 5 · Akış ekranı — `Akış ↗`
+
+*Aşağıdakiler tarayıcı gerçekten sürülerek ölçüldü —
+[`pipeline/tests/drive/`](../pipeline/tests/drive/README.md).*
+
+**Zincir adım adım doluyor** ve bu izlenecek bir şey; sayfayı açar açmaz anlat:
+
+| an | ekranda |
+|---|---|
+| +0,4 sn | 4 kutu sönük, **1 yanıyor** |
+| +0,8 sn | bir **ok** yanıyor — mesaj geçiyor |
+| +4,8 sn | hepsi parlak, **ışık sönmüş** |
+
+> *"Işık sönerse tur bitmiştir. Yanan kutu 'şu an burada' demek — bitmiş bir
+> koşuda bir şeyin hâlâ yanıyor olması, ekranın zamanı yanlış söylemesi olurdu."*
+
 
 Yeni sekmede açılıyor; ikinci ekran varsa açık kalsın.
 
