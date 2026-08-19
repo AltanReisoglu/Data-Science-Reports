@@ -5,6 +5,23 @@ Koşturulmayan tek satır yok; bir şey denenmediyse öyle yazıyor.*
 
 ---
 
+## §0a · Nereye yazılıyor — bu doküman bunu atlıyordu
+
+**Hepsi aynı kutuya**: alttaki `Ask about this scan…`. Değişen tek şey düğme.
+
+| ne | düğme | ek adım |
+|---|---|---|
+| Normal soru | **Ask** | — |
+| `/openclaw …` satırı | **Ask** | yok — uygulama öneki görüp modeli atlıyor |
+| Takım | **`Takımla sor`** | önce sol raydaki listeden tip seç |
+| Kod isteyen soru | **Ask** | çıkan karttaki `Approve and retry` |
+
+> ⚠️ Takımda **`Ask` değil `Takımla sor`.** `Ask`'a basarsan tek ajan koşar,
+> takım hiç kurulmaz ve ekranda beş takım tipinin farkı görünmez. Prova
+> ederken en sık yapılan hata bu.
+
+---
+
 ## §0 · Her seferinde önce bu
 
 ```
@@ -143,7 +160,7 @@ tutuyor).
 `/steer` yön veriyor, `/btw` bağlamı kirletmeden soruyor. AutoGen'de bir turun
 içine girmenin hiçbir yolu yok."*
 
-### Kapının tuttuğu — güven modelinin kanıtı
+### Kapının tuttuğu — güven modelinin kanıtı, ve **finali sona sakla**
 
 ```
 /openclaw list
@@ -152,6 +169,9 @@ içine girmenin hiçbir yolu yok."*
 > *"Bu satır OpenClaw'ın kendi ajanına gidiyor. O ajanın kabuk erişimi var ve
 > şu an onay sormadan çalıştırıyor (**exec: mode=full, ask=off**); bizim kapımız
 > içeride ne yapacağını görmez."*
+
+**Burada onaylama.** Tutulmuş hâlde bırak — anlatmak istediğin şey tam olarak
+kapının tutmuş olması. Onaylarsan gösterdiğin şeyi geri almış olursun.
 
 **Bu, sunumun en iyi 20 saniyesi.** "OpenClaw'ın güven modeli bizim kurumumuz
 için yanlış" cümlesini biz kurmuyoruz — sistem kendi kuruyor, gerekçesiyle.
