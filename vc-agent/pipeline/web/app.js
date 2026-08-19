@@ -172,7 +172,13 @@
         // Leaving it as hover text meant the only way to act on it was curl.
         var refusal = parseRefusal(event.preview);
         if (refusal) {
-          askApproval(refusal, function () { streamAsk(question); });
+          askApproval(refusal, function () { streamAsk(question); }, function (ran) {
+            // Not a retry: the code already ran. This carries its output back so
+            // the agent can answer with it rather than recomputing.
+            streamAsk('Onayladığım kod konteynerde çalıştı. Çıktısı:\n\n' +
+                      ran.output + '\n\nBuna göre cevabı yaz. Kodu tekrar ' +
+                      'çalıştırma, sayıları da yeniden hesaplama.');
+          });
         }
       } else if (event.type === 'done') {
         if (!text.textContent && event.text) { text.textContent = event.text; }
@@ -209,7 +215,7 @@
      are held by the same gate now and they do not go back through `streamAsk`,
      so what the approval has to remember is *how to try again* — not *what was
      asked*. */
-  function askApproval(refusal, retry) {
+  function askApproval(refusal, retry, onRan) {
     addTurn('bot', { title: 'Approval needed', path: 'gate' }, function (bubble) {
       bubble.appendChild(el('div', 'approval__why', refusal.reason));
 
@@ -236,7 +242,26 @@
           body: JSON.stringify({ note: 'from the chat' })
         }).then(function (response) {
           if (!response.ok) { throw new Error('HTTP ' + response.status); }
+          return response.json().catch(function () { return {}; });
+        }).then(function (data) {
           status.textContent = verb === 'approve' ? 'approved' : 'denied';
+          // Code is not retried, it is *replayed*: the server ran the exact text
+          // that was on the card. Asking the model again would produce a
+          // different program — measured — and then the thing approved would not
+          // be the thing that ran.
+          if (verb === 'approve' && data && data.ran) {
+            status.textContent = 'onaylandı · konteynerde koştu';
+            mech.term.code(data.ran.code);
+            mech.term.result({ output: data.ran.output,
+                               is_error: !data.ran.ok,
+                               seconds: data.ran.seconds });
+            // The container answered the person; it has not answered the agent.
+            // The gate's refusal ended that turn, so the model never saw the
+            // result and the thread was left holding a promise it could not
+            // keep. Handing the output back as a new turn is what closes it.
+            if (typeof onRan === 'function') { onRan(data.ran); }
+            return;
+          }
           // The grant covers exactly this call and is consumed by it, so the
           // work has to be attempted again for it to run.
           if (verb === 'approve' && typeof retry === 'function') {
@@ -365,6 +390,71 @@
        Deliberately terse: elapsed, lane, what, and whatever one number the
        stage carried. A log that needs to be read slowly does not get read. */
     var traceHost = document.getElementById('mech-trace');
+
+    // ---------------------------------------------------------- terminal
+    //
+    // Read-only: it shows what the model ran and what came back. There is no
+    // input, and that is the whole security story — the panel makes an existing
+    // capability visible, it does not add one.
+    var termHost = document.getElementById('term');
+    var termBody = document.getElementById('term-body');
+    var termMeta = document.getElementById('term-meta');
+
+    function termLine(text, cls) {
+      if (!termBody) { return; }
+      // Measured before appending: adding the line changes scrollHeight, so a
+      // check made afterwards would always say "not at the bottom". Same bug,
+      // same fix as the trace strip — someone scrolled up is reading on purpose.
+      var atBottom = termBody.scrollHeight - termBody.scrollTop
+                     - termBody.clientHeight < 4;
+      var row = el('div', cls || null, text);
+      termBody.appendChild(row);
+      while (termBody.children.length > 400) {
+        termBody.removeChild(termBody.firstChild);
+      }
+      if (atBottom) { termBody.scrollTop = termBody.scrollHeight; }
+    }
+
+    function termOpen() {
+      if (!termHost) { return; }
+      termHost.hidden = false;
+      document.body.classList.add('term-open');
+    }
+
+    function termClose() {
+      if (!termHost) { return; }
+      termHost.hidden = true;
+      document.body.classList.remove('term-open');
+    }
+
+    function termCode(code) {
+      termOpen();
+      if (termMeta) { termMeta.textContent = 'çalışıyor…'; }
+      termLine('$ python /workspace/tmp.py', 't-cmd');
+      String(code || '').split('\n').forEach(function (line) {
+        termLine('  ' + line, 't-dim');
+      });
+    }
+
+    function termResult(meta) {
+      termOpen();
+      var ok = !meta.is_error;
+      if (termMeta) {
+        termMeta.textContent = (ok ? 'exit 0' : 'hata') +
+          (meta.seconds != null ? ' · ' + meta.seconds + ' sn' : '');
+      }
+      String(meta.output == null ? '' : meta.output)
+        .split('\n').forEach(function (line) {
+          termLine(line, ok ? null : 't-err');
+        });
+      termLine('── ' + (ok ? 'bitti' : 'hata ile bitti') +
+               (meta.seconds != null ? ' · ' + meta.seconds + ' sn' : '') + ' ──',
+               't-dim');
+    }
+
+    if (document.getElementById('term-close')) {
+      document.getElementById('term-close').addEventListener('click', termClose);
+    }
     var traceT0 = 0;
     var TRACE_CAP = 60;
 
@@ -400,6 +490,13 @@
           return m.blocked ? ('RET · ' + (m.reason || '')) : ((m.tool || '') + ' · izin');
         case 'tool_exec':
           return (m.tool || '') + (m.kind ? ' · ' + m.kind : '');
+        case 'code_request':
+          // The code itself goes to the terminal; the strip gets its size, so a
+          // twenty-line program does not push the trace off the panel.
+          return String(m.code || '').split('\n').length + ' satır';
+        case 'code_result':
+          return (m.is_error ? 'hata' : 'exit 0') +
+                 (m.seconds != null ? ' · ' + m.seconds + ' sn' : '');
         case 'loop':
           return m.limit ? ('tavan ' + m.limit) : '';
         case 'done':
@@ -430,6 +527,11 @@
       var prev = traceHost.querySelector('li.is-live');
       if (prev) { prev.classList.remove('is-live'); }
 
+      // Measured before appending: adding the row changes scrollHeight, so a
+      // check made afterwards would always say "not at the bottom".
+      var atBottom = traceHost.scrollHeight - traceHost.scrollTop
+                     - traceHost.clientHeight < 4;
+
       var lane = LANE_LABEL[event.lane] || event.lane || '';
       var row = el('li', 'is-live' + (meta.blocked ? ' is-block' : ''));
       row.appendChild(el('span', 't-at', '+' + ((now - traceT0) / 1000).toFixed(2) + 's'));
@@ -443,7 +545,11 @@
       while (traceHost.children.length > TRACE_CAP) {
         traceHost.removeChild(traceHost.firstChild);
       }
-      traceHost.scrollTop = traceHost.scrollHeight;
+      // Follow the newest row only when the reader is already at the bottom.
+      // Someone scrolled up is reading an earlier stage on purpose — during a
+      // demo, narrating the trace from the top — and yanking them back down
+      // makes the strip unusable for exactly that.
+      if (atBottom) { traceHost.scrollTop = traceHost.scrollHeight; }
     }
     var collapsed = localStorage.getItem('mech-collapsed') === '1';
 
@@ -933,6 +1039,9 @@
 
     return {
       cron: loadCron,
+      // The terminal lives inside this closure with the rest of the panel, but
+      // the approval card is outside it and needs to replay a run into it.
+      term: { code: termCode, result: termResult, close: termClose },
       enable: function () {
         loadCron();
         if (Object.keys(catalogue).length) {
@@ -999,6 +1108,10 @@
         draw();
         say(event.id, meta);
         traceAdd(event, meta);
+        // The terminal is fed by the two code stages and nothing else, so it
+        // stays empty for every turn that did not run code.
+        if (event.id === 'code_request') { termCode(meta.code); }
+        else if (event.id === 'code_result') { termResult(meta); }
         if (finished) {
           setTimeout(function () { if (!active) { idleLoop(); } }, 8000);
         } else {
@@ -1054,6 +1167,23 @@
       pending.appendChild(head);
 
       var body = data.ok ? data.result : (data.error || 'no answer');
+      // A frame is the one result worth showing rather than printing. The server
+      // hands back an id and a URL; the id is what it is addressed by, and the
+      // path never comes from anything typed here.
+      if (data.ok && body && body.url && /^\/api\/shot\/[0-9a-f]{32}$/.test(body.url)) {
+        var shot = el('img', 'shot');
+        shot.src = body.url;
+        shot.alt = 'kamera karesi';
+        shot.loading = 'lazy';
+        pending.appendChild(shot);
+        var by = el('div', 'approval__note',
+          body.by === 'local'
+            ? 'kare yerel ffmpeg ile alındı — OpenClaw üretmedi'
+            : 'kareyi OpenClaw çekti');
+        pending.appendChild(by);
+        if (data.note) { pending.appendChild(el('div', 'approval__note', data.note)); }
+        return;
+      }
       if (data.tier === 'chat' && typeof body === 'string') {
         // An answer from OpenClaw's agent is prose. Putting it in the raw box
         // would make a sentence scroll sideways for no reason — the raw box is a

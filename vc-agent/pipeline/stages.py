@@ -119,11 +119,37 @@ CATALOGUE: dict[str, Mechanism] = {
             "Sonuç bağlama giriyor ve döngü modele geri dönüyor.",
             "pipeline/conversation.py",
         ),
+        # ---- kod yürütme: resmî sekiz desenin sonuncusu -----------------------
+        #
+        # Bu ikisi `tool_request`/`tool_result`'ın özel hâli, ve ayrı olmalarının
+        # sebebi terminal: panel kodu ve çıktısını gösterebilmek için ham metne
+        # ihtiyaç duyuyor, ve o metin normal tool meta'sına sığmıyor.
+        Mechanism(
+            "code_request", OURS, "Kod yazıldı",
+            "CodeExecutor(code=…) → onay kapısı", "05:3054",
+            "Model, uygun bir tool bulamadığı için kod yazdı. Çalışmadan önce "
+            "kapıya takılıyor: adı hiçbir outbound markerına uymadığı için "
+            "kanca onu adına göre değil, ne olduğuna göre yakalıyor.",
+            "pipeline/codeexec.py",
+        ),
+        Mechanism(
+            "code_result", CORE, "Konteyner cevapladı",
+            "DockerCommandLineCodeExecutor.execute_code_blocks()", "05:3054",
+            "Her blok bir dosyaya yazılıp ayrı süreçte koştu. Çıktı koşu bitince "
+            "tek parça dönüyor — akış hâlinde değil, ve panel öyleymiş gibi "
+            "göstermiyor.",
+            "pipeline/codeexec.py",
+        ),
         Mechanism(
             "loop", AGENTCHAT, "Döngü devam ediyor",
             "max_tool_iterations=6", "08:2298",
-            "Varsayılan 1'dir: ajan bir tool çağırır, sonucu görür ve susar. "
-            "Zincirleme davranış için bu değer elle yükseltildi.",
+            # Ölçüldü (2026-08-18): varsayılanda ikinci tool hiç çağrılmıyor ve
+            # kullanıcıya ham tool çıktısı gidiyor (ToolCallSummaryMessage) —
+            # model sonucu okuyup cevabı yazmıyor. Zincirlemeyi açan
+            # `max_tool_iterations`, modelin cevabı yazmasını açan ayrı bir
+            # anahtar: `reflect_on_tool_use`.
+            "Varsayılan 1'dir: zincir bir adım sonra durur ve kullanıcıya ham "
+            "tool çıktısı gider. Bu değer zincirleme için elle yükseltildi.",
             "pipeline/conversation.py",
         ),
         Mechanism(

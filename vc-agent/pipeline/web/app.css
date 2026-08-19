@@ -330,7 +330,11 @@ body.has-mech.mech-collapsed .turn { scroll-margin-bottom: 6rem; }
   border-top: 1px solid var(--hairline);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.66rem; line-height: 1.55;
-  max-height: 8.4rem; overflow-y: auto; overscroll-behavior: contain;
+  /* Tool kullanan bir tur on satır üretiyor (ölçüldü: context → model →
+     tool_request → gate → tool_exec → tool_result → loop → model → stream
+     → done). 8.4rem yalnız sekizini gösteriyordu, yani sunumda anlatmaya
+     baştan başlamak isteyen biri ilk iki satırı bulamıyordu. */
+  max-height: 13rem; overflow-y: auto; overscroll-behavior: contain;
 }
 .mech__trace li {
   display: grid; grid-template-columns: 3.4rem 4.8rem 1fr auto;
@@ -364,3 +368,11 @@ body.has-mech.mech-collapsed .turn { scroll-margin-bottom: 6rem; }
 .mech__cron .cron-when { color: var(--ink-2); }
 .mech__cron .cron-warn { color: #e8590c; margin-top: 0.3rem; white-space: normal; }
 .mech__cron .cron-off  { color: #c92a2a; }
+
+/* Kamera karesi. Genişliği baloncuk belirliyor, yüksekliği oran —
+   sabit yükseklik vermek 4:3 bir kareyi ezerdi. */
+.shot{
+  display:block; width:100%; max-width:420px; height:auto;
+  margin:.4rem 0 .3rem; border-radius:3px;
+  border:1px solid var(--hairline);
+}

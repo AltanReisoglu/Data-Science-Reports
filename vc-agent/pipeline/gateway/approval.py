@@ -68,6 +68,14 @@ class Request:
     # Kept in memory only, so the operator can see what they are approving. It is
     # never written to the audit ledger — that stores metadata (`policy.py`).
     preview: dict[str, Any] = field(default_factory=dict)
+    # The *whole* argument set, unclipped. `preview` is for reading and is cut at
+    # 400 characters; this is for **replay**, and a truncated program is not a
+    # program. Measured why it is needed: the gate refuses a call and the agent
+    # moves on, so approving only marks a digest as granted — and the model does
+    # not rewrite byte-identical code on the next attempt (two runs of the same
+    # question produced two different digests). Without the arguments kept here,
+    # what the operator approved could never be the thing that ran.
+    payload: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -157,6 +165,7 @@ class ApprovalGate:
             session=session,
             requested_at=_now(),
             preview={k: _clip(v) for k, v in args.items()},
+            payload=dict(args),
         )
         self._requests[request.id] = request
         return request

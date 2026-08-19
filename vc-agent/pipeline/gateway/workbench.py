@@ -42,11 +42,17 @@ not an enforcement point.
 
 from __future__ import annotations
 
+import time
 from typing import Any, Callable, Mapping, Sequence
 
 from autogen_core.tools import TextResultContent, ToolResult, Workbench
 
 from . import hooks as hooks_module
+
+# The one tool whose result is worth showing rather than printing. Kept as a
+# literal rather than imported from `codeexec` so this module stays importable
+# without the docker extra installed.
+_CODE_TOOL = "CodeExecutor"
 
 
 class GatedWorkbench(Workbench):
@@ -158,9 +164,25 @@ class GatedWorkbench(Workbench):
 
         self._stage("gate", tool=name, blocked=False, workbench=self._label,
                     hooks=len(decision.ran))
+
+        # Code execution gets its own two stages on top of the generic pair. The
+        # terminal panel needs the source and the output as *text*, and neither
+        # fits in the metadata a normal tool call carries.
+        is_code = name == _CODE_TOOL
+        if is_code:
+            self._stage("code_request", tool=name,
+                        code=str((arguments or {}).get("code", "")))
+
         self._stage("tool_exec", tool=name, workbench=self._label,
                     kind=type(self._inner).__name__)
+        started = time.monotonic()
         result = await self._inner.call_tool(name, arguments, cancellation_token, call_id)
+
+        if is_code:
+            self._stage("code_result", tool=name,
+                        output=result.to_text()[:8000],
+                        is_error=result.is_error,
+                        seconds=round(time.monotonic() - started, 2))
 
         after = await self._registry.run(
             hooks_module.AFTER_TOOL_CALL,

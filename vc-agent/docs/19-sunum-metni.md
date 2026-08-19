@@ -138,16 +138,35 @@ o satır."**
 
 **"Bu destede tek bir şey hatırlayacaksanız bu olsun."**
 
-**"Model bir tool çağırıyor, tool koşuyor, sonuç dönüyor. Ve varsayılan ayarda
-tur tam orada bitiyor. Yani model, tool'un bulduğu sonucu hiç görmüyor."**
+**"Model tool'u çağırıyor, tool koşuyor, sonuç dönüyor. Ve varsayılan ayarda tur
+tam orada bitiyor. Modele giden ikinci bir tur yok — dolayısıyla cevabı da model
+yazmıyor. Kullanıcıya ham tool çıktısı gidiyor."**
 
-**"Kullanıcıya giden cevap, tool hiç çağrılmamış gibi yazılmış oluyor. Ve hiçbir
-hata çıkmıyor. Loga bakarsınız: tool çağrılmış, sonuç dönmüş, her şey yolunda
-görünüyor. Ama cevap yanlış."**
+Yönerge: burada ölçümü anlat, ikna edici olan o.
 
-**"Eksik olan çağrı değil, ikinci model turu."**
+**"Ölçtük. İki adımlı basit bir iş kurduk: bir tool şirketin id'sini buluyor,
+ikinci tool o id ile çalışan sayısını getiriyor. Soru şuydu — Kuantum AI'nın
+çalışan sayısı kaç?"**
+
+**"Dönen cevap şu oldu: süslü parantez, tırnak içinde id, KA-9931. Yani birinci
+tool'un ham çıktısı. Çalışan sayısı hiç sorulmadı."**
+
+Duraklama.
+
+**"İkinci tool hiç çağrılmadı. Ve bunu söyleyen hiçbir şey yok: log'da tek bir
+başarılı tool çağrısı var, hata yok, uyarı yok. Sessiz olan ham çıktı değil,
+duran zincir."**
+
+**"Bir de karıştırılan bir şey var. Burada iki ayrı anahtar iş görüyor.
+`max_tool_iterations` — varsayılanı bir — zincirlemeyi açıyor.
+`reflect_on_tool_use` — varsayılanı kapalı — modelin sonucu okuyup cevabı
+yazmasını. Farklı şeyler, ve ikisi de açıkça yazılmalı."**
 
 Yönerge: burada bir soru gelirse iyi işaret — izleyici gerçekten dinliyor.
+"Neden ikisi de kapalı" derlerse: `reflect_on_tool_use`, `output_content_type`
+verildiğinde kendiliğinden açılıyor. Yani yapılandırılmış çıktı isteyip
+istememen davranışı değiştiriyor.
+
 
 ### [S10] Beş takım ve [S15] cache sınırı — maliyetin nereden geldiği
 
@@ -485,6 +504,119 @@ Onayla, aynı satırı tekrar gönder. İş gerçekten kuruluyor —
 **"Ve onay tüketildi. Aynı satırı şimdi bir daha gönderirsem yeniden soracak,
 çünkü onaylanan şey 'bu tool' değil, 'bu tool bu argümanlarla, bir kez'."**
 
+### Akışı canlı anlatmak — 10 aşama, 2 dakika
+
+Yönerge: bu, demonun ② numaralı perdesinin uzun hâli. Soruyu yazıyorsun, şerit
+dolarken **sırayla anlatıyorsun**. Aşağıdaki on aşama ölçüldü — 18 Ağustos'ta bu
+makinede, bu sırayla çıktı.
+
+**Soruyu ölçülmüş olanlardan seç.** Model tool çağırıp çağırmayacağına kendisi
+karar veriyor, ve "docs'ta şunu ara" gibi bir cümle bazen bağlamdan
+cevaplanıyor — o zaman şerit dört aşamada bitiyor ve anlatacak bir şey kalmıyor.
+Üçü de tool yolunu tetikledi:
+
+```
+search_docs ile durable execution konusunda ne dediğimizi bul
+scan_facts ile son taramanın özetini ver
+docs içinde durable execution ne diyoruz, arama yap
+```
+
+Şeritte üç etiket var ve anlatının omurgası bu: **GATEWAY** (turuncu) bizim
+yazdığımız, **CORE** (mor) `autogen_core`, **AGENTCHAT** (mavi)
+`autogen_agentchat`. Sunumun tamamında söylediğin ayrım ekranda renk olarak
+duruyor — ve şeridin üstünde `2 LLM · 1 TOOL · 19775 TOKEN` özeti var.
+
+---
+
+**1 · `context` — GATEWAY (bizim)** · `CompactingChatCompletionContext.get_messages()`
+
+**"İlk satır bizim. Model çağrılmadan önce, modele ne gideceğine karar
+veriliyor. AutoGen'in hazır sınıfı mesaj sayar; bu bizim token sayan hâlimiz,
+çünkü on kısa mesajla iki uzun mesaj aynı şey değil."**
+
+Ekranda yazan meta: `tools: 16 · budget: 12000 · workbenches: [StaticWorkbench,
+McpWorkbench, McpWorkbench]`.
+
+**"Şuraya dikkat: üç workbench var. Biri yerel Python fonksiyonları, ikisi uzak
+MCP sunucuları. Ajan üçünü de aynı arayüzün arkasından görüyor."**
+
+**2 · `model` — core** · `model_client.create_stream()`
+
+**"Model çağrısı. `create` değil `create_stream` — ve bu masum bir tercih
+değil: akış kullanınca AutoGen `LLMCallEvent` değil `LLMStreamEndEvent`
+yayıyor. Maliyeti yalnız birincisini dinleyerek sayan bir ölçüm sıfır görür."**
+
+**3 · `tool_request` — agentchat** · `ToolCallRequestEvent`
+
+**"Model bir tool istedi: `search_docs`. Şunu vurgulamak istiyorum — modelin bu
+tool'u seçmesinin tek sebebi docstring'i. Şema fonksiyon imzasından ve
+docstring'den üretiliyor. Yani docstring dokümantasyon değil, arayüz."**
+
+**4 · `gate` — GATEWAY (bizim)** · `before_tool_call → GatedWorkbench`
+
+Yönerge: burada dur. Bu satır sunumun tezi.
+
+**"Ve işte kapı. Bu satır bizim; AutoGen'de karşılığı yok. Her tool çağrısı
+buradan geçiyor — yerel fonksiyon da, uzak MCP tool'u da."**
+
+Ekranda: `blocked: false · hooks: 2`.
+
+**"İki kanca çalıştı ve ikisi de geçirdi. Biri engelleseydi burada `blocked:
+true` yazacaktı, ve ajana gerekçesiyle birlikte bir ret dönecekti — istisna
+değil, okunabilir bir ret. Ajan o gerekçeyi kullanıcıya söyleyebilsin diye."**
+
+**"Ve kritik olan şu: kapı ajanın uyum göstermeyi seçmesine dayanmıyor. Hattın
+kendisine dayanıyor. Model isteyebilir; geçip geçmeyeceğine model karar
+vermiyor."**
+
+**5 · `tool_exec` — core** · `workbench.call_tool()`
+
+**"Tool şimdi koşuyor. Hangi workbench'te olduğu yazıyor:
+`StaticWorkbench` — yani yerel bir Python fonksiyonu. Uzak bir MCP tool'u
+olsaydı burada `McpWorkbench` yazacaktı ve geri kalan her şey aynı kalacaktı."**
+
+**6 · `tool_result` — agentchat** · `ToolCallExecutionEvent`
+
+**"Sonuç döndü ve bağlama girdi. Şimdi döngü modele geri dönüyor."**
+
+**7 · `loop` — agentchat** · `max_tool_iterations=6`
+
+Yönerge: `[S9]`'da anlattığın tuzağın ekrandaki kanıtı bu satır.
+
+**"Bu satır az önce anlattığım tuzağın tam karşılığı. Burada altı yazıyor,
+çünkü biz elle yükselttik. Varsayılan bir olsaydı bu satır hiç olmayacaktı:
+zincir burada duracak, ve kullanıcıya modelin yazdığı bir cevap değil, tool'un
+ham çıktısı gidecekti."**
+
+**8 · `model` — core** · ikinci model çağrısı
+
+**"İkinci model çağrısı. Model şimdi tool'un bulduğunu görüyor ve cevabı buna
+göre yazıyor. Birinci turda göremediği şeyi ikinci turda görüyor."**
+
+**9 · `stream` — agentchat** · `ModelClientStreamingChunkEvent`
+
+**"Cevap token token geliyor. `model_client_stream` kapalı olsaydı cevap tek
+parça hâlinde, model tamamen bitirdikten sonra düşecekti."**
+
+**10 · `done` — agentchat** · `TaskResult.stop_reason`
+
+**"Ve tur bitti. `TaskResult` iki şey taşıyor: bütün konuşma, ve neden
+durduğu."**
+
+Ekranda ölçülen: `llm_calls: 2 · tool_calls: 1 · tokens: 16792`.
+
+**"İki model çağrısı, bir tool çağrısı, on altı bin yedi yüz doksan iki token.
+Bu sayı ekranda çünkü biz sayıyoruz — ve az önce gösterdiğim yüzde 63,7'lik
+desen farkı, tam olarak bu sayacın ürettiği bir ölçüm."**
+
+---
+
+**Kapanış cümlesi** — şerit dolduktan sonra, ekranı göstererek:
+
+**"On satır. İkisi GATEWAY — bizim. Üçü CORE, beşi AGENTCHAT. Bütün
+sunum boyunca anlattığım ayrım burada duruyor: motor onların, kuşatma bizim. Ve
+dördüncü satır — kapı — AutoGen'de olmayan tek şey."**
+
 ### Demo çökerse
 
 Yönerge: hiçbirini gizleme, üçünün de dürüst bir cümlesi var.
@@ -498,7 +630,8 @@ Yönerge: hiçbirini gizleme, üçünün de dürüst bir cümlesi var.
 **Demo öncesi kontrol** — sunumdan 10 dakika önce, tek tek:
 
 - [ ] `curl -s localhost:8000/api/health` → `"ok":true` ve `"live_llm":true`
-- [ ] Bir soru sor, şeritte dört satır çıkıyor mu
+- [ ] Bir soru sor, şeritte **on satır** çıkıyor mu (tool'lu tur) — dördü
+      çıkıyorsa model tool'a hiç gitmemiştir, soruyu ölçülmüş olanlardan seç
 - [ ] `openclaw gateway status` → servis ayakta
 - [ ] `/openclaw schedule` → mevcut işleri listeliyor
 - [ ] **Test artıklarını sil.** Önceki denemelerden kalan işler OpenClaw'ın

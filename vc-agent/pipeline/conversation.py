@@ -50,6 +50,7 @@ import asyncio
 import json
 from typing import Any, AsyncIterator
 
+import codeexec as codeexec_module
 import config
 import engine
 import observability
@@ -95,6 +96,21 @@ Rules that override everything else:
 - If a tool call is refused, tell the person what you wanted to do and why it was
   refused. Do not retry it.
 - Be brief. No preamble.
+
+Writing code (only when `CodeExecutor` is among your tools):
+- **If the person asks for code, call it.** "Write code", "kod yaz", "compute
+  this with code" is an instruction, not a preference — do not answer it by
+  doing the arithmetic in your head and showing the steps. That is refusing the
+  request while appearing to serve it.
+- Otherwise it is a **last resort, not a shortcut**. Check the tool list first.
+  If a tool answers the question, call it — a number you computed yourself is
+  worth less than one the pipeline recorded, because nobody can trace where it
+  came from.
+- Unasked, reach for code only when nothing fits: an arithmetic result, a
+  conversion, a parse, a statistic over values you already obtained from tools.
+- The person approves your code before it runs and sees it in full. Write it to
+  run once and to be read: no scratch loops, no exploratory prints.
+- If it is refused, say what you were going to compute. Do not rewrite and retry.
 
 Current scan: {scan_line}{memory}{channels}"""
 
@@ -189,6 +205,15 @@ class Conversation:
             FunctionTool(fn, description=(fn.__doc__ or "").strip().split("\n")[0])
             for fn in tools_module.build(self._sources)
         ]
+        # Code execution joins the *same* StaticWorkbench as the local functions,
+        # which is the whole point: it reaches the agent through the gated
+        # workbench like everything else, with no separate path to audit.
+        # `build_tool()` returns None when the feature is off or Docker is
+        # missing, and then the tool is never listed at all.
+        code_tool = codeexec_module.build_tool()
+        if code_tool is not None:
+            local.append(code_tool)
+
         # `tools=` and `workbench=` are mutually exclusive, so local functions go
         # in through a StaticWorkbench and the remote sources join them.
         raw: list[Any] = [StaticWorkbench(local)]
@@ -349,8 +374,13 @@ class Conversation:
                                    "arguments": str(call.arguments)[:200]}
                     elif kind == "ToolCallExecutionEvent":
                         for result in event.content:
+                            # 180 was enough while a refusal was a tooltip. It is
+                            # not enough now: the approval id is appended to the
+                            # *end* of the reason, so a long reason pushed it past
+                            # the clip and the card lost its button. Measured: the
+                            # code-exec refusal is 242 characters.
                             yield {"type": "tool_result", "name": result.name,
-                                   "preview": str(result.content)[:180]}
+                                   "preview": str(result.content)[:600]}
                         # A tool result means the loop is going back to the model
                         # — the behaviour `max_tool_iterations=1` would have made
                         # impossible.
@@ -501,6 +531,9 @@ class ConversationRegistry:
         import openclaw_control
 
         openclaw_control.install_gate(hooks_module.REGISTRY)
+        # Same reason, different tool: `CodeExecutor` matches no outbound marker
+        # either, and what it is about to run lives in its argument.
+        codeexec_module.install_gate(hooks_module.REGISTRY)
 
     def route(self, channel: str = "web", **kwargs) -> sessions_module.SessionRecord:
         return self.sessions.route(channel, **kwargs)

@@ -670,7 +670,15 @@ body {
   display: grid;
   grid-template-columns: 15.5rem 1fr;
   grid-template-rows: 1fr auto;
+  transition: grid-template-columns 180ms ease;
 }
+
+/* The rail is 15.5rem, which is right for stats and wrong for code: at that
+   width a line of Python breaks around thirty characters and stops being
+   readable at all. So the rail widens while the terminal has something to show
+   and goes back when it does not — the terminal keeps the place it was asked
+   for without the rest of the session paying for it. */
+body.term-open .app { grid-template-columns: 28rem 1fr; }
 
 .chrome {
   grid-column: 1; grid-row: 1 / -1;
@@ -697,6 +705,45 @@ body {
 }
 .chrome__meta { font-size: 0.75rem; color: var(--ink-2); }
 .chrome__foot { margin-top: auto; font-size: 0.6875rem; color: var(--ink-muted); }
+
+/* ------------------------------------------------------------- terminal */
+/* `margin-top: auto` moves from the foot to the terminal while it is open, so
+   the console sits at the bottom of the rail and the theme toggle stays under
+   it rather than being pushed off. */
+.term {
+  margin-top: auto; display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--hairline); border-radius: 4px;
+  background: var(--surface); overflow: hidden;
+}
+/* `display: flex` above beats the browser's own `[hidden] { display: none }`,
+   so without this line the panel is on screen from the first paint — empty, and
+   with the rail still at its narrow width because `term-open` was never added.
+   Measured: computed display stayed `flex` while `.hidden` read `true`. */
+.term[hidden] { display: none; }
+body.term-open .chrome__foot { margin-top: 0; }
+.term__head {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--hairline);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem;
+}
+.term__title { font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.term__meta { color: var(--ink-muted); margin-left: auto; }
+.term__close {
+  border: 0; background: none; color: var(--ink-muted); cursor: pointer;
+  font-size: 0.9rem; line-height: 1; padding: 0 0.15rem;
+}
+.term__close:hover { color: var(--ink); }
+.term__body {
+  margin: 0; padding: 0.45rem 0.55rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 22rem; overflow: auto; overscroll-behavior: contain;
+  color: var(--ink-2);
+}
+.term__body .t-cmd { color: var(--ink); font-weight: 600; }
+.term__body .t-err { color: #c92a2a; }
+.term__body .t-dim { color: var(--ink-muted); }
 
 /* ---------------------------------------------------------------- thread */
 .thread {
@@ -911,6 +958,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 @media (max-width: 56rem) {
   /* Below this the rail costs more room than it earns, so it folds back to a bar. */
   .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  /* `body.term-open .app` outranks the line above on specificity, so without
+     this the terminal would force a 28rem column onto a phone. Repeat it here
+     rather than weakening the desktop rule. */
+  body.term-open .app { grid-template-columns: 1fr; }
+  /* The rail is a horizontal bar down here; the terminal drops below it as a
+     full-width block instead of trying to sit inside a row. */
+  .term { flex-basis: 100%; margin-top: 0.5rem; }
+  .term__body { max-height: 12rem; }
   .chrome {
     grid-column: 1; grid-row: 1;
     position: sticky; top: 0; height: auto;

@@ -255,7 +255,7 @@ A.append(card(
     "Ve hangi yürütücüyü seçtiğin bir güven kararı — bir önceki bileşen "
     "slaytındaki Docker/local ayrımı.",
     cap_mm=48,
-    foot="Bu desen bizde YOK: taramada modelin yazdığı kod koşmuyor, bütün tool'lar önceden yazılmış."))
+    foot="Bizde artık VAR ama dar: varsayılan kapalı, açıldığında kapıdan geçiyor, ve onaylanan metnin kendisi koşuyor — model onu yeniden yazmıyor."))
 
 # ═══════════════════════════════════════════ AGENTCHAT "ADVANCED"
 #
