@@ -1264,6 +1264,98 @@
     catch (e) { return 'latest'; }
   })();
 
+  /* ---------------------------------------------------------------- deste
+   *
+   * Sohbet sayfasındakinin aynısı, iki farkla. **Varsayılan kapalı**: bu
+   * sayfanın işi çizim ve graf 1:1'in altına inmiyor, yani deste açılınca kart
+   * daralıyor ve graf yana kaymaya başlıyor — burada slayt bedava değil.
+   * **Tercih kalıcı**: koşu değiştirmek sayfayı yeniden yüklüyor ve her
+   * seferinde kapanan bir panel, sunum ortasında işe yaramaz.
+   */
+  var deckHost = document.getElementById('deck');
+  var deckBar = document.getElementById('deck-bar');
+  var deckFrame = document.getElementById('deck-frame');
+  var deckToggle = document.getElementById('deck-toggle');
+  var deckOn = false;
+
+  function deckRemember(open, id) {
+    try {
+      localStorage.setItem('akis-deck', open ? (id || '1') : '');
+    } catch (e) { /* özel pencerede depolama yok; panel yine çalışsın */ }
+  }
+
+  function showDeck(on) {
+    if (!deckHost) { return; }
+    deckOn = !!on;
+    deckHost.hidden = !deckOn;
+    document.body.classList.toggle('deck-open', deckOn);
+    if (deckToggle) {
+      deckToggle.textContent = deckOn ? 'slayt ◂' : 'slayt ▸';
+      deckToggle.setAttribute('aria-pressed', deckOn ? 'true' : 'false');
+    }
+    // Graf kartın genişliğine göre ölçekleniyor ve sütun değişti; yeniden
+    // çizilmezse eski genişlikte kalıp taşıyor.
+    if (view.report) { render(view.report); }
+  }
+
+  function pickDeck(id) {
+    if (!deckFrame) { return; }
+    // Gezinme Chrome'un kendi görüntüleyicisinde — `view=Fit` sayfanın
+    // tamamını sığdırıyor, `navpanes=0` dar sütunda yer kaplayan küçük resim
+    // şeridini kapatıyor.
+    deckFrame.src = '/deck/' + encodeURIComponent(id) + '#view=Fit&navpanes=0';
+    showDeck(true);
+    deckRemember(true, id);
+    [].forEach.call(deckBar.querySelectorAll('.deck__tab'), function (b) {
+      b.classList.toggle('is-on', b.dataset.deck === id);
+    });
+  }
+
+  function loadDecks() {
+    if (!deckBar) { return; }
+    fetch('/api/decks').then(function (r) { return r.json(); }).then(function (d) {
+      var decks = d.decks || [];
+      deckBar.textContent = '';
+      decks.forEach(function (deck) {
+        var b = el('button', 'deck__tab', deck.label);
+        b.type = 'button';
+        b.dataset.deck = deck.id;
+        b.title = deck.pages + ' sayfa';
+        b.addEventListener('click', function () { pickDeck(deck.id); });
+        deckBar.appendChild(b);
+      });
+      var close = el('button', 'deck__tab deck__tab--chat', 'Kapat ×');
+      close.type = 'button';
+      close.addEventListener('click', function () {
+        showDeck(false); deckRemember(false);
+      });
+      deckBar.appendChild(close);
+
+      var want = '';
+      try { want = localStorage.getItem('akis-deck') || ''; } catch (e) { want = ''; }
+      if (!decks.length) { if (deckToggle) { deckToggle.hidden = true; } return; }
+      if (want) {
+        pickDeck(decks.some(function (x) { return x.id === want; })
+          ? want : decks[0].id);
+      }
+    }).catch(function (e) {
+      // Sessiz yutmak, desteyi hiç açılmamış bırakıyor ve konsolda iz
+      // kalmıyordu — sohbet tarafında bu hatayı bir kez yaptık.
+      console.warn('deste yüklenemedi:', e && e.message);
+      if (deckToggle) { deckToggle.hidden = true; }
+    });
+  }
+
+  if (deckToggle) {
+    deckToggle.addEventListener('click', function () {
+      if (deckOn) { showDeck(false); deckRemember(false); return; }
+      var first = deckBar && deckBar.querySelector('.deck__tab');
+      if (first && first.dataset.deck) { pickDeck(first.dataset.deck); }
+      else { showDeck(true); }
+    });
+  }
+  loadDecks();
+
   var backButton = document.getElementById('back');
   if (backButton) {
     backButton.addEventListener('click', function () {

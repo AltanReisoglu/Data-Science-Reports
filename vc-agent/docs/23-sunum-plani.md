@@ -230,6 +230,12 @@ Dört şey göster, bu sırayla:
 > *"Üstte olan şey çerçevenin işi. Altta olan şey bizim işimiz. Bu ayrım
 > sunumun tamamının konusu ve burada çizili."*
 
+**⓪ Slayt burada da var.** Sağ üstteki `slayt ▸` düğmesi aynı dört desteyi
+akış ekranının yanına getiriyor — sunarken sekme değiştirmek gerekmiyor.
+**Varsayılan kapalı ve öyle kalmalı:** ölçüldü, deste açılınca çizim kartı
+1454 → 808 px'e düşüyor ve graf 1420 px'te kalıp **yana kaymaya** başlıyor.
+Slayta bakacaksan aç, grafı anlatacaksan kapat.
+
 **② Kenarların üstündeki mesaj türleri.** Ölçülen dördü:
 `TextMessage` → `ToolCallRequestEvent` → `ToolCallExecutionEvent` → `TaskResult`
 > *"Ok değil, tür. Hangi sınıfın hangi yönde gittiği yazıyor."*

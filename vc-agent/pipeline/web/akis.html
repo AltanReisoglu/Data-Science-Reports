@@ -94,6 +94,39 @@
     margin-top: -0.15rem;
   }
 
+  /* ---------------------------------------------------------------- deste */
+  /* Tek sütun → deste açıkken iki sütun. `minmax(0,1fr)` şart: `1fr` içeriğin
+     en küçük genişliğini taban alıyor ve graf `min-width` taşıdığı için sol
+     sütun daralmayı reddediyordu — deste açılınca sayfa yana kayıyordu. */
+  .shell { display: block; }
+  body.deck-open .shell {
+    display: grid; grid-template-columns: minmax(0, 1fr) 34rem;
+    gap: 1rem; align-items: start;
+  }
+  body.deck-open .flow { max-width: none; }
+  .deck { display: flex; flex-direction: column; height: 100vh;
+          position: sticky; top: 0; border-left: 1px solid var(--hairline); }
+  .deck[hidden] { display: none; }
+  .deck__bar {
+    display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;
+    padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--hairline);
+  }
+  .deck__tab {
+    font: inherit; font-size: 0.72rem; padding: 0.15rem 0.45rem;
+    background: none; color: var(--ink-2); cursor: pointer;
+    border: 1px solid var(--hairline); border-radius: 999px;
+  }
+  .deck__tab:hover { border-color: var(--ink-2); color: var(--ink); }
+  .deck__tab.is-on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+  .deck__tab--chat { margin-left: auto; }
+  .deck__frame { flex: 1; width: 100%; border: 0; min-height: 0; }
+  @media (max-width: 78rem) {
+    /* Dar ekranda deste grafı ezerdi; alta iniyor. */
+    body.deck-open .shell { grid-template-columns: minmax(0, 1fr); }
+    .deck { height: 32rem; position: static; border-left: 0;
+            border-top: 1px solid var(--hairline); }
+  }
+
   .tl li { cursor: pointer; }
   .tl li:hover { background: var(--bar-soft); }
 
@@ -486,6 +519,7 @@
 </style>
 </head>
 <body>
+<div class="shell" id="shell">
 <div class="flow">
   <div class="flow__top">
     <span class="flow__title">Akış</span>
@@ -494,6 +528,8 @@
     <!-- Sekmeyi kapatır, sohbete GİTMEZ. Bu sayfa sohbetten ayrı bir sekmede
          açılıyor; "/" adresine gitmek onu ikinci bir sohbete çeviriyordu ve
          geri dönünce akış ekranı yok olmuş oluyordu. -->
+    <button type="button" class="flow__back" id="deck-toggle"
+            aria-pressed="false">slayt ▸</button>
     <button type="button" class="flow__back" id="back">← sohbete dön</button>
   </div>
 
@@ -508,6 +544,18 @@
   <div class="design" id="design"></div>
 
   <div class="cards" id="cards"></div>
+</div>
+
+<!-- Deste, akış ekranında da. Sohbet sayfasındakinin aynısı ama **varsayılan
+     kapalı**: bu sayfanın işi çizim, ve graf 1:1'in altına inmiyor — deste
+     açılınca kart daralıyor ve graf yana kaymaya başlıyor. Yani burada slayt
+     bir maliyet, sohbet sayfasındaki gibi bedava değil. Açık/kapalı tercihi
+     localStorage'da: koşu değiştirmek sayfayı yeniden yüklüyor ve her seferinde
+     kapanan bir panel işe yaramaz. -->
+<aside class="deck" id="deck" hidden aria-label="Sunum destesi">
+  <div class="deck__bar" id="deck-bar"></div>
+  <iframe class="deck__frame" id="deck-frame" title="Slayt destesi"></iframe>
+</aside>
 </div>
 
 <script src="/rough.js"></script>
