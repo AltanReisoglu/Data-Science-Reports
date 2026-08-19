@@ -47,6 +47,53 @@
   .design__val { font-size: 0.95rem; font-weight: 650; }
   .design__note { font-size: 0.75rem; color: var(--ink-2); }
 
+  /* ------------------------------------------------------------- tepegöz */
+  .oh {
+    display: grid; gap: 0.55rem; margin: 0.7rem 0 0.2rem;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  }
+  .oh[hidden] { display: none; }
+  .oh__cell {
+    border: 1.5px solid var(--hairline); border-radius: 6px;
+    padding: 0.45rem 0.6rem; min-width: 0;
+    border-left-width: 4px;
+    transition: background 200ms ease, border-color 200ms ease;
+  }
+  /* Şerit hücreleri şeridin rengini taşıyor — grafla aynı palet, çünkü aynı
+     şeyden bahsediyorlar. */
+  .oh__cell[data-lane="core"]  { border-left-color: #5f3dc4; }
+  .oh__cell[data-lane="ours"]  { border-left-color: #d9480f; }
+  .oh__cell[data-lane="ext"]   { border-left-color: #2f9e44; }
+  .oh__cell[data-lane="agentchat"] { border-left-color: #1864ab; }
+  /* Sıfır kere çalışmış hücre söner — ama silinmez. "Bu turda kapı hiç
+     devreye girmedi" bir bilgi, ve boş bir yer onu söylemiyor. */
+  .oh__cell.is-idle { opacity: 0.42; }
+  .oh__cell.is-live {
+    background: rgba(232, 89, 12, 0.09); border-color: #e8590c;
+    animation: oh-pulse 1.15s ease-in-out infinite;
+  }
+  @keyframes oh-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
+  @media (prefers-reduced-motion: reduce) { .oh__cell.is-live { animation: none; } }
+  .oh__head { display: flex; align-items: baseline; gap: 0.4rem; }
+  .oh__name { font-size: 0.92rem; font-weight: 700; }
+  .oh__hits {
+    margin-left: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem; font-variant-numeric: tabular-nums; color: var(--ink-2);
+  }
+  .oh__sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; color: var(--ink-muted); display: block; margin-top: 0.1rem;
+  }
+  .oh__note {
+    font-size: 0.76rem; line-height: 1.45; color: var(--ink-2);
+    margin: 0.3rem 0 0;
+  }
+  .oh__src {
+    grid-column: 1 / -1; font-size: 0.72rem; color: var(--ink-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin-top: -0.15rem;
+  }
+
   .tl li { cursor: pointer; }
   .tl li:hover { background: var(--bar-soft); }
 
@@ -79,9 +126,14 @@
   /* The drawing. It scrolls inside its own box: a wide graph must never push
      the page sideways. */
   .canvas { overflow-x: auto; padding: 0.25rem 0; }
-  /* The drawing scales up to fill the card. A graph this small rendered at its
-     natural 630px sat in a corner of a 1400px card and was read from across a
-     room only by the people in the front row. */
+  /* İki yönlü kural, ve ikinci yarısı sonradan eklendi.
+     Küçük graf karta kadar BÜYÜYOR — doğal 630px'lik bir çizim 1400px'lik
+     kartın köşesinde oturuyordu ve yalnız ön sıradan okunuyordu.
+     Büyük graf ise artık KÜÇÜLMÜYOR. `width:100%` tek başına altı sütunluk bir
+     grafı 0,6 ölçeğe indiriyordu: 13pt'lik kutu adı ekranda 8px'e düşüyor ve
+     yazıyı büyütmenin bir anlamı kalmıyordu. `min-width` doğal genişliğe
+     bağlanınca çizim 1:1'in altına inmiyor, karta sığmayan graf yana kayıyor —
+     kaydırmak, okunmayan bir şemadan iyidir. */
   .canvas svg { display: block; width: 100%; height: auto; }
 
   /* Sırası gelmemiş kutu ve kenar. Silmek yerine söndürmek bilinçli: turun
@@ -444,6 +496,12 @@
          geri dönünce akış ekranı yok olmuş oluyordu. -->
     <button type="button" class="flow__back" id="back">← sohbete dön</button>
   </div>
+
+  <!-- Tepegöz. Runtime'ın KENDİ dört işi — kılavuzun kendi cümlesinden. Graf
+       mesajın yolunu çiziyor; bu şerit o yolu taşırken runtime'ın ne yaptığını.
+       En üstte ve her zaman görünür: turun hangi işi döndürdüğü, kutu kutu
+       dolaşarak aranacak bir şey değil. -->
+  <div class="oh" id="overhead" hidden></div>
 
   <div class="tot" id="totals"></div>
 

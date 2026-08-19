@@ -70,9 +70,31 @@ def _team_run(kind: str) -> runlog.Run:
     return run
 
 
+def _cron_run() -> runlog.Run:
+    """Zamanlama turu. Üst bandı BOŞ, ve bu bilinçli: bu yolda AutoGen'in
+    hiçbir parçası koşmuyor. Testin buradaki işi, boş bandın yerleşimi
+    bozmadığını doğrulamak — sıfır düğümlü bir bant, sıfıra bölme demek."""
+    run = runlog.Run(id="k", kind="cron", question="her sabah 9da tarama yap")
+    run.event(_stage("cron_parse", text="her sabah 9da tarama yap", action="add"))
+    run.event(_stage("cron_gate", method="cron.add", held=False, when="her gün 09:00"))
+    run.event(_stage("cron_done", action="add", ok=True, when="her gün 09:00"))
+    return run
+
+
+def _team_tool_run() -> runlog.Run:
+    """Tool çağıran takım: ajan başına tool düğümleri ve dönüş okları."""
+    run = _team_run("selector")
+    run.event(_stage("team_tool", who="Researcher", tool="search_docs"))
+    run.event(_stage("team_tool", who="Researcher", tool="search_docs"))
+    run.event(_stage("team_tool", who="Critic", tool="scan_facts"))
+    return run
+
+
 def _cases():
     yield "chat", _chat_run()
     yield "scan", _scan_run()
+    yield "cron", _cron_run()
+    yield "team:selector tool'lu", _team_tool_run()
     for kind in teams.KINDS:
         yield "team:" + kind, _team_run(kind)
 
@@ -155,13 +177,47 @@ class GraphShapeTests(unittest.TestCase):
                             "details", "totals"):
                     self.assertIn(key, report, f"{label}: {key} yok")
 
+    def test_the_counter_never_contradicts_the_drawing(self):
+        """Grafta tool kutusu varsa sayaç sıfır diyemez — ve tersi.
+
+        Bu hata **üç kez** çıktı, her seferinde aynı şekilde: sayaç bir olay
+        türünü sayıyor, çağrı başka bir yoldan geliyor, ve ekran kendi
+        diyagramıyla çelişiyor.
+
+        1. `done.tool_calls` yalnız koşanı sayıyordu; kapı tuttuğunda sıfır.
+        2. O sayaç `BaseTool` olaylarını sayıyordu; **MCP** onu yaymıyor.
+        3. Takım koşusu `tool_exec` değil `team_tool` yayıyor — graf
+           "Critic çağırdı, 4 kez" derken sayaç `TOOL · KOŞTU 0` diyordu.
+
+        Bir sayacı düzeltmek bir kez; bu bekçi, dördüncüsünü yazılırken
+        yakalasın diye duruyor. Model çağırmadan koşuyor.
+        """
+        for label, run in _cases():
+            with self.subTest(label):
+                tools = [n for n in run.graph()["nodes"] if n["kind"] == "tool"]
+                ran = run.totals()["tools_ran"]
+                if tools:
+                    self.assertGreater(
+                        ran, 0,
+                        f"{label}: grafta {len(tools)} tool kutusu var ama "
+                        f"sayaç {ran} diyor",
+                    )
+                else:
+                    self.assertEqual(
+                        ran, 0,
+                        f"{label}: sayaç {ran} tool koştu diyor ama grafta "
+                        f"tool kutusu yok",
+                    )
+
     def test_exactly_one_team_is_claimed_per_run(self):
         for label, run in _cases():
             with self.subTest(label):
                 used = [t["id"] for t in run.teams() if t["used"]]
                 self.assertLessEqual(len(used), 1, f"{label}: {used}")
                 if label.startswith("team:"):
-                    self.assertEqual(used, [label.split(":", 1)[1]])
+                    # Etiket "team:<tip>" ya da "team:<tip> <not>" olabiliyor;
+                    # nottan önceki kelime takım tipi.
+                    self.assertEqual(used, [label.split(":", 1)[1].split(" ")[0]])
                 elif label == "chat":
                     self.assertEqual(used, [])
 

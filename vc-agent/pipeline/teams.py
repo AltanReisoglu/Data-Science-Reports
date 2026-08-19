@@ -49,21 +49,61 @@ ROSTER = [
         "description": "Görevi alt adımlara bölen ve kimin ne yapacağını söyleyen ajan.",
         "system": "Sen bir planlayıcısın. Görevi en fazla üç adıma böl, her adımın "
                   "yanına hangi ajanın yapacağını yaz. Kendin araştırma yapma.",
+        # Bilerek tool'suz: planlayıcının işi aramak değil, dağıtmak. Ve grafta
+        # tool'u olmayan bir kutunun durması, iş bölümünün gerçek olduğunu
+        # tool'u olanlardan daha iyi anlatıyor.
+        "tools": (),
     },
     {
         "name": "Researcher",
         "description": "Soruyu kendi bilgisiyle cevaplayan, olguları toplayan ajan.",
-        "system": "Sen bir araştırmacısın. Sorulan konuda bildiklerini kısa ve "
-                  "maddeler hâlinde yaz. Emin olmadığın yeri 'emin değilim' diye "
-                  "işaretle.",
+        "system": "Sen bir araştırmacısın. **Tek bir** tool çağrısı yap: belge "
+                  "sorusu için `search_docs`, tarama sorusu için `scan_facts`. "
+                  "Aynı aramayı tekrar etme. Sonra bulduğunu en fazla beş madde "
+                  "hâlinde yaz. Emin olmadığın yeri 'emin değilim' diye işaretle.",
+        "tools": ("search_docs", "scan_facts"),
     },
     {
         "name": "Critic",
         "description": "Üretilen cevabı eksik ve çelişki için denetleyen ajan.",
         "system": "Sen bir eleştirmensin. Önceki cevabı oku, eksik ve çelişkili "
-                  "yerleri say. Sorun kalmadıysa yalnızca 'ONAY' yaz.",
+                  "yerleri say. **En fazla bir** `search_docs` çağrısıyla tek bir "
+                  "iddiayı kontrol edebilirsin; fazlası yasak. Sorun kalmadıysa "
+                  "yalnızca 'ONAY' yaz.",
+        "tools": ("search_docs",),
     },
 ]
+
+
+def _tool_catalogue() -> dict[str, Any]:
+    """Takım ajanlarına verilecek tool'lar — sohbetin kullandığı fonksiyonların
+    aynısı, aynı `gateway/tools.py`'den.
+
+    Neden tool veriliyor: kadro baştan tool'suzdu ve beş takım tipi ekranda
+    birbirinin aynı üç konuşan kutu olarak duruyordu. Konuşan bir takım desen
+    farkını göstermiyor; **iş bölümü** gösteriyor, ve iş bölümü ancak ajanların
+    yapacak ayrı işleri varsa görünür.
+
+    Kapı burada YOK, ve bu bilinçli: takım koşusu bir kıyas yüzeyi, üretim yolu
+    değil. Verilen iki tool da salt okunur (`search_docs`, `scan_facts`) —
+    dışarı yazan bir tool'u kapısız vermek başka bir karar olurdu.
+    """
+    from autogen_core.tools import FunctionTool
+
+    import gateway.tools as tools_module
+
+    out: dict[str, Any] = {}
+    # `scan_getter` en son taramayı diskten okuyor; sohbetin kullandığı yolun
+    # aynısı. `scan_starter` yok — takım tarama BAŞLATAMAZ, ve o bir yetenek
+    # kısıtı değil bir kapsam kararı: kıyas turu dışarıya iş açmamalı.
+    sources = tools_module.Sources(
+        scan_getter=tools_module.read_latest_scan, session_id="team")
+    for fn in tools_module.build(sources):
+        name = getattr(fn, "__name__", "")
+        if name in ("search_docs", "scan_facts"):
+            out[name] = FunctionTool(
+                fn, description=(fn.__doc__ or "").strip().split("\n")[0])
+    return out
 
 
 def available() -> bool:
@@ -78,9 +118,21 @@ def _agents(ledger: "engine.Ledger", *, handoffs: bool = False) -> list[Any]:
     from autogen_agentchat.base import Handoff
 
     names = [a["name"] for a in ROSTER]
+    catalogue = _tool_catalogue()
     built = []
     for spec in ROSTER:
         extra: dict[str, Any] = {}
+        picked = [catalogue[t] for t in spec.get("tools", ()) if t in catalogue]
+        if picked:
+            # `max_tool_iterations` ELLE veriliyor, ve iki ucu da ölçüldü.
+            # Varsayılan **1**: ajan tool'u çağırır, sonucu görür ve DURUR —
+            # cevabı hiç yazmaz, tur sessizce boş geçer.
+            # **4** ise ters uca düştü: ilk canlı koşuda üç ajan 41 tool çağrısı
+            # yaptı, 74.612 token ve 124 saniye. Sunumda izlenemez.
+            # **2** ikisinin arasında: bir arama, bir de cevabı yazacak tur.
+            # Sistem prompt'ları da "tek çağrı" diyor — ikisi birlikte tutuyor.
+            extra["tools"] = picked
+            extra["max_tool_iterations"] = 2
         if handoffs:
             # Devir bir TOOL çağrısı. Adı küçük harfe düşüyor, o yüzden elle
             # yazılmıyor — `Handoff(...)` nesnesi üretiyor.
@@ -208,6 +260,16 @@ async def run(kind: str, task: str, *, bus: Any = None, spans: list | None = Non
             # Devir, Swarm'da bir tool çağrısı olarak görünüyor.
             if name == "ToolCallRequestEvent" and kind == "swarm" and bus is not None:
                 bus.emit("handoff", who=source, to=_handoff_target(event) or "?")
+            # Hangi ajan hangi tool'u çağırdı. Konuşma sırası "kim konuştu"yu
+            # söylüyordu ama "ne yaptı"yı söylemiyordu, ve ekranda üç ajan
+            # birbirinin aynı üç kutu olarak duruyordu. Devir tool'ları
+            # (`transfer_to_*`) dışarıda: onlar zaten `handoff` olarak
+            # çiziliyor, ve iki kez göstermek Swarm'ı gereksiz kalabalık yapar.
+            if name == "ToolCallRequestEvent" and bus is not None:
+                for call in getattr(event, "content", None) or []:
+                    tool = getattr(call, "name", "") or ""
+                    if tool and not tool.startswith("transfer_to"):
+                        bus.emit("team_tool", who=source, tool=tool)
             yield {"type": "message", "source": source, "kind": name,
                    "text": _text(event)}
     finally:

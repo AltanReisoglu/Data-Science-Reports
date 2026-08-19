@@ -17,7 +17,7 @@
   var totalsEl = document.getElementById('totals');
   var cardsEl = document.getElementById('cards');
 
-  var INK = '#1e1e1e', GREY = '#868e96', MUTE = '#5a5044';
+  var INK = '#1e1e1e', GREY = '#6b7178', MUTE = '#4a4238';
   var LANE_INK = {
     agentchat: '#1971c2', core: '#5f3dc4', ext: '#2f9e44', ours: '#e8590c',
     // MAF kendi rengi: ayrı bir çerçeve, AutoGen'in katmanlarıyla aynı renge
@@ -25,7 +25,17 @@
     maf: '#9c36b5'
   };
   var KIND_INK = {
-    user: '#868e96', agent: '#1971c2', tool: '#5f3dc4', component: '#e8590c'
+    user: '#495057', agent: '#1864ab', tool: '#5f3dc4', component: '#d9480f',
+    exec: '#087f5b', gate: '#c92a2a'
+  };
+  /* Kutular DOLGULU. Yalnız kenarlıkla çizildiklerinde — ekran görüntüsünde
+     ölçüldü — beyaz zemin üstünde soluk bir çerçeveden ibaret kalıyorlardı ve
+     bir metre öteden hiçbiri diğerinden ayrılmıyordu. İç mimari şemaları zaten
+     dolgu kullanıyordu; grafın onlardan daha az okunaklı olması için bir sebep
+     yok. Dolgular çok açık: yazı hâlâ zeminle tam kontrastta duruyor. */
+  var KIND_WASH = {
+    user: '#f1f3f5', agent: '#e7f5ff', tool: '#f3f0ff', component: '#fff4e6',
+    exec: '#e6fcf5', gate: '#fff5f5'
   };
 
   function el(tag, cls, text) {
@@ -116,9 +126,16 @@
       // az önce izlenen şeyin izini siliyordu. Graf ışığı yine de sönüyor:
       // sahnedeki resim "bu olmuştu" der, grafın ışığı "bu OLUYOR" der.
       play.target = rows.length ? rows[rows.length - 1] : null;
+      // Sahnedeki şema kalıyor, grafın ışığı sönüyor — yukarıdaki cümlenin
+      // gerçekten olması için ayrı bir bayrak gerekiyordu. `markGraph` tek
+      // ölçüt olarak `play.target`e bakıyordu, ve o son satırda duruyor:
+      // bitmiş bir turda `answer` kutusu nefes almaya devam ediyordu (ölçüldü,
+      // DOM'da `is-live` kalıyordu), yani ekran zamanı yanlış söylüyordu.
+      play.done = true;
       paint();
       return;
     }
+    play.done = false;
     play.target = rows[play.at];
     play.at += 1;
     play.reached = Math.max(play.reached, play.at);
@@ -334,8 +351,26 @@
     edges.forEach(function (e, i) {
       if (doneNodes[e.src] && doneNodes[e.dst]) { doneEdges[i] = 1; }
     });
+    // Ve simetriği: hiçbir aşamaya bağlı OLMAYAN kutular. `Soru` hiçbir
+    // aşamanın hedefi değil — tur başlamadan önce oradaydı — ve yalnız
+    // aşamalara bakan bir kural onu sonsuza kadar sönük bırakıyordu (ölçüldü:
+    // bitmiş bir turda `is-pending` kalıyordu), yani zincirin başı hep eksik
+    // görünüyordu.
+    //
+    // Yayılım GERİYE doğru: zincir senin ÜSTÜNDEN geçtiyse geçilmişsin.
+    // İleriye doğru yaymak yanlış olurdu — ilk kutu yanar yanmaz bütün graf
+    // yanardı ve zincirin adım adım dolması diye bir şey kalmazdı.
+    // `İz` gibi uç kutular bilerek dışarıda: onlar gerçekten en sonda oluyor,
+    // ve yürüyüş bittiğinde zaten hiçbir kutu sönük kalmıyor.
+    for (var pass = 0; pass < 3; pass += 1) {
+      edges.forEach(function (e) {
+        if (doneNodes[e.dst]) { doneNodes[e.src] = 1; }
+      });
+    }
 
-    var cur = play.target;
+    // Yürüyüş bittiyse hiçbir yer yanmıyor ve hiçbir yer sönük değil: bütün
+    // zincir eşit parlaklıkta duruyor, çünkü artık hepsi geçmiş.
+    var cur = play.done ? null : play.target;
     var live = {};
     if (cur) {
       [].concat(cur.node == null ? [] : cur.node).forEach(function (id) { live[id] = 1; });
@@ -363,13 +398,16 @@
   // Sütun aralığı kutu genişliğinden çok daha geniş: aradaki boşluk kenar
   // etiketinin yeri. Dar bıraktığımızda `ToolCallRequestEvent` kutunun üstüne
   // biniyordu — etiket okunmuyorsa kenar da anlatmıyor.
-  var W = 168, H = 58, COL = 320, GAP = 64, PAD = 24;
+  var W = 186, H = 64, COL = 330, GAP = 64, PAD = 24;
   // Kutunun ALTINDA, içinde değil: açıklama uzun ve kutuya sığdırmaya
   // çalışmak ya kutuyu şişiriyor ya da yazıyı okunmaz hâle getiriyor.
-  var NOTE = 32, NOTE_LINES = 3, NOTE_CHARS = 52;
+  var NOTE = 40, NOTE_LINES = 3, NOTE_CHARS = 44;
+  // Dolanan okların en alta indiği nokta (aşağıdaki `dip`/`below` ile aynı
+  // hesap). Bant yüksekliği buna yer ayırmazsa ok bir alttaki bandın kutusunun
+  // içinden geçiyor.
   // Sol oluk bant adları için; DIP dönüş oklarının kutuların altında
   // kullandığı yer; BANDGAP iki bandı ayıran boşluk.
-  var LABEL = 132, DIP = NOTE + 30, BANDGAP = 44;
+  var LABEL = 196, DIP = NOTE + 86, BANDGAP = 52;
 
   /* İki bant, iki ayrı yerleşim.
    *
@@ -467,6 +505,9 @@
 
     var geo = layout(graph);
     var svg = Rough.svg(geo.width, geo.height);
+    // Doğal genişliğin altına inme (bkz. `.canvas svg` yorumu). `width` niteliği
+    // CSS'teki `width:100%` tarafından eziliyor, `min-width` ezilmiyor.
+    svg.style.minWidth = geo.width + 'px';
     var pen = new Rough.Pen(7, 1);
 
     /* Her düğüm ve her kenar kendi `<g>`'sine giriyor. Sebep canlı vurgu:
@@ -484,10 +525,10 @@
       if (i > 0) {
         svg.appendChild(pen.line(PAD, row.top - BANDGAP / 2,
                                  geo.width - PAD, row.top - BANDGAP / 2,
-                                 { stroke: '#c9c2b4', width: 0.8, dash: '3 5' }));
+                                 { stroke: '#adb5bd', width: 1.2, dash: '4 6' }));
       }
-      svg.appendChild(Rough.text(PAD, row.top + 16, row.label, {
-        size: 9, colour: i === 0 ? LANE_INK.agentchat : LANE_INK.ours,
+      svg.appendChild(Rough.text(PAD, row.top + 18, row.label, {
+        size: 13, colour: i === 0 ? LANE_INK.agentchat : LANE_INK.ours,
         weight: '700', mono: true
       }));
     });
@@ -506,20 +547,23 @@
         var cx = a.x + W / 2, cy = a.y + H, tx = b.x + W / 2, ty = b.y;
         svg.appendChild(pen.curve([[cx, cy], [cx, (cy + ty) / 2],
                                    [tx, (cy + ty) / 2], [tx, ty]],
-                                  { stroke: LANE_INK.ours, width: 1.2, dash: '5 4',
+                                  { stroke: LANE_INK.ours, width: 1.7, dash: '6 4',
                                     arrow: true }));
-        svg.appendChild(Rough.text((cx + tx) / 2, (cy + ty) / 2 - 4, e.message,
-          { size: 6.8, anchor: 'middle', colour: LANE_INK.ours, mono: true }));
+        // Not satırları kutunun altında NOTE kadar yer kaplıyor; etiket onun
+        // ALTINA iniyor, yoksa üstüne biniyor (ölçüldü: `takım koşusu`,
+        // `Researcher`ın "10 kez konuştu…" notunun üstünde duruyordu).
+        svg.appendChild(Rough.text((cx + tx) / 2, cy + NOTE + 26, e.message,
+          { size: 9.4, anchor: 'middle', colour: LANE_INK.ours, mono: true, weight: '600' }));
         return;
       }
 
       if (e.back) {
-        var dip = Math.max(a.y, b.y) + H + NOTE + 14;
+        var dip = Math.max(a.y, b.y) + H + NOTE + 16 + (i % 2) * 16;
         svg.appendChild(pen.curve([
           [a.x + W / 2, a.y + H], [a.x, dip], [b.x + W, dip], [b.x + W, b.y + H - 6]
-        ], { stroke: ink, width: 1.1, dash: '4 3' }));
+        ], { stroke: ink, width: 1.6, dash: '5 4' }));
         svg.appendChild(Rough.text((a.x + b.x + W) / 2, dip + 11, e.message,
-          { size: 6.8, anchor: 'middle', colour: ink, mono: true }));
+          { size: 9.4, anchor: 'middle', colour: ink, mono: true, weight: '600' }));
         return;
       }
 
@@ -531,23 +575,23 @@
         // geçiyordu — ölçüldü: `TaskResult` oku `scan_facts`'in başlığının
         // üstüne biniyordu. Alttan dolanmak aynı zamanda doğru şeyi söylüyor:
         // bu mesaj o kutuya uğramadı.
-        var below = Math.max(a.y, b.y) + H + NOTE + 18;
+        var below = Math.max(a.y, b.y) + H + NOTE + 54 + (i % 2) * 16;
         svg.appendChild(pen.curve([
           [x1, y1], [x1 + 30, below], [x2 - 30, below], [x2, y2]
-        ], { stroke: ink, width: 1.3, arrow: true }));
+        ], { stroke: ink, width: 1.8, arrow: true }));
         svg.appendChild(Rough.text((x1 + x2) / 2, below + 12, e.message,
-          { size: 6.8, anchor: 'middle', colour: ink, mono: true }));
+          { size: 9.4, anchor: 'middle', colour: ink, mono: true, weight: '600' }));
         return;
       }
 
       svg.appendChild(pen.line(x1, y1, x2, y2,
-        { stroke: ink, width: e.join ? 1.7 : 1.3, arrow: true,
+        { stroke: ink, width: e.join ? 2.3 : 1.8, arrow: true,
           dash: e.join ? '6 3' : null }));
 
       // Etiket okun üstünde, ve komşu oklarla çakışmasın diye sıra sıra kaydırılıyor.
       mx = x1 + (x2 - x1) * 0.5; my = y1 + (y2 - y1) * 0.5;
-      svg.appendChild(Rough.text(mx, my - 6 - (i % 2) * 9, e.message,
-        { size: 6.8, anchor: 'middle', colour: ink, mono: true }));
+      svg.appendChild(Rough.text(mx, my - 8 - (i % 2) * 13, e.message,
+        { size: 9.4, anchor: 'middle', colour: ink, mono: true, weight: '600' }));
       if (e.gate) {
         svg.appendChild(Rough.text(mx, my + 11, 'kapı · ' + e.gate, {
           size: 6.8, anchor: 'middle',
@@ -569,18 +613,19 @@
         svg.addEventListener('mouseenter', function () { showInner(n, svg); });
         svg.addEventListener('mouseleave', hideInner);
       }
-      svg.appendChild(pen.rect(p.x, p.y, W, H, { stroke: ink, width: 1.6 }));
-      svg.appendChild(Rough.text(p.x + W / 2, p.y + 21, n.name,
-        { size: 9, anchor: 'middle', weight: '700', colour: ink }));
+      svg.appendChild(pen.rect(p.x, p.y, W, H,
+        { stroke: ink, width: 2, fill: KIND_WASH[n.kind] || '#f8f9fa' }));
+      svg.appendChild(Rough.text(p.x + W / 2, p.y + 24, n.name,
+        { size: 13, anchor: 'middle', weight: '700', colour: ink }));
       if (n.sub) {
-        svg.appendChild(Rough.text(p.x + W / 2, p.y + 36, n.sub,
-          { size: 6.6, anchor: 'middle', colour: GREY, mono: true }));
+        svg.appendChild(Rough.text(p.x + W / 2, p.y + 40, n.sub,
+          { size: 8.6, anchor: 'middle', colour: GREY, mono: true }));
       }
       // Kutunun altında ne olduğu. Kutu adı NE olduğunu söylüyor, bu satırlar
       // orada NE YAPILDIĞINI — ikisi ayrı soru.
       wrap(n.note, NOTE_CHARS, NOTE_LINES).forEach(function (row, li) {
-        svg.appendChild(Rough.text(p.x + W / 2, p.y + H + 11 + li * 9.5, row,
-          { size: 6.4, anchor: 'middle', colour: MUTE }));
+        svg.appendChild(Rough.text(p.x + W / 2, p.y + H + 14 + li * 11.5, row,
+          { size: 8, anchor: 'middle', colour: MUTE }));
       });
     });
 
@@ -980,6 +1025,39 @@
     });
   }
 
+  /* Tepegöz: runtime'ın kendi dört işi, canlı.
+     Graf mesajın nereye gittiğini çiziyor. Bu şerit, o mesajı taşırken
+     runtime'ın ne yaptığını — ve dördü de kılavuzun kendi cümlesinden geliyor,
+     bizim uydurduğumuz bir sınıflandırma değil. Sayaçlar önemli: "güvenlik
+     sınırı 0" diyen bir tur, kapının o turda hiç devreye girmediğini söylüyor
+     ve bunu grafta aramak kutu kutu dolaşmak demek. */
+  function overhead(report) {
+    var host = document.getElementById('overhead');
+    if (!host) { return; }
+    var data = report.overhead;
+    if (!data || !data.cells) { host.hidden = true; return; }
+    host.hidden = false;
+    clear(host);
+    data.cells.forEach(function (c) {
+      var cell = el('div', 'oh__cell');
+      cell.setAttribute('data-lane', c.lane || '');
+      if (c.live) { cell.classList.add('is-live'); }
+      if (!c.hits) { cell.classList.add('is-idle'); }
+      var head = el('div', 'oh__head');
+      head.appendChild(el('span', 'oh__name', c.name));
+      head.appendChild(el('span', 'oh__hits', c.hits ? c.hits + '×' : '—'));
+      cell.appendChild(head);
+      cell.appendChild(el('code', 'oh__sub', c.sub));
+      cell.appendChild(el('p', 'oh__note', c.note));
+      host.appendChild(cell);
+    });
+    // Alıntı şeridin altında ve kısaltılmamış: dört hücrenin nereden geldiğini
+    // sormak sunumda kesin gelen bir soru, ve cevabı ekranda durmalı.
+    host.appendChild(el('div', 'oh__src',
+      'runtime · ' + data.ref + '  ·  ' + data.spans + ' span  ·  “' +
+      data.quote + '”'));
+  }
+
   /* O an hangi ajan tasarımı koşuyor. Ekranın en üstünde ve her zaman görünür:
      "hangi desen" sorusu sunumda ilk sorulan soru, ve cevabı bir kartın içinde
      aranacak bir şey olmamalı. */
@@ -1004,6 +1082,7 @@
     questionEl.textContent = report.question || '—';
     questionEl.title = report.question || '';
     totals(report);
+    overhead(report);
     design(report);
     clear(cardsEl);
 

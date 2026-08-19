@@ -191,6 +191,15 @@ STAGE_TARGET: dict[str, tuple[str, str]] = {
     "subscribe": ("node", "topic"),
     "publish": ("node", "topic"),
     "runtime_stop": ("node", "runtime"),
+    # Zamanlama.
+    "cron_parse": ("node", "parse"),
+    "cron_gate": ("node", "gate"),
+    "cron_done": ("node", "cron"),
+    # Takım tarafı. `team_tool`'un hedefi koşuya göre değişiyor (hangi ajan,
+    # hangi tool) — bu yüzden sabit değil, `_live_target` çözüyor.
+    "speaker": ("node", "*speaker"),
+    "team_tool": ("node", "*team_tool"),
+    "handoff": ("node", "*speaker"),
 }
 
 
@@ -670,6 +679,14 @@ class Run:
         Onun için koşan sayısı `tool_exec` aşamalarından sayılıyor: o aşama,
         kapının geçirdiği ve workbench'e girilen her çağrıda yayılıyor —
         çağrının hangi workbench'ten gittiğinden bağımsız.
+
+        3. Ve aynı hata üçüncü kez, takım tarafında. Takım koşusu `tool_exec`
+           yaymıyor — kendi `team_tool` aşamasını yayıyor. Ölçüldü (team-0001):
+           graf `search_docs · Critic çağırdı, 4 kez` yazarken üstteki sayaç
+           `TOOL · KOŞTU 0` diyordu. Ekranın kendi diyagramıyla çelişmesi, aynı
+           sayacın üçüncü kez aynı şekilde kırılması demek — sayaç artık
+           **çağrının hangi yoldan geldiğini değil, çağrı olup olmadığını**
+           soruyor.
         """
         done = next((e for e in self.events if e.get("type") == "done"), None)
         # `done` sohbetin, `team_done` takımın bitiş aşaması. Yalnız birincisine
@@ -679,10 +696,12 @@ class Run:
                            if e.get("id") in ("done", "team_done")), None)
         meta = (stage_done or {}).get("meta", {}) if stage_done else {}
         stages_seen = self._stages()
-        requested = len(self._tool_calls())
+        team_tools = sum(1 for e in stages_seen if e.get("id") == "team_tool")
+        requested = len(self._tool_calls()) + team_tools
         blocked = sum(1 for e in stages_seen
                       if e.get("id") == "gate" and (e.get("meta") or {}).get("blocked"))
-        ran = sum(1 for e in stages_seen if e.get("id") == "tool_exec")
+        ran = sum(1 for e in stages_seen
+                  if e.get("id") in ("tool_exec", "team_tool"))
         return {
             "llm_calls": meta.get("llm_calls", 0),
             "tokens": meta.get("tokens", 0),
@@ -705,6 +724,8 @@ class Run:
             return _team_graph(self)
         if self.kind == "maf":
             return _maf_graph(self)
+        if self.kind == "cron":
+            return _cron_graph(self)
         return _scan_graph(self) if self.kind == "scan" else _chat_graph(self)
 
     def teams(self) -> list[dict[str, Any]]:
@@ -939,7 +960,8 @@ class Run:
         if not stages_seen:
             return None
         last = stages_seen[-1]
-        node, edge = self._target(self.graph(), str(last.get("id", "")))
+        node, edge = self._target(self.graph(), str(last.get("id", "")),
+                                  last.get("meta") or {})
         return {
             "stage": last.get("id", ""),
             # `Mechanism` alanının adı `title`; `name` diye okumak sessizce boş
@@ -953,20 +975,34 @@ class Run:
         }
 
     @classmethod
-    def _target(cls, graph: dict[str, Any],
-                stage_id: str) -> tuple[Any, int | None]:
+    def _target(cls, graph: dict[str, Any], stage_id: str,
+                meta: dict[str, Any] | None = None) -> tuple[Any, int | None]:
         """Bir aşamanın grafta yandığı yer: (düğüm, kenar). İkisi de olmayabilir."""
         where = STAGE_TARGET.get(stage_id)
         if where is None:
             return None, None
         what, target = where
         if what == "node":
-            return cls._resolve_node(graph, target), None
+            return cls._resolve_node(graph, target, meta or {}), None
         return None, cls._resolve_edge(graph)
 
     @staticmethod
-    def _resolve_node(graph: dict[str, Any], target: str) -> str | list[str] | None:
+    def _resolve_node(graph: dict[str, Any], target: str,
+                      meta: dict[str, Any] | None = None) -> str | list[str] | None:
         ids = [n["id"] for n in graph["nodes"]]
+        # Takım aşamalarının hedefi sabit değil: hangi ajanın sırası geldiği ve
+        # hangi tool'un çağrıldığı aşamanın kendi meta'sında yazıyor. Sabit bir
+        # hedef koymak, üç ajanlı bir koşuda ışığı hep aynı kutuda yakardı.
+        if target.startswith("*"):
+            meta = meta or {}
+            who = str(meta.get("who", ""))
+            if target == "*speaker":
+                return who if who in ids else None
+            tool = str(meta.get("tool", ""))
+            tid = f"tool:{who}:{tool}"
+            if tid in ids:
+                return [tid, who] if who in ids else [tid]
+            return who if who in ids else None
         if target == "tool":
             # İki kutu birden: üstte koşan tool, altta onu çağıran workbench.
             # Tek başına biri yanınca "tool nerede koşuyor" sorusunun yarısı
@@ -1106,7 +1142,8 @@ class Run:
         graph = self.graph()
         rows = []
         for e in self._stages():
-            node, edge = self._target(graph, str(e.get("id", "")))
+            node, edge = self._target(graph, str(e.get("id", "")),
+                                      e.get("meta") or {})
             rows.append(
                 {"at": e.get("at", 0), "id": e.get("id", ""), "lane": e.get("lane", ""),
                  "name": e.get("title", ""), "klass": e.get("klass", ""),
@@ -1140,8 +1177,109 @@ class Run:
             "topics": self.topics(),
             "code": self.code_runs(),
             "spans": self.spans,
+            "overhead": _overhead(self),
             "timeline": self.timeline(),
         }
+
+
+# ------------------------------------------------------------------ tepegöz
+#
+# Runtime'ın **kendi** işleri, kılavuzun kendi cümlesinden (`05:920`):
+#
+#   *"an agent runtime provides the necessary infrastructure to facilitate
+#   communication between agents, manage agent lifecycles, enforce security
+#   boundaries, and support monitoring and debugging."*
+#
+# Dördü de her turda çalışıyor ama grafta hiçbiri görünmüyordu: graf mesajın
+# yolunu çiziyor, runtime'ın o yolu taşırken ne yaptığını değil. Tepegöz o
+# katman — turun üstünde duran, hangi işin şu an döndüğünü gösteren şerit.
+#
+# Hücreler kılavuzun sırasıyla; hangi aşamanın hangi hücreyi yaktığı aşağıda.
+# Bir aşama birden çok hücre yakabiliyor: bir tool çağrısı hem iletişim hem
+# güvenlik sınırı, ve ikisini ayırmak yanlış olurdu.
+OVERHEAD_CELLS = [
+    {"id": "comm", "name": "İletişim", "lane": "core",
+     "sub": "send · publish · topic",
+     "note": "Mesajı doğru ajana taşımak. Yayında dönüş yok, doğrudanda var."},
+    {"id": "life", "name": "Yaşam döngüsü", "lane": "core",
+     "sub": "AgentId(type, key)",
+     "note": "Ajanı gerektiğinde yaratmak. Topic kaynağı ajan anahtarına dönüşüyor."},
+    {"id": "guard", "name": "Güvenlik sınırı", "lane": "ours",
+     "sub": "InterventionHandler · GatedWorkbench",
+     "note": "Çağrıyı geçirmeden önce durdurabilen tek yer. Bizim kapımız burada."},
+    {"id": "watch", "name": "İzleme", "lane": "ext",
+     "sub": "OTel · gen_ai.*",
+     "note": "Her iş bir span. Şelale ve bu şerit aynı kaynaktan besleniyor."},
+]
+
+# Hangi aşama tepegözde neyi yakıyor. Boş bırakılan aşama hiçbir hücreyi
+# yakmıyor — "her aşama bir şey yakmalı" diye zorlamak, şeridi anlamsız
+# yanıp sönen bir süse çevirirdi.
+OVERHEAD_OF: dict[str, tuple[str, ...]] = {
+    "runtime_start": ("life", "comm"),
+    "subscribe": ("life", "comm"),
+    "publish": ("comm",),
+    "speaker": ("comm",),
+    "handoff": ("comm",),
+    "model": ("watch",),
+    "stream": ("watch",),
+    "tool_request": ("comm", "guard"),
+    "gate": ("guard",),
+    "tool_exec": ("comm", "guard", "watch"),
+    "team_tool": ("comm", "guard", "watch"),
+    "tool_result": ("comm",),
+    "code_request": ("guard",),
+    "code_result": ("guard", "watch"),
+    "intervention": ("guard",),
+    "context": ("life",),
+    "compaction": ("life",),
+    "graph_build": ("life",),
+    "graph_run": ("comm", "life"),
+    "analysts": ("comm",),
+    "join": ("comm",),
+    "runtime_stop": ("watch", "life"),
+    "done": ("watch",),
+    "team_done": ("watch",),
+    "maf_gate": ("guard",),
+    "maf_run": ("comm", "watch"),
+    "maf_approval": ("guard",),
+    # Zamanlama. `comm` ve `life` bilerek boş: bu turda AutoGen runtime'ı hiç
+    # çalışmıyor, ve sıfır göstermek doğru olanı söylüyor. Kapı ile kayıt ise
+    # bizim hattımızda gerçekten dönüyor.
+    "cron_gate": ("guard",),
+    "cron_done": ("watch",),
+}
+
+
+def _overhead(run: Run) -> dict[str, Any]:
+    """Tepegöz: runtime'ın dört işi, hangisi kaç kez ve şu an hangisi.
+
+    Sayı önemli çünkü "güvenlik sınırı" hücresinin sıfır olduğu bir tur,
+    kapının o turda hiç devreye girmediğini söylüyor — ve bunu grafta aramak
+    kutu kutu dolaşmak demek.
+    """
+    counts: dict[str, int] = {c["id"]: 0 for c in OVERHEAD_CELLS}
+    for e in run._stages():
+        for cell in OVERHEAD_OF.get(str(e.get("id", "")), ()):
+            counts[cell] = counts.get(cell, 0) + 1
+
+    live: list[str] = []
+    if run.status == "running":
+        seen = run._stages()
+        if seen:
+            live = list(OVERHEAD_OF.get(str(seen[-1].get("id", "")), ()))
+
+    return {
+        "cells": [{**c, "hits": counts.get(c["id"], 0),
+                   "live": c["id"] in live} for c in OVERHEAD_CELLS],
+        "spans": len(run.spans),
+        "running": run.status == "running",
+        "ref": "05:920",
+        "quote": ("an agent runtime provides the necessary infrastructure to "
+                  "facilitate communication between agents, manage agent "
+                  "lifecycles, enforce security boundaries, and support "
+                  "monitoring and debugging"),
+    }
 
 
 # ------------------------------------------------------------- graf türetme
@@ -1247,7 +1385,7 @@ def _chat_graph(run: Run) -> dict[str, Any]:
          "sub": "CompactingChatCompletionContext", "lane": "ours",
          "note": "Modele ne gideceğini token bütçesine göre seçiyor. AutoGen'in "
                  "kendi hâli mesaj sayar; bu token sayıyor."},
-        {"id": "gate", "band": 1, "kind": "component", "name": "Kapı",
+        {"id": "gate", "band": 1, "kind": "gate", "name": "Kapı",
          "sub": "GatedWorkbench", "lane": "ours",
          "note": "Her tool çağrısının geçtiği tek nokta. Red bir istisna değil, "
                  "hata işaretli bir sonuç — ajan gerekçeyi okuyabiliyor."},
@@ -1268,7 +1406,7 @@ def _chat_graph(run: Run) -> dict[str, Any]:
     ]
 
     if "code_result" in ids or "code_request" in ids:
-        nodes.append({"id": "exec", "band": 1, "kind": "component",
+        nodes.append({"id": "exec", "band": 1, "kind": "exec",
                       "name": "Docker yürütücü",
                       "sub": "PythonCodeExecutionTool", "lane": "ext",
                       "note": "Tool'u olmayan iş için kaçış kapağı. Konteyner "
@@ -1428,6 +1566,28 @@ def _speakers(run: Run) -> list[dict[str, Any]]:
     return out
 
 
+def _team_tools(run: Run) -> dict[str, list[dict[str, Any]]]:
+    """Hangi ajan hangi tool'u kaç kez çağırdı — kayıttan, sırasıyla.
+
+    Konuşma sırası "kim konuştu"yu söylüyor; bu "ne yaptı"yı. İkisi olmadan
+    beş takım tipi ekranda birbirinin aynı üç kutu olarak duruyor, ve grafın
+    anlatması gereken tek fark tam olarak iş bölümü.
+    """
+    out: dict[str, list[dict[str, Any]]] = {}
+    for e in run._stages():
+        if e.get("id") != "team_tool":
+            continue
+        meta = e.get("meta") or {}
+        who, tool = str(meta.get("who", "?")), str(meta.get("tool", "?"))
+        rows = out.setdefault(who, [])
+        hit = next((r for r in rows if r["tool"] == tool), None)
+        if hit is None:
+            rows.append({"tool": tool, "n": 1, "at": e.get("at", 0)})
+        else:
+            hit["n"] += 1
+    return out
+
+
 def _team_sequence(run: Run) -> dict[str, Any]:
     """Takımın sıra diyagramı: her konuşma bir ok, devirler işaretli."""
     order = _speakers(run)
@@ -1527,6 +1687,28 @@ def _team_graph(run: Run) -> dict[str, Any]:
                     (f" {len(turns)} kez." if len(turns) > 1 else ""),
         })
 
+    # Ajanın çağırdığı tool'lar, ajanın hemen sağında. Sütun hesabı ileri
+    # kenarlardan çıktığı için tool düğümü ajanı bir sağa itmiyor — kendi
+    # sütununu alıyor ve dönüş oku `back` ile alttan dolanıyor.
+    for who, rows in _team_tools(run).items():
+        if who not in roster:
+            continue
+        for i, row in enumerate(rows):
+            tid = f"tool:{who}:{row['tool']}"
+            nodes.append({
+                "id": tid, "band": 0, "kind": "tool", "name": row["tool"],
+                "sub": "workbench.call_tool", "lane": "core",
+                "note": (f"{who} çağırdı"
+                         + (f", {row['n']} kez." if row["n"] > 1 else ".")),
+            })
+            edges.append({"src": who, "dst": tid, "at": row["at"],
+                          "message": "ToolCallRequestEvent",
+                          "note": f"{who} bu tool'a uzandı."})
+            edges.append({"src": tid, "dst": who, "at": row["at"], "back": True,
+                          "message": "ToolCallExecutionEvent",
+                          "note": "Sonuç ajanın bağlamına döndü."})
+            del i
+
     done = next((e for e in run._stages() if e.get("id") == "team_done"), None)
     if done:
         meta = done.get("meta") or {}
@@ -1563,6 +1745,57 @@ def _team_graph(run: Run) -> dict[str, Any]:
             "bands": [{"id": "agent", "label": "TAKIM · AgentChat"},
                       {"id": "gateway", "label": "GATEWAY · bizim hat"}],
             "shape": "gözlenen konuşma sırası", "team": run.variant}
+
+
+def _cron_graph(run: Run) -> dict[str, Any]:
+    """Zamanlama turu: kısa, ve tamamı alt bantta.
+
+    Üst bant boş kalıyor ve bu **doğru**: zamanlamada AutoGen'in hiçbir parçası
+    çalışmıyor. Bir kütüphane saat tutmaz, ve bunu boş bir bant olarak göstermek
+    "her şey AutoGen'in içinde oluyor" izlenimini düzelten tek yer.
+    """
+    ids = run._stage_ids()
+    meta: dict[str, dict[str, Any]] = {
+        str(e.get("id")): (e.get("meta") or {}) for e in run._stages()
+    }
+    parse, gate, done = meta.get("cron_parse", {}), meta.get("cron_gate", {}), \
+        meta.get("cron_done", {})
+
+    nodes: list[dict[str, Any]] = [
+        {"id": "user", "band": 1, "kind": "user", "name": "Cümle",
+         "sub": "/openclaw schedule",
+         "note": str(run.question)[:110] or "Zamanlama isteği."},
+        {"id": "parse", "band": 1, "kind": "component", "name": "Ayrıştırıcı",
+         "sub": "scheduler.parse_command", "lane": "ours",
+         "note": (f"Hata: {parse['error']}"[:110] if parse.get("error")
+                  else "Türkçe cümle cron ifadesine çevrildi.")},
+        {"id": "gate", "band": 1, "kind": "gate", "name": "Kapı",
+         "sub": "GATE.require · cron.add", "lane": "ours",
+         "note": ("Onay bekliyor — imza yazılan cümlenin üstünde."
+                  if gate.get("held") else
+                  "İmza yazılan cümlenin üstünde, çözülmüş zamanın değil.")},
+        {"id": "cron", "band": 1, "kind": "component", "name": "Zamanlayıcı",
+         "sub": "openclaw cron.add", "lane": "ext", "terminal": True,
+         "note": (f"{done.get('when', '')}"[:110] if done.get("when")
+                  else "OpenClaw'ın Gateway sürecinde, SQLite'ta.")},
+    ]
+    edges: list[dict[str, Any]] = [
+        {"src": "user", "dst": "parse", "message": "metin", "at": 0.0,
+         "note": "Ne yazıldıysa o — ayrıştırma sonrası değil."},
+        {"src": "parse", "dst": "gate", "message": "cron ifadesi", "at": 0.0,
+         "note": "Dışarı yazan bir çağrı; kapıdan geçmesi gerekiyor."},
+        {"src": "gate", "dst": "cron",
+         "message": "red" if gate.get("held") else "cron.add",
+         "at": 0.0,
+         "note": ("Onay tüketilmedi: iş yaratılmadı." if gate.get("held")
+                  else "İş OpenClaw'ın zamanlayıcısına yazıldı.")},
+    ]
+    if "cron_done" not in ids and "cron_gate" in ids:
+        nodes[-1]["note"] = "Henüz yazılmadı."
+    return {"nodes": _attach_inner(nodes), "edges": edges,
+            "bands": [{"id": "agent", "label": "AJAN · bu turda yok"},
+                      {"id": "gateway", "label": "GATEWAY · bizim hat"}],
+            "shape": "zamanlama devri — AutoGen'in payı yok"}
 
 
 MAF_LANES = [

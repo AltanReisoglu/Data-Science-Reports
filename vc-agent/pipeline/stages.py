@@ -247,6 +247,40 @@ CATALOGUE: dict[str, Mechanism] = {
             "çağrısı olarak gerçekleşiyor — ölçülen en pahalı desen bu yüzden.",
             "pipeline/teams.py",
         ),
+        # Zamanlayıcı. Bizim yazdığımız hat: AutoGen'de zamanlama diye bir
+        # kavram yok, ve olmaması bir eksiklik değil — bir kütüphane saat
+        # tutmaz. Bu üç aşama `scheduler.py`'nin OpenClaw'ın cron'una devrettiği
+        # işin ekrandaki karşılığı.
+        Mechanism(
+            "cron_parse", OURS, "Zamanlama okundu",
+            "scheduler.parse_command()", "18:63",
+            "\"her sabah 9'da\" gibi bir cümle cron ifadesine çevriliyor. "
+            "Çeviremezse SORMUYOR — sözdizimini yazıp reddediyor.",
+            "pipeline/scheduler.py",
+        ),
+        Mechanism(
+            "cron_gate", OURS, "Zamanlama kapıda",
+            "GATE.require() → cron.add", "18:150",
+            "İş yaratmak dışarı yazan bir çağrı. Onay imzası KULLANICININ "
+            "YAZDIĞI cümlenin üstünde: \"20dk sonra\" her ayrıştırmada başka "
+            "bir zaman damgası veriyor ve sonucun üstündeki imza hiç tutmazdı.",
+            "pipeline/server.py",
+        ),
+        Mechanism(
+            "cron_done", OURS, "Zamanlayıcıya devredildi",
+            "openclaw cron.add", "18:502",
+            "Zamanlayıcı bizde değil. OpenClaw'ın Gateway sürecinde yaşıyor, "
+            "işleri SQLite'ta tutuyor ve yeniden başlatmayı atlatıyor. "
+            "gateway/cron.py yerli karşılığı — yazıldı, bağlanmadı.",
+            "pipeline/scheduler.py",
+        ),
+        Mechanism(
+            "team_tool", CORE, "Ajan tool çağırdı",
+            "workbench.call_tool()", "05:2473",
+            "Kadro sabit ama iş bölümü koşuya ait: hangi ajanın hangi tool'a "
+            "uzandığı, takım tipinin gerçekten farklı davrandığının kanıtı.",
+            "pipeline/teams.py",
+        ),
         Mechanism(
             "team_done", AGENTCHAT, "Takım bitti",
             "TerminationCondition → TaskResult", "08:2813",
@@ -394,7 +428,11 @@ SCAN_FLOW = ("graph_build", "intervention", "graph_run", "analysts", "join",
              "count", "runtime_stop")
 # Bir takım koşusunun yolu. Sohbetten farkı: burada gerçekten bir takım var,
 # ve ekranın "takım yok" demediği tek yol bu.
-TEAM_FLOW = ("team_build", "speaker", "handoff", "team_done", "runtime_stop")
+TEAM_FLOW = ("team_build", "speaker", "team_tool", "handoff", "team_done",
+             "runtime_stop")
+# Zamanlama turu: sohbetin içinden çıkıyor, ayrı bir koşu değil. Şeritte
+# göründüğü yer de bu yüzden sohbet akışının içi.
+CRON_FLOW = ("cron_parse", "cron_gate", "cron_done")
 # MAF turu. Ayrı bir şerit rengi var çünkü ayrı bir çerçeve — AutoGen'in
 # katmanlarıyla aynı renge boyamak, ekranın anlattığı ayrımı silerdi.
 MAF_FLOW = ("maf_build", "maf_tool", "maf_gate", "maf_agent", "maf_session",
@@ -715,6 +753,54 @@ DETAILS: dict[str, dict[str, str]] = {
                "nereden geldiği.",
         "trap": "`SelectorGroupChat`, ajanların `description` alanına bakarak "
                 "seçiyor. Boşsa seçim kör yapılıyor ve hata da vermiyor.",
+    },
+    "cron_parse": {
+        "what": "Türkçe bir zamanlama cümlesi cron ifadesine çevrildi.",
+        "how": "`parse_command` metni ayrıştırıyor; anlamadığında `WhenError` "
+               "fırlatıp kabul edilen sözdizimini yazıyor.",
+        "why": "Zamanlamada tahmin etmek pahalı: yanlış okunan bir cümle her "
+               "gün yanlış saatte koşan bir iş demek, ve kimse fark etmiyor.",
+        "trap": "Cron'un gün alanları **OR**'lanıyor: `0 9 * * 1` ile "
+                "`0 9 1 * *` birlikte yazılırsa hem pazartesileri hem ayın "
+                "birinde koşuyor. OpenClaw bunu ayrı ayrı iş açarak çözüyor.",
+    },
+    "cron_gate": {
+        "what": "Zamanlanmış iş yaratma çağrısı kapıya geldi.",
+        "how": "`GATE.require()` — imza **kullanıcının yazdığı cümlenin** "
+               "üstünde, çözülmüş zaman damgasının değil.",
+        "why": "\"20dk sonra\" her ayrıştırmada başka bir zaman veriyor. "
+               "Sonucun üstündeki bir imza hiçbir zaman tutmazdı ve onay "
+               "sistemi sessizce işe yaramaz hâle gelirdi.",
+        "trap": "Zamanlanmış iş, onayı **gelecekteki** bir koşuya taşıyor: "
+                "onaylayan kişi o an odada olmayacak. Bu yüzden her koşu "
+                "kendi taze oturumunu alıyor ve bağlam taşımıyor.",
+    },
+    "cron_done": {
+        "what": "İş OpenClaw'ın zamanlayıcısına yazıldı.",
+        "how": "`cron.add` — iş OpenClaw'ın Gateway sürecinde, SQLite'ta "
+               "yaşıyor; süreç yeniden başlarsa geçmiş işleri tekrar "
+               "oynatmıyor, yeniden zamanlıyor.",
+        "why": "Zamanlayıcı bizim değil, ve bilinçli: OpenClaw'ın zaten "
+               "koşan, kalıcı ve yeniden başlatmayı atlatan bir zamanlayıcısı "
+               "var. Gecelik bir tarama için onu yeniden yazmak, ölçtüğümüz "
+               "kararları yeniden türetmek olurdu.",
+        "trap": "Bu devir bir bağımlılık: OpenClaw ayakta değilse zamanlanmış "
+                "hiçbir iş koşmuyor ve bunu söyleyen bir alarm yok. "
+                "`gateway/cron.py` yerli karşılığı — yazıldı ve testli, ama "
+                "hiçbir yerden çağrılmıyor.",
+    },
+    "team_tool": {
+        "what": "Takımdaki bir ajan bir tool çağırdı.",
+        "how": "`ToolCallRequestEvent`in `content`inde çağrının adı var; olay "
+               "hangi ajandan geldiyse `source` orada yazıyor. Devir tool'ları "
+               "(`transfer_to_*`) dışarıda tutuluyor — onlar zaten `handoff` "
+               "olarak çiziliyor ve iki kez göstermek Swarm'ı kalabalık yapar.",
+        "why": "Konuşma sırası **kimin** konuştuğunu söylüyor, bu **ne yaptığını**. "
+               "İkisi olmadan beş takım tipi ekranda birbirinin aynı üç kutu "
+               "olarak duruyor, ve grafın anlatması gereken tek fark iş bölümü.",
+        "trap": "Takımdaki ajanlara tool vermezsen bu aşama hiç çıkmaz ve graf "
+                "yalnız konuşma sırasını gösterir — eksik değil, ama takımın "
+                "gerçekten iş yaptığını da göstermez.",
     },
     "handoff": {
         "what": "Bir ajan işi başka bir ajana devretti.",

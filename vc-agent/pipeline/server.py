@@ -819,16 +819,39 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
 
     So this branch never asks anything. It parses, and either creates, lists,
     removes, or refuses with the syntax spelled out.
+
+    ### Neden burada da bir kayıt açılıyor
+
+    Zamanlama, akış ekranında görünmeyen tek yoldu: sohbet, takım, tarama ve MAF
+    kendi turlarını kaydederken `/openclaw schedule` hiçbir iz bırakmıyordu.
+    Ekranın "bu sistemde ne olduğunu gösteriyorum" iddiası varsa, kaydetmediği
+    bir yol o iddianın deliği olur. Üç aşama az ama doğru üç aşama: cümlenin
+    okunması, kapı, ve devir.
     """
     import scheduler as scheduler_module
 
+    run = runlog.LOG.begin("cron", plan["text"][:160], record.id)
+    bus = stages.StageBus()
+
+    def _flush() -> None:
+        runlog.LOG.record(run, bus.drain())
+
     try:
         command = scheduler_module.parse_command(plan["text"])
+        bus.emit("cron_parse", text=plan["text"][:120],
+                 action=command["action"])
+        _flush()
     except scheduler_module.WhenError as exc:
+        # Ayrıştırma hatası da kaydediliyor: reddedilen bir zamanlama, hiç
+        # denenmemiş bir zamanlamadan farklı bir şey.
+        bus.emit("cron_parse", text=plan["text"][:120], error=str(exc)[:120])
+        _flush()
+        run.end("error")
         return {"ok": False, "method": "schedule", "tier": "local", "error": str(exc)}
 
     if command["action"] == "list":
         listing = await scheduler_module.jobs()
+        run.end()
         return {"ok": True, "method": "schedule", "tier": "local", "result": listing}
 
     if command["action"] == "remove":
@@ -837,13 +860,25 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
              "params": {"id": command["id"]}, "text": "", "error": ""},
             record.id,
         )
-        return held if held is not None else await scheduler_module.remove(command["id"])
+        bus.emit("cron_gate", method="cron.remove", held=held is not None)
+        _flush()
+        if held is not None:
+            run.end("blocked")
+            return held
+        out = await scheduler_module.remove(command["id"])
+        bus.emit("cron_done", action="remove", id=command["id"])
+        _flush()
+        run.end()
+        return out
 
     try:
         params = scheduler_module.build_job(
             command["ask"][:60], command["when"], command["ask"], to=command["to"]
         )
     except scheduler_module.WhenError as exc:
+        bus.emit("cron_parse", text=plan["text"][:120], error=str(exc)[:120])
+        _flush()
+        run.end("error")
         return {"ok": False, "method": "schedule", "tier": "local", "error": str(exc)}
 
     # Signed on what was typed, not on the resolved schedule: `"20dk sonra"` is a
@@ -855,11 +890,19 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
          "text": "", "error": ""},
         record.id,
     )
+    bus.emit("cron_gate", method="cron.add", held=held is not None,
+             when=scheduler_module.describe(params["schedule"])[:80])
+    _flush()
     if held is not None:
+        run.end("blocked")
         return held
 
     outcome = await openclaw_control.call("cron.add", params)
     outcome["when"] = scheduler_module.describe(params["schedule"])
+    bus.emit("cron_done", action="add", ok=bool(outcome.get("ok")),
+             when=outcome["when"][:80], to=command["to"] or "—")
+    _flush()
+    run.end("done" if outcome.get("ok") else "error")
     if not command["to"]:
         outcome["note"] = (
             "Teslimat hedefi verilmedi: iş koşacak ama sonucu yalnız task kaydına "

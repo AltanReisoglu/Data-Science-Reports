@@ -34,9 +34,16 @@ class CatalogueTest(unittest.TestCase):
         kendi sembolüne (`maf:FunctionTool`). İkisi de bir okuyucunun gidip
         bakabileceği bir yer; atıfsız bir iddia, birkaç gün sonra yanlış
         anlatılıyor.
+
+        Üçüncü biçim sonradan eklendi: `18:150`. Zamanlayıcı mekanizmalarının
+        AutoGen'de atıf verecekleri bir yer **yok**, çünkü AutoGen'de zamanlama
+        diye bir kavram yok — ve bu bir eksiklik değil, bir kütüphane saat
+        tutmaz. Onlar bizim kendi analizimize (`docs/18`) atıf veriyor. Kural
+        gevşemiyor: hâlâ bu depoda açılıp bakılabilecek bir satır isteniyor.
         """
         for mech in stages.CATALOGUE.values():
-            pattern = r"^maf:[A-Za-z_]+$" if mech.lane == stages.MAF else r"^0[58]:\d+$"
+            pattern = (r"^maf:[A-Za-z_]+$" if mech.lane == stages.MAF
+                       else r"^(0[58]|18):\d+$")
             self.assertRegex(
                 mech.ref, pattern,
                 f"{mech.id} atıfsız ya da yanlış biçimde: {mech.ref!r}",
