@@ -146,6 +146,9 @@ celerybeat.pid
 .env
 .envrc
 .venv
+# MAF ayrı bir sanal ortamda koşuyor (`agent-framework` ile `autogen-*`
+# aynı bağımlılık ağacında çözülemedi). 1 GB; koda ait değil, ortama ait.
+.venv-maf
 env/
 venv/
 ENV/

@@ -13,6 +13,13 @@ served over `/api/mechanisms`. The browser holds none of it. A panel that teache
 from strings hardcoded in JavaScript drifts away from the code it describes within
 a release or two, and nothing fails when it does.
 
+The chat no longer draws any of this. The panel that used to sit above the
+composer was removed so the explaining could get an interface of its own; the
+catalogue, the bus and `/api/mechanisms` are untouched and still emit on every
+turn, which is what that interface will read. The one consumer left in the chat
+is the terminal, which listens for `code_request` and `code_result` and ignores
+the rest.
+
 ### Three lanes, and why the third one exists
 
 ``agentchat`` and ``core`` are AutoGen's own layers. ``ours`` is the third, and
@@ -34,11 +41,13 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
 # Lanes. The order is the order they are drawn in.
 AGENTCHAT = "agentchat"
+MAF = "maf"
 CORE = "core"
 OURS = "ours"
 
@@ -157,6 +166,93 @@ CATALOGUE: dict[str, Mechanism] = {
             "TaskResult.stop_reason", "08:2813",
             "TaskResult iki şey taşıyor: bütün konuşma ve neden durduğu.",
             "pipeline/conversation.py",
+        ),
+
+        # ---- MAF: halef çerçeve, ayrı sanal ortamda --------------------------
+        Mechanism(
+            "maf_build", MAF, "MAF kuruldu",
+            "agent_framework 1.14.0 · OpenAIChatClient", "maf:Agent",
+            "AutoGen'in resmî halefi. Ayrı bir sanal ortamda koşuyor: iki çerçeve "
+            "aynı bağımlılık ağacını paylaşamıyor.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_tool", MAF, "Tool tanımlandı",
+            "FunctionTool(approval_mode, max_invocations)", "maf:FunctionTool",
+            "Onay ve çağrı tavanı tool'un KENDİ alanları. AutoGen'de ikisi de yok: "
+            "kapıyı sarmalayıcı olarak, tavanı ajan ayarı olarak biz kuruyoruz.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_gate", MAF, "Kapı çerçevede",
+            "ToolApprovalMiddleware", "maf:ToolApprovalMiddleware",
+            "Onay ara katmanı hazır geliyor. Bizim GatedWorkbench'imizin karşılığı, "
+            "ama yazılmış hâlde.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_agent", MAF, "Ajan kuruldu",
+            "agent_framework.Agent", "maf:Agent",
+            "Ayrı bir run_stream() yok: akış run(stream=True) parametresi. "
+            "AutoGen'de bunlar iki ayrı yüzey.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_session", MAF, "Oturum açıldı",
+            "AgentSession", "maf:AgentSession",
+            "Onay ara katmanı oturumsuz koşuya takılamıyor — ölçüldü, "
+            "RuntimeError ile düşüyor.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_run", MAF, "Ajan koşuyor",
+            "Agent.run(messages, session=...)", "maf:Agent",
+            "Tek çağrı. Tool döngüsü çerçevenin içinde dönüyor.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_approval", MAF, "Onay istendi",
+            "AgentResponse.user_input_requests", "maf:AgentResponse",
+            "Onay cevabın BİRİNCİ SINIF alanı: tur duruyor, finish_reason "
+            "'tool_calls' oluyor ve bir function_approval_request dönüyor.",
+            "pipeline/maf_runner.py",
+        ),
+        Mechanism(
+            "maf_done", MAF, "MAF turu bitti",
+            "AgentResponse", "maf:AgentResponse",
+            "Tool çağrıldığında response.text BOŞ kalıyor ve cevap mesajların "
+            "içinde — AutoGen'in reflect_on_tool_use varsayılanıyla aynı sonuç.",
+            "pipeline/maf_runner.py",
+        ),
+
+        # ---- takımlar: beş tipin gerçekten koştuğu yol -------------------------
+        Mechanism(
+            "team_build", AGENTCHAT, "Takım kuruldu",
+            "RoundRobin / Selector / Swarm / MagenticOne / GraphFlow", "08:1789",
+            "Beş tipin tek farkı sırayı kimin belirlediği: sabit döngü, model "
+            "seçimi, ajanın devri, planlayıcı, ya da önceden çizilmiş graf.",
+            "pipeline/teams.py",
+        ),
+        Mechanism(
+            "speaker", AGENTCHAT, "Sıra bir ajanda",
+            "BaseGroupChatManager.select_speaker", "08:1908",
+            "Konuşan değişti. Kimin konuşacağına karar veren mekanizma takım "
+            "tipine göre değişiyor; ajanlar aynı kalıyor.",
+            "pipeline/teams.py",
+        ),
+        Mechanism(
+            "handoff", AGENTCHAT, "Devir",
+            "Handoff(target=...) → tool çağrısı", "08:2093",
+            "Swarm'da sırayı ajanın kendisi devrediyor ve devir bir TOOL "
+            "çağrısı olarak gerçekleşiyor — ölçülen en pahalı desen bu yüzden.",
+            "pipeline/teams.py",
+        ),
+        Mechanism(
+            "team_done", AGENTCHAT, "Takım bitti",
+            "TerminationCondition → TaskResult", "08:2813",
+            "Sonlandırma koşulu tetiklendi. Koşulu olmayan takım sonsuza kadar "
+            "konuşuyor ve fatura gerçek.",
+            "pipeline/teams.py",
         ),
 
         # ---- the scan, which is GraphFlow and not core -------------------------
@@ -296,6 +392,13 @@ CHAT_FLOW = ("context", "model", "stream", "tool_request", "gate", "tool_exec", 
 # because `scan.py` does not call them.
 SCAN_FLOW = ("graph_build", "intervention", "graph_run", "analysts", "join",
              "count", "runtime_stop")
+# Bir takım koşusunun yolu. Sohbetten farkı: burada gerçekten bir takım var,
+# ve ekranın "takım yok" demediği tek yol bu.
+TEAM_FLOW = ("team_build", "speaker", "handoff", "team_done", "runtime_stop")
+# MAF turu. Ayrı bir şerit rengi var çünkü ayrı bir çerçeve — AutoGen'in
+# katmanlarıyla aynı renge boyamak, ekranın anlattığı ayrımı silerdi.
+MAF_FLOW = ("maf_build", "maf_tool", "maf_gate", "maf_agent", "maf_session",
+            "maf_run", "maf_approval", "maf_done")
 
 # Drawn dim, always. See the module docstring: this lane is a measurement.
 # The last sentence used to say the scan is where core really runs. It is not —
@@ -337,7 +440,8 @@ def emit_line(stage_id: str, **meta: Any) -> None:
     if not line_streaming() or stage_id not in CATALOGUE:
         return
     try:
-        print(LINE_TAG + json.dumps({"id": stage_id, "meta": meta}, ensure_ascii=False),
+        print(LINE_TAG + json.dumps({"id": stage_id, "t": time.time(), "meta": meta},
+                                    ensure_ascii=False),
               flush=True)
     except Exception:  # noqa: BLE001 — a scan must not die reporting on itself
         pass
@@ -354,7 +458,10 @@ def parse_line(line: str) -> dict[str, Any] | None:
     mechanism = CATALOGUE.get(str(raw.get("id")))
     if mechanism is None:
         return None
-    event = {"type": "stage", **mechanism.as_dict()}
+    # The scan is a subprocess, so this timestamp was taken over there. Same
+    # machine, same clock — and it is still closer to the truth than the moment
+    # the server happened to read the line off stdout.
+    event = {"type": "stage", "t": raw.get("t") or time.time(), **mechanism.as_dict()}
     if raw.get("meta"):
         event["meta"] = raw["meta"]
     return event
@@ -382,7 +489,13 @@ class StageBus:
             # An unknown id is a bug in the caller, but a panel is not worth
             # breaking a turn over. Drop it; `test_stages` catches the drift.
             return
-        event = {"type": "stage", **mechanism.as_dict()}
+        # Emitted-at, not drained-at. The queue is drained only when the run
+        # loop next yields, so a gate decision taken underneath an awaited tool
+        # call reaches the reader seconds after it happened. Stamping here is
+        # what keeps a timeline from collapsing six stages onto one instant —
+        # measured: a real turn showed context, model, gate and tool_exec all at
+        # +8.23s because the first drain was the first timestamp anyone took.
+        event = {"type": "stage", "t": time.time(), **mechanism.as_dict()}
         if meta:
             event["meta"] = meta
         try:
@@ -415,8 +528,342 @@ class StageBus:
 # So `GatedWorkbench` emits its own stages instead. It is the only place that
 # sees all three outcomes — filtered by name, blocked by a hook, allowed through.
 
+
+# --------------------------------------------------------------- uzun anlatım
+#
+# `Mechanism.note` bir cümle: şeridin altında, geçerken okunacak kadar. Bu tablo
+# onun uzun hâli — bir aşamanın üstüne basıldığında baştan sona anlatılması için.
+#
+# Dört soru, hep aynı sırada, çünkü bir mekanizmayı anlamak hep aynı sırada
+# oluyor: **ne** olduğu, **nasıl** çalıştığı, **neden** böyle kurulduğu, ve
+# **nerede ısırdığı**. Dördüncüsü en değerlisi ve çoğu belgede hiç yazmıyor.
+#
+# Katalogla aynı dosyada duruyor, çünkü ikisi birlikte değişiyor: bir mekanizma
+# adı değiştiğinde anlatımı da değişmeli, ve iki dosyaya bakmak birini unutmanın
+# en kısa yolu.
+DETAILS: dict[str, dict[str, str]] = {
+    # ---------------------------------------------------------------- sohbet
+    "context": {
+        "what": "Modele gönderilecek mesaj kümesi burada seçiliyor. Ajanın "
+                "belleği bu nesnede yaşıyor; `model_context` verilmezse ajanın "
+                "belleği hiç olmuyor ve bu durum hata da vermiyor.",
+        "how": "`CompactingChatCompletionContext.get_messages()` çağrılıyor ve "
+               "geçmiş, token bütçesine göre kırpılıyor. AutoGen'in kendi "
+               "`BufferedChatCompletionContext`'i **mesaj** sayar; bu bizim "
+               "yazdığımız hâli **token** sayıyor.",
+        "why": "Mesaj saymak, uzunlukları çok farklı mesajlarda bütçeyi tutmaz: "
+               "on kısa mesaj ile on uzun mesaj aynı sayılır ama aynı maliyette "
+               "değildir. Bütçe token cinsinden konuşulduğu için sayaç da token "
+               "saymalı.",
+        "trap": "Her tur sistem prompt'u, tool şemaları ve workbench tarifleri "
+                "yeniden gönderiliyor. \"merhaba\" bile tam tarifeyi ödüyor — "
+                "bağlamın tabanı sabit bir maliyet, ve bütçeyi asıl o belirliyor.",
+    },
+    "compaction": {
+        "what": "Bağlam bütçeyi aştı ve eski mesajlar özete indirildi.",
+        "how": "Model çağrısından hemen önce, tur ortasında oluyor. Kırpılan "
+               "mesajlar atılmıyor; yerlerine bir özet konuyor.",
+        "why": "Bütçeyi aşan istek reddedilir. Sıkıştırma, uzun bir konuşmanın "
+               "turu düşürmeden sürmesini sağlıyor.",
+        "trap": "Özet bir kayıptır. Sıkıştırma sonrası ajan, konuşmanın erken "
+                "kısmındaki bir ayrıntıyı artık bilmiyor olabilir — ve bunu "
+                "bilmediğini de bilmiyor.",
+    },
+    "model": {
+        "what": "Model çağrısı. Ajan, bağlamı ve tool şemalarını modele "
+                "gönderiyor ve bir karar bekliyor: cevap mı yazsın, tool mu "
+                "çağırsın.",
+        "how": "`create()` değil `create_stream()` çağrılıyor. İkisi farklı "
+               "olaylar yayıyor: birincisi `LLMCallEvent`, ikincisi "
+               "`LLMStreamEndEvent`.",
+        "why": "Akış olmadan cevap tek parça geliyor ve arayüz, model bitirene "
+               "kadar donmuş görünüyor. `model_client_stream=True` bunun için.",
+        "trap": "Maliyeti yalnız `LLMCallEvent` dinleyerek sayan bir gözlemci, "
+                "akışlı çağrılarda **sıfır** görür. Ölçüldü: iki sayaç birden "
+                "gerekiyor, yoksa maliyet ya iki modda da yanlış ya hiç yok.",
+    },
+    "stream": {
+        "what": "Cevap token token geliyor.",
+        "how": "Her parça bir `ModelClientStreamingChunkEvent`. Tur bitmeden "
+               "ekranda metin oluşmaya başlıyor.",
+        "why": "Bekleme süresi değişmiyor, ama algılanan süre değişiyor: ilk "
+               "token'ın ekrana düştüğü an, sistemin çalıştığının kanıtı.",
+        "trap": "Akış açıkken nihai metin iki yerden gelebiliyor — parçalardan "
+                "ve `TaskResult`'tan. İkisini birden yazan bir arayüz cevabı "
+                "iki kez gösterir.",
+    },
+    "tool_request": {
+        "what": "Model bir tool çağırmaya karar verdi. **Henüz hiçbir şey "
+                "koşmadı** — bu yalnız bir istek.",
+        "how": "`ToolCallRequestEvent`, tool adı ve modelin seçtiği "
+               "argümanlarla geliyor. Şema, fonksiyon imzasından ve "
+               "docstring'den üretilmiş.",
+        "why": "İstek ile yürütmenin ayrı olaylar olması bir tasarım kararı: "
+               "aradaki boşluk, kapının oturduğu yer. Tek olay olsaydı "
+               "araya girecek yer olmazdı.",
+        "trap": "Docstring dokümantasyon değil, **arayüz**. Yanlış yazılmış bir "
+                "docstring, yanlış çağrılan bir tool demek — ve bu hata "
+                "çalışma anında değil, cevabın içeriğinde görünür.",
+    },
+    "gate": {
+        "what": "Kapı. Her tool çağrısının geçtiği tek nokta, ve bizim "
+                "kodumuz — AutoGen'de böyle bir şey yok.",
+        "how": "`GatedWorkbench`, herhangi bir `Workbench`'i sarmalıyor ve "
+               "`before_tool_call` kancasını çalıştırıyor. Politika reddederse "
+               "çağrı hiç yapılmıyor; geriye hata işaretli bir `ToolResult` "
+               "dönüyor.",
+        "why": "Red bir **istisna değil**, bir sonuç. İstisna turu düşürürdü; "
+               "sonuç, ajanın gerekçeyi okuyup kullanıcıya söylemesine izin "
+               "veriyor. Kapı, ajanın uyum göstermeyi seçmesine değil, hattın "
+               "kendisine dayanıyor.",
+        "trap": "İmza `(tool, argümanlar)` üstünde ve bir kez tüketiliyor. "
+                "Model aynı soruya iki kez aynı programı yazmıyor — ölçüldü — "
+                "yani onaylanan şeyin çalışması için **onaylanan metnin** "
+                "saklanması gerekiyor, yeniden üretilenin değil.",
+    },
+    "tool_exec": {
+        "what": "Tool gerçekten koşuyor.",
+        "how": "`workbench.call_tool()` çağrılıyor. Workbench bir tool "
+               "*kaynağı*: yerel fonksiyonlar `StaticWorkbench`'te, OpenClaw ve "
+               "DeepWiki `McpWorkbench`'te — ajan için hepsi aynı arayüz.",
+        "why": "Ajana `tools=` ile düz bir liste vermek yerine bir kaynak "
+               "vermek, kaynağı sarmalanabilir yapıyor. Kapı tam olarak bunu "
+               "kullanıyor; liste verilseydi araya girecek yer olmazdı.",
+        "trap": "`tools=` ve `workbench=` aynı ajana birlikte verilemiyor: "
+                "`ValueError: Tools cannot be used with a workbench.`",
+    },
+    "tool_result": {
+        "what": "Sonuç ajana döndü ve bağlama girdi.",
+        "how": "`ToolCallExecutionEvent`. Reddedilen çağrı da bu tiple dönüyor "
+               "— hata işaretiyle.",
+        "why": "İstek ve sonucun ayrı olaylar olması, aradaki kapının "
+               "reddedebilmesinden geliyor: reddedilirse sonuç hiç olmaz.",
+        "trap": "Varsayılanda ajan sonucu okuyup cevabı yazmıyor; ham tool "
+                "çıktısı doğrudan kullanıcıya gidiyor "
+                "(`ToolCallSummaryMessage`). Bunu açan ayrı bir anahtar var: "
+                "`reflect_on_tool_use`.",
+    },
+    "loop": {
+        "what": "Döngü devam ediyor: ajan sonucu gördü ve modeli tekrar çağırıyor.",
+        "how": "`max_tool_iterations=6`. Bu değer elle yükseltildi.",
+        "why": "Zincirleme davranış — bir tool'un çıktısını başka bir tool'a "
+               "vermek — ancak birden fazla tur mümkünse oluyor.",
+        "trap": "Varsayılan **1**. Yani varsayılanda ajan bir tool çağırır, "
+                "sonucu görür ve **durur**. Hata vermez; yalnız zincirleme "
+                "sessizce imkânsızdır.",
+    },
+    "code_request": {
+        "what": "Model, mevcut tool'ların karşılamadığı bir iş için Python yazdı.",
+        "how": "Kod normal bir tool çağrısı olarak gidiyor: aynı döngü, aynı "
+               "kapı, aynı onay. Onay kartında çalışacak metnin kendisi görünüyor.",
+        "why": "Kaçış kapağı, orkestrasyon dili değil. Model önce mevcut "
+               "tool'lara bakıyor; uyan bir tool yoksa kod yazıyor.",
+        "trap": "Onay, çalıştırılacak **metne** bağlanmalı. Model aynı soruya "
+                "her seferinde farklı bir program yazıyor; onayı yeniden "
+                "üretilen koda bağlarsan onay hiç tüketilemiyor.",
+    },
+    "code_result": {
+        "what": "Program izole bir konteynerde koştu ve çıktısı döndü.",
+        "how": "`PythonCodeExecutionTool` + `DockerCommandLineCodeExecutor`. "
+               "Konteyner sürece ait, çağrıya değil: her çağrıda konteyner "
+               "ayağa kaldırmak iki üç saniye ve demoyu öldürüyor.",
+        "why": "Model kodu doğrudan makinede koşturmuyor; yıkım yarıçapı "
+               "konteynerle sınırlanıyor.",
+        "trap": "Konteynerin **ağ erişimi var**. `DockerCommandLineCodeExecutor` "
+                "içinde `network_mode` diye bir parametre yok — ölçüldü. "
+                "Varsayılan kapalı olması ve onay kartının bunu yazması, "
+                "\"sandbox güvenli\" demenin yerine geçmiyor.",
+    },
+    "done": {
+        "what": "Tur bitti.",
+        "how": "`TaskResult` iki şey taşıyor: bütün konuşma (`messages`) ve "
+               "neden durduğu (`stop_reason`).",
+        "why": "Turun nasıl bittiği, ne ürettiği kadar önemli: süre sınırı mı "
+               "doldu, sonlandırma koşulu mu tetiklendi, model mi bitirdi.",
+        "trap": "`stop_reason` boşsa takım değil **tek ajan** koştu — "
+                "sonlandırma koşulu yalnız takımlarda var. Ayrıca bu aşamanın "
+                "`tool_calls` sayacı yalnız **koşan** çağrıları sayıyor: kapı "
+                "bir çağrıyı tuttuğunda sıfır kalıyor, ve sıfıra bakıp \"model "
+                "tool çağırmıyor\" demek yanlış bir teşhis oluyor.",
+    },
+    # ---------------------------------------------------------------- takımlar
+    "team_build": {
+        "what": "Beş takım tipinden biri kuruldu ve aynı üç ajanla koşuyor. "
+                "`MagenticOneGroupChat` bir istisna: kadroya ek olarak kendi "
+                "yöneticisini de yaratıyor.",
+        "how": "Kadro sabit: Planner · Researcher · Critic. Değişen tek şey "
+               "sırayı belirleyen mekanizma.",
+        "why": "Kadro da değişseydi ölçülen token farkının takım tipinden mi "
+               "kadrodan mı geldiği belirsiz kalırdı.",
+        "trap": "Sonlandırma koşulu olmayan takım sonsuza kadar konuşuyor. "
+                "Buradaki `MaxMessageTermination` bir maliyet tavanı, üslup "
+                "tercihi değil. Ayrı bir uyarı: `MagenticOne` preset'i "
+                "(WebSurfer · FileSurfer · Coder · ComputerTerminal) tarayıcı "
+                "ve kabuk kullanıyor; resmî kılavuz onu konteynerde ve insan "
+                "gözetiminde koşturmayı, logları izlemeyi ve web sayfalarından "
+                "gelen prompt injection'a dikkat etmeyi şart koşuyor. Biz o "
+                "preset'i koşturmuyoruz — yalnız yöneticiyi kendi ajanlarımızın "
+                "üstünde kullanıyoruz.",
+    },
+    "speaker": {
+        "what": "Sıra bir ajana geçti.",
+        "how": "RoundRobin sırayla dolaşıyor; Selector her turdan önce bir model "
+               "çağrısıyla soruyor; Swarm'da ajanın kendisi devrediyor; "
+               "MagenticOne'da bir planlayıcı dağıtıyor; GraphFlow'da sıra "
+               "önceden çizilmiş graftan geliyor.",
+        "why": "Bir takımı diğerinden ayıran şey ajanları değil, sıranın "
+               "nereden geldiği.",
+        "trap": "`SelectorGroupChat`, ajanların `description` alanına bakarak "
+                "seçiyor. Boşsa seçim kör yapılıyor ve hata da vermiyor.",
+    },
+    "handoff": {
+        "what": "Bir ajan işi başka bir ajana devretti.",
+        "how": "Devir bir **tool çağrısı**: `Handoff(target=...)` bir "
+               "`transfer_to_<ajan>` tool'u üretiyor ve model onu çağırıyor.",
+        "why": "Yönlendirme kararı dışarıdaki bir yöneticide değil, ajanın "
+               "kendisinde. Agents SDK'nın tek modeli bu.",
+        "trap": "Tool adı küçük harfe düşüyor; elle yazınca eşleşmiyor. "
+                "Ve ölçüldü: her devir bir tur demek — 334 token ile en pahalı "
+                "desen.",
+    },
+    "team_done": {
+        "what": "Sonlandırma koşulu tetiklendi ve takım durdu.",
+        "how": "`TaskResult` bütün konuşmayı ve `stop_reason`'ı taşıyor.",
+        "why": "Turun nasıl bittiği ne ürettiği kadar önemli: koşul mu doldu, "
+               "mesaj tavanı mı, yoksa ajanlar mı bitirdi.",
+        "trap": "`stop_reason` boşsa takım değil tek ajan koşmuştur — "
+                "sonlandırma koşulu yalnız takımlarda var.",
+    },
+    # ---------------------------------------------------------------- tarama
+    "graph_build": {
+        "what": "Graf kuruluyor: beş katılımcı ve aralarındaki kenarlar.",
+        "how": "`DiGraphBuilder` ile düğümler ekleniyor, üç analist dalından "
+               "risk denetçisine giden kenarlara `activation_condition=\"all\"` "
+               "veriliyor, sonra `GraphFlow` üretiliyor.",
+        "why": "Zenginleştirme sabit ve paralel. GraphFlow, AutoGen'de gerçek "
+               "eşzamanlılığı olan tek takım — diğer dördü sırayla konuşuyor.",
+        "trap": "Grafın kenarları **veri taşımıyor**. Bütün katılımcılar tek bir "
+                "paylaşılan `group_topic_type`'a abone; mesaj zaten herkese "
+                "gidiyor ve kenarlar yalnız sıranın kimde olduğunu belirliyor.",
+    },
+    "graph_run": {
+        "what": "Graf koşmaya başladı.",
+        "how": "Görev tek bir yayınla giriyor ve üç dal aynı anda çalışmaya "
+               "başlıyor.",
+        "why": "Paralellik bir model kararı değil, bir abonelik tablosu "
+               "sonucu: yayınlayan taraf kaç dalın dinlediğini bilmiyor.",
+        "trap": "Bir dal çökerse `gather` erken dönüyor ve tamamlanmış "
+                "kardeşlerin sonuçları sessizce kaybolabiliyor — ölçüldü, "
+                "deterministik bile değil.",
+    },
+    "analysts": {
+        "what": "Üç analist dalı paralel koşuyor: teknik, pazar, ekip.",
+        "how": "Üçü de aynı görevi farklı gözle okuyor ve kimse kimseyi "
+               "beklemiyor.",
+        "why": "Kılavuzun *Concurrent Agents* deseni: tek yayın → çok dal → "
+               "toplayıcı.",
+        "trap": "Resmî desenler bu konuda birbiriyle çelişiyor: *Concurrent "
+                "Agents* sonucu kuyrukla topluyor, *Mixture of Agents* "
+                "`asyncio.gather` ile — ve sessiz kaybın kaynağı ikincisi.",
+    },
+    "join": {
+        "what": "Birleşme. Risk denetçisi, üç dal da gelmeden başlamıyor.",
+        "how": "Beklenen dal **sayısı** sayılıyor; runtime'ın \"boşta\" demesi "
+               "beklenmiyor.",
+        "why": "`stop_when_idle()` bariyeri bir dal çöktüğünde erken açılıyor. "
+               "Sayarak beklemek, o bariyere güvenmemek demek.",
+        "trap": "Gelmeyen her dal `missing_data`'ya yazılıyor: sessiz bir "
+                "eksik, beyan edilmiş bir bilgi yokluğuna çevriliyor. Eksik "
+                "veriyle düşük skor aynı şey değil.",
+    },
+    "count": {
+        "what": "Skorlayıcı şemaya bağlı çıktı üretiyor.",
+        "how": "`StructuredMessage[Score]` — alanları önceden tanımlı bir mesaj.",
+        "why": "Serbest metin bir skoru taşıyabilir ama doğrulayamaz. Şema, "
+               "eksik alanı bir hata hâline getiriyor.",
+        "trap": "Takıma `custom_message_types=[...]` ile beyan edilmezse runtime "
+                "`Message type StructuredMessage[X] is not registered` diyerek "
+                "düşüyor.",
+    },
+    "intervention": {
+        "what": "Müdahale kapısı: runtime'a takılan tek kapı.",
+        "how": "`AuditingInterventionHandler.on_publish` — her mesaj buradan "
+               "geçiyor ve denetim kaydına yazılıyor. `DropMessage` dönerse "
+               "teslimat hiç olmuyor.",
+        "why": "AgentChat'in mesaj listesi konuşmayı gösteriyor; bu, "
+               "yönlendirmeyi gösteriyor. Kapı ajanın davranışına değil, "
+               "runtime'a bağlı.",
+        "trap": "Takmanın bedeli runtime'ı kendin kurmak. Ve kendi runtime'ında "
+                "çöken bir ajan fırlatmıyor, **asılıyor**.",
+    },
+    "runtime_start": {
+        "what": "Aktör runtime'ı açıldı; mesaj işleme döngüsü başladı.",
+        "how": "`SingleThreadedAgentRuntime.start()`.",
+        "why": "Ajanlar gerçekten aktör: kendi mailbox'ı olan, mesajı **tipe "
+               "göre** yönlendiren birimler.",
+        "trap": "Bu runtime kısa ömürlü — şirket başına kurulup kapatılıyor. "
+                "Gateway'inki ise sürekli koşuyor; ikisi ayrı ömür ve "
+                "karıştırılırsa oturum durumu beklenmedik yerde kayboluyor.",
+    },
+    "subscribe": {
+        "what": "Abonelikler kuruldu.",
+        "how": "`TypeSubscription(topic_type, agent_type)`. Üç dal da **aynı** "
+               "topic tipine abone.",
+        "why": "Topic kaynağı, ajan anahtarına dönüşüyor: `TopicId(\"turn\", "
+               "\"oturum-42\")`'ye yayın yapmak `AgentId(\"session\", "
+               "\"oturum-42\")` ajanını yaratıyor — oturum başına izole örnek, "
+               "elle sözlük tutmadan.",
+        "trap": "Yayınlayan taraf kaç abonesi olduğunu bilmiyor. Bu paralelliğin "
+                "kaynağı, ama aynı zamanda \"kaç sonuç bekleyeceğim\" sorusunun "
+                "cevabının runtime'da olmamasının da sebebi.",
+    },
+    "publish": {
+        "what": "Görev yayınlandı.",
+        "how": "`runtime.publish_message(BranchTask, TopicId(...))` — tek satır.",
+        "why": "Tek yayın, üç ajan koşuyor. Tool değil, model kararı değil: düz "
+               "bir Python satırı ve bir abonelik tablosu araması.",
+        "trap": "Yayının dönüş değeri **yok**. Bir sonucu bekleyeceksen doğrudan "
+                "`send_message`, bir olayı duyuracaksan yayın. Handler çökerse "
+                "yayında loglanıyor, doğrudan çağrıda çağırana fırlatılıyor.",
+    },
+    "branch": {
+        "what": "Bir dal çalışıyor.",
+        "how": "`BranchWorker(RoutedAgent).handle` — handler'ı **tip anotasyonu** "
+               "seçti, bir if/else değil.",
+        "why": "Tipe göre yönlendirme, yeni bir mesaj tipi eklendiğinde "
+               "yönlendirme kodunu değiştirmeyi gereksiz kılıyor.",
+        "trap": "Bu ajan asla fırlatmıyor: hata da bir sonuç olarak "
+                "yayınlanıyor. Fırlatsaydı kardeşlerinin işini de götürürdü.",
+    },
+    "collect": {
+        "what": "Sonuç kuyruğa düştü.",
+        "how": "`ClosureAgent` → `asyncio.Queue`. Sonuç üretildiği anda "
+               "yayınlandı ve kuyruk onu çoktan tuttu.",
+        "why": "Güvenilmeyecek bariyer yok, çünkü bariyer yok. Ölçüldü: bu yol "
+               "arıza altında iki sonucu ~3 ms'de topluyor, GraphFlow ise sıfır "
+               "ya da bir sonuçla süre sınırına giriyor.",
+        "trap": "Kuyruğun sınırı ve tüketicisi olmalı. Tüketici yoksa sonuçlar "
+                "birikiyor ve kimse fark etmiyor.",
+    },
+    "runtime_stop": {
+        "what": "Runtime kapandı.",
+        "how": "`stop_when_idle()` süre sınırıyla, sonra `close()`.",
+        "why": "Toplama bittikten **sonra** çağrılıyor: bariyer burada bir "
+               "kapatma aracı, sonuç toplama aracı değil.",
+        "trap": "Aynı çağrıyı sonuç toplamak için kullanmak, bu projede ölçülen "
+                "sessiz veri kaybının tam kaynağı.",
+    },
+}
+
+
+def detail(stage_id: str) -> dict[str, str] | None:
+    """Bir aşamanın uzun anlatımı; yoksa None."""
+    return DETAILS.get(stage_id)
+
+
 __all__ = [
-    "AGENTCHAT", "CATALOGUE", "CHAT_FLOW", "CORE", "CORE_IDLE_NOTE", "LINE_TAG",
-    "Mechanism", "OURS", "SCAN_FLOW", "STREAM_ENV", "RUNS", "StageBus", "catalogue",
-    "emit_line", "line_streaming", "parse_line",
+    "AGENTCHAT", "CATALOGUE", "CHAT_FLOW", "CORE", "CORE_IDLE_NOTE", "DETAILS",
+    "LINE_TAG", "Mechanism", "OURS", "SCAN_FLOW", "STREAM_ENV", "RUNS", "StageBus",
+    "TEAM_FLOW", "MAF", "MAF_FLOW",
+    "catalogue", "detail", "emit_line", "line_streaming", "parse_line",
 ]

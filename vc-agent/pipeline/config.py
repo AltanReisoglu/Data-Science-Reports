@@ -92,6 +92,11 @@ MEMORY_DIR = WORKSPACE / "memory"          # daily notes, indexed, not injected
 CACHE = STATE / "cache"
 OUTPUT = STATE / "scans"
 AUDIT_LOG = STATE / "state" / "audit.jsonl"
+# Turların izi. `AUDIT_LOG`'dan ayrı bir dosya, çünkü onun şeması URL izniyle
+# ilgili (url · allowed · reason) ve bir turu oraya sıkıştırmak o şemayı bozardı.
+# Burada tutulan şey turun *şekli*: hangi takım, hangi desen, hangi tool, kaç
+# token, kapı ne dedi. Cevap metni yazılmıyor — soru zaten oturum transkriptinde.
+RUN_TRACE = STATE / "state" / "runs.jsonl"
 
 # Where state used to live. Kept as a read path so an existing checkout does not
 # appear to have lost its scans; `_migrate_legacy_state` copies them across once.

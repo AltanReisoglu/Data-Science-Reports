@@ -42,6 +42,7 @@ import config  # noqa: E402
 import conversation as conversation_module  # noqa: E402
 import dashboard  # noqa: E402
 import openclaw_control  # noqa: E402
+import runlog  # noqa: E402
 import stages  # noqa: E402
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -80,6 +81,9 @@ class ScanRun:
         self.started_at = time.time()
         self.finished_at = None
         self.args = {"query": query, "days": days, "limit": limit}
+        # A scan is the one path that really assembles a team, so it is the one
+        # the flow screen has the most to say about. Recorded like a chat turn.
+        self.run = runlog.LOG.begin("scan", f"tarama · {query}")
         command = [
             sys.executable, str(Path(__file__).resolve().parent / "scan.py"),
             "--query", query, "--days", str(days), "--limit", str(limit),
@@ -105,6 +109,7 @@ class ScanRun:
                     self.stages.append(stage)
                     if len(self.stages) > 500:
                         del self.stages[:200]
+                self.run.event(stage)
                 continue
             with self.lock:
                 self.lines.append(text)
@@ -113,6 +118,7 @@ class ScanRun:
                     del self.lines[:1000]
         self.process.wait()
         self.finished_at = time.time()
+        self.run.end("done" if self.process.poll() == 0 else "error")
 
     def snapshot(self, *, since: int = 0) -> dict:
         with self.lock:
@@ -290,8 +296,14 @@ def script() -> PlainTextResponse:
 
 @app.get("/rough.js", response_class=PlainTextResponse)
 def rough() -> PlainTextResponse:
-    """Hand-drawn SVG primitives for the mechanism panel — the browser half of
-    `docs/diagrams/rough.py`, so the screen and the PDF draw in the same hand."""
+    """Hand-drawn SVG primitives — the browser half of `docs/diagrams/rough.py`,
+    so the screen and the PDF draw in the same hand.
+
+    Nothing loads this at the moment: its only consumer was the mechanism panel,
+    which is no longer part of the chat. The route and the file stay because the
+    interface that replaces the panel will want the same hand, and re-deriving
+    these primitives from the Python side is the expensive way to get them back.
+    """
     return PlainTextResponse((WEB / "rough.js").read_text(encoding="utf-8"), media_type="text/javascript")
 
 
@@ -438,11 +450,22 @@ async def chat(payload: ChatTurn):
         # queue behind each other, which is the point of the session lane.
         async with lane:
             CHAT.sessions.record_turn(record, "user", payload.question)
+            # The turn is recorded as it streams. The id goes out first so the
+            # interface can offer the flow screen for *this* question rather than
+            # for whatever ran last — two tabs asking at once would otherwise
+            # each open the other's turn.
+            run = runlog.LOG.begin("chat", payload.question, record.id)
+            yield f"data: {json.dumps({'type': 'run', 'id': run.id})}\n\n"
             final = ""
+            status = "done"
             async for event in conversation.stream(payload.question):
                 if event.get("type") == "done":
                     final = event.get("text", "")
+                elif event.get("type") in ("cancelled", "error"):
+                    status = event["type"]
+                run.event(event)
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            run.end(status)
 
             if final:
                 CHAT.sessions.record_turn(record, "assistant", final)
@@ -497,6 +520,219 @@ def mechanisms() -> JSONResponse:
         "core_idle_note": stages.CORE_IDLE_NOTE,
         "runtime": GATEWAY.report(),
     })
+
+
+@app.get("/akis", response_class=HTMLResponse)
+def akis() -> str:
+    """The flow screen: one turn, drawn.
+
+    A separate page rather than a panel in the chat. The panel had to explain the
+    machine in the margin of a conversation and did both jobs badly; here the
+    drawing gets the whole viewport, and the chat gets its width back.
+    """
+    return (WEB / "akis.html").read_text(encoding="utf-8")
+
+
+@app.get("/akis.js", response_class=PlainTextResponse)
+def akis_script() -> PlainTextResponse:
+    return PlainTextResponse((WEB / "akis.js").read_text(encoding="utf-8"),
+                             media_type="text/javascript")
+
+
+@app.get("/figures.js", response_class=PlainTextResponse)
+def figures_script() -> PlainTextResponse:
+    """The mechanism drawings — the browser half of the hap deck's diagrams.
+
+    Recovered from the panel that used to sit in the chat (`3af7313`). The panel
+    went; these did not, because they are the part that actually explains a turn,
+    and they are the same drawings as `docs/pdf/hap-autogen.pdf` in the same hand.
+    """
+    return PlainTextResponse((WEB / "figures.js").read_text(encoding="utf-8"),
+                             media_type="text/javascript")
+
+
+@app.get("/patterns.js", response_class=PlainTextResponse)
+def patterns_script() -> PlainTextResponse:
+    """The eight design-pattern drawings, ported from `docs/diagrams/figures.py`.
+
+    Same coordinates, same palette, same caption lines as the deck. Two separate
+    drawings of one claim start telling it two different ways within a release.
+    """
+    return PlainTextResponse((WEB / "patterns.js").read_text(encoding="utf-8"),
+                             media_type="text/javascript")
+
+
+class TeamTurn(BaseModel):
+    kind: str
+    question: str
+    max_messages: int = 6
+
+
+@app.post("/api/team")
+async def team_run(payload: TeamTurn):
+    """Run one question through a real AutoGen team, streamed as SSE.
+
+    This is the one path where the flow screen has an actual team to draw. The
+    chat path deliberately has none — a single `AssistantAgent` — and saying so
+    is the honest answer, but it left the five team types as something we could
+    only describe. Here they run.
+    """
+    import teams as teams_module
+
+    if payload.kind not in teams_module.KINDS:
+        raise HTTPException(400, f"unknown team: {payload.kind}")
+    if not teams_module.available():
+        raise HTTPException(409, "No LLM configured; a team needs a live model.")
+
+    async def events():
+        run = runlog.LOG.begin("team", payload.question)
+        run.variant = payload.kind
+        yield f"data: {json.dumps({'type': 'run', 'id': run.id})}\n\n"
+        bus = stages.StageBus()
+        status = "done"
+        try:
+            async for event in teams_module.run(payload.kind, payload.question,
+                                                bus=bus, spans=run.spans,
+                                                max_messages=payload.max_messages):
+                for stage in bus.drain():
+                    run.event(stage)
+                    yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+                run.event(event)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as e:  # noqa: BLE001 — the stream reports its own failure
+            status = "error"
+            yield ("data: " + json.dumps({"type": "error",
+                                          "message": f"{type(e).__name__}: {e}"}) + "\n\n")
+        for stage in bus.drain():
+            run.event(stage)
+            yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+        run.end(status)
+        yield "data: {\"type\": \"end\"}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
+class MafTurn(BaseModel):
+    question: str
+    approval: str = "never_require"
+
+
+@app.post("/api/maf")
+async def maf_run(payload: MafTurn):
+    """Run one question through Microsoft Agent Framework instead of AutoGen.
+
+    A comparison surface, not a production path: the pipeline's tools, gate,
+    memory and scan all live on the AutoGen side. What this shows is the same
+    question in the successor framework, and where its defaults differ.
+    """
+    import maf as maf_module
+
+    if not maf_module.available():
+        raise HTTPException(409, "MAF modu hazır değil: " + maf_module.report()["why"])
+
+    async def events():
+        run = runlog.LOG.begin("maf", payload.question)
+        yield f"data: {json.dumps({'type': 'run', 'id': run.id})}\n\n"
+        bus = stages.StageBus()
+        status = "done"
+        async for event in maf_module.run(payload.question,
+                                          approval=payload.approval, bus=bus):
+            for stage in bus.drain():
+                run.event(stage)
+                yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+            if event.get("type") == "error":
+                status = "error"
+            run.event(event)
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        for stage in bus.drain():
+            run.event(stage)
+            yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+        run.end(status)
+        yield "data: {\"type\": \"end\"}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
+# Sunumda gösterilecek desteler. Beyaz liste, çünkü ad bir yol parçası:
+# `docs/pdf` altındaki her şeyi açmak, istemcinin seçtiği bir dizeyi dosya
+# yoluna çevirmek demek olurdu. `shots.py`'deki aynı disiplin.
+DECKS = {
+    "autogen": ("hap-autogen.pdf", "AutoGen · hap"),
+    "openclaw": ("hap-openclaw.pdf", "OpenClaw · hap"),
+    "openclaw-nis": ("hap-openclaw-nis.pdf", "OpenClaw · niş"),
+}
+
+
+@app.get("/api/decks")
+def decks() -> JSONResponse:
+    """Hangi desteler gösterilebilir. Diskte olmayanı listelemiyoruz."""
+    base = Path(__file__).resolve().parent.parent / "docs" / "pdf"
+    out = []
+    for key, (filename, label) in DECKS.items():
+        path = base / filename
+        if path.exists():
+            out.append({"id": key, "label": label,
+                        "size_kb": round(path.stat().st_size / 1024)})
+    return JSONResponse({"decks": out, "default": "autogen"})
+
+
+@app.get("/deck/{deck_id}")
+def deck(deck_id: str) -> Response:
+    """One slide deck as a PDF, by id — never by path.
+
+    The id is looked up in a whitelist and never joined onto a path from
+    client input. Same rule as the camera frames: the request names a key,
+    the server owns the filename.
+    """
+    entry = DECKS.get(deck_id)
+    if entry is None:
+        raise HTTPException(404, "no such deck")
+    path = Path(__file__).resolve().parent.parent / "docs" / "pdf" / entry[0]
+    if not path.exists():
+        raise HTTPException(404, "deck not built")
+    return Response(path.read_bytes(), media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{entry[0]}"'})
+
+
+@app.get("/api/maf")
+def maf_status() -> JSONResponse:
+    """Whether MAF mode can be offered, and why not when it cannot."""
+    import maf as maf_module
+
+    return JSONResponse(maf_module.report())
+
+
+@app.get("/api/teams")
+def team_kinds() -> JSONResponse:
+    """Which team types can be run, and what picks the speaker in each."""
+    import teams as teams_module
+
+    return JSONResponse({
+        "kinds": [{"id": k, "picker": teams_module.PICKER[k]} for k in teams_module.KINDS],
+        "roster": [a["name"] for a in teams_module.ROSTER],
+        "available": teams_module.available(),
+    })
+
+
+@app.get("/api/runs")
+def runs() -> JSONResponse:
+    """Recent turns, newest first — the flow screen's own picker."""
+    return JSONResponse({"runs": runlog.LOG.listing()})
+
+
+@app.get("/api/run/{run_id}")
+def run_report(run_id: str) -> JSONResponse:
+    """Everything the flow screen draws for one turn, in one request.
+
+    `latest` is accepted as an id so the screen can be opened cold — from a
+    bookmark, or on a second monitor — without the chat having handed it one.
+    """
+    from gateway.runtime import GATEWAY
+
+    run = runlog.LOG.latest() if run_id == "latest" else runlog.LOG.get(run_id)
+    if run is None:
+        raise HTTPException(404, "no such run")
+    return JSONResponse({**run.report(), "runtime": GATEWAY.report()})
 
 
 class OpenClawLine(BaseModel):

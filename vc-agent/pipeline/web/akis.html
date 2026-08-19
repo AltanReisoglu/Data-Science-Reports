@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="tr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Akış — bir soruda ne oldu</title>
+<!-- The shared stylesheet, for the palette and the theme tokens only. The layout
+     below is this page's own: a full-width drawing surface has nothing in common
+     with a two-column chat. -->
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { background: var(--plane); color: var(--ink); }
+  .flow { max-width: 96rem; margin: 0 auto; padding: 1.25rem 1.5rem 4rem; }
+
+  /* ---------------------------------------------------------------- header */
+  .flow__top {
+    display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+    padding-bottom: 0.75rem; border-bottom: 1px solid var(--hairline);
+  }
+  .flow__title { font-size: 1.05rem; font-weight: 650; letter-spacing: -0.01em; }
+  .flow__q {
+    flex: 1 1 20rem; min-width: 0; color: var(--ink-2); font-size: 0.9rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .flow__pick {
+    font: inherit; font-size: 0.8rem; padding: 0.25rem 0.4rem;
+    background: var(--surface, transparent); color: inherit;
+    border: 1px solid var(--hairline); border-radius: 4px;
+  }
+  .flow__back {
+    font: inherit; font-size: 0.8rem; color: var(--ink-muted);
+    background: none; border: 0; padding: 0; cursor: pointer;
+  }
+  .flow__back:hover { color: var(--ink); }
+
+  /* Hangi ajan tasarımı koşuyor. En üstte ve her zaman görünür: sunumda ilk
+     sorulan soru bu, ve cevabı bir kartın içinde aranmamalı. */
+  .design {
+    display: flex; gap: 2rem; flex-wrap: wrap;
+    margin: 0.5rem 0 0.2rem; padding: 0.6rem 0;
+    border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  }
+  .design__cell { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+  .design__key {
+    font-size: 0.58rem; letter-spacing: 0.08em; color: var(--ink-muted);
+  }
+  .design__val { font-size: 0.95rem; font-weight: 650; }
+  .design__note { font-size: 0.75rem; color: var(--ink-2); }
+
+  .tl li { cursor: pointer; }
+  .tl li:hover { background: var(--bar-soft); }
+
+  /* Totals. Tabular numerals because these are read as a row, not as prose. */
+  .tot { display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 0.85rem 0 0.4rem; }
+  .tot__cell { display: flex; flex-direction: column; gap: 0.1rem; }
+  .tot__key {
+    font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--ink-muted);
+  }
+  .tot__val { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+  .tot__val.is-warn { color: #e8590c; }
+
+  /* ----------------------------------------------------------------- cards */
+  .cards {
+    display: grid; gap: 1rem; margin-top: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(23rem, 1fr));
+  }
+  .card {
+    border: 1px solid var(--hairline); border-radius: 6px; padding: 0.85rem 1rem;
+    background: var(--surface, transparent); min-width: 0;
+  }
+  .card--wide { grid-column: 1 / -1; }
+  .card__head {
+    display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem;
+  }
+  .card__title { font-weight: 650; font-size: 0.9rem; }
+  .card__hint { font-size: 0.72rem; color: var(--ink-muted); }
+
+  /* The drawing. It scrolls inside its own box: a wide graph must never push
+     the page sideways. */
+  .canvas { overflow-x: auto; padding: 0.25rem 0; }
+  /* The drawing scales up to fill the card. A graph this small rendered at its
+     natural 630px sat in a corner of a 1400px card and was read from across a
+     room only by the people in the front row. */
+  .canvas svg { display: block; width: 100%; height: auto; }
+
+  /* Sırası gelmemiş kutu ve kenar. Silmek yerine söndürmek bilinçli: turun
+     nereye gideceği de bilgi, ve boş bir tuvalde zincirin nereye varacağı
+     görünmüyor. */
+  .canvas [data-node].is-pending,
+  .canvas [data-edge].is-pending { opacity: 0.2; }
+  .canvas [data-node], .canvas [data-edge] { transition: opacity 220ms ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .canvas [data-node], .canvas [data-edge] { transition: none; }
+  }
+
+  /* Işığın bulunduğu kutunun içi — grafın hemen altında, sabit yerde. */
+  .liveinner {
+    margin-top: 0.6rem; padding-top: 0.7rem;
+    border-top: 1px solid var(--hairline); overflow-x: auto;
+  }
+  .liveinner[hidden] { display: none; }
+  .liveinner__head {
+    display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem;
+  }
+  .liveinner__where { font-weight: 650; font-size: 0.82rem; }
+  .liveinner__title {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem; color: var(--ink-muted);
+  }
+  .liveinner svg { display: block; max-width: 46rem; height: auto; }
+  .liveinner__head:not(:first-child) { margin-top: 0.9rem; }
+  .liveinner__role {
+    margin: 0.25rem 0 0; font-size: 0.8rem; line-height: 1.5; color: var(--ink-2);
+    max-width: 46rem;
+  }
+  .liveinner__role code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.72rem;
+    color: var(--ink);
+  }
+
+  /* ------------------------------------------------------- nerede koşuyor */
+  /* The light is the whole point of watching a run instead of reading it after
+     the fact, so it is deliberately loud: the box breathes, and the edge the
+     message is crossing marches. Both stop the moment the turn ends — a box
+     still glowing on a finished run would be the screen lying about tense. */
+  .card__live {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.72rem; color: var(--ink-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .card__dot {
+    width: 0.45rem; height: 0.45rem; border-radius: 50%; background: #2f9e44;
+    animation: live-breathe 1.15s ease-in-out infinite;
+  }
+  @keyframes live-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @keyframes live-march   { to { stroke-dashoffset: -18; } }
+
+  /* Yanan kutu KALINLAŞIYOR, solmuyor. İlk hâli opaklığı 0.25'e indiriyordu ve
+     vurgulanan kutu, vurgulanmayanlardan daha zor okunuyordu — ölçüldü: ekran
+     görüntüsünde `scan_facts` yandığı anda neredeyse görünmezdi. */
+  @keyframes live-thick { 0%, 100% { stroke-width: 3.4; } 50% { stroke-width: 1.6; } }
+  .canvas [data-node].is-live path { animation: live-thick 1.15s ease-in-out infinite; }
+  .canvas [data-node].is-live text { font-weight: 700; }
+  /* Marching ants on the edge itself. `rough.js` draws two overlapping strokes
+     per line, so the dash lands on both and reads as one moving current. */
+  .canvas [data-edge].is-live path {
+    stroke-dasharray: 5 4;
+    animation: live-march 0.5s linear infinite;
+  }
+  .tl li.is-live { color: var(--ink); }
+  .tl li.is-live .t-what { color: var(--ink); font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card__dot,
+    .canvas [data-node].is-live path,
+    .canvas [data-edge].is-live path { animation: none; }
+    .canvas [data-node].is-live path { stroke-width: 3.4; }
+    .canvas [data-edge].is-live path { stroke-dasharray: 5 4; }
+  }
+
+  /* ----------------------------------------------------------- şema kartı */
+  /* Hap destesindeki şemanın ekrandaki hâli. Ortalanmış ve büyük: bu kart
+     sunumda tek başına okunacak, kartın içinde değil karşısında durulacak. */
+  .fig { padding: 0.2rem 0; }
+  /* Sahne: o an anlatılan şema, büyük. */
+  .fig__stage svg {
+    display: block; width: 100%; max-width: 52rem; height: auto; margin: 0 auto;
+    animation: fig-in 260ms ease-out;
+  }
+  @keyframes fig-in {
+    from { transform: scale(0.86); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .fig__cap {
+    text-align: center; margin: 0.25rem 0 0; font-size: 0.78rem; color: var(--ink-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .fig__none { color: var(--ink-muted); font-size: 0.82rem; text-align: center; }
+
+  /* Şerit: sahneden inenler, küçülmüş ve ok'la dizilmiş. Yatay kayıyor —
+     uzun bir tur şeridi sayfayı yana itmemeli. */
+  .fig__trail {
+    display: flex; align-items: center; gap: 0.4rem; overflow-x: auto;
+    margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px solid var(--hairline);
+  }
+  .fig__arrow { flex: 0 0 auto; color: var(--ink-muted); font-size: 0.8rem; }
+  .fig__thumb {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 0.15rem;
+    padding: 0.3rem; border: 1px solid var(--hairline); border-radius: 4px;
+    background: none; color: inherit; font: inherit; cursor: pointer;
+    animation: fig-shrink 300ms ease-out;
+  }
+  /* "Küçülerek aşağı düştü" hissi: şeride eklenen minik şema, sahnedeki
+     boyuna yakın bir yerden gelip yerine oturuyor. */
+  @keyframes fig-shrink {
+    from { transform: scale(1.35); opacity: 0.2; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .fig__thumb:hover { border-color: var(--ink-2); }
+  /* Sahnedeki kare. Kenarlık kalın ve zemin dolu: şeritte gözün ilk gideceği
+     yer burası olmalı, çünkü "neredeyim" sorusunun cevabı o. */
+  .fig__thumb.is-current {
+    border-color: #e8590c; border-width: 2px; padding: calc(0.3rem - 1px);
+    background: rgba(232, 89, 12, 0.07);
+  }
+  .fig__thumb svg { display: block; width: 11rem; height: auto; }
+  .fig__thumbhead {
+    display: flex; align-items: center; gap: 0.3rem; padding: 0 0.1rem 0.15rem;
+  }
+  .fig__thumbno {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6rem; color: var(--ink-muted); font-variant-numeric: tabular-nums;
+  }
+  .fig__thumblane { font-size: 0.5rem; padding: 0.02rem 0.22rem; }
+  .fig__thumbat {
+    margin-left: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.58rem; color: var(--ink-muted); font-variant-numeric: tabular-nums;
+  }
+  .fig__thumbcap {
+    font-size: 0.62rem; color: var(--ink-2); text-align: center;
+    max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .fig__thumb.is-current .fig__thumbcap { color: var(--ink); font-weight: 600; }
+  /* Şeması olmayan aşama da şeritte yerini alıyor — sırayı kopuk göstermemek
+     için, ve yerine sınıf adını koyuyor. */
+  .fig__thumbnone {
+    display: flex; align-items: center; justify-content: center;
+    width: 11rem; height: 2.6rem; font-size: 0.58rem; text-align: center;
+    color: var(--ink-muted); border: 1px dashed var(--hairline); border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden; padding: 0 0.2rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fig__stage svg, .fig__thumb { animation: none; }
+  }
+  /* `mech-flow` sınıfını şemaların kendisi koyuyor: akan ok. */
+  .mech-flow path {
+    stroke-dasharray: 5 4;
+    animation: live-march 0.6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .mech-flow path { animation: none; } }
+
+  /* --------------------------------------------------------- iç mimari kutusu */
+  /* Kutunun üstüne gelince açılan pencere. `position: absolute` ve sayfa
+     kayınca kapanıyor: konumu bir kez hesaplanıyor, ve kayarken takip etmeye
+     çalışmak onu grafın üstünde sürüklerdi. */
+  .pop {
+    position: absolute; z-index: 40; max-width: 34rem;
+    padding: 0.7rem 0.85rem; border-radius: 6px;
+    background: var(--surface, var(--plane)); color: var(--ink);
+    border: 1px solid var(--ink-muted);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    pointer-events: none;                 /* imleç kutuda kalsın */
+  }
+  .pop[hidden] { display: none; }
+  .pop__title {
+    font-size: 0.78rem; font-weight: 650; margin-bottom: 0.35rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .pop svg { display: block; max-width: 100%; height: auto; }
+  .pop__note {
+    margin: 0.4rem 0 0; font-size: 0.76rem; line-height: 1.5; color: var(--ink-2);
+    border-top: 1px solid var(--hairline); padding-top: 0.4rem;
+  }
+  .pop__note code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; color: var(--ink);
+  }
+  /* İçi olan kutu, olduğunu belli etsin — keşfedilmeyen bir etkileşim,
+     olmayan bir etkileşimle aynı şey. */
+  .pop { max-width: 40rem; }
+  .row.has-fig { cursor: help; }
+  .row.has-fig:hover { background: var(--bar-soft); }
+  .canvas .has-inner { cursor: help; }
+  .canvas .has-inner:hover path { stroke-width: 2.6; }
+
+  /* ------------------------------------------------------ aşamanın anlatımı */
+  .detail {
+    margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid var(--hairline);
+    max-width: 58rem; margin-left: auto; margin-right: auto;
+  }
+  .detail__head {
+    display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap;
+    margin-bottom: 0.55rem;
+  }
+  .detail__title { font-weight: 650; font-size: 0.95rem; }
+  .detail__ref, .detail__mod {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem; color: var(--ink-muted);
+  }
+  .detail__row {
+    display: grid; grid-template-columns: 8.5rem 1fr; gap: 0.7rem;
+    padding: 0.35rem 0; border-top: 1px solid var(--hairline);
+  }
+  .detail__row:first-of-type { border-top: 0; }
+  .detail__key {
+    font-size: 0.58rem; letter-spacing: 0.08em; color: var(--ink-muted);
+    padding-top: 0.18rem;
+  }
+  .detail__text { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--ink-2); }
+  .detail__text code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem; color: var(--ink);
+    background: var(--paper-sunk, rgba(0, 0, 0, 0.05));
+    padding: 0.03rem 0.22rem; border-radius: 3px;
+  }
+  /* Tuzak satırı ayrı duruyor: bir mekanizmayı bilmek ile onunla çalışmak
+     arasındaki fark çoğu zaman tam olarak bu satır. */
+  .detail__row--trap .detail__key { color: #e8590c; }
+  .detail__row--trap .detail__text { color: var(--ink); }
+  @media (max-width: 46rem) {
+    .detail__row { grid-template-columns: 1fr; gap: 0.15rem; }
+  }
+
+  /* ------------------------------------------------------------- row lists */
+  .row {
+    display: grid; grid-template-columns: 1.2rem 1fr; gap: 0.55rem;
+    padding: 0.4rem 0; border-top: 1px solid var(--hairline);
+    font-size: 0.8rem; align-items: start;
+  }
+  .row:first-of-type { border-top: 0; }
+  .row__mark { font-size: 0.8rem; line-height: 1.5; }
+  .row.is-used .row__mark { color: #2f9e44; }
+  .row:not(.is-used) { opacity: 0.55; }
+  .row:not(.is-used) .row__mark { color: var(--ink-muted); }
+  .row__name { font-weight: 600; }
+  .row__meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem; color: var(--ink-muted); margin-left: 0.4rem;
+  }
+  .row__what { color: var(--ink-2); display: block; margin-top: 0.1rem; }
+  .row__why { display: block; margin-top: 0.15rem; font-size: 0.75rem; }
+  .row.is-used .row__why { color: var(--ink); }
+  .row:not(.is-used) .row__why { color: var(--ink-muted); }
+
+  /* Which layer a thing belongs to. `ours` is deliberately distinct: the gate
+     and the context engine are not AutoGen features and must not read as if
+     they were. */
+  .lane {
+    font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 0.05rem 0.3rem; border-radius: 3px; vertical-align: 0.08em;
+  }
+  .lane--agentchat { background: rgba(25, 113, 194, 0.14); color: #1971c2; }
+  .lane--core      { background: rgba(95, 61, 196, 0.14); color: #5f3dc4; }
+  .lane--ext       { background: rgba(47, 158, 68, 0.14); color: #2f9e44; }
+  .lane--ours      { background: rgba(232, 89, 12, 0.16); color: #e8590c; }
+  .lane--maf       { background: rgba(156, 54, 181, 0.14); color: #9c36b5; }
+
+  /* --------------------------------------------------------- zamanlanmış iş */
+  .sched__row {
+    display: grid; grid-template-columns: 1.1rem 1fr; gap: 0.5rem;
+    padding: 0.35rem 0; border-top: 1px solid var(--hairline); font-size: 0.8rem;
+  }
+  .sched__row:first-of-type { border-top: 0; }
+  .sched__mark { color: #2f9e44; }
+  .sched__row.is-off { opacity: 0.55; }
+  .sched__row.is-off .sched__mark { color: var(--ink-muted); }
+  .sched__name { font-weight: 600; }
+  .sched__when {
+    margin-left: 0.45rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; color: var(--ink-2);
+  }
+  .sched__last { display: block; font-size: 0.72rem; color: var(--ink-muted); }
+  /* Zamanlayıcının kendi sınırı. Turuncu ve okunacak: sunumda "zamanlama var"
+     demekle "oturum kapanınca duruyor" demek arasındaki fark burada. */
+  .sched__warn {
+    margin: 0.5rem 0 0; padding-top: 0.4rem; border-top: 1px solid var(--hairline);
+    font-size: 0.75rem; line-height: 1.5; color: #e8590c;
+  }
+
+  /* ------------------------------------------------------------- şelale */
+  /* Minimal: çizgi yok, kutu yok, yalnız ad · çubuk · süre. Bir şelalede
+     okunan tek şey çubuğun nerede başlayıp nerede bittiği. */
+  .wf { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; }
+  .wf__row {
+    display: grid; grid-template-columns: 22rem 1fr 4.5rem; gap: 0.6rem;
+    align-items: center; padding: 0.06rem 0;
+  }
+  .wf__row:hover { background: var(--bar-soft); }
+  .wf__name {
+    color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .wf__track { position: relative; height: 0.55rem; background: var(--hairline); border-radius: 2px; }
+  .wf__bar {
+    position: absolute; top: 0; height: 100%; border-radius: 2px;
+    background: #1971c2; min-width: 2px;
+  }
+  .wf__bar.is-slow { background: #e8590c; }
+  .wf__ms { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 60rem) { .wf__row { grid-template-columns: 11rem 1fr 4rem; } }
+
+  /* ------------------------------------------------------------- timeline */
+  .tl {
+    list-style: none; margin: 0; padding: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; line-height: 1.6;
+  }
+  .tl li {
+    display: grid; grid-template-columns: 3.4rem 5rem 1fr auto; gap: 0.6rem;
+    padding: 0.12rem 0; border-top: 1px solid var(--hairline);
+  }
+  .tl li:first-child { border-top: 0; }
+  .tl .t-at { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .tl .t-lane { text-transform: uppercase; font-size: 0.62rem; letter-spacing: 0.04em; }
+  .tl .t-what { color: var(--ink-2); }
+  .tl .t-ref { color: var(--ink-muted); }
+  .tl .lane-agentchat { color: #1971c2; }
+  .tl .lane-core      { color: #5f3dc4; }
+  .tl .lane-ours      { color: #e8590c; }
+  .tl .lane-maf       { color: #9c36b5; }
+
+  /* -------------------------------------------------------------- the code */
+  .code {
+    margin: 0; padding: 0.6rem 0.75rem; border-radius: 4px;
+    background: var(--paper-sunk, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--hairline); overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; line-height: 1.55; white-space: pre;
+  }
+  .code--out { margin-top: 0.4rem; }
+  .code--err { border-color: rgba(201, 42, 42, 0.4); color: #c92a2a; }
+
+  .note { font-size: 0.8rem; color: var(--ink-2); margin: 0.2rem 0 0; }
+  .note code { font-size: 0.72rem; }
+  .empty { color: var(--ink-muted); font-size: 0.82rem; }
+
+  @media (max-width: 46rem) {
+    .flow { padding: 1rem 0.85rem 3rem; }
+    .cards { grid-template-columns: 1fr; }
+    .tl li { grid-template-columns: 3rem 1fr; }
+    .tl .t-ref { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="flow">
+  <div class="flow__top">
+    <span class="flow__title">Akış</span>
+    <select class="flow__pick" id="pick" aria-label="Hangi tur"></select>
+    <span class="flow__q" id="question">—</span>
+    <!-- Sekmeyi kapatır, sohbete GİTMEZ. Bu sayfa sohbetten ayrı bir sekmede
+         açılıyor; "/" adresine gitmek onu ikinci bir sohbete çeviriyordu ve
+         geri dönünce akış ekranı yok olmuş oluyordu. -->
+    <button type="button" class="flow__back" id="back">← sohbete dön</button>
+  </div>
+
+  <div class="tot" id="totals"></div>
+
+  <div class="design" id="design"></div>
+
+  <div class="cards" id="cards"></div>
+</div>
+
+<script src="/rough.js"></script>
+<script src="/figures.js"></script>
+<script src="/patterns.js"></script>
+<script src="/akis.js"></script>
+</body>
+</html>
