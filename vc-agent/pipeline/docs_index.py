@@ -37,7 +37,10 @@ from pathlib import Path
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
 # Which file is what, so a hit can say whose claim it is. The distinction matters:
-# 05 and 08 are Microsoft's words, everything else is ours.
+# 05, 08, 20 and 21 are Microsoft's words, everything else is ours. That split is
+# most of the value here: a hit that quotes the vendor and a hit that quotes us
+# carry different weight, and a reader who cannot tell them apart is worse off
+# than one with no citation at all.
 PROVENANCE = {
     "05-autogen-core-user-guide.md": "AutoGen Core guide (official, verbatim)",
     "08-autogen-agentchat-user-guide.md": "AutoGen AgentChat guide (official, verbatim)",
@@ -56,6 +59,9 @@ PROVENANCE = {
     "16-openclaw-enterprise-ilham.md": "our enterprise reading of OpenClaw (what transfers, what does not)",
     "17-autogen-openclaw-sirket-plani.md": "our build/borrow/deploy decision for the company",
     "18-task-manager-ve-dayanikli-yurutme.md": "our reading of OpenClaw's scheduler, task ledger, flow engine and concurrency model",
+    "20-maf-user-guide.md": "Microsoft Agent Framework user guide (official, verbatim)",
+    "21-maf-tasarim-kararlari.md": "Agent Framework design records — ADRs (official, verbatim)",
+    "22-maf-turkce.md": "our Turkish guide to Agent Framework, measured against AutoGen",
     "github-starred-repos.md": "starred-repo inventory",
 }
 

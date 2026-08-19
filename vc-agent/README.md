@@ -34,10 +34,12 @@ sistem. Yanında, temelini oluşturan AutoGen araştırması ve ölçüm POC'u.
 | [12](docs/12-autogen-bastan-sona.md) · [14](docs/14-autogen-protokoller-ve-farklar.md) | Uçtan uca anlatım · protokoller ve altı framework karşılaştırması |
 | [09](docs/09-framework-karsilastirma.md) | Kısa framework karşılaştırması |
 | [13](docs/13-openclaw-teknik-analiz.md) | OpenClaw mimari analizi — 15'in kaynağı |
+| [20](docs/20-maf-user-guide.md) · [21](docs/21-maf-tasarim-kararlari.md) | **MAF'ın tam metni** — Learn kılavuzu (106 sayfa) + 35 tasarım kaydı (ADR) |
+| [22](docs/22-maf-turkce.md) | MAF Türkçe rehberi, `20:satır` / `21:satır` atıflı — AutoGen ile mekanizma mekanizma karşılaştırma |
 | [github-starred-repos.md](docs/github-starred-repos.md) | 893 starlı reponun kategorize envanteri |
 
 Yeni başlıyorsan: **03 → 04 → 15** oku. AutoGen'i öğrenmek istiyorsan **12**,
-sonra **06**.
+sonra **06**. AutoGen'den MAF'a geçiş sorusu için **22**.
 
 ---
 
