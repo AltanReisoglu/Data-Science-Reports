@@ -709,16 +709,42 @@ body.term-open .app { grid-template-columns: 28rem 1fr; }
    istenen şey ikisinin aynı anda durması: bir yanda slayt, bir yanda koşan
    sistem. Kendi sütununda ve kendi genişliğinde. */
 .deck {
-  grid-column: 3; grid-row: 1 / -1;
+  grid-column: 4; grid-row: 1 / -1;
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
   border-left: 1px solid var(--hairline);
 }
 /* Üçüncü sütun yalnız deste açıkken var. Sabit genişlik: slayt okunabilir
    kalmalı ama sohbeti de ezmemeli. */
 /* Deste sütunu geniş: tarama raporu açılışta basılmayı bıraktığından orta
-   sütunda yalnız sohbet baloncukları kaldı, ve slayt o yeri hak ediyor. */
-body.deck-open .app { grid-template-columns: 15.5rem minmax(24rem, 1fr) 32rem; }
-body.deck-open.term-open .app { grid-template-columns: 28rem minmax(22rem, 1fr) 30rem; }
+   sütunda yalnız sohbet baloncukları kaldı, ve slayt o yeri hak ediyor.
+   Genişlik artık sabit DEĞİL: `--deckw` tutamaktan geliyor ve localStorage'da
+   duruyor. Sabit bir sütun iki işi de yarım yapıyordu — slayta bakarken dar,
+   sohbeti okurken geniş. */
+body.deck-open .app {
+  grid-template-columns: 15.5rem minmax(20rem, 1fr) auto var(--deckw, 32rem);
+}
+body.deck-open.term-open .app {
+  grid-template-columns: 28rem minmax(18rem, 1fr) auto var(--deckw, 30rem);
+}
+/* Tutamak. Dördüncü sütun deste olduğu için üçüncüsü bu; görünür çizgi ince,
+   yakalama alanı geniş — 3 px'lik bir kenarı fareyle tutmak zor. */
+.grip {
+  grid-column: 3; grid-row: 1 / -1; width: 9px; cursor: col-resize;
+  background: none; border: 0; padding: 0; position: relative;
+  touch-action: none;
+}
+.grip::before {
+  content: ""; position: absolute; inset: 0 4px;
+  background: var(--hairline); transition: background 140ms ease;
+}
+.grip:hover::before, .grip:focus-visible::before, .grip.is-drag::before {
+  background: #e8590c;
+}
+.grip:focus-visible { outline: none; }
+body:not(.deck-open) .grip { display: none; }
+/* Sürüklerken iframe fare olaylarını yutuyor ve tutamak imleci kaybediyor. */
+body.deck-drag { cursor: col-resize; user-select: none; }
+body.deck-drag .deck__frame { pointer-events: none; }
 .deck[hidden] { display: none; }
 .deck__bar {
   display: flex; gap: 0.3rem; padding: 0.5rem 0.7rem 0.4rem;
@@ -732,36 +758,17 @@ body.deck-open.term-open .app { grid-template-columns: 28rem minmax(22rem, 1fr) 
 .deck__tab:hover { border-color: var(--ink-2); color: var(--ink); }
 .deck__tab.is-on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
 .deck__tab--chat { margin-left: auto; }
-/* Dar ekranda üçüncü sütun yok: slayt ile sohbeti 900 px'e sıkıştırmak
-   ikisini birden okunmaz yapıyor. */
+/* Dar ekranda deste sütunu yok: slayt ile sohbeti 900 px'e sıkıştırmak
+   ikisini birden okunmaz yapıyor. Sürüklenecek bir yan sınır da kalmıyor. */
 @media (max-width: 78rem) {
   body.deck-open .app, body.deck-open.term-open .app {
     grid-template-columns: 15.5rem 1fr; }
   .deck { grid-column: 2; grid-row: 1; border-left: 0; }
+  .grip { display: none; }
 }
 .deck__frame { flex: 1; width: 100%; border: 0; min-height: 0;
                background: var(--plane); }
-.deck__bar {
-  display: flex; gap: 0.3rem; padding: 0.5rem 0.7rem 0.4rem;
-  border-bottom: 1px solid var(--hairline); flex-wrap: wrap;
-}
-.deck__tab {
-  font: inherit; font-size: 0.75rem; padding: 0.22rem 0.6rem; cursor: pointer;
-  border: 1px solid var(--hairline); border-radius: 999px;
-  background: transparent; color: var(--ink-2);
-}
-.deck__tab:hover { border-color: var(--ink-2); color: var(--ink); }
-.deck__tab.is-on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
-.deck__tab--chat { margin-left: auto; }
-/* Dar ekranda üçüncü sütun yok: slayt ile sohbeti 900 px'e sıkıştırmak
-   ikisini birden okunmaz yapıyor. */
-@media (max-width: 78rem) {
-  body.deck-open .app, body.deck-open.term-open .app {
-    grid-template-columns: 15.5rem 1fr; }
-  .deck { grid-column: 2; grid-row: 1; border-left: 0; }
-}
-.deck__frame { flex: 1; width: 100%; border: 0; min-height: 0;
-               background: var(--plane); }
+
 /* Çerçeve anahtarı. Sağ üstte ve her zaman görünür: bir tur ayarı değil,
    bütün sistemin hangi çerçevede koştuğu. Rengi de o yüzden farklı — AutoGen
    mavi, MAF mor; ekranın başka hiçbir yerinde bu iki renk yan yana durmuyor. */

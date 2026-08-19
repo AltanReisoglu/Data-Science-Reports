@@ -1289,6 +1289,9 @@
     deckOn = !!on;
     deckHost.hidden = !deckOn;
     document.body.classList.toggle('deck-open', deckOn);
+    if (deckOn) {
+      document.documentElement.style.setProperty('--deckw', deckWidth() + 'px');
+    }
     if (deckToggle) {
       deckToggle.textContent = deckOn ? 'slayt ◂' : 'slayt ▸';
       deckToggle.setAttribute('aria-pressed', deckOn ? 'true' : 'false');
@@ -1345,6 +1348,81 @@
       if (deckToggle) { deckToggle.hidden = true; }
     });
   }
+
+  /* Genişlik. Sabit bir sütun iki işi de yarım yapıyordu — slayta bakarken dar,
+     grafa bakarken geniş. Sürükleyip bırakıyorsun ve tercih kalıyor.
+     Sınırlar: sol tarafa en az 30rem bırakılıyor (grafın en dar okunabilir
+     hâli), deste en az 20rem alıyor (altında PDF `view=Fit`'te okunmuyor). */
+  var DECK_MIN = 20 * 16, FLOW_MIN = 30 * 16, DECK_DEFAULT = 34 * 16;
+  var grip = document.getElementById('grip');
+
+  function clampDeck(px) {
+    var max = Math.max(DECK_MIN, window.innerWidth - FLOW_MIN);
+    return Math.round(Math.min(Math.max(px, DECK_MIN), max));
+  }
+
+  function setDeckWidth(px, remember) {
+    var w = clampDeck(px);
+    document.documentElement.style.setProperty('--deckw', w + 'px');
+    if (remember) {
+      try { localStorage.setItem('akis-deckw', String(w)); } catch (e) { /* yok say */ }
+    }
+    // Sütun değişti; graf kartın genişliğine göre ölçekleniyor.
+    if (view.report) { render(view.report); }
+    return w;
+  }
+
+  function deckWidth() {
+    var saved = 0;
+    try { saved = parseInt(localStorage.getItem('akis-deckw') || '', 10) || 0; }
+    catch (e) { saved = 0; }
+    return clampDeck(saved || DECK_DEFAULT);
+  }
+
+  if (grip) {
+    var dragFrom = 0, dragW = 0;
+
+    function onMove(ev) {
+      // Tutamak sağa gidince deste DARALIYOR: genişlik sağ kenardan ölçülüyor.
+      setDeckWidth(dragW - (ev.clientX - dragFrom), false);
+    }
+    function onUp() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.body.classList.remove('deck-drag');
+      grip.classList.remove('is-drag');
+      setDeckWidth(parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue('--deckw'), 10)
+        || DECK_DEFAULT, true);
+    }
+    grip.addEventListener('pointerdown', function (ev) {
+      dragFrom = ev.clientX;
+      dragW = deckHost ? deckHost.getBoundingClientRect().width : DECK_DEFAULT;
+      document.body.classList.add('deck-drag');
+      grip.classList.add('is-drag');
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      ev.preventDefault();
+    });
+    // Klavye: bir ayırıcı fareyle sürüklenebiliyorsa ok tuşlarıyla da
+    // ayarlanabilmeli, yoksa yalnız fare kullananın özelliği olur.
+    grip.addEventListener('keydown', function (ev) {
+      var step = ev.shiftKey ? 96 : 24, w = deckHost.getBoundingClientRect().width;
+      if (ev.key === 'ArrowLeft') { setDeckWidth(w + step, true); }
+      else if (ev.key === 'ArrowRight') { setDeckWidth(w - step, true); }
+      else if (ev.key === 'Home') { setDeckWidth(DECK_DEFAULT, true); }
+      else { return; }
+      ev.preventDefault();
+    });
+    grip.addEventListener('dblclick', function () {
+      setDeckWidth(DECK_DEFAULT, true);
+    });
+  }
+  // Pencere daralınca kayıtlı genişlik sınırı aşabiliyor; kırpılıyor ama
+  // KAYDEDİLMİYOR — pencere büyüyünce eski tercih geri gelsin.
+  window.addEventListener('resize', function () {
+    if (deckOn) { setDeckWidth(deckHost.getBoundingClientRect().width, false); }
+  });
 
   if (deckToggle) {
     deckToggle.addEventListener('click', function () {

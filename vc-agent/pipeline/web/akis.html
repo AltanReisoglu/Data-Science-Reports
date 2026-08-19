@@ -99,10 +99,43 @@
      en küçük genişliğini taban alıyor ve graf `min-width` taşıdığı için sol
      sütun daralmayı reddediyordu — deste açılınca sayfa yana kayıyordu. */
   .shell { display: block; }
+  /* Genişlik artık sabit değil, sürüklenebilir. `--deckw` JS'ten geliyor ve
+     `localStorage`'da duruyor. Sabit 34rem iki işi de yarım yapıyordu: slayta
+     bakarken dar, grafa bakarken geniş. */
   body.deck-open .shell {
-    display: grid; grid-template-columns: minmax(0, 1fr) 34rem;
-    gap: 1rem; align-items: start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto var(--deckw, 34rem);
+    gap: 0; align-items: start;
   }
+  body.deck-open .flow { max-width: none; padding-right: 1rem; }
+
+  /* Tutamak. Görünür bir çizgi değil, dokunulabilir bir şerit: 3px'lik bir
+     kenarlığı fareyle yakalamak zor, 9px'lik bir şerit kolay. Çizgi ortada
+     duruyor, tıklama alanı etrafında. */
+  /* Tutamak destenin YANINDA duruyor, sayfanın boyunda değil. `align-self:
+     stretch` ile grid satırının tamamına uzuyordu — akış sayfası uzun olduğu
+     için 4638 px oldu ve merkezi ekranın çok altında kaldı; imleç oraya hiç
+     gitmediği için tutamak pratikte tıklanamıyordu. Deste zaten `sticky` ve
+     `100vh`; tutamak da öyle olmalı. */
+  .grip {
+    align-self: start; position: sticky; top: 0; height: 100vh;
+    width: 9px; flex: none; cursor: col-resize;
+    background: none; border: 0; padding: 0;
+    touch-action: none;
+  }
+  .grip::before {
+    content: ""; position: absolute; inset: 0 4px;
+    background: var(--hairline); transition: background 140ms ease;
+  }
+  .grip:hover::before, .grip:focus-visible::before, .grip.is-drag::before {
+    background: #e8590c;
+  }
+  .grip:focus-visible { outline: none; }
+  body:not(.deck-open) .grip { display: none; }
+  /* Sürükleme sırasında iframe fare olaylarını yutuyor ve tutamak imleci
+     kaybediyordu — sürüklerken üstünü kapatıyoruz. */
+  body.deck-drag { cursor: col-resize; user-select: none; }
+  body.deck-drag .deck__frame { pointer-events: none; }
   body.deck-open .flow { max-width: none; }
   .deck { display: flex; flex-direction: column; height: 100vh;
           position: sticky; top: 0; border-left: 1px solid var(--hairline); }
@@ -121,10 +154,12 @@
   .deck__tab--chat { margin-left: auto; }
   .deck__frame { flex: 1; width: 100%; border: 0; min-height: 0; }
   @media (max-width: 78rem) {
-    /* Dar ekranda deste grafı ezerdi; alta iniyor. */
+    /* Dar ekranda deste grafı ezerdi; alta iniyor — ve orada sürüklenecek bir
+       yan sınır kalmıyor, tutamak da gidiyor. */
     body.deck-open .shell { grid-template-columns: minmax(0, 1fr); }
     .deck { height: 32rem; position: static; border-left: 0;
             border-top: 1px solid var(--hairline); }
+    .grip { display: none; }
   }
 
   .tl li { cursor: pointer; }
@@ -552,6 +587,9 @@
      bir maliyet, sohbet sayfasındaki gibi bedava değil. Açık/kapalı tercihi
      localStorage'da: koşu değiştirmek sayfayı yeniden yüklüyor ve her seferinde
      kapanan bir panel işe yaramaz. -->
+<div class="grip" id="grip" role="separator" aria-orientation="vertical"
+     tabindex="0" aria-label="Slayt genişliği — sürükle, ok tuşlarıyla ayarla,
+     çift tıkla sıfırla"></div>
 <aside class="deck" id="deck" hidden aria-label="Sunum destesi">
   <div class="deck__bar" id="deck-bar"></div>
   <iframe class="deck__frame" id="deck-frame" title="Slayt destesi"></iframe>

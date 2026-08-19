@@ -45,6 +45,13 @@ Hepsi ölçüldü, hiçbiri koddan okunarak bulunmadı:
 * **Demo sorusu yanlıştı.** `docs/23 §4 Durak 2`'ye bak: eski soru 39 adım ve
   altı tool çağrısı üretiyor, ekranda anlatılan on aşama hiç çıkmıyor.
 
+* **Tutamak tıklanamıyordu ve sürücü bunu göremiyordu.** Slayt genişliği
+  ayırıcısı `align-self: stretch` yüzünden **4638 px** boyundaydı; merkezi
+  y=2319'da, yani ekranın çok altında. Tık oraya gidiyor, hiçbir olay düşmüyor,
+  ve sürücü "✔ tık" diyordu. `box()` artık öğenin merkezine değil **görünür
+  kısmının** merkezine tıklıyor, ve `elementFromPoint` ile üstünü kapatan bir
+  şey var mı diye bakıyor.
+
 ## Sürücünün kendi öğrettiği
 
 Üç hata yaptım ve üçü de **uygulamada değil, ölçümdeydi** — not olarak duruyor:

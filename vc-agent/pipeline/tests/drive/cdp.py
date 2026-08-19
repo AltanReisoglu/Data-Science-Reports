@@ -68,8 +68,15 @@ class Page:
         await asyncio.sleep(wait)
 
     async def box(self, selector: str):
-        """Öğenin ekrandaki merkezi. `null` dönerse öğe yok ya da görünmez —
-        ikisi de tıklamadan önce bilinmesi gereken şey."""
+        """Öğenin tıklanacak noktası. `null` dönerse öğe yok ya da görünmez —
+        ikisi de tıklamadan önce bilinmesi gereken şey.
+
+        Nokta, öğenin merkezi DEĞİL: öğenin **görünür kısmının** merkezi.
+        Ölçüldü — 4638 px boyundaki bir ayırıcının merkezi y=2319'daydı, yani
+        ekranın çok altında; tık oraya gidiyor, hiçbir olay düşmüyor ve sürücü
+        "tıkladım" diyordu. Uzun bir öğeye merkezinden tıklamak, sessizce
+        ıskalamanın en kolay yolu.
+        """
         return await self.js(f"""(() => {{
           const el = document.querySelector({selector!r});
           if (!el) return null;
@@ -77,9 +84,18 @@ class Page:
           if (r.width === 0 || r.height === 0) return null;
           const cs = getComputedStyle(el);
           if (cs.visibility === 'hidden' || cs.display === 'none') return null;
-          return {{x: r.left + r.width/2, y: r.top + r.height/2,
-                   w: r.width, h: r.height, text: (el.textContent||'').trim().slice(0,40),
-                   disabled: !!el.disabled}};
+          const vw = window.innerWidth, vh = window.innerHeight;
+          const x0 = Math.max(r.left, 0), x1 = Math.min(r.right, vw);
+          const y0 = Math.max(r.top, 0), y1 = Math.min(r.bottom, vh);
+          if (x1 <= x0 || y1 <= y0) return null;   // tamamen ekran dışında
+          const x = (x0 + x1) / 2, y = (y0 + y1) / 2;
+          const hit = document.elementFromPoint(x, y);
+          return {{x: x, y: y, w: r.width, h: r.height,
+                   text: (el.textContent||'').trim().slice(0,40),
+                   disabled: !!el.disabled,
+                   // Üstünü başka bir şey kapatıyorsa tık ona gider.
+                   ortu: (hit && (hit === el || el.contains(hit) || hit.contains(el)))
+                         ? null : (hit ? (hit.id || hit.className || hit.tagName) : 'yok')}};
         }})()""")
 
     async def click(self, selector: str, label: str = ""):
@@ -89,6 +105,10 @@ class Page:
             return False
         if b.get("disabled"):
             self.log.append(f"  ✘ TIKLANAMADI {label or selector} — düğme pasif")
+            return False
+        if b.get("ortu"):
+            self.log.append(f"  ✘ TIKLANAMADI {label or selector} — üstünü "
+                            f"{b['ortu']!r} kapatıyor")
             return False
         for kind in ("mousePressed", "mouseReleased"):
             await self.call("Input.dispatchMouseEvent", type=kind,
