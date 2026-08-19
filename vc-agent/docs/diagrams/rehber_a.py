@@ -471,3 +471,147 @@ chapter(
           "(<code>pipeline/maf_runner.py</code>). Yan yana çalıştırmayı "
           "planlıyorsan bunu baştan hesaba kat. <b>[ölçüldü]</b>")),
 )
+
+# ─────────────────────────────────────────── AutoGen: bileşen ve ileri yüzeyler
+
+from figures import (  # noqa: E402,F401
+    f_code_executors, f_component_config, f_custom_agent, f_magentic,
+    f_memory_rag, f_serialize_agentchat, f_tools_component, f_tracing,
+)
+
+chapter(
+    "14", "Bileşenler: tool, kod yürütücü, yapılandırma",
+    ["Tool şemasının nereden üretildiği",
+     "Üç kod yürütücü ve aralarındaki güven kararı",
+     "Bileşen yapılandırmasının plan mı fotoğraf mı olduğu"],
+    fig(f_tools_component(), "Tool şeması imzadan ve docstring'den üretiliyor.")
+    + p("Tool'un tarifi <b>dokümantasyon değil, arayüz</b>: modelin bu tool'a ne "
+        "zaman ve nasıl uzanacağına karar verdiği metin o. Yanlış yazılmış bir "
+        "docstring, yanlış çağrılan bir tool demek — ve bu hata çalışma anında "
+        "değil, <b>cevabın içeriğinde</b> görünüyor.")
+    + fig(f_code_executors(), "Üç kod yürütücü: yerel, Docker, Jupyter.")
+    + neden(
+        p("Yürütücü seçimi bir performans tercihi değil, bir <b>güven kararı</b>. "
+          "Yerel yürütücü modelin yazdığı kodu senin makinende koşturuyor. "
+          "Docker yürütücü konteynere alıyor — ama ölçüldü: "
+          "<code>DockerCommandLineCodeExecutor</code>'da <code>network_mode</code> "
+          "diye bir parametre <b>yok</b>, yani konteynerin ağ erişimi var. "
+          "“Sandbox güvenli” cümlesi bu yüzden kurulmuyor. <b>[ölçüldü]</b>"))
+    + fig(f_component_config(), "Bileşen yapılandırması: plan mı, fotoğraf mı?")
+    + tuzak(
+        p("<code>dump_component()</code> bir <b>plan</b> üretiyor, bir fotoğraf "
+          "değil. Yeniden yüklendiğinde aynı yapı kuruluyor ama <b>durum "
+          "taşınmıyor</b> — konuşma geçmişi, sayaçlar, açık bağlantılar gelmiyor. "
+          "Bunu yedek sanmak, geri yüklendiğinde belleği boş bir ajanla "
+          "karşılaşmak demek.")),
+)
+
+chapter(
+    "15", "İleri yüzeyler: özel ajan, bellek, serileştirme, izleme",
+    ["Kendi ajanını yazmanın maliyeti",
+     "Memory protokolünün RAG'den farkı",
+     "Serileştirmedeki tek sert uyarı",
+     "OpenTelemetry'nin hazır gelen kısmı"],
+    two(fig(f_custom_agent(), "Özel ajan: <code>BaseChatAgent</code>'tan türetmek."),
+        fig(f_memory_rag(), "<code>Memory</code> protokolü ve RAG hattı."))
+    + p("<code>Memory</code> bir <b>protokol</b>: sen uyguluyorsun, AutoGen "
+        "çağırıyor. Her model çağrısından önce ilgili parçaları bağlama "
+        "ekliyor. RAG ise bunun bir uygulaması — vektör deposu, gömme, geri "
+        "getirme. Protokol ile uygulamayı karıştırmak, “AutoGen'de RAG var mı” "
+        "sorusunun neden net cevabı olmadığını açıklıyor: <b>yeri var, "
+        "uygulaması sende</b>.")
+    + fig(f_serialize_agentchat(), "Serileştirme: neyin taşındığı ve neyin taşınmadığı.")
+    + tuzak(
+        p("Serileştirmedeki tek sert uyarı: <b>bileşen yapılandırması "
+          "sırları da taşıyabiliyor</b>. Bir <code>dump_component()</code> "
+          "çıktısını depoya koymadan önce içinde API anahtarı olup olmadığına "
+          "bakmak gerekiyor."))
+    + fig(f_tracing(), "OTel GenAI sözleşmesi: hazır gelen span'ler.")
+    + olcum(
+        p("İzleme kısmen hazır geliyor. <code>SingleThreadedAgentRuntime</code>'a "
+          "bir <code>tracer_provider</code> verildiğinde <code>gen_ai.*</code> "
+          "sözleşmesine uygun span'ler üretiliyor: <code>gen_ai.system=\"autogen\"</code>, "
+          "ajan adı, tool adı, hata tipi. Bu projede bir takım koşusunda "
+          "<b>46–88 span</b> toplandı. Toplayıcıyı sen seçiyorsun — Jaeger, "
+          "Zipkin ya da herhangi bir OTLP hedefi. <b>[ölçüldü]</b> · "
+          "<code>pipeline/telemetry.py</code>"))
+    + fig(f_magentic(), "Magentic-One: görev defteri tutan bir yönetici.")
+    + tuzak(
+        p("<code>MagenticOneGroupChat</code> ile <code>MagenticOne</code> "
+          "<b>aynı şey değil</b>. Birincisi yöneticiyi senin ajanlarının üstüne "
+          "koyuyor. İkincisi kendi kadrosunu getiriyor — WebSurfer, FileSurfer, "
+          "Coder, ComputerTerminal — ve resmî kılavuz onun için konteyner, "
+          "<b>insan gözetimi</b>, log izleme ve web sayfalarından gelen prompt "
+          "injection uyarısı şart koşuyor. <b>[kaynak]</b>")),
+)
+
+chapter(
+    "16", "MAF'ın geçiş haritası",
+    ["Sınıf sınıf eşleme",
+     "Karşılığı olmayan yerler",
+     "Geçişin gerçek maliyeti"],
+    p("Aşağıdaki eşleme Microsoft'un kendi geçiş kılavuzundan. <b>[kaynak]</b>")
+    + table(
+        ["AutoGen", "MAF karşılığı", "Not"],
+        [["<code>AssistantAgent</code>", "<code>Agent</code>",
+          "MAF çok turlu varsayılan"],
+         ["<code>OpenAIChatCompletionClient</code>", "<code>OpenAIChatClient</code>",
+          "MAF ayrıca Responses API destekliyor"],
+         ["<code>FunctionTool</code>", "<code>@tool</code> / <code>FunctionTool</code>",
+          "şema otomatik çıkarılıyor"],
+         ["<code>Workbench</code> / <code>McpWorkbench</code>", "MCP istemcileri + hosted tool'lar",
+          "hosted: kod yorumlayıcı, web arama"],
+         ["<code>GraphFlow</code> + <code>DiGraphBuilder</code>",
+          "<code>Workflow</code> + <code>WorkflowBuilder</code>",
+          "kontrol akışı → <b>veri akışı</b>"],
+         ["<code>RoundRobinGroupChat</code> vb.", "workflow kalıpları",
+          "takım tipleri doğrudan karşılık bulmuyor"],
+         ["sonlandırma koşulları", "workflow yapısı + executor mantığı",
+          "on bir hazır koşulun karşılığı yok"],
+         ["<code>SingleThreadedAgentRuntime</code>", "—",
+          "MAF bugün <b>tek süreç</b>"],
+         ["—", "<code>AgentSession</code>", "AutoGen'de karşılığı yok"],
+         ["—", "middleware / context providers", "AutoGen'de karşılığı yok"],
+         ["—", "checkpoint + request/response duraklama", "AutoGen'de yok"]])
+    + neden(
+        p("Tablodaki boşluklar iki yöne de bakıyor. AutoGen'in <b>dağıtık "
+          "runtime'ı</b> ve <b>on bir hazır sonlandırma koşulu</b> MAF'ta yok; "
+          "MAF'ın <b>oturumu, ara katmanı, checkpoint'i ve duraklaması</b> "
+          "AutoGen'de yok. Geçiş bir yükseltme değil, bir <b>takas</b>."))
+    + tuzak(
+        p("Beş takım tipini kullanan bir kod, MAF'ta doğrudan karşılık bulmuyor. "
+          "Orkestrasyon workflow olarak <b>yeniden yazılıyor</b>. Bu projedeki "
+          "<code>pipeline/teams.py</code> gibi bir dosya, geçişte baştan "
+          "kurulmak zorunda.")),
+)
+
+chapter(
+    "17", "MAF'ın kendi katmanları: harness, bağlam, ara katman",
+    ["Harness Agent'ın içindekiler",
+     "Context providers ile Memory protokolünün farkı",
+     "Middleware'in nereye takıldığı",
+     "Checkpoint ve duraklama"],
+    p("MAF yalnız AutoGen'i taşımıyor; harness katmanının bir kısmını da "
+      "kütüphaneye alıyor. Dört yer önemli.")
+    + table(
+        ["Yüzey", "Ne yapıyor", "AutoGen'de"],
+        [["<b>Harness Agent</b>",
+          "planlama ve todo takibi, bağlam sıkıştırma, dosya erişimi ve bellek, "
+          "<b>bir daha sorma</b> tool onayı, gözlemlenebilirlik", "yok"],
+         ["<b>Context providers</b>", "ajan belleği için takılabilir sağlayıcı",
+          "<code>Memory</code> protokolü (benzer)"],
+         ["<b>Middleware</b>", "ajan ve fonksiyon çağrılarının arasına girmek",
+          "yok — <code>Workbench</code> sarmalayarak yapılıyor"],
+         ["<b>Checkpoint</b>", "<code>FileCheckpointStorage</code> · "
+          "<code>InMemoryCheckpointStorage</code>", "yok"]])
+    + neden(
+        p("<b>Harness Agent</b> listesi dikkatle okunmalı: planlama, todo, "
+          "sıkıştırma, dosya, onay, gözlemlenebilirlik. Bunlar bir "
+          "<i>harness</i>'ın işleri — OpenClaw'ın yaptığı şey. Halef çerçeve, "
+          "harness ile kütüphane arasındaki sınırı <b>kendi lehine kaydırıyor</b>."))
+    + tuzak(
+        p("“Bir daha sorma” onayı (<i>don't-ask-again</i>) kolaylık gibi duruyor "
+          "ama bir <b>duran onay</b>. Kurumsal bir kurulumda duran onayın "
+          "kapsamı ve süresi açıkça sınırlanmalı: onay bir kez verilip "
+          "süresizce geçerli olduğunda, kapı artık kapı değil.")),
+)

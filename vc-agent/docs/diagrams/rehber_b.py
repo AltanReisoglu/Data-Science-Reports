@@ -8,6 +8,9 @@ from make_ogretici import (  # noqa: F401
     tuzak, two,
 )
 from figures import (  # noqa: F401
+    f_failover, f_lobster, f_loopguard, f_memory_write, f_packages,
+    f_profiles, f_repair, f_result_middleware, f_self_learning,
+    f_session_tools, f_tool_catalog, f_tool_search, f_trajectory,
     f_atlas, f_ctx_engine, f_durable, f_external_content, f_frozen_plan,
     f_gate, f_gateway, f_memory_tiers, f_oc_arch, f_scopes, f_secrets,
     f_task_stack, f_three_axes, f_two_ledgers,
@@ -20,7 +23,7 @@ part("4", "OpenClaw: harness katmanı",
      "koştururken ortaya çıkan soruların cevapları burada.")
 
 chapter(
-    "14", "Harness nedir, kütüphaneden farkı ne",
+    "18", "Harness nedir, kütüphaneden farkı ne",
     ["Harness'ın kapsadığı işler",
      "Neden bu işler kütüphanede olmuyor",
      "OpenClaw'ın mimarisi kuşbakışı"],
@@ -49,7 +52,7 @@ chapter(
 )
 
 chapter(
-    "15", "Üç kontrol ekseni",
+    "19", "Üç kontrol ekseni",
     ["Yetkinin üç ayrı eksende ayrılması",
      "Metot kapsamının neden yalnızca ilk kapı olduğu",
      "Donmuş plan: onay komuta değil plana bağlanır"],
@@ -77,7 +80,7 @@ chapter(
 )
 
 chapter(
-    "16", "Bellek, bağlam ve dış içerik",
+    "20", "Bellek, bağlam ve dış içerik",
     ["Beş bellek katmanı ve hangisinin ne zaman okunduğu",
      "Bağlam motoru ve sıkıştırmanın bedeli",
      "Dış içeriğin veri olarak işaretlenmesi"],
@@ -100,7 +103,7 @@ chapter(
 )
 
 chapter(
-    "17", "Zamanlama, dayanıklılık ve denetim",
+    "21", "Zamanlama, dayanıklılık ve denetim",
     ["Zamanlayıcının gerçekte nerede koştuğu",
      "Dayanıklı durum ile dayanıklı yürütmenin farkı",
      "Neden iki ayrı kayıt hattı gerekiyor"],
@@ -126,6 +129,226 @@ chapter(
     + fig(f_secrets(), "Sır yalnız son sınırda gerçek değerine dönüşüyor."),
 )
 
+
+# ─────────────────────────────────────────────── OpenClaw: niş yüzeyler
+
+chapter(
+    "22", "İskelet ve tool kataloğu",
+    ["Kodun nasıl bölündüğünün ne anlattığı",
+     "51 tool'un dağılımı ve tasarım niyeti",
+     "“Kaç tool var” sorusunun neden üç cevabı olduğu"],
+    p("Bir sistemin nasıl düşünüldüğünü öğrenmenin en hızlı yolu, kodun nasıl "
+      "bölündüğüne bakmaktır. OpenClaw <b>22 pakete</b> bölünmüş.")
+    + fig(f_packages(), "22 paket — çekirdeğin her ilginç parçası ayrı.")
+    + p("En büyük üçü: <b>ai</b> (118 dosya) model sağlayıcılarıyla konuşuyor, "
+        "<b>gateway-protocol</b> (108 dosya) kontrol düzleminin tipli şemasını "
+        "tutuyor, <b>memory-host-sdk</b> (83 dosya) bellek sağlayıcılarının "
+        "uyması gereken sözleşmeyi tanımlıyor. Üçünün ayrı olması bir tercih: "
+        "model erişimi, kontrol düzlemi ve bellek <b>birbirinden bağımsız "
+        "değişebiliyor</b>.")
+    + neden(
+        p("İlginç olan en küçükler. <code>tool-call-repair</code> altı dosya, "
+          "<code>retry</code> tek dosya. Ama ikisi de olmadığında sistem "
+          "çökmüyor — <b>sessizce yanlış çalışıyor</b>, ki bu daha kötü."))
+    + fig(f_tool_catalog(), "51 tool, on bir grup.")
+    + p("Asıl bilgi sayıda değil <b>dağılımda</b>. En kalabalık grup 15 tool'la "
+        "<b>sessions</b>: alt-ajan başlatmak, iş devretmek, cevap beklemek, "
+        "aralarında mesajlaşmak. Dosya işlemleri için 4, komut çalıştırmak için "
+        "3 tool var. Yatırımın büyük kısmı dosyaya ya da kabuğa değil, "
+        "<b>ajanların birbirini yönetmesine</b> yapılmış — tasarımın niyeti bu: "
+        "tek asistan değil, çok ajanlı bir işletim ortamı.")
+    + fig(f_profiles(), "Üç sayı, üç anlam: 51 kaynakta, 44 canlıda, doküman eskimiş.")
+    + olcum(
+        p("“Kaç tool var?” sorusuna üç farklı cevap geliyor ve üçü de doğru, "
+          "çünkü üçü farklı şeyi sayıyor. <b>51</b> kaynak kodda tanımlı; "
+          "<b>44</b> canlı gateway'in gerçekten sunduğu <b>[ölçüldü]</b>; "
+          "dokümandaki tablo ise <b>eskimiş</b>. Daralma üç aşamada: profil bir "
+          "taban liste veriyor, <code>allow</code>/<code>deny</code> kesiyor, "
+          "sandbox politikası bir kez daha kesiyor. Üçü de yalnız "
+          "<b>daraltıyor</b>; hiçbiri listeye tool <i>ekleyemiyor</i>.")
+        + p("Sonuç: bir kurulumun gerçek tool yüzeyini öğrenmenin tek yolu "
+            "<b>çalışan sisteme sormaktır</b>.")),
+)
+
+chapter(
+    "23", "Tool katmanının iki inceliği",
+    ["Bozuk tool çağrısını kurtarmak",
+     "Sonuca dokunan ara katman ve neden komuta dokunmadığı"],
+    fig(f_repair(), "Tool Call Repair: düz yazıyı gerçek çağrıya çevirmek.")
+    + p("Modelin bir tool çağırmasının doğru yolu, sağlayıcının function calling "
+        "biçimini kullanmaktır. Ama bazı modeller bunu beceremiyor: çağrıyı "
+        "cevabın içine <b>düz yazı olarak</b> yazıyorlar. OpenClaw dört farklı "
+        "biçimi tanıyıp gerçek çağrıya çeviriyor — "
+        "<code>[END_TOOL_REQUEST]</code> bloğu, Harmony işaretçileri, ve "
+        "XML'e benzeyen <code>&lt;function=ad&gt;</code> etiketleri.")
+    + tuzak(
+        p("Kritik adım ikincisi: modelin yazdığı ad, sağlayıcının <i>o istekte</i> "
+          "izin verdiği tam tool adına eşleniyor. Yakın ama birebir olmayan bir "
+          "ad işe yaramıyor. Onarmazsan tur boşa gidiyor ve <b>hiçbir yerde "
+          "sebebi görünmüyor</b>."))
+    + fig(f_result_middleware(), "Tokenjuice: komuta değil, sonuca dokunuyor.")
+    + p("Bir <code>exec</code> çağrısı 40.000 satır log döndürebilir; o log "
+        "olduğu gibi bağlama girerse tek komut bütün pencereyi yiyor. Tokenjuice "
+        "bunu komut <b>zaten koştuktan sonra</b> çözüyor: çıktıyı kısaltıyor.")
+    + neden(
+        p("Hangi katmanda durduğu tasarımın kendisi. Komutu yeniden yazmıyor, "
+          "tekrar koşturmuyor, çıkış kodunu değiştirmiyor — yalnızca modele "
+          "dönen <code>tool_result</code>'a dokunuyor. Komutu değiştirseydin "
+          "sonucun <i>doğruluğuna</i> karışmış olurdun; sonucu kısaltmak ise "
+          "yalnızca <b>bağlam muhasebesi</b>.")),
+)
+
+chapter(
+    "24", "Lobster ve Code Mode: orkestrasyonu modelden almak",
+    ["Çok adımlı işi tipli bir runtime'a vermek",
+     "Kapıyı runtime'ın tutmasının önemi",
+     "Büyük katalog, küçük prompt"],
+    fig(f_lobster(), "Lobster: tek tool çağrısı, gömülü onay kapıları, devam token'ı.")
+    + p("Çok adımlı bir işi modele orkestra ettirirsen her adım ayrı bir tur "
+        "olur; dört adımlı iş dört model turu demektir ve her turda bütün bağlam "
+        "yeniden gönderilir. Lobster bu orkestrasyonu modelden alıp <b>tipli bir "
+        "runtime'a</b> veriyor: model tek çağrı yapıyor, runtime bütün boru "
+        "hattını koşturuyor.")
+    + neden(
+        p("İçinde onay kapıları da var. Bir adım yan etkiliyse akış <b>orada "
+          "duruyor</b> ve bir devam token'ı döndürüyor; onayladıktan sonra "
+          "baştan başlamıyor, kaldığı yerden devam ediyor. Önemli olan şu: "
+          "<b>kapıyı runtime tutuyor, model değil.</b> Model “onay sormayı "
+          "atlayayım” diye karar veremiyor."))
+    + fig(f_tool_search(), "Code Mode: model şemaları görmüyor, köprüye kod yazıyor.")
+    + p("Katalog büyüdükçe bütün tool şemalarını prompt'a koymak imkânsızlaşıyor. "
+        "<b>Code Mode</b> bunu şöyle çözüyor: model şemaları görmüyor, küçük bir "
+        "JavaScript köprüsüne <code>search</code>, <code>describe</code>, "
+        "<code>call</code> yazıyor. <b>Swarm</b> aynı köprüden eşzamanlı "
+        "alt-ajanlar başlatıyor.")
+    + neden(
+        p("İkisinin güvenlik hikâyesi aynı ve dikkat çekici. Köprü izole bir Node "
+          "alt sürecinde koşuyor: <b>environment boş, dosya sistemi yok, ağ yok, "
+          "eklenti kodu yok, sır yok</b>. Köprüde koşan kod tek başına hiçbir şey "
+          "yapamıyor; gerçek her çağrı Gateway'e geri dönüyor ve normal politika, "
+          "onay, hook ve log yolundan geçiyor.")),
+)
+
+chapter(
+    "25", "Koşan bir tura müdahale, ve öğrenmenin kalıcı birimi",
+    ["Tur başladıktan sonra yapılabilecek dört şey",
+     "Düzeltmenin belleğe değil skill'e yazılması",
+     "Öğrenilen şeyin doğrudan davranışa yazılmaması"],
+    fig(f_session_tools(), "Dört müdahale yolu: /steer · /btw · /goal · /loop")
+    + p("Sıradan bir sohbet arayüzünde mesajı gönderdikten sonra yapabileceğin "
+        "tek şey beklemektir. Bu dört komut aynı soruya farklı cevaplar veriyor: "
+        "<b>tur çoktan başlamışken ne yapabilirsin?</b>")
+    + table(
+        ["Komut", "Ne yapıyor", "İnceliği"],
+        [["<code>/steer</code>", "koşan turu yönlendiriyor",
+          "runtime kabul etmezse mesajı çöpe atmıyor, sıradan prompt olarak gönderiyor"],
+         ["<code>/btw</code>", "araya yan soru sokuyor",
+          "cevabı konuşma geçmişine <b>eklemiyor</b> — asıl işin bağlamını kirletmiyor"],
+         ["<code>/goal</code>", "oturuma kalıcı hedef bağlıyor",
+          "hem operatör hem model aynı hedefi görüyor"],
+         ["<code>/loop</code>", "kendini tekrarlayan iş kuruyor",
+          "konuşmaya bağlı"]])
+    + fig(f_self_learning(), "Skill Workshop: öner → tara → uygula.")
+    + p("Bir asistana “öyle değil, böyle yapacaksın” dediğinde o bilgi nereye "
+        "gidiyor? Akla ilk gelen cevap belleğe yazmak. Ama bellekteki bir satır "
+        "bir <i>olgu</i>dur; sonraki oturumun izleyeceği bir <i>prosedür</i> "
+        "değildir. “Kullanıcı tabloları sever” ile “rapor yazarken önce şunu, "
+        "sonra şunu yap” aynı şey değil.")
+    + neden(
+        p("OpenClaw'ın cevabı: kalıcı birim <b>skill</b>. Bir düzeltme ya da "
+          "başarıyla biten bir iş, yönetilen bir yoldan geçip yeniden "
+          "kullanılabilir bir prosedüre dönüşüyor. Kritik olan aradaki kapı: "
+          "öğrenilen şey <b>doğrudan davranışa yazılmıyor</b> — önce öneriliyor, "
+          "sonra taranıyor, sonra uygulanıyor.")),
+)
+
+chapter(
+    "26", "Trajectory ve dayanıklılık frenleri",
+    ["“Ajan neden bunu yaptı” sorusunun cevabını baştan kaydetmek",
+     "Model failover'daki dört fren",
+     "Oturum yapışkanlığının maliyet kararı olması",
+     "Döngü kırıcının iki yönlü ince ayarı"],
+    fig(f_trajectory(), "Trajectory: oturumun uçuş kayıt cihazı.")
+    + p("“Ajan neden bunu yaptı?” sorusunun cevabı normalde elde yoktur; modele "
+        "tam olarak ne gittiğini görmek için prompt'u elle yeniden kurman "
+        "gerekir. Trajectory bunu baştan kaydediyor: modele giden prompt ve "
+        "sistem prompt'u, gönderilen tool tanımları, çağrı ve sonuç zinciri, "
+        "süreler ve hatalar.")
+    + neden(
+        p("Ve <b>redaksiyon varsayılan</b>. Bu küçük bir ayrıntı gibi duruyor "
+          "ama değil: hata raporu paylaşmanın sır paylaşmak anlamına gelmemesi, "
+          "insanların gerçekten rapor göndermesini sağlayan şey."))
+    + fig(f_failover(), "Failover: profil rotasyonu ve üç fren.")
+    + p("Bir model sağlayıcısı düştüğünde sırayla başka profiller deneniyor — "
+        "ama körlemesine değil. <b>Cooldown</b> az önce düşen profili bir süre "
+        "atlıyor, <b>auth-hata önbelleği</b> aynı 401'i tekrar yemeyi "
+        "engelliyor, <b>faturalama kilidi</b> kotası bitmiş profili devre dışı "
+        "bırakıyor.")
+    + neden(
+        p("En ilginç ayrıntı dördüncüsü: <b>oturum yapışkanlığı</b>. Aynı oturum "
+          "mümkün olduğunca aynı profilde kalmaya çalışıyor ve gerekçesi belgede "
+          "açıkça yazılı — <i>cache-friendly</i>. Model değiştirmek prompt "
+          "cache'ini yakıyor, çünkü cache isteğin başındaki değişmeyen kısımdan "
+          "çalışıyor. Yani gereksiz yere model değiştirmemek bir <b>maliyet</b> "
+          "kararı. <b>[kaynak]</b>"))
+    + fig(f_loopguard(), "Döngü kırıcı: aynı üçlü tekrarlanırsa koşu iptal.")
+    + tuzak(
+        p("En pahalı hata sonsuz döngü, ve en sinsi biçimi şu zincir: bağlam "
+          "doluyor, sıkıştırma çalışıyor, model sıkıştırma yüzünden ne yaptığını "
+          "unutup aynı tool'u aynı argümanla tekrar çağırıyor, bağlam yine "
+          "doluyor.")
+        + p("İnce ayar <b>iki yönlü</b> ve ikisi de gerekli. "
+            "<code>exec</code> için hash hesaplanırken <b>oynak</b> alanlar "
+            "(süre, PID, çalışma dizini) dışarıda bırakılıyor — yoksa aynı komut "
+            "her seferinde farklı görünür ve döngü hiç yakalanmaz. Giden "
+            "mesajlarda ise tam tersi: oynak id'ler çıkarılıyor ki iki ayrı "
+            "gönderim yanlışlıkla aynı sanılmasın.")),
+)
+
+chapter(
+    "27", "Değiştirilebilirlik ve sessiz altyapı",
+    ["Bağlam motorunun dört eklenti noktası",
+     "Belleğin bir sözleşme olması",
+     "Genişletme noktasının güvenlik sınırının üstünde durması",
+     "Hiçbir özellik listesinde yer almayan beş paket"],
+    fig(f_ctx_engine(), "Bağlam motoru dört noktada değiştirilebilir.")
+    + p("Çoğu harness'ta “modele ne gönderilecek” kararı çekirdeğe gömülüdür. "
+        "OpenClaw'da bu kararın verildiği <b>dört an da eklenti yüzeyi</b>: "
+        "mesaj bağlama eklenirken, model koşusundan hemen önce, pencere "
+        "dolduğunda, ve tur bittiğinde. Sıkıştırma bile devralınabiliyor — bir "
+        "eklenti <code>ownsCompaction</code> bayrağını kaldırırsa sıkıştırmanın "
+        "tamamı ona geçiyor.")
+    + tuzak(
+        p("Bütün bu esnekliğin altında pazarlığa açık olmayan tek bir kural "
+          "duruyor: <b>tool çağrısı sonucundan ayrılmaz</b>. Ayrılırsa model, "
+          "cevabını hiç görmediği bir çağrı yapmış gibi görünür, ve çoğu "
+          "sağlayıcı bu şekli geçersiz sayıp isteği reddeder."))
+    + fig(f_memory_write(), "Bellek bir sağlayıcı sözleşmesi: builtin · honcho · qmd.")
+    + p("Bellekte tek bir uygulama yok; bir <b>sözleşme</b> var ve onu uygulayan "
+        "birden çok sağlayıcı. 83 dosyalık ayrı bir SDK paketi ayrılmış olması "
+        "işin ne kadar ciddiye alındığını gösteriyor.")
+    + neden(
+        p("Sözleşmenin değişmeyen kısmı: her bellek kaydının bir <b>köken</b> "
+          "sınıfı var, kapalı bir kümeden seçiliyor ve ayrı bir sütunda duruyor "
+          "— yani <b>model onu düzyazıyla yazamıyor</b>. Sağlayıcı değişse de bu "
+          "kural değişmiyor. Sonuç önemli: “belleği değiştirebilirsin” ile "
+          "“güvenlik sınırını gevşetebilirsin” aynı şey değil. Genişletme "
+          "noktası, sınırın <i>üstünde</i> duruyor."))
+    + p("<b>Sessiz altyapı.</b> Bir harness'ın görünmeyen yarısı beş pakette: "
+        "<code>normalization-core</code> farklı kanallardan geleni tek biçime "
+        "indiriyor, <code>markdown-core</code> modelin yazdığını her kanalın "
+        "kaldırabileceği biçime çeviriyor (WhatsApp'ın markdown'ı Slack'inki "
+        "değil), <code>terminal-core</code> TUI çıktısını üretiyor, "
+        "<code>retry</code> yeniden deneme politikasını topluyor, "
+        "<code>net-policy</code> IP ayrıştırması, SSRF engellemesi ve URL "
+        "redaksiyonu yapıyor.")
+    + tuzak(
+        p("Sonuncusu iyi bir örnek: <code>net-policy</code> olmadan "
+          "<code>web_fetch</code>, modelin eline verilmiş bir <b>iç ağ "
+          "tarayıcısına</b> dönüşüyor. Hiçbir özellik listesinde yer almayan bu "
+          "paketler, biri eksik olduğunda hemen fark ediliyor.")),
+)
+
 # ═══════════════════════════════════════════════ KISIM 5 — karşılaştırma
 
 part("5", "Karşılaştırma ve seçim",
@@ -133,7 +356,7 @@ part("5", "Karşılaştırma ve seçim",
      "hangi kısıt altında hangisi.")
 
 chapter(
-    "18", "Beş çerçeve, tek tabloda",
+    "28", "Beş çerçeve, tek tabloda",
     ["Her çerçevenin merkezî metaforu",
      "Eksen eksen karşılaştırma",
      "Hangi iddiaların koşturularak doğrulandığı"],
@@ -179,7 +402,7 @@ chapter(
 )
 
 chapter(
-    "19", "Ne zaman hangisi",
+    "29", "Ne zaman hangisi",
     ["Kısıta göre seçim tablosu",
      "“Ajan gerekmiyor” cevabının ne zaman doğru olduğu"],
     p("“Hangisi daha iyi” sorusunun cevabı yok; “<b>bu kısıt altında hangisi</b>” "
@@ -210,7 +433,7 @@ chapter(
 )
 
 chapter(
-    "20", "Kurumsal soru: ne alınır, ne alınmaz",
+    "30", "Kurumsal soru: ne alınır, ne alınmaz",
     ["Mekanizmanın taşınabilir, güven modelinin taşınamaz olması",
      "Bir kurumun kütüphaneye ekleme yapması gereken yerler",
      "Karar özeti"],
