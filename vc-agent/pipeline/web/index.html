@@ -15,6 +15,12 @@
         <strong id="scan-query">—</strong>
       </div>
       <span class="badge" id="mode-badge" hidden></span>
+      <!-- Çerçeve anahtarı. Sağ üstte, çünkü bu bir tur ayarı değil, bütün
+           sistemin hangi çerçevede koştuğu — ve o soru başlıkta durmalı. -->
+      <button type="button" class="fw" id="fw-toggle" hidden
+              aria-pressed="false" title="AutoGen ile MAF arasında geç">
+        <span class="fw__dot"></span><span class="fw__label">AutoGen</span>
+      </button>
       <div class="chrome__meta" id="scan-meta"></div>
     </div>
 
@@ -25,6 +31,15 @@
       <select id="scan-pick" class="picker" aria-label="Choose a scan"></select>
       <button type="button" class="primary" id="new-scan">New scan</button>
       <button type="button" class="ghost" id="reset-chat" hidden>Reset chat</button>
+      <!-- The flow screen for *this* question. It opens in its own tab rather
+           than in a panel here: the drawing needs the whole viewport, and on a
+           second monitor it can stay open while the conversation continues.
+           Disabled until a turn exists, because there is nothing to draw. -->
+      <button type="button" class="ghost" id="flow-open" disabled>Akış ↗</button>
+      <!-- Gerçek bir takım koşturmak. Sohbet turu bilerek tek ajan; beş takım
+           tipini yalnız anlatabilmek yerine gösterebilmek için ayrı bir yol. -->
+      <select id="team-kind" class="picker" aria-label="Takım tipi" hidden></select>
+      <button type="button" class="ghost" id="team-run" hidden>Takımla sor</button>
     </div>
 
     <!-- The terminal. Hidden until the model actually runs code, because an
@@ -46,39 +61,26 @@
     </div>
   </header>
 
+  <!-- Sunum yüzeyi. Varsayılan görünüm burası: sunarken slaytı ve PoC'yi aynı
+       pencerede tutmak, ekran değiştirmekten iyi. Soru sorulduğu anda sohbete
+       geçiyor, çünkü cevabı göremeyen bir sohbet kutusu işe yaramaz. -->
+  <!-- Genişlik tutamağı. Deste ile sohbetin arasında; sürükle, ok tuşlarıyla
+       ayarla, çift tıkla sıfırla. Sabit bir sütun iki işi de yarım yapıyordu. -->
+  <div class="grip" id="grip" role="separator" aria-orientation="vertical"
+       tabindex="0" aria-label="Slayt genişliği — sürükle, ok tuşlarıyla ayarla,
+       çift tıkla sıfırla"></div>
+
+  <section class="deck" id="deck" aria-label="Sunum destesi">
+    <div class="deck__bar" id="deck-bar"></div>
+    <!-- Gezinme Chrome'un kendi PDF görüntüleyicisinde: araç çubuğu, sayfa
+         numarası, yakınlaştırma ve arama onda hazır. Kendi tıklama katmanımız
+         aynı işi daha kötü yapıyordu. -->
+    <iframe class="deck__frame" id="deck-frame" title="Slayt destesi"></iframe>
+  </section>
+
   <main class="thread" id="thread" role="log" aria-live="polite" aria-label="Conversation"></main>
 
   <div class="composer">
-    <!-- What is running right now. It lives inside the composer rather than as a
-         sibling because `.app` is a two-row grid (dashboard.py) and a third child
-         lands in an implicit row below the fold. Hidden until the backend confirms
-         a live agent: the static export has no server behind it and nothing to
-         report. -->
-    <section class="mech" id="mech" hidden aria-label="Running mechanism">
-      <div class="mech__head">
-        <span class="mech__title">Şu an ne oluyor</span>
-        <span class="mech__counts" id="mech-counts"></span>
-        <button type="button" class="ghost mech__toggle" id="mech-toggle">gizle</button>
-      </div>
-      <div class="mech__body" id="mech-body">
-        <!-- Which team, which pattern, which message types. Constant for a run,
-             so it sits above the figure rather than inside it. -->
-        <div class="mech__run" id="mech-run"></div>
-        <div class="mech__canvas" id="mech-canvas"></div>
-        <p class="mech__note" id="mech-note"></p>
-        <!-- The running trace. The figure above shows the mechanism that is
-             live *now*; this shows the whole turn as it accumulates, one short
-             line per stage, so "what happened between my question and this
-             answer" is answerable after the fact and not just during it. -->
-        <ol class="mech__trace" id="mech-trace" aria-label="Çalışma izi"></ol>
-        <!-- Scheduled work. It sits under the trace because it answers the
-             neighbouring question: the trace is what ran just now, this is what
-             will run without anybody asking. Hidden until there is something to
-             say, including the case where we cannot reach the scheduler. -->
-        <div class="mech__cron" id="mech-cron" hidden></div>
-      </div>
-    </section>
-
     <div class="chips" id="chips"></div>
     <form class="ask" id="ask" autocomplete="off">
       <input id="q" name="q" type="text" placeholder="Ask about this scan…" aria-label="Ask about this scan">
@@ -116,7 +118,6 @@
 </dialog>
 
 <div class="tooltip" role="status" aria-live="polite"></div>
-<script src="/rough.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

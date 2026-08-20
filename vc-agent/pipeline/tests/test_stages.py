@@ -27,12 +27,48 @@ class CatalogueTest(unittest.TestCase):
                 f"{mech.id} has no identifier in its class field",
             )
 
-    def test_every_entry_cites_a_line(self) -> None:
+    def test_every_entry_cites_something_checkable(self) -> None:
+        """Her girdi doğrulanabilir bir yere atıf vermeli.
+
+        AutoGen mekanizmaları kılavuzun satırına (`08:2298`), MAF mekanizmaları
+        kendi sembolüne (`maf:FunctionTool`). İkisi de bir okuyucunun gidip
+        bakabileceği bir yer; atıfsız bir iddia, birkaç gün sonra yanlış
+        anlatılıyor.
+
+        Üçüncü biçim sonradan eklendi: `18:150`. Zamanlayıcı mekanizmalarının
+        AutoGen'de atıf verecekleri bir yer **yok**, çünkü AutoGen'de zamanlama
+        diye bir kavram yok — ve bu bir eksiklik değil, bir kütüphane saat
+        tutmaz. Onlar bizim kendi analizimize (`docs/18`) atıf veriyor. Kural
+        gevşemiyor: hâlâ bu depoda açılıp bakılabilecek bir satır isteniyor.
+        """
         for mech in stages.CATALOGUE.values():
+            pattern = (r"^maf:[A-Za-z_]+$" if mech.lane == stages.MAF
+                       else r"^(0[58]|18):\d+$")
             self.assertRegex(
-                mech.ref, r"^0[58]:\d+$",
-                f"{mech.id} must cite a guide line like 08:2298, got {mech.ref!r}",
+                mech.ref, pattern,
+                f"{mech.id} atıfsız ya da yanlış biçimde: {mech.ref!r}",
             )
+
+    def test_maf_citations_point_at_symbols_that_exist(self) -> None:
+        """`maf:X` atıfları uydurma olmasın.
+
+        Ayrı sanal ortam kurulu değilse atlanıyor: bu test bir kurulum
+        gereksinimi getirmemeli, ama kuruluysa iddiayı gerçekten sınamalı.
+        """
+        import subprocess
+        from pathlib import Path
+
+        python = Path(__file__).resolve().parents[2] / ".venv-maf" / "bin" / "python"
+        if not python.exists():
+            self.skipTest(".venv-maf kurulu değil")
+        symbols = sorted({m.ref.split(":", 1)[1] for m in stages.CATALOGUE.values()
+                          if m.lane == stages.MAF})
+        code = ("import agent_framework as af;"
+                "print(','.join(n for n in %r if hasattr(af, n)))" % symbols)
+        found = subprocess.run([str(python), "-c", code], capture_output=True,
+                               text=True, timeout=120).stdout.strip().split(",")
+        for symbol in symbols:
+            self.assertIn(symbol, found, f"agent_framework.{symbol} yok")
 
     def test_every_entry_names_a_file_that_exists(self) -> None:
         """"Which module ran" has to be answerable, and answerable correctly.
@@ -48,9 +84,19 @@ class CatalogueTest(unittest.TestCase):
                 f"{mech.id} points at {mech.module}, which is not there",
             )
 
-    def test_lanes_are_the_three_known_ones(self) -> None:
+    def test_lanes_are_the_known_ones(self) -> None:
+        """Dört şerit: AutoGen'in iki katmanı, bizim hattımız, ve MAF.
+
+        MAF ayrı bir şerit çünkü ayrı bir çerçeve. AutoGen'in katmanlarıyla aynı
+        renge boyamak, ekranın anlattığı ayrımı silerdi.
+        """
+        known = (stages.AGENTCHAT, stages.CORE, stages.OURS, stages.MAF)
         for mech in stages.CATALOGUE.values():
-            self.assertIn(mech.lane, (stages.AGENTCHAT, stages.CORE, stages.OURS), mech.id)
+            self.assertIn(mech.lane, known, mech.id)
+
+    def test_maf_mechanisms_are_never_labelled_autogen(self) -> None:
+        for stage_id in stages.MAF_FLOW:
+            self.assertEqual(stages.CATALOGUE[stage_id].lane, stages.MAF, stage_id)
 
     def test_our_own_machinery_is_not_labelled_autogen(self) -> None:
         """The gate and the compacting context are ours; AutoGen ships neither.

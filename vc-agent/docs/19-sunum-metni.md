@@ -1,7 +1,9 @@
 # Sunum metni — AutoGen, OpenClaw ve Atlas
 
 **Tarih:** 19 Ağustos 2026
-**Desteler:** `hap-autogen.pdf` (37) · `hap-openclaw.pdf` (19) · `hap-openclaw-nis.pdf` (17)
+**Desteler:** `hap-autogen.pdf` (32) · `hap-openclaw.pdf` (19) · `hap-openclaw-nis.pdf` (17)
+**Sıra ve ekran koreografisi:** [23-sunum-plani.md](23-sunum-plani.md) — omurgaya
+MAF perdesi eklendi, bu belgenin üstünde okunmalı.
 **Soru hazırlığı:** ayrı sayfada, 24 soru
 
 ---

@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -42,6 +43,7 @@ import config  # noqa: E402
 import conversation as conversation_module  # noqa: E402
 import dashboard  # noqa: E402
 import openclaw_control  # noqa: E402
+import runlog  # noqa: E402
 import stages  # noqa: E402
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -80,6 +82,9 @@ class ScanRun:
         self.started_at = time.time()
         self.finished_at = None
         self.args = {"query": query, "days": days, "limit": limit}
+        # A scan is the one path that really assembles a team, so it is the one
+        # the flow screen has the most to say about. Recorded like a chat turn.
+        self.run = runlog.LOG.begin("scan", f"tarama · {query}")
         command = [
             sys.executable, str(Path(__file__).resolve().parent / "scan.py"),
             "--query", query, "--days", str(days), "--limit", str(limit),
@@ -105,6 +110,7 @@ class ScanRun:
                     self.stages.append(stage)
                     if len(self.stages) > 500:
                         del self.stages[:200]
+                self.run.event(stage)
                 continue
             with self.lock:
                 self.lines.append(text)
@@ -113,6 +119,7 @@ class ScanRun:
                     del self.lines[:1000]
         self.process.wait()
         self.finished_at = time.time()
+        self.run.end("done" if self.process.poll() == 0 else "error")
 
     def snapshot(self, *, since: int = 0) -> dict:
         with self.lock:
@@ -290,8 +297,14 @@ def script() -> PlainTextResponse:
 
 @app.get("/rough.js", response_class=PlainTextResponse)
 def rough() -> PlainTextResponse:
-    """Hand-drawn SVG primitives for the mechanism panel — the browser half of
-    `docs/diagrams/rough.py`, so the screen and the PDF draw in the same hand."""
+    """Hand-drawn SVG primitives — the browser half of `docs/diagrams/rough.py`,
+    so the screen and the PDF draw in the same hand.
+
+    Nothing loads this at the moment: its only consumer was the mechanism panel,
+    which is no longer part of the chat. The route and the file stay because the
+    interface that replaces the panel will want the same hand, and re-deriving
+    these primitives from the Python side is the expensive way to get them back.
+    """
     return PlainTextResponse((WEB / "rough.js").read_text(encoding="utf-8"), media_type="text/javascript")
 
 
@@ -438,11 +451,22 @@ async def chat(payload: ChatTurn):
         # queue behind each other, which is the point of the session lane.
         async with lane:
             CHAT.sessions.record_turn(record, "user", payload.question)
+            # The turn is recorded as it streams. The id goes out first so the
+            # interface can offer the flow screen for *this* question rather than
+            # for whatever ran last — two tabs asking at once would otherwise
+            # each open the other's turn.
+            run = runlog.LOG.begin("chat", payload.question, record.id)
+            yield f"data: {json.dumps({'type': 'run', 'id': run.id})}\n\n"
             final = ""
+            status = "done"
             async for event in conversation.stream(payload.question):
                 if event.get("type") == "done":
                     final = event.get("text", "")
+                elif event.get("type") in ("cancelled", "error"):
+                    status = event["type"]
+                run.event(event)
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            run.end(status)
 
             if final:
                 CHAT.sessions.record_turn(record, "assistant", final)
@@ -497,6 +521,250 @@ def mechanisms() -> JSONResponse:
         "core_idle_note": stages.CORE_IDLE_NOTE,
         "runtime": GATEWAY.report(),
     })
+
+
+@app.get("/akis", response_class=HTMLResponse)
+def akis() -> str:
+    """The flow screen: one turn, drawn.
+
+    A separate page rather than a panel in the chat. The panel had to explain the
+    machine in the margin of a conversation and did both jobs badly; here the
+    drawing gets the whole viewport, and the chat gets its width back.
+    """
+    return (WEB / "akis.html").read_text(encoding="utf-8")
+
+
+@app.get("/akis.js", response_class=PlainTextResponse)
+def akis_script() -> PlainTextResponse:
+    return PlainTextResponse((WEB / "akis.js").read_text(encoding="utf-8"),
+                             media_type="text/javascript")
+
+
+@app.get("/figures.js", response_class=PlainTextResponse)
+def figures_script() -> PlainTextResponse:
+    """The mechanism drawings — the browser half of the hap deck's diagrams.
+
+    Recovered from the panel that used to sit in the chat (`3af7313`). The panel
+    went; these did not, because they are the part that actually explains a turn,
+    and they are the same drawings as `docs/pdf/hap-autogen.pdf` in the same hand.
+    """
+    return PlainTextResponse((WEB / "figures.js").read_text(encoding="utf-8"),
+                             media_type="text/javascript")
+
+
+@app.get("/patterns.js", response_class=PlainTextResponse)
+def patterns_script() -> PlainTextResponse:
+    """The eight design-pattern drawings, ported from `docs/diagrams/figures.py`.
+
+    Same coordinates, same palette, same caption lines as the deck. Two separate
+    drawings of one claim start telling it two different ways within a release.
+    """
+    return PlainTextResponse((WEB / "patterns.js").read_text(encoding="utf-8"),
+                             media_type="text/javascript")
+
+
+class TeamTurn(BaseModel):
+    kind: str
+    question: str
+    max_messages: int = 6
+
+
+@app.post("/api/team")
+async def team_run(payload: TeamTurn):
+    """Run one question through a real AutoGen team, streamed as SSE.
+
+    This is the one path where the flow screen has an actual team to draw. The
+    chat path deliberately has none — a single `AssistantAgent` — and saying so
+    is the honest answer, but it left the five team types as something we could
+    only describe. Here they run.
+    """
+    import teams as teams_module
+
+    if payload.kind not in teams_module.KINDS:
+        raise HTTPException(400, f"unknown team: {payload.kind}")
+    if not teams_module.available():
+        raise HTTPException(409, "No LLM configured; a team needs a live model.")
+
+    async def events():
+        run = runlog.LOG.begin("team", payload.question)
+        run.variant = payload.kind
+        yield f"data: {json.dumps({'type': 'run', 'id': run.id})}\n\n"
+        bus = stages.StageBus()
+        status = "done"
+        try:
+            async for event in teams_module.run(payload.kind, payload.question,
+                                                bus=bus, spans=run.spans,
+                                                max_messages=payload.max_messages):
+                for stage in bus.drain():
+                    run.event(stage)
+                    yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+                run.event(event)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as e:  # noqa: BLE001 — the stream reports its own failure
+            status = "error"
+            yield ("data: " + json.dumps({"type": "error",
+                                          "message": f"{type(e).__name__}: {e}"}) + "\n\n")
+        for stage in bus.drain():
+            run.event(stage)
+            yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+        run.end(status)
+        yield "data: {\"type\": \"end\"}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
+class MafTurn(BaseModel):
+    question: str
+    approval: str = "never_require"
+
+
+@app.post("/api/maf")
+async def maf_run(payload: MafTurn):
+    """Run one question through Microsoft Agent Framework instead of AutoGen.
+
+    A comparison surface, not a production path: the pipeline's tools, gate,
+    memory and scan all live on the AutoGen side. What this shows is the same
+    question in the successor framework, and where its defaults differ.
+    """
+    import maf as maf_module
+
+    if not maf_module.available():
+        raise HTTPException(409, "MAF modu hazır değil: " + maf_module.report()["why"])
+
+    async def events():
+        run = runlog.LOG.begin("maf", payload.question)
+        yield f"data: {json.dumps({'type': 'run', 'id': run.id})}\n\n"
+        bus = stages.StageBus()
+        status = "done"
+        async for event in maf_module.run(payload.question,
+                                          approval=payload.approval, bus=bus):
+            for stage in bus.drain():
+                run.event(stage)
+                yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+            if event.get("type") == "error":
+                status = "error"
+            run.event(event)
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        for stage in bus.drain():
+            run.event(stage)
+            yield f"data: {json.dumps(stage, ensure_ascii=False)}\n\n"
+        run.end(status)
+        yield "data: {\"type\": \"end\"}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
+# Sunumda gösterilecek desteler. Beyaz liste, çünkü ad bir yol parçası:
+# `docs/pdf` altındaki her şeyi açmak, istemcinin seçtiği bir dizeyi dosya
+# yoluna çevirmek demek olurdu. `shots.py`'deki aynı disiplin.
+# Etiketler KISA: deste sütunu 32 rem ve dört sekme + kapat düğmesi tek satıra
+# sığmalı. Uzun adlarda "Kapat ×" alt satıra düşüyor ve bant iki kat oluyor.
+DECKS = {
+    "autogen": ("hap-autogen.pdf", "AutoGen"),
+    "openclaw": ("hap-openclaw.pdf", "OpenClaw"),
+    "openclaw-nis": ("hap-openclaw-nis.pdf", "niş"),
+    # Uzun rehber: hap desteler "ne" diye sorana, bu "hangisi, neden" diye
+    # sorana cevap veriyor. Sunumda soru gelince açılacak yer burası.
+    "rehber": ("rehber-cerceveler.pdf", "Rehber"),
+    # Sunum kâğıtları. Deste izleyiciye bakar; bunlar KONUŞANA bakar ve
+    # sunum sırasında açılır — o yüzden aynı panelde, en sonda.
+    "dort": ("sunum-dort-sayfa.pdf", "4 sayfa"),
+    "kart-autogen": ("kart-autogen.pdf", "kart·AG"),
+    "kart-openclaw": ("kart-openclaw.pdf", "kart·OC"),
+}
+
+
+@app.get("/api/decks")
+def decks() -> JSONResponse:
+    """Hangi desteler gösterilebilir. Diskte olmayanı listelemiyoruz."""
+    base = Path(__file__).resolve().parent.parent / "docs" / "pdf"
+    out = []
+    for key, (filename, label) in DECKS.items():
+        path = base / filename
+        if path.exists():
+            out.append({"id": key, "label": label,
+                        "pages": _page_count(path),
+                        "size_kb": round(path.stat().st_size / 1024)})
+    return JSONResponse({"decks": out, "default": "autogen"})
+
+
+def _page_count(path: Path) -> int:
+    """Sayfa sayısı, PDF kütüphanesi olmadan.
+
+    İki yol birden okunuyor ve büyüğü alınıyor: `/Type /Page` girdileri sıkıştırılmış
+    nesne akışlarının içinde kalabiliyor, `/Count` ise sayfa ağacının kökünde duruyor
+    ama iç düğümlerde de geçiyor. Üç destede ikisi de aynı sayıyı verdi (43 · 19 · 17);
+    ayrışsalardı gezinme yanlış yerde durur, hata vermezdi.
+    """
+    try:
+        data = path.read_bytes()
+        pages = len(re.findall(rb"/Type\s*/Page[^s]", data))
+        counts = [int(m) for m in re.findall(rb"/Count\s+(\d+)", data)]
+        return max([pages] + counts) or 1
+    except Exception:  # noqa: BLE001 — sayfa sayısı bir gösterge, koşuyu düşüremez
+        return 1
+
+
+@app.get("/deck/{deck_id}")
+def deck(deck_id: str) -> Response:
+    """One slide deck as a PDF, by id — never by path.
+
+    The id is looked up in a whitelist and never joined onto a path from
+    client input. Same rule as the camera frames: the request names a key,
+    the server owns the filename.
+    """
+    entry = DECKS.get(deck_id)
+    if entry is None:
+        raise HTTPException(404, "no such deck")
+    path = Path(__file__).resolve().parent.parent / "docs" / "pdf" / entry[0]
+    if not path.exists():
+        raise HTTPException(404, "deck not built")
+    # Deste bir kez yükleniyor ve gezinmeyi tarayıcının görüntüleyicisi
+    # yapıyor; önbellek başlığı sekmeler arası geçişi bedavaya getiriyor.
+    return Response(path.read_bytes(), media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{entry[0]}"',
+                             "Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/api/maf")
+def maf_status() -> JSONResponse:
+    """Whether MAF mode can be offered, and why not when it cannot."""
+    import maf as maf_module
+
+    return JSONResponse(maf_module.report())
+
+
+@app.get("/api/teams")
+def team_kinds() -> JSONResponse:
+    """Which team types can be run, and what picks the speaker in each."""
+    import teams as teams_module
+
+    return JSONResponse({
+        "kinds": [{"id": k, "picker": teams_module.PICKER[k]} for k in teams_module.KINDS],
+        "roster": [a["name"] for a in teams_module.ROSTER],
+        "available": teams_module.available(),
+    })
+
+
+@app.get("/api/runs")
+def runs() -> JSONResponse:
+    """Recent turns, newest first — the flow screen's own picker."""
+    return JSONResponse({"runs": runlog.LOG.listing()})
+
+
+@app.get("/api/run/{run_id}")
+def run_report(run_id: str) -> JSONResponse:
+    """Everything the flow screen draws for one turn, in one request.
+
+    `latest` is accepted as an id so the screen can be opened cold — from a
+    bookmark, or on a second monitor — without the chat having handed it one.
+    """
+    from gateway.runtime import GATEWAY
+
+    run = runlog.LOG.latest() if run_id == "latest" else runlog.LOG.get(run_id)
+    if run is None:
+        raise HTTPException(404, "no such run")
+    return JSONResponse({**run.report(), "runtime": GATEWAY.report()})
 
 
 class OpenClawLine(BaseModel):
@@ -556,16 +824,39 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
 
     So this branch never asks anything. It parses, and either creates, lists,
     removes, or refuses with the syntax spelled out.
+
+    ### Neden burada da bir kayıt açılıyor
+
+    Zamanlama, akış ekranında görünmeyen tek yoldu: sohbet, takım, tarama ve MAF
+    kendi turlarını kaydederken `/openclaw schedule` hiçbir iz bırakmıyordu.
+    Ekranın "bu sistemde ne olduğunu gösteriyorum" iddiası varsa, kaydetmediği
+    bir yol o iddianın deliği olur. Üç aşama az ama doğru üç aşama: cümlenin
+    okunması, kapı, ve devir.
     """
     import scheduler as scheduler_module
 
+    run = runlog.LOG.begin("cron", plan["text"][:160], record.id)
+    bus = stages.StageBus()
+
+    def _flush() -> None:
+        runlog.LOG.record(run, bus.drain())
+
     try:
         command = scheduler_module.parse_command(plan["text"])
+        bus.emit("cron_parse", text=plan["text"][:120],
+                 action=command["action"])
+        _flush()
     except scheduler_module.WhenError as exc:
+        # Ayrıştırma hatası da kaydediliyor: reddedilen bir zamanlama, hiç
+        # denenmemiş bir zamanlamadan farklı bir şey.
+        bus.emit("cron_parse", text=plan["text"][:120], error=str(exc)[:120])
+        _flush()
+        run.end("error")
         return {"ok": False, "method": "schedule", "tier": "local", "error": str(exc)}
 
     if command["action"] == "list":
         listing = await scheduler_module.jobs()
+        run.end()
         return {"ok": True, "method": "schedule", "tier": "local", "result": listing}
 
     if command["action"] == "remove":
@@ -574,13 +865,25 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
              "params": {"id": command["id"]}, "text": "", "error": ""},
             record.id,
         )
-        return held if held is not None else await scheduler_module.remove(command["id"])
+        bus.emit("cron_gate", method="cron.remove", held=held is not None)
+        _flush()
+        if held is not None:
+            run.end("blocked")
+            return held
+        out = await scheduler_module.remove(command["id"])
+        bus.emit("cron_done", action="remove", id=command["id"])
+        _flush()
+        run.end()
+        return out
 
     try:
         params = scheduler_module.build_job(
             command["ask"][:60], command["when"], command["ask"], to=command["to"]
         )
     except scheduler_module.WhenError as exc:
+        bus.emit("cron_parse", text=plan["text"][:120], error=str(exc)[:120])
+        _flush()
+        run.end("error")
         return {"ok": False, "method": "schedule", "tier": "local", "error": str(exc)}
 
     # Signed on what was typed, not on the resolved schedule: `"20dk sonra"` is a
@@ -592,11 +895,19 @@ async def _openclaw_schedule(plan: dict, record) -> dict:
          "text": "", "error": ""},
         record.id,
     )
+    bus.emit("cron_gate", method="cron.add", held=held is not None,
+             when=scheduler_module.describe(params["schedule"])[:80])
+    _flush()
     if held is not None:
+        run.end("blocked")
         return held
 
     outcome = await openclaw_control.call("cron.add", params)
     outcome["when"] = scheduler_module.describe(params["schedule"])
+    bus.emit("cron_done", action="add", ok=bool(outcome.get("ok")),
+             when=outcome["when"][:80], to=command["to"] or "—")
+    _flush()
+    run.end("done" if outcome.get("ok") else "error")
     if not command["to"]:
         outcome["note"] = (
             "Teslimat hedefi verilmedi: iş koşacak ama sonucu yalnız task kaydına "
@@ -973,6 +1284,32 @@ async def approval_approve(request_id: str, payload: ApprovalDecision) -> JSONRe
         # Grant tüketiliyor: onay bu koşuyu kapsıyor, sonraki her benzerini değil.
         approval_module.GATE._granted.discard(request.digest)  # noqa: SLF001
         outcome["ran"] = {"code": code, **run}
+
+        # Konteyner koşusunu TURUN kaydına iliştir.
+        #
+        # `code_request` ve `code_result` `stages.py`'de tanımlıydı, `runlog`'da
+        # grafta çizilecek yerleri vardı — ve **hiç kimse yayınlamıyordu**.
+        # Ölçüldü: bir Docker turunda aşamalar `context · model · tool_request ·
+        # gate · tool_result · loop · model · stream · done`; kodun kendisi ve
+        # konteynerin cevabı akış ekranında hiç görünmüyordu. Terminal çıktıyı
+        # basıyordu ama graf "Docker yürütücü" kutusunu bile çizmiyordu, çünkü
+        # o kutu `code_result`'a bağlı.
+        #
+        # Onay ayrı bir HTTP isteği, yani turun akışının dışında. Ama kaydın
+        # dışında olması gerekmiyor: koşu hangi oturumdaysa onun son turuna
+        # iliştiriliyor. Ekranın "bu turda ne oldu" iddiası varsa, turun en
+        # pahalı adımı orada olmalı.
+        target = runlog.LOG.latest(request.session)
+        if target is not None:
+            bus = stages.StageBus()
+            # Anahtarlar `Run.code_runs()`'ın okuduğu adlar: `code`, `output`,
+            # `is_error`, `seconds`. Başka bir ad koymak, panelin boş kod ve
+            # boş çıktı göstermesi demek — sessizce.
+            out = str(run.get("output") or "")
+            bus.emit("code_request", code=code[:4000], lines=code.count("\n") + 1)
+            bus.emit("code_result", output=out[:4000],
+                     is_error=not run.get("ok"), seconds=run.get("seconds"))
+            runlog.LOG.record(target, bus.drain())
     return JSONResponse(outcome)
 
 

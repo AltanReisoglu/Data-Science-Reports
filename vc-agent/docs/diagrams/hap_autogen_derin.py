@@ -15,7 +15,7 @@ kullanılmıyor. Uzun tire bağlacın yerini tutmuyor.
 # ═══════════════════════════════════════════ BİLEŞENLER, teker teker
 
 A.append(card(
-    "AutoGen · bileşen 1/6", "Model Clients",
+    "AutoGen · bileşen", "Model Clients",
     f_model_clients(),
     "05:1984 — dördü de aynı ChatCompletionClient protokolünü uyguluyor",
     "Model istemcisi, sağlayıcıyla konuşan katman. Ajan \"şu mesajları gönder, "
@@ -33,7 +33,7 @@ A.append(card(
     foot="Uyumlu bir endpoint kullanıyorsan model_info tuzağı burada bekliyor — destenin tuzak slaytına bak."))
 
 A.append(card(
-    "AutoGen · bileşen 2/6", "Model Context",
+    "AutoGen · bileşen", "Model Context",
     f_context(),
     "05:2341 — modele NE gideceğine karar veren şey",
     "Model istemcisi sağlayıcıyla <i>nasıl</i> konuşulacağını bilir. Model "
@@ -52,7 +52,7 @@ A.append(card(
     foot="Bizde: pipeline/context_engine.py — dört yaşam noktası, ve tool çağrısını sonucundan ayırmayan bir sıkıştırma."))
 
 A.append(card(
-    "AutoGen · bileşen 3/6", "Tools",
+    "AutoGen · bileşen", "Tools",
     f_tools_component(),
     "05:2473 — şema, fonksiyon imzasından ve docstring'den türetiliyor",
     "Tool, ajanın bir eylem yapmak için koşturduğu koddur. Bir hesap makinesi "
@@ -67,7 +67,7 @@ A.append(card(
     cap_mm=44))
 
 A.append(card(
-    "AutoGen · bileşen 4/6", "Workbench (ve MCP)",
+    "AutoGen · bileşen", "Workbench (ve MCP)",
     f_workbench_component(),
     "05:2841 — tek tool değil, durum ve kaynak paylaşan bir koleksiyon",
     "<code>Tool</code> tek bir tool'a arayüz verir. <b>Workbench</b> ise birden "
@@ -85,7 +85,7 @@ A.append(card(
     foot="Tuzak: aynı ajana hem tools= hem workbench= verirsen ValueError alırsın. İkisi birbirinin alternatifi."))
 
 A.append(card(
-    "AutoGen · bileşen 5/6", "Code Executors",
+    "AutoGen · bileşen", "Code Executors",
     f_code_executors(),
     "05:3054 — her blok bir dosyaya yazılıp AYRI SÜREÇTE koşuyor",
     "Modelin yazdığı kodu çalıştırmanın en basit biçimi şu: her kod bloğu bir "
@@ -102,7 +102,7 @@ A.append(card(
     cap_mm=42))
 
 A.append(card(
-    "AutoGen · bileşen 6/6", "Component config — plan ile fotoğrafın farkı",
+    "AutoGen · bileşen", "Component config — plan ile fotoğrafın farkı",
     f_component_config(),
     "05:1888 — config bir PLAN, state bir FOTOĞRAF",
     "Kılavuzun kendi ayrımı, ve karıştırılması çok kolay. "
@@ -121,7 +121,7 @@ A.append(card(
 # ═══════════════════════════════════════════ DESENLER, teker teker
 
 A.append(card(
-    "AutoGen · desen 1/8", "Concurrent Agents",
+    "AutoGen · desen", "Concurrent Agents",
     f_fanout(),
     "05:3236 — eşzamanlılık abonelikten geliyor, bir çağrıdan değil",
     "Kılavuz bu deseni üç alt başlıkta anlatıyor. <b>Tek mesaj, çok işleyici</b>: "
@@ -138,7 +138,7 @@ A.append(card(
     cap_mm=42))
 
 A.append(card(
-    "AutoGen · desen 2/8", "Sequential Workflow",
+    "AutoGen · desen", "Sequential Workflow",
     f_sequential(),
     "05:3504 — deterministik sıra, her ajan bir alt görev",
     "Ajanlar önceden belli bir sırayla çalışıyor. Her biri bir mesajı alıyor, "
@@ -155,7 +155,7 @@ A.append(card(
     cap_mm=40))
 
 A.append(card(
-    "AutoGen · desen 3/8", "Group Chat",
+    "AutoGen · desen", "Group Chat",
     f_groupchat(),
     "05:3772 — herkes aynı topic'e hem abone hem yayıncı",
     "Bir grup ajan <b>ortak bir mesaj dizisini</b> paylaşıyor. Hepsi aynı "
@@ -172,7 +172,7 @@ A.append(card(
     cap_mm=48))
 
 A.append(card(
-    "AutoGen · desen 4/8", "Handoffs",
+    "AutoGen · desen", "Handoffs",
     f_handoffs(),
     "05:4349 — devretme, özel bir tool çağrısından ibaret",
     "Fikir OpenAI'ın <b>Swarm</b> adlı deneysel projesinden geliyor. Bir ajan, "
@@ -190,7 +190,7 @@ A.append(card(
     foot="Tuzak: Handoff tool adı küçük harfe düşürülüyor. Elle yazarsan eşleşmez — Handoff(target=X).name ile üret."))
 
 A.append(card(
-    "AutoGen · desen 5/8", "Mixture of Agents",
+    "AutoGen · desen", "Mixture of Agents",
     f_mixture(),
     "05:4989 — ileri-beslemeli bir sinir ağından modellenmiş",
     "İki tip ajan var: bir sürü <b>işçi</b> ve tek bir <b>orkestratör</b>. "
@@ -206,7 +206,7 @@ A.append(card(
     cap_mm=44))
 
 A.append(card(
-    "AutoGen · desen 6/8", "Multi-Agent Debate",
+    "AutoGen · desen", "Multi-Agent Debate",
     f_debate(),
     "05:5358 — her turda cevaplar karşılıklı değiş tokuş ediliyor",
     "Çok turlu bir etkileşim. Her turda ajanlar cevaplarını birbirine "
@@ -223,7 +223,7 @@ A.append(card(
     cap_mm=42))
 
 A.append(card(
-    "AutoGen · desen 7/8", "Reflection",
+    "AutoGen · desen", "Reflection",
     f_reflection(),
     "05:5822 — ikinci üretim, birincinin çıktısına koşullanmış",
     "Bir model çıktı üretiyor, ardından ikinci bir model o çıktının kritiğini "
@@ -240,7 +240,7 @@ A.append(card(
     cap_mm=46))
 
 A.append(card(
-    "AutoGen · desen 8/8", "Code Execution",
+    "AutoGen · desen", "Code Execution",
     f_codeexec_pattern(),
     "05:6188 — kodu yazan ajan ile koşturan ajan ayrı",
     "Sekizincisi aslında bir orkestrasyon deseni değil, bir <b>yetenek</b>. "
@@ -264,7 +264,7 @@ A.append(card(
 # Agents, Memory/RAG, Serializing ve Tracing hiç yoktu.
 
 A.append(card(
-    "AutoGen · advanced 1/5", "Custom Agents",
+    "AutoGen · advanced", "Custom Agents",
     f_custom_agent(),
     "08:7248 — BaseChatAgent + üç üye, hepsi bu",
     "Hazır ajanlar istediğin davranışı vermiyorsa kendi ajanını yazıyorsun. "
@@ -282,7 +282,7 @@ A.append(card(
     foot="Bizde: pipeline/agents/ hazır AssistantAgent kullanıyor; özel ajana henüz ihtiyaç olmadı."))
 
 A.append(card(
-    "AutoGen · advanced 2/5", "Memory ve RAG",
+    "AutoGen · advanced", "Memory ve RAG",
     f_memory_rag(),
     "08:6242 — add · query · update_context · clear · close",
     "Bir olgu deposu tutup, onu <b>belirli bir adımdan hemen önce</b> ajanın "
@@ -301,7 +301,7 @@ A.append(card(
     foot="Bizde YOK ve bu bilinçli: docs_index bir tool olarak duruyor, bağlama kendiliğinden enjekte etmiyor."))
 
 A.append(card(
-    "AutoGen · advanced 3/5", "Serializing Components — ve tek sert uyarı",
+    "AutoGen · advanced", "Serializing Components — ve tek sert uyarı",
     f_serialize_agentchat(),
     "08:6834 — dump_component() / load_component()",
     "Ajan, takım, model istemcisi — hepsi bildirimsel bir şartnameye yazılıp "
@@ -318,7 +318,7 @@ A.append(card(
     cap_mm=42))
 
 A.append(card(
-    "AutoGen · advanced 4/5", "Tracing ve Observability",
+    "AutoGen · advanced", "Tracing ve Observability",
     f_tracing(),
     "08:6975 — OpenTelemetry, GenAI Semantic Conventions",
     "Logging sana tek tek olayları verir. <b>Tracing</b> ise bir koşunun "
@@ -336,7 +336,7 @@ A.append(card(
     foot="OpenClaw tarafındaki karşılığını ölçtük: içerik varsayılan olarak kapalı, yalnız boyut bilgisi aktarılıyor."))
 
 A.append(card(
-    "AutoGen · advanced 5/5", "Magentic-One",
+    "AutoGen · advanced", "Magentic-One",
     f_magentic(),
     "08:6053 — orkestratör + dört uzman ajan, arXiv:2411.04468",
     "Açık uçlu web ve dosya görevleri için kurulmuş <b>genelci</b> bir çok-ajan "
