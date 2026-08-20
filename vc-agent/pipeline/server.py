@@ -666,6 +666,11 @@ DECKS = {
     # Uzun rehber: hap desteler "ne" diye sorana, bu "hangisi, neden" diye
     # sorana cevap veriyor. Sunumda soru gelince açılacak yer burası.
     "rehber": ("rehber-cerceveler.pdf", "Rehber"),
+    # Sunum kâğıtları. Deste izleyiciye bakar; bunlar KONUŞANA bakar ve
+    # sunum sırasında açılır — o yüzden aynı panelde, en sonda.
+    "dort": ("sunum-dort-sayfa.pdf", "4 sayfa"),
+    "kart-autogen": ("kart-autogen.pdf", "kart·AG"),
+    "kart-openclaw": ("kart-openclaw.pdf", "kart·OC"),
 }
 
 
