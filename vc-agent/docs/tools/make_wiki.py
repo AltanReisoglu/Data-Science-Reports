@@ -41,8 +41,16 @@ sys.path.insert(0, str(ROOT / "diagrams"))
 
 import figures  # noqa: E402
 
-WIKI = ROOT / "25-atlas-wiki.md"
 SCENES = ROOT / "diagrams" / "wiki"
+
+# Hangi belge nereye. Üçü aynı motoru kullanıyor ve şemaları paylaşıyor:
+# `f_layers` iki wiki'de geçiyorsa aynı `.excalidraw` dosyasına bağlanıyor,
+# ikinci bir kopya üretilmiyor.
+WIKIS: list[tuple[str, str]] = [
+    ("25-atlas-wiki.md", "atlas"),
+    ("26-autogen-maf-wiki.md", "autogen_maf"),
+    ("27-openclaw-wiki.md", "openclaw"),
+]
 
 
 def svg(name: str, caption: str) -> str:
@@ -102,6 +110,31 @@ def scene_from_svg(name: str) -> dict:
     }
 
 
+def anchors(text: str) -> str:
+    """`## 1 · Başlık` başlıklarının önüne AÇIK çapa koy, ve içindekileri ona bağla.
+
+    Otomatik çapa üreten her motorun kuralı farklı: GitHub `· ` işaretini atıp
+    iki boşluk bıraktığı için `#1--sözlük` üretiyor, python-markdown boşlukları
+    tek tireye indirip `#1-sözlük`, Confluence büsbütün başka bir şey. Ölçüldü:
+    üç wiki'de 40 bağın **hepsi** en az bir motorda kırıktı.
+
+    Açık `<a id="s1">` her üçünde de aynı çalışıyor, ve içindekiler artık
+    başlığın metnine değil **sırasına** bağlı — başlık yeniden yazıldığında bağ
+    kırılmıyor.
+    """
+    import re
+
+    n = 0
+    out = []
+    for line in text.split("\n"):
+        m = re.match(r"^## (\d+) · ", line)
+        if m:
+            n = int(m.group(1))
+            out.append(f'<a id="s{n}"></a>')
+        out.append(line)
+    return "\n".join(out)
+
+
 def used_figures(text: str) -> list[str]:
     """Metinde gerçekten geçen şemalar — elle tutulan bir listeden değil.
 
@@ -120,7 +153,7 @@ def used_figures(text: str) -> list[str]:
     return seen
 
 
-def build() -> str:
+def atlas() -> str:
     """Wiki metni. Her bölüm bir soruya cevap veriyor, sırayla değil ARANARAK."""
     return f"""# Atlas — ajan altyapısı wiki'si
 
@@ -139,19 +172,19 @@ def build() -> str:
 
 ## İçindekiler
 
-1. [Sözlük — beş terim](#1--sözlük)
-2. [AutoGen: üç katman](#2--autogen-üç-katman)
-3. [Aktör modeli: ajanlar nasıl konuşuyor](#3--aktör-modeli)
-4. [Tool döngüsü ve sessiz varsayılanlar](#4--tool-döngüsü)
-5. [Workbench: tool'ların tek kapısı](#5--workbench)
-6. [Onay kapısı](#6--onay-kapısı)
-7. [Takımlar ve faturaları](#7--takımlar)
-8. [Kod yürütme ve Docker](#8--kod-yürütme)
-9. [Zamanlayıcı](#9--zamanlayıcı)
-10. [OpenClaw'dan alınanlar](#10--openclawdan-alınanlar)
-11. [Denetim: iki kayıt hattı](#11--denetim)
-12. [Çerçeve seçimi](#12--çerçeve-seçimi)
-13. [Bilinen sınırlar](#13--bilinen-sınırlar)
+1. [Sözlük — beş terim](#s1)
+2. [AutoGen: üç katman](#s2)
+3. [Aktör modeli: ajanlar nasıl konuşuyor](#s3)
+4. [Tool döngüsü ve sessiz varsayılanlar](#s4)
+5. [Workbench: tool'ların tek kapısı](#s5)
+6. [Onay kapısı](#s6)
+7. [Takımlar ve faturaları](#s7)
+8. [Kod yürütme ve Docker](#s8)
+9. [Zamanlayıcı](#s9)
+10. [OpenClaw'dan alınanlar](#s10)
+11. [Denetim: iki kayıt hattı](#s11)
+12. [Çerçeve seçimi](#s12)
+13. [Bilinen sınırlar](#s13)
 
 ---
 
@@ -519,8 +552,20 @@ Bu wiki'nin en önemli bölümü. Her sayının ölçüldüğünü söyleyen bir
 
 
 if __name__ == "__main__":
-    text = build()
-    names = used_figures(text)
+    import wiki_pages  # noqa: E402 — bölüm metinleri, bu dosyayı şişirmesin
+
+    wiki_pages.bind(svg, figures)
+
+    texts = {}
+    for filename, key in WIKIS:
+        texts[filename] = atlas() if key == "atlas" else getattr(wiki_pages, key)()
+
+    # Şemalar paylaşılıyor: üç belgede geçen her ad tek dosyaya bağlanıyor.
+    names: list[str] = []
+    for t in texts.values():
+        for n in used_figures(t):
+            if n not in names:
+                names.append(n)
 
     SCENES.mkdir(parents=True, exist_ok=True)
     for stale in SCENES.glob("*.excalidraw"):
@@ -530,10 +575,12 @@ if __name__ == "__main__":
         (SCENES / f"{name}.excalidraw").write_text(
             json.dumps(scene_from_svg(name), ensure_ascii=False), encoding="utf-8")
 
-    WIKI.write_text(text, encoding="utf-8")
-    embedded = text.count("<svg")
-    assert embedded == len(names), f"{embedded} gömülü svg, {len(names)} bağ"
-    print(f"{WIKI.name}  ·  {len(text.splitlines())} satır  ·  "
-          f"{embedded} şema  ·  {len(text)/1024:.0f} KB")
-    print(f"{SCENES.relative_to(ROOT.parent)}  ·  {len(names)} .excalidraw "
-          f"(hepsi metinden bağlı)")
+    for filename, _ in WIKIS:
+        text = texts[filename]
+        text = anchors(text)
+        (ROOT / filename).write_text(text, encoding="utf-8")
+        embedded, linked = text.count("<svg"), len(used_figures(text))
+        assert embedded == linked, f"{filename}: {embedded} svg, {linked} bağ"
+        print(f"{filename:26s} {len(text.splitlines()):>4} satır  "
+              f"{embedded:>2} şema  {len(text)/1024:>4.0f} KB")
+    print(f"{'diagrams/wiki':26s} {len(names):>4} .excalidraw (hepsi bağlı)")

@@ -15,22 +15,23 @@
 
 ## İçindekiler
 
-1. [Sözlük — beş terim](#1--sözlük)
-2. [AutoGen: üç katman](#2--autogen-üç-katman)
-3. [Aktör modeli: ajanlar nasıl konuşuyor](#3--aktör-modeli)
-4. [Tool döngüsü ve sessiz varsayılanlar](#4--tool-döngüsü)
-5. [Workbench: tool'ların tek kapısı](#5--workbench)
-6. [Onay kapısı](#6--onay-kapısı)
-7. [Takımlar ve faturaları](#7--takımlar)
-8. [Kod yürütme ve Docker](#8--kod-yürütme)
-9. [Zamanlayıcı](#9--zamanlayıcı)
-10. [OpenClaw'dan alınanlar](#10--openclawdan-alınanlar)
-11. [Denetim: iki kayıt hattı](#11--denetim)
-12. [Çerçeve seçimi](#12--çerçeve-seçimi)
-13. [Bilinen sınırlar](#13--bilinen-sınırlar)
+1. [Sözlük — beş terim](#s1)
+2. [AutoGen: üç katman](#s2)
+3. [Aktör modeli: ajanlar nasıl konuşuyor](#s3)
+4. [Tool döngüsü ve sessiz varsayılanlar](#s4)
+5. [Workbench: tool'ların tek kapısı](#s5)
+6. [Onay kapısı](#s6)
+7. [Takımlar ve faturaları](#s7)
+8. [Kod yürütme ve Docker](#s8)
+9. [Zamanlayıcı](#s9)
+10. [OpenClaw'dan alınanlar](#s10)
+11. [Denetim: iki kayıt hattı](#s11)
+12. [Çerçeve seçimi](#s12)
+13. [Bilinen sınırlar](#s13)
 
 ---
 
+<a id="s1"></a>
 ## 1 · Sözlük
 
 Beş terim; wiki'nin geri kalanı bunları kullanıyor.
@@ -45,6 +46,7 @@ Beş terim; wiki'nin geri kalanı bunları kullanıyor.
 
 ---
 
+<a id="s2"></a>
 ## 2 · AutoGen: üç katman
 
 <div align="center">
@@ -65,6 +67,7 @@ Beş terim; wiki'nin geri kalanı bunları kullanıyor.
 
 ---
 
+<a id="s3"></a>
 ## 3 · Aktör modeli
 
 <div align="center">
@@ -94,6 +97,7 @@ duyuracaksan yayın. Karıştırırsan hata sessizce kaybolur.
 
 ---
 
+<a id="s4"></a>
 ## 4 · Tool döngüsü
 
 <div align="center">
@@ -132,6 +136,7 @@ cevabı hiç yazmaz. Hata da vermez.
 
 ---
 
+<a id="s5"></a>
 ## 5 · Workbench
 
 <div align="center">
@@ -167,6 +172,7 @@ olurdu.
 
 ---
 
+<a id="s6"></a>
 ## 6 · Onay kapısı
 
 <div align="center">
@@ -201,6 +207,7 @@ zorlama noktası değil.*
 
 ---
 
+<a id="s7"></a>
 ## 7 · Takımlar
 
 <div align="center">
@@ -229,6 +236,7 @@ bir tur ve her tur bir model çağrısı.
 
 ---
 
+<a id="s8"></a>
 ## 8 · Kod yürütme
 
 <div align="center">
@@ -282,6 +290,7 @@ yolu, çalıştırılacak olanın **onaylanan metin** olması.
 
 ---
 
+<a id="s9"></a>
 ## 9 · Zamanlayıcı
 
 <div align="center">
@@ -320,6 +329,7 @@ ulaşılamamasını **boş liste değil, kendi durumu** olarak raporluyor.
 
 ---
 
+<a id="s10"></a>
 ## 10 · OpenClaw'dan alınanlar
 
 <div align="center">
@@ -364,6 +374,7 @@ güncellenmiyor**.
 
 ---
 
+<a id="s11"></a>
 ## 11 · Denetim
 
 <div align="center">
@@ -387,6 +398,7 @@ kaydına sır sızar, ya hata ayıklama kaydı gereksiz yere ömür boyu saklan�
 
 ---
 
+<a id="s12"></a>
 ## 12 · Çerçeve seçimi
 
 <div align="center">
@@ -428,6 +440,7 @@ motorun döndüğünü bilmiyor **[ölçüldü]**. Ekrandaki MAF düğmesi bunun
 
 ---
 
+<a id="s13"></a>
 ## 13 · Bilinen sınırlar
 
 Bu wiki'nin en önemli bölümü. Her sayının ölçüldüğünü söyleyen bir belge,
