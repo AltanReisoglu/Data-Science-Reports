@@ -765,6 +765,40 @@
   // reason to type this instead of asking is that you want the bytes.
   var OPENCLAW = '/openclaw';
 
+  /* Bir Gateway cevabının tek satırlık hâli.
+   *
+   * Ham JSON'u okumak "iş oluştu mu, ne zaman koşacak" sorusunu cevaplamıyor;
+   * cevabı üç alanda ama yirmi satırın içinde. Bilinmeyen bir metot için
+   * genel kural yeterli: hangi dizi alanı varsa kaç eleman taşıdığını say.
+   * Tanımadığı bir şekle `null` dönüyor ve o zaman yalnız ham kutu kalıyor —
+   * uydurma bir özet, özetsizlikten kötüdür.
+   */
+  function openclawSummary(method, body) {
+    if (!body || typeof body !== 'object') { return null; }
+
+    // Zamanlanmış iş: demonun cevabını arayan tek yer burası.
+    if (body.schedule && body.schedule.expr) {
+      var bits = ['cron ' + body.schedule.expr];
+      if (body.schedule.tz) { bits.push(body.schedule.tz); }
+      if (body.nextRunAtMs) {
+        bits.push('ilk koşu ' + new Date(body.nextRunAtMs)
+          .toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }));
+      }
+      if (body.sessionTarget) { bits.push('oturum: ' + body.sessionTarget); }
+      var what = body.name || (body.payload && body.payload.message) || '';
+      return (what ? '“' + what + '” · ' : '') + bits.join(' · ');
+    }
+
+    // Genel kural: dizi alanlarını say. `commands.list` 89, `audit.list` 100.
+    var counts = [];
+    Object.keys(body).forEach(function (k) {
+      if (Array.isArray(body[k])) { counts.push(body[k].length + ' ' + k); }
+    });
+    if (!counts.length) { return null; }
+    if (body.nextCursor) { counts.push('devamı var'); }
+    return counts.join(' · ');
+  }
+
   function runOpenClaw(line) {
     addTurn('user', null, function (bubble) {
       bubble.appendChild(document.createTextNode(line));
@@ -830,7 +864,22 @@
         pending.appendChild(el('div', 'prose', body));
       } else {
         var text = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-        pending.appendChild(el('pre', 'raw', text));
+        // Özet satırı ham kutunun YERİNE değil, ÜSTÜNE geliyor. Ham kutu bu
+        // arayüzdeki tek "baytlara dokunulmadı" sözü ve onu bir paragrafla
+        // değiştirmek o sözü bozardı. Ama `cron.add` yirmi satır JSON basıyor
+        // ve içinde okunmaya değer üç alan var — ölçüldü, ekran görüntüsünde
+        // gövdenin tamamı kaydırma kutusuydu ve saat hiç görünmüyordu.
+        // Adı `line` DEĞİL: bu geri çağırım `runOpenClaw(line)`'ın içinde ve
+        // `var line` dış parametreyi gölgeliyordu. Aynı geri çağırımdaki
+        // "tutuldu" dalı `runOpenClaw(line)` diye yeniden deniyor, ve
+        // gölgelenen değişken `undefined` olduğu için istek gövdesi `{}`
+        // gidiyordu: onaydan sonra "no answer". Ölçüldü — sunucu
+        // `Field required: line` dedi, tarayıcı sessizce yuttu.
+        var summary = openclawSummary(data.method, body);
+        if (summary) { pending.appendChild(el('div', 'ocsum', summary)); }
+        var pre = el('pre', 'raw', text);
+        if (summary) { pre.classList.add('raw--short'); }
+        pending.appendChild(pre);
       }
       if (data.usage) { pending.appendChild(el('div', 'approval__note', data.usage)); }
     }).catch(function (error) {

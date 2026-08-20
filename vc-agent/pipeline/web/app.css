@@ -68,6 +68,18 @@
   font-size: 0.8125rem; line-height: 1.5; color: var(--ink);
   white-space: pre; overflow-x: auto; max-height: 28rem; overflow-y: auto;
 }
+/* Gateway cevabının tek satırlık hâli — ham kutunun ÜSTÜNDE, yerine değil.
+   Ham kutu "baytlara dokunulmadı" sözü; bu satır o baytların ne dediği. */
+.ocsum {
+  font-size: 0.875rem; line-height: 1.5; color: var(--ink);
+  margin: 0 0 0.5rem; padding-left: 0.6rem;
+  border-left: 3px solid #2f9e44;
+}
+/* Özeti olan ham kutu kısalıyor: cevap zaten üstte, bunun altında duran şey
+   kanıt. 28rem'lik bir kaydırma kutusu ekranı yutuyordu ve içindeki saat
+   görünmüyordu. */
+.raw--short { max-height: 11rem; }
+
 .bubble__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 
 .prose { font-size: 0.9375rem; color: var(--ink); white-space: pre-wrap; margin: 0 0 1rem; }
