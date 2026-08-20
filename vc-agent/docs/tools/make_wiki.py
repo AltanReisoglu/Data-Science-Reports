@@ -113,13 +113,14 @@ def scene_from_svg(name: str) -> dict:
 def anchors(text: str) -> str:
     """`## 1 · Başlık` başlıklarının önüne AÇIK çapa koy, ve içindekileri ona bağla.
 
-    Otomatik çapa üreten her motorun kuralı farklı: GitHub `· ` işaretini atıp
+    Otomatik çapa üreten her motorun kuralı farklı: GitHub `·` işaretini atıp
     iki boşluk bıraktığı için `#1--sözlük` üretiyor, python-markdown boşlukları
-    tek tireye indirip `#1-sözlük`, Confluence büsbütün başka bir şey. Ölçüldü:
-    üç wiki'de 40 bağın **hepsi** en az bir motorda kırıktı.
+    tek tireye indirip `#1-sözlük`, Confluence büsbütün başka bir şey. Aynı
+    belge üç motorda üç ayrı çapa kümesi veriyor, ve kırık bir çapa hata
+    vermiyor — tıklanınca hiçbir şey olmuyor.
 
-    Açık `<a id="s1">` her üçünde de aynı çalışıyor, ve içindekiler artık
-    başlığın metnine değil **sırasına** bağlı — başlık yeniden yazıldığında bağ
+    Açık `<a id="s1">` üçünde de aynı çalışıyor. İçindekiler böylece başlığın
+    metnine değil **sırasına** bağlanıyor: başlık yeniden yazıldığında da bağ
     kırılmıyor.
     """
     import re
@@ -138,11 +139,9 @@ def anchors(text: str) -> str:
 def used_figures(text: str) -> list[str]:
     """Metinde gerçekten geçen şemalar — elle tutulan bir listeden değil.
 
-    İlk hâlinde `FIGURES` diye ayrı bir liste vardı ve `f_gateway` orada olup
-    metinde hiç kullanılmıyordu: on iki `.excalidraw` üretiliyor, on biri
-    bağlanıyordu. İki yerde tutulan bir liste, ikisinden biri eskiyene kadar
-    doğru görünüyor — ve eskidiğini kimse fark etmiyor çünkü fazladan dosya
-    hata vermiyor.
+    Şema listesini ayrıca tutmak, aynı bilgiyi iki yerde saklamak demek: liste
+    ile metin ayrıştığında fazladan üretilen dosya hata vermiyor, yalnız
+    sessizce orada duruyor. Tek kaynak metnin kendisi.
     """
     import re
 
@@ -212,8 +211,9 @@ Beş terim; wiki'nin geri kalanı bunları kullanıyor.
 
 **Kural:** yukarıdan başla. AgentChat'in çözdüğü bir problemi core'da yeniden
 çözmek, aynı işi daha az testle yapmak demek. Aşağı inmek zorunda değilsin ama
-**inebildiğini bilmek** bir güvence — bu projede paralel dal kaybını AgentChat'te
-çözemedik, core'a inip çözdük.
+**inebildiğini bilmek** bir güvence: AgentChat'in çözemediği bir problem —
+paralel dallarda sessiz sonuç kaybı — core'un `ClosureAgent` + kuyruk deseniyle
+çözülüyor.
 
 ---
 

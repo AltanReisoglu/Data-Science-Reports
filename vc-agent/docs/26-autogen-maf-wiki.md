@@ -297,9 +297,9 @@ seçeneklerinde**.
 | **MAF** | 6 hosted sözleşme | `SupportsCodeInterpreterTool` · `SupportsWebSearchTool` · `SupportsFileSearchTool` · `SupportsImageGenerationTool` · `SupportsShellTool` · `SupportsMCPTool` **[ölçüldü]** |
 | **OpenClaw** | **51** (44'ü canlı) | Çekirdekte, 11 grupta |
 
-> **Sonuç:** AutoGen bir **motor**, bir asistan değil. Tool yazmak senin işin —
-> ve bu bir eksiklik değil, ama *"kurdum, dosya okusun"* beklentisiyle gelen
-> herkes buraya çarpıyor.
+> **Sonuç:** AutoGen bir **motor**, bir asistan değil. Tool yazmak kullanan
+> tarafın işi. Bu bir eksiklik değil, bir kapsam tercihi — ama kurulumdan sonra
+> hazır yetenek bekleyen bir plan buna göre düzeltilmeli.
 
 ### Tool nasıl yazılıyor
 
@@ -362,9 +362,9 @@ tool'lar için de geçerli oluyor.
 <sub>▲ İstemci ve model_info · düzenlemek için: [`f_model_clients.excalidraw`](diagrams/wiki/f_model_clients.excalidraw) → excalidraw.com'a sürükle</sub>
 
 
-**Tuzak:** OpenAI-*uyumlu* bir endpoint kullanıyorsan `model_info` **zorunlu** —
-yoksa `model_info is required when model name is not a valid OpenAI model`.
-Bu projede ilk çarpılan duvar buydu.
+**Tuzak:** OpenAI-*uyumlu* bir endpoint kullanıyorsan `model_info` **zorunlu**.
+Verilmezse hata net: `model_info is required when model name is not a valid
+OpenAI model`. Azure, vLLM, Ollama, OpenRouter — hepsi bu kapsamda.
 
 ---
 

@@ -62,8 +62,9 @@ Beş terim; wiki'nin geri kalanı bunları kullanıyor.
 
 **Kural:** yukarıdan başla. AgentChat'in çözdüğü bir problemi core'da yeniden
 çözmek, aynı işi daha az testle yapmak demek. Aşağı inmek zorunda değilsin ama
-**inebildiğini bilmek** bir güvence — bu projede paralel dal kaybını AgentChat'te
-çözemedik, core'a inip çözdük.
+**inebildiğini bilmek** bir güvence: AgentChat'in çözemediği bir problem —
+paralel dallarda sessiz sonuç kaybı — core'un `ClosureAgent` + kuyruk deseniyle
+çözülüyor.
 
 ---
 
