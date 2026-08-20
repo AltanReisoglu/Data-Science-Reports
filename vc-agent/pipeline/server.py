@@ -1284,6 +1284,32 @@ async def approval_approve(request_id: str, payload: ApprovalDecision) -> JSONRe
         # Grant tüketiliyor: onay bu koşuyu kapsıyor, sonraki her benzerini değil.
         approval_module.GATE._granted.discard(request.digest)  # noqa: SLF001
         outcome["ran"] = {"code": code, **run}
+
+        # Konteyner koşusunu TURUN kaydına iliştir.
+        #
+        # `code_request` ve `code_result` `stages.py`'de tanımlıydı, `runlog`'da
+        # grafta çizilecek yerleri vardı — ve **hiç kimse yayınlamıyordu**.
+        # Ölçüldü: bir Docker turunda aşamalar `context · model · tool_request ·
+        # gate · tool_result · loop · model · stream · done`; kodun kendisi ve
+        # konteynerin cevabı akış ekranında hiç görünmüyordu. Terminal çıktıyı
+        # basıyordu ama graf "Docker yürütücü" kutusunu bile çizmiyordu, çünkü
+        # o kutu `code_result`'a bağlı.
+        #
+        # Onay ayrı bir HTTP isteği, yani turun akışının dışında. Ama kaydın
+        # dışında olması gerekmiyor: koşu hangi oturumdaysa onun son turuna
+        # iliştiriliyor. Ekranın "bu turda ne oldu" iddiası varsa, turun en
+        # pahalı adımı orada olmalı.
+        target = runlog.LOG.latest(request.session)
+        if target is not None:
+            bus = stages.StageBus()
+            # Anahtarlar `Run.code_runs()`'ın okuduğu adlar: `code`, `output`,
+            # `is_error`, `seconds`. Başka bir ad koymak, panelin boş kod ve
+            # boş çıktı göstermesi demek — sessizce.
+            out = str(run.get("output") or "")
+            bus.emit("code_request", code=code[:4000], lines=code.count("\n") + 1)
+            bus.emit("code_result", output=out[:4000],
+                     is_error=not run.get("ok"), seconds=run.get("seconds"))
+            runlog.LOG.record(target, bus.drain())
     return JSONResponse(outcome)
 
 
