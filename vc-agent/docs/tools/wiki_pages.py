@@ -48,10 +48,11 @@ def autogen_maf() -> str:
 8. [Durmayı öğretmek](#s8)
 9. [Sekiz resmî desen](#s9)
 10. [Built-in tool'lar — ve neden yok](#s10)
-11. [Ölçülmüş tuzaklar](#s11)
-12. [MAF: halef ne getirdi](#s12)
-13. [MAF: ne kaybettirdi](#s13)
-14. [Geçiş haritası](#s14)
+11. [Kod yürütücüler](#s11)
+12. [Ölçülmüş tuzaklar](#s12)
+13. [MAF: halef ne getirdi](#s13)
+14. [MAF: ne kaybettirdi](#s14)
+15. [Geçiş haritası](#s15)
 
 ---
 
@@ -318,7 +319,123 @@ OpenAI model`. Azure, vLLM, Ollama, OpenRouter — hepsi bu kapsamda.
 
 ---
 
-## 11 · Ölçülmüş tuzaklar
+## 11 · Kod yürütücüler
+
+{svg("f_code_executors", "Yerel · Docker · Jupyter")}
+
+Resmî sekiz desenin sonuncusu **Code Execution**, ve diğer yedisinden farkı şu:
+onlar orkestrasyon deseni, bu bir **yetenek**. Modelin yazdığı Python'u
+çalıştırıyor.
+
+### Dört yürütücü
+
+`autogen_ext.code_executors` altında **[ölçüldü]**:
+
+| Yürütücü | İzolasyon | Not |
+|---|---|---|
+| `local` | **yok** | Kod doğrudan sunucu sürecinin yanında koşuyor |
+| `docker` | konteyner | Kılavuzun önerdiği |
+| `jupyter` | çekirdek | Ekstra gerekiyor · **durum taşıyor** |
+| `docker_jupyter` | konteyner + çekirdek | İkisinin birleşimi |
+| `azure` | uzak | Azure Container Apps |
+
+Kılavuz yerel yürütücü için açık uyarı veriyor: **modelin ürettiği kodu izolesiz
+çalıştırmak risklidir.**
+
+### Docker yürütücünün parametreleri — ve orada olmayanlar
+
+`DockerCommandLineCodeExecutor` **[ölçüldü]**:
+
+```python
+DockerCommandLineCodeExecutor(
+    image="python:3-slim",      # varsayılan
+    timeout=60,                  # saniye
+    work_dir=None,               # host'ta bağlanan dizin
+    auto_remove=True,            # konteyner çıkışta siliniyor
+    stop_container=True,
+    extra_volumes=None,
+    device_requests=None,        # GPU
+    init_command=None,           # konteyner açılışında koşacak komut
+)
+```
+
+**Ve listede olmayanlar, listede olanlardan daha önemli:**
+
+| Yok | Sonucu |
+|---|---|
+| `network_mode` | Konteyner varsayılan **bridge** ağında — **interneti var** |
+| `user` | İçeride **root** |
+| `read_only` | Kök dosya sistemi **yazılabilir** |
+| `mem_limit` · `nano_cpus` · `pids_limit` | **Kaynak sınırı yok** |
+| `cap_drop` | Hiçbir yetki düşürülmüyor |
+
+Bu bir yapılandırma eksikliği değil, **API'de o parametreler yok** — kaynağında
+ağ ile ilgili tek kelime geçmiyor.
+
+> **Sonuç:** *"kod sandbox'ta koşuyor"* cümlesi bu yürütücüyle kurulamaz.
+> Kurulabilecek cümle: *"kod izole bir konteynerde koşuyor, ve konteynerin ağ
+> erişimi var."*
+
+Sertleştirme mümkün ama bedava değil: `start()` override edilip
+`containers.create(..., network_mode="none", user="1000", mem_limit="512m")`
+geçilebilir — bu **yukarı akışın iç koduna bağımlılık** yaratıyor ve sürüm
+değişince sessizce kırılıyor. Bakım modundaki bir projede risk daha yüksek.
+
+### Konteynerin ömrü: çağrı başına mı, süreç başına mı
+
+Konteyner ayağa kaldırmak **2–3 saniye**, ve bu süre kullanıcının beklediği
+zamana ekleniyor. İki seçenek:
+
+| | Çağrı başına | Süreç başına |
+|---|---|---|
+| Gecikme | her çağrıda 2–3 sn | bir kez, açılışta |
+| Turlar arası durum | temiz | **taşınıyor** |
+| İzolasyon | konteyner ↔ host, tur ↔ tur | yalnız konteyner ↔ host |
+
+`start()` / `stop()` sunucunun yaşam döngüsüne bağlanırsa süreç başına tek
+konteyner olur — hızlı, ama bir turun `/tmp`'ye yazdığını sonraki tur görüyor.
+
+### Tool'a dönüşmesi — ve tarifin önemi
+
+`PythonCodeExecutionTool(executor)` yürütücüyü normal bir tool'a çeviriyor, yani
+**aynı döngüden, aynı workbench'ten, aynı kapıdan** geçiyor. Ayrı bir yol yok.
+
+Ama varsayılan tarifi tek cümle: **`"Execute Python code blocks."`** Bu tarifle
+model kodu bir *kaçış kapağı* değil, bir *genel çözüm* sanıyor ve her hesabı
+yeniden icat ediyor — mevcut tool'lar boşta kalıyor.
+
+Tarif, modelin bu tool'a **ne zaman** uzanacağına karar verdiği tek metin. Rolü
+anlatan bir tarif şunu söylemeli: *"önce mevcut tool'lara bak; sorulanı
+karşılayan yoksa kod yaz."*
+
+### Kapı için özel bir kanca gerekiyor
+
+Ad bazlı bir kapı **bu tool'u göremiyor.** `"CodeExecutor"` tipik dışarı-yazma
+işaretlerinin (`send`, `post`, `write`, `delete`) hiçbirine uymuyor, yani ada
+bakan bir filtre onu sessizce geçiriyor.
+
+Çözüm: `before_tool_call` seviyesinde **ada değil türe** bakan bir kanca, ve
+onayı `(tool, argümanlar)` imzasına bağlamak — böylece kod değişirse eski onay
+tutmuyor.
+
+> **Ve onay tüketildikten sonra:** aynı soruyu modele tekrar sormak **farklı bir
+> program** üretiyor **[ölçüldü]**. Onaylananla çalışanın aynı olmasının tek
+> yolu, çalıştırılacak olanın **onaylanan metin** olması — yeniden üretilen değil.
+
+### MAF tarafı
+
+MAF'ta karşılığı **hosted tool** olarak geliyor: `SupportsCodeInterpreterTool`
+sözleşmesini karşılayan bir istemci, kodu **sağlayıcı tarafında** çalıştırıyor.
+Ayrıca `MontyCodeActProvider` ile sandbox'lı, çapraz platform bir yorumlayıcı
+seçeneği var **[teyitsiz]**.
+
+Fark: AutoGen'de konteyner **senin makinende**, MAF'ın hosted yolunda
+**sağlayıcıda**. İkisi farklı güven kararı — birinde altyapı senin, diğerinde
+veri dışarı çıkıyor.
+
+---
+
+## 12 · Ölçülmüş tuzaklar
 
 {svg("f_gotchas", "Hiçbiri istisna fırlatmıyor")}
 
@@ -339,7 +456,7 @@ OpenAI model`. Azure, vLLM, Ollama, OpenRouter — hepsi bu kapsamda.
 
 ---
 
-## 12 · MAF ne getirdi
+## 13 · MAF ne getirdi
 
 {svg("f_components", "MAF'ın eklediği katmanlar")}
 
@@ -368,7 +485,7 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-## 13 · MAF ne kaybettirdi
+## 14 · MAF ne kaybettirdi
 
 | Yetenek | AutoGen | MAF |
 |---|---|---|
@@ -395,7 +512,7 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-## 14 · Geçiş haritası
+## 15 · Geçiş haritası
 
 Microsoft'un kendi göç kılavuzundan **[kaynak]**:
 

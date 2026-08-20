@@ -35,7 +35,7 @@ sistem. Yanında, temelini oluşturan AutoGen araştırması ve ölçüm POC'u.
 | [09](docs/09-framework-karsilastirma.md) | Kısa framework karşılaştırması |
 | [13](docs/13-openclaw-teknik-analiz.md) | OpenClaw mimari analizi — 15'in kaynağı |
 | [20](docs/20-maf-user-guide.md) · [21](docs/21-maf-tasarim-kararlari.md) | **MAF'ın tam metni** — Learn kılavuzunun tamamı (177 sayfa) + 35 tasarım kaydı (ADR) |
-| [**25**](docs/25-atlas-wiki.md) · [**26**](docs/26-autogen-maf-wiki.md) · [**27**](docs/27-openclaw-wiki.md) | **Şirket wiki'leri** — üç tek dosya, 55 gömülü şema: Atlas · AutoGen+MAF · OpenClaw |
+| [**25**](docs/25-atlas-wiki.md) · [**26**](docs/26-autogen-maf-wiki.md) · [**27**](docs/27-openclaw-wiki.md) | **Şirket wiki'leri** — üç tek dosya, 56 gömülü şema: Atlas · AutoGen+MAF · OpenClaw |
 | [23](docs/23-sunum-plani.md) · [24](docs/24-poc-promptlari.md) | Sunum sırası ve ekran koreografisi · **koşturulmuş PoC promptları** |
 | [22](docs/22-maf-turkce.md) | MAF Türkçe rehberi, `20:satır` / `21:satır` atıflı — AutoGen ile mekanizma mekanizma karşılaştırma |
 | [github-starred-repos.md](docs/github-starred-repos.md) | 893 starlı reponun kategorize envanteri |

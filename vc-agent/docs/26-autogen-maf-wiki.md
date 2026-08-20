@@ -23,10 +23,11 @@
 8. [Durmayı öğretmek](#s8)
 9. [Sekiz resmî desen](#s9)
 10. [Built-in tool'lar — ve neden yok](#s10)
-11. [Ölçülmüş tuzaklar](#s11)
-12. [MAF: halef ne getirdi](#s12)
-13. [MAF: ne kaybettirdi](#s13)
-14. [Geçiş haritası](#s14)
+11. [Kod yürütücüler](#s11)
+12. [Ölçülmüş tuzaklar](#s12)
+13. [MAF: halef ne getirdi](#s13)
+14. [MAF: ne kaybettirdi](#s14)
+15. [Geçiş haritası](#s15)
 
 ---
 
@@ -369,7 +370,129 @@ OpenAI model`. Azure, vLLM, Ollama, OpenRouter — hepsi bu kapsamda.
 ---
 
 <a id="s11"></a>
-## 11 · Ölçülmüş tuzaklar
+## 11 · Kod yürütücüler
+
+<div align="center">
+<svg viewBox="0 0 600 150" width="600" height="150"><path d="M17,31 L133,31 L133,73 L17,73 Z" fill="#f8f9fa" stroke="none"/><path d="M14.7,29.7 Q75.0,28.4 132.7,31.3 M134.1,29.5 Q134.8,52.0 135.1,72.9 M133.5,73.2 Q75.0,74.6 14.4,73.8 M16.3,72.6 Q15.3,52.0 15.4,29.8" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><path d="M14.7,28.9 Q75.0,31.5 134.9,28.5 M134.2,29.2 Q133.3,52.0 135.1,74.9 M135.0,73.1 Q75.0,74.6 16.3,74.1 M15.4,73.7 Q16.5,52.0 16.9,30.0" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><text x="75.0" y="51.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">kod bloğu</text><text x="75.0" y="62.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">modelden</text><path d="M136.4,52.5 Q154.0,52.3 173.2,52.0" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M135.6,50.5 Q154.0,52.3 172.8,51.0" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M172.0,52.0 L166.2,56.8" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M172.0,52.0 L166.0,47.4" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M175,9 L363,9 L363,47 L175,47 Z" fill="#fff5f5" stroke="none"/><path d="M173.7,6.6 Q269.0,7.4 363.9,8.2 M363.0,6.7 Q364.3,28.0 364.4,46.4 M363.1,48.1 Q269.0,48.5 174.7,49.3 M175.6,49.5 Q174.2,28.0 174.4,7.1" fill="none" stroke="#c92a2a" stroke-width="1.6" stroke-linecap="round"/><path d="M173.0,9.6 Q269.0,7.9 363.8,8.8 M362.8,7.0 Q364.7,28.0 363.2,47.5 M363.8,47.7 Q269.0,48.8 172.7,46.6 M172.7,47.8 Q173.8,28.0 172.4,8.1" fill="none" stroke="#c92a2a" stroke-width="1.6" stroke-linecap="round"/><text x="269.0" y="27.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">LocalCommandLine…</text><text x="269.0" y="38.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">host makinede</text><path d="M175,61 L363,61 L363,99 L175,99 Z" fill="#ebfbee" stroke="none"/><path d="M174.6,59.7 Q269.0,58.5 365.6,59.2 M364.8,59.5 Q364.0,80.0 363.5,100.4 M365.2,99.7 Q269.0,98.3 174.7,100.6 M173.2,98.7 Q173.8,80.0 175.2,58.6" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><path d="M174.1,58.9 Q269.0,60.1 364.5,61.3 M363.6,58.8 Q363.6,80.0 365.5,100.1 M365.0,99.6 Q269.0,99.5 172.6,98.8 M173.5,101.2 Q174.3,80.0 174.8,61.5" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><text x="269.0" y="79.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">DockerCommandLine…</text><text x="269.0" y="90.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">konteynerde</text><path d="M365.4,28.9 Q384.0,28.3 400.5,28.1" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M366.0,26.8 Q384.0,28.7 402.0,28.1" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M402.0,28.0 L395.6,32.7" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M402.0,28.0 L395.6,23.5" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M365.1,79.4 Q384.0,80.0 401.7,81.4" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M365.0,79.0 Q384.0,79.3 403.6,81.3" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M402.0,80.0 L395.3,84.3" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M402.0,80.0 L395.2,75.6" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M405,9 L587,9 L587,47 L405,47 Z" fill="#fff5f5" stroke="none"/><path d="M404.1,9.4 Q496.0,7.4 589.0,8.1 M587.9,8.7 Q587.5,28.0 588.9,47.2 M588.2,48.0 Q496.0,46.8 403.7,47.1 M402.8,48.4 Q404.0,28.0 405.3,8.9" fill="none" stroke="#c92a2a" stroke-width="1.6" stroke-linecap="round"/><path d="M404.0,8.6 Q496.0,8.4 586.8,6.6 M587.6,8.5 Q587.4,28.0 587.7,47.5 M587.5,48.8 Q496.0,47.0 405.0,47.0 M402.6,47.7 Q404.8,28.0 404.0,9.1" fill="none" stroke="#c92a2a" stroke-width="1.6" stroke-linecap="round"/><text x="496.0" y="31.2" font-size="7.8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">→ host'un her şeyi</text><path d="M405,61 L587,61 L587,99 L405,99 Z" fill="#ebfbee" stroke="none"/><path d="M404.2,59.6 Q496.0,58.8 589.3,58.8 M589.0,59.4 Q588.4,80.0 589.4,98.6 M586.7,100.2 Q496.0,100.4 405.5,99.4 M403.3,99.8 Q404.2,80.0 404.2,59.2" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><path d="M404.0,61.3 Q496.0,60.7 587.3,61.5 M586.5,60.5 Q588.5,80.0 588.7,99.9 M589.6,98.9 Q496.0,101.6 405.2,101.3 M405.2,99.9 Q403.6,80.0 405.3,61.2" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><text x="496.0" y="83.2" font-size="7.8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">→ yalıtılmış</text><text x="16" y="122" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Her kod bloğu bir dosyaya yazılıp AYRI BİR SÜREÇTE koşuyor — yani bloklar arası değişken paylaşımı yok.</text><text x="16" y="138" font-size="7.6" fill="#c92a2a" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Local, modelin yazdığı kodu makinende koşturur. Bu bir tercih değil, bir güven kararıdır.</text></svg>
+</div>
+
+<sub>▲ Yerel · Docker · Jupyter · düzenlemek için: [`f_code_executors.excalidraw`](diagrams/wiki/f_code_executors.excalidraw) → excalidraw.com'a sürükle</sub>
+
+
+Resmî sekiz desenin sonuncusu **Code Execution**, ve diğer yedisinden farkı şu:
+onlar orkestrasyon deseni, bu bir **yetenek**. Modelin yazdığı Python'u
+çalıştırıyor.
+
+### Dört yürütücü
+
+`autogen_ext.code_executors` altında **[ölçüldü]**:
+
+| Yürütücü | İzolasyon | Not |
+|---|---|---|
+| `local` | **yok** | Kod doğrudan sunucu sürecinin yanında koşuyor |
+| `docker` | konteyner | Kılavuzun önerdiği |
+| `jupyter` | çekirdek | Ekstra gerekiyor · **durum taşıyor** |
+| `docker_jupyter` | konteyner + çekirdek | İkisinin birleşimi |
+| `azure` | uzak | Azure Container Apps |
+
+Kılavuz yerel yürütücü için açık uyarı veriyor: **modelin ürettiği kodu izolesiz
+çalıştırmak risklidir.**
+
+### Docker yürütücünün parametreleri — ve orada olmayanlar
+
+`DockerCommandLineCodeExecutor` **[ölçüldü]**:
+
+```python
+DockerCommandLineCodeExecutor(
+    image="python:3-slim",      # varsayılan
+    timeout=60,                  # saniye
+    work_dir=None,               # host'ta bağlanan dizin
+    auto_remove=True,            # konteyner çıkışta siliniyor
+    stop_container=True,
+    extra_volumes=None,
+    device_requests=None,        # GPU
+    init_command=None,           # konteyner açılışında koşacak komut
+)
+```
+
+**Ve listede olmayanlar, listede olanlardan daha önemli:**
+
+| Yok | Sonucu |
+|---|---|
+| `network_mode` | Konteyner varsayılan **bridge** ağında — **interneti var** |
+| `user` | İçeride **root** |
+| `read_only` | Kök dosya sistemi **yazılabilir** |
+| `mem_limit` · `nano_cpus` · `pids_limit` | **Kaynak sınırı yok** |
+| `cap_drop` | Hiçbir yetki düşürülmüyor |
+
+Bu bir yapılandırma eksikliği değil, **API'de o parametreler yok** — kaynağında
+ağ ile ilgili tek kelime geçmiyor.
+
+> **Sonuç:** *"kod sandbox'ta koşuyor"* cümlesi bu yürütücüyle kurulamaz.
+> Kurulabilecek cümle: *"kod izole bir konteynerde koşuyor, ve konteynerin ağ
+> erişimi var."*
+
+Sertleştirme mümkün ama bedava değil: `start()` override edilip
+`containers.create(..., network_mode="none", user="1000", mem_limit="512m")`
+geçilebilir — bu **yukarı akışın iç koduna bağımlılık** yaratıyor ve sürüm
+değişince sessizce kırılıyor. Bakım modundaki bir projede risk daha yüksek.
+
+### Konteynerin ömrü: çağrı başına mı, süreç başına mı
+
+Konteyner ayağa kaldırmak **2–3 saniye**, ve bu süre kullanıcının beklediği
+zamana ekleniyor. İki seçenek:
+
+| | Çağrı başına | Süreç başına |
+|---|---|---|
+| Gecikme | her çağrıda 2–3 sn | bir kez, açılışta |
+| Turlar arası durum | temiz | **taşınıyor** |
+| İzolasyon | konteyner ↔ host, tur ↔ tur | yalnız konteyner ↔ host |
+
+`start()` / `stop()` sunucunun yaşam döngüsüne bağlanırsa süreç başına tek
+konteyner olur — hızlı, ama bir turun `/tmp`'ye yazdığını sonraki tur görüyor.
+
+### Tool'a dönüşmesi — ve tarifin önemi
+
+`PythonCodeExecutionTool(executor)` yürütücüyü normal bir tool'a çeviriyor, yani
+**aynı döngüden, aynı workbench'ten, aynı kapıdan** geçiyor. Ayrı bir yol yok.
+
+Ama varsayılan tarifi tek cümle: **`"Execute Python code blocks."`** Bu tarifle
+model kodu bir *kaçış kapağı* değil, bir *genel çözüm* sanıyor ve her hesabı
+yeniden icat ediyor — mevcut tool'lar boşta kalıyor.
+
+Tarif, modelin bu tool'a **ne zaman** uzanacağına karar verdiği tek metin. Rolü
+anlatan bir tarif şunu söylemeli: *"önce mevcut tool'lara bak; sorulanı
+karşılayan yoksa kod yaz."*
+
+### Kapı için özel bir kanca gerekiyor
+
+Ad bazlı bir kapı **bu tool'u göremiyor.** `"CodeExecutor"` tipik dışarı-yazma
+işaretlerinin (`send`, `post`, `write`, `delete`) hiçbirine uymuyor, yani ada
+bakan bir filtre onu sessizce geçiriyor.
+
+Çözüm: `before_tool_call` seviyesinde **ada değil türe** bakan bir kanca, ve
+onayı `(tool, argümanlar)` imzasına bağlamak — böylece kod değişirse eski onay
+tutmuyor.
+
+> **Ve onay tüketildikten sonra:** aynı soruyu modele tekrar sormak **farklı bir
+> program** üretiyor **[ölçüldü]**. Onaylananla çalışanın aynı olmasının tek
+> yolu, çalıştırılacak olanın **onaylanan metin** olması — yeniden üretilen değil.
+
+### MAF tarafı
+
+MAF'ta karşılığı **hosted tool** olarak geliyor: `SupportsCodeInterpreterTool`
+sözleşmesini karşılayan bir istemci, kodu **sağlayıcı tarafında** çalıştırıyor.
+Ayrıca `MontyCodeActProvider` ile sandbox'lı, çapraz platform bir yorumlayıcı
+seçeneği var **[teyitsiz]**.
+
+Fark: AutoGen'de konteyner **senin makinende**, MAF'ın hosted yolunda
+**sağlayıcıda**. İkisi farklı güven kararı — birinde altyapı senin, diğerinde
+veri dışarı çıkıyor.
+
+---
+
+<a id="s12"></a>
+## 12 · Ölçülmüş tuzaklar
 
 <div align="center">
 <svg viewBox="0 0 600 200" width="600" height="200"><path d="M17,11 L583,11 L583,39 L17,39 Z" fill="#fff5f5" stroke="none"/><path d="M17.1,8.7 Q300.0,10.0 583.6,8.6 M583.0,9.4 Q583.8,25.0 585.0,38.6 M583.4,41.0 Q300.0,41.2 15.9,40.4 M15.1,39.8 Q16.5,25.0 14.9,10.9" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.8,9.5 Q300.0,8.3 584.2,9.0 M583.4,9.9 Q583.5,25.0 585.4,40.3 M583.1,41.3 Q300.0,40.6 16.7,40.4 M17.3,38.8 Q16.1,25.0 15.6,11.0" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="23" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">max_tool_iterations</text><text x="28" y="35" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: 1</text><text x="210" y="29" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">model tool sonucunu GÖRMEDEN cevaplar</text><path d="M17,49 L583,49 L583,77 L17,77 Z" fill="#fff5f5" stroke="none"/><path d="M16.4,48.5 Q300.0,48.6 583.9,48.2 M585.4,47.3 Q584.1,63.0 583.2,77.4 M584.4,78.3 Q300.0,79.2 14.6,77.2 M15.3,78.5 Q16.5,63.0 15.7,46.9" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.4,47.2 Q300.0,49.7 584.3,47.4 M582.5,47.8 Q583.6,63.0 584.4,78.8 M582.6,77.9 Q300.0,79.4 16.3,77.9 M15.3,78.7 Q15.5,63.0 16.1,49.4" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="61" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">model_context</text><text x="28" y="73" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: yok</text><text x="210" y="67" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">ajanın belleği yoktur</text><path d="M17,87 L583,87 L583,115 L17,115 Z" fill="#fff5f5" stroke="none"/><path d="M16.4,86.3 Q300.0,84.4 583.8,84.6 M583.4,84.9 Q584.1,101.0 585.1,114.7 M585.3,117.4 Q300.0,117.7 16.5,116.0 M14.6,115.2 Q16.3,101.0 16.0,84.8" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.3,85.2 Q300.0,87.4 584.3,87.1 M585.2,86.9 Q583.8,101.0 584.2,117.3 M583.3,115.1 Q300.0,114.6 14.9,116.7 M16.1,117.6 Q16.4,101.0 15.5,85.1" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="99" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">model_client_stream</text><text x="28" y="111" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: False</text><text x="210" y="105" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">token akışı hiç yayılmaz</text><path d="M17,125 L583,125 L583,153 L17,153 Z" fill="#fff5f5" stroke="none"/><path d="M16.6,123.8 Q300.0,123.5 585.4,123.6 M584.7,124.1 Q583.6,139.0 585.5,154.6 M585.6,154.7 Q300.0,152.6 15.8,153.3 M15.5,155.4 Q16.5,139.0 15.3,123.1" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.5,122.9 Q300.0,125.6 583.9,123.2 M584.5,124.6 Q584.1,139.0 585.3,155.6 M583.4,155.6 Q300.0,154.7 16.1,154.8 M15.0,153.3 Q15.6,139.0 15.7,123.8" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="137" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">sonlandırma</text><text x="28" y="149" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: yok</text><text x="210" y="143" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">takım tavansız koşar</text><text x="16" y="176" font-size="9" fill="#c92a2a" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Dördünün ortak yanı: HİÇBİRİ HATA VERMEZ.</text><text x="16" y="190" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Sistem çalışır, sonuç yanlış olur — ve aramak için önce yanlış olduğunu bilmen gerekir.</text></svg>
@@ -395,8 +518,8 @@ OpenAI model`. Azure, vLLM, Ollama, OpenRouter — hepsi bu kapsamda.
 
 ---
 
-<a id="s12"></a>
-## 12 · MAF ne getirdi
+<a id="s13"></a>
+## 13 · MAF ne getirdi
 
 <div align="center">
 <svg viewBox="0 0 600 156" width="600" height="156"><path d="M13,9 L391,9 L391,27 L13,27 Z" fill="#e7f5ff" stroke="none"/><path d="M13.2,8.7 Q202.0,6.3 390.5,8.2 M393.2,9.1 Q392.2,18.0 391.4,28.3 M391.3,27.8 Q202.0,28.0 11.7,27.9 M12.7,26.5 Q12.4,18.0 11.5,9.5" fill="none" stroke="#1971c2" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3,8.5 Q202.0,8.9 392.6,6.9 M391.3,7.0 Q392.1,18.0 392.6,26.5 M392.7,29.3 Q202.0,29.2 11.4,29.1 M10.9,29.3 Q12.3,18.0 10.9,7.9" fill="none" stroke="#1971c2" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="22" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Model Clients</text><text x="160" y="22" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:1984</text><text x="216" y="22" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">sağlayıcıya konuşan şey</text><path d="M13,33 L391,33 L391,51 L13,51 Z" fill="#f8f0fc" stroke="none"/><path d="M10.7,32.5 Q202.0,30.5 393.1,30.8 M392.4,32.3 Q392.1,42.0 390.8,52.6 M393.4,52.5 Q202.0,53.4 12.5,53.4 M11.0,52.4 Q11.8,42.0 13.3,33.4" fill="none" stroke="#5f3dc4" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3,31.6 Q202.0,33.1 392.9,32.4 M392.8,32.0 Q391.7,42.0 392.5,51.1 M392.8,52.7 Q202.0,52.8 10.5,51.1 M12.2,51.5 Q11.9,42.0 11.6,33.4" fill="none" stroke="#5f3dc4" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="46" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Model Context</text><text x="160" y="46" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:2341</text><text x="216" y="46" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">modele NE gideceğine karar veren şey</text><path d="M13,57 L391,57 L391,75 L13,75 Z" fill="#ebfbee" stroke="none"/><path d="M11.8,57.4 Q202.0,55.6 391.4,56.1 M393.1,57.0 Q392.3,66.0 391.2,76.4 M393.1,76.0 Q202.0,76.9 11.3,77.5 M12.2,77.5 Q12.0,66.0 11.3,55.9" fill="none" stroke="#2f9e44" stroke-width="1.2" stroke-linecap="round"/><path d="M11.5,57.1 Q202.0,57.5 392.4,57.5 M393.2,56.0 Q391.9,66.0 391.1,75.5 M392.4,75.9 Q202.0,76.0 11.6,75.3 M12.6,76.4 Q12.0,66.0 10.5,55.2" fill="none" stroke="#2f9e44" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="70" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Tools</text><text x="160" y="70" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:2473</text><text x="216" y="70" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">modelin çağırabildiği fonksiyonlar</text><path d="M13,81 L391,81 L391,99 L13,99 Z" fill="#fff4e6" stroke="none"/><path d="M12.0,79.3 Q202.0,80.6 392.3,78.5 M393.4,79.5 Q392.0,90.0 390.9,100.6 M391.5,99.2 Q202.0,99.6 10.4,98.7 M11.7,101.1 Q12.2,90.0 13.5,80.8" fill="none" stroke="#e8590c" stroke-width="1.2" stroke-linecap="round"/><path d="M10.8,81.3 Q202.0,79.5 390.9,78.9 M391.3,79.3 Q392.1,90.0 391.0,98.6 M393.4,98.7 Q202.0,101.7 11.8,100.5 M13.2,101.5 Q12.1,90.0 12.3,79.8" fill="none" stroke="#e8590c" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="94" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Workbench (+ MCP)</text><text x="160" y="94" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:2841</text><text x="216" y="94" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">tool'ların toplandığı arayüz</text><path d="M13,105 L391,105 L391,123 L13,123 Z" fill="#fff5f5" stroke="none"/><path d="M11.5,103.0 Q202.0,104.5 391.9,104.0 M391.9,103.6 Q392.2,114.0 390.7,125.5 M392.2,122.7 Q202.0,123.9 11.4,122.5 M12.5,124.0 Q12.3,114.0 12.6,103.8" fill="none" stroke="#c92a2a" stroke-width="1.2" stroke-linecap="round"/><path d="M13.6,102.8 Q202.0,104.1 392.6,103.7 M390.9,104.3 Q392.2,114.0 390.7,125.0 M391.4,123.8 Q202.0,124.3 11.7,123.8 M11.7,123.2 Q11.8,114.0 12.8,104.3" fill="none" stroke="#c92a2a" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="118" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Code Executors</text><text x="160" y="118" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:3054</text><text x="216" y="118" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">kodu nerede koşturacağın</text><path d="M413,9 L587,9 L587,123 L413,123 Z" fill="#f8f9fa" stroke="none"/><path d="M411.5,7.5 Q500.0,7.5 589.5,8.5 M589.3,8.7 Q586.4,66.0 588.4,123.4 M586.8,123.9 Q500.0,123.6 412.6,124.0 M412.5,124.3 Q412.0,66.0 412.2,8.2" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><path d="M412.2,6.4 Q500.0,7.6 588.4,7.1 M586.6,8.1 Q587.4,66.0 587.4,123.9 M588.7,125.1 Q500.0,122.8 412.2,125.2 M413.2,123.1 Q413.8,66.0 410.8,7.5" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><text x="500.0" y="23" font-size="8.4" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">Component config</text><text x="500" y="30" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">05:1888</text><text x="424" y="56" font-size="6.6" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">dump_component / load_component</text><text x="424" y="70" font-size="7" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">her bileşen JSON'a yazılıp</text><text x="424" y="82" font-size="7" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">geri yüklenebiliyor</text><text x="424" y="100" font-size="7" fill="#2f9e44" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">→ yapılandırma kod değil VERİ</text><text x="12" y="146" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Beşi de değiştirilebilir yüzey. Bir ajan bunların hangi uygulamasıyla konuştuğunu bilmiyor — kapıyı kurmayı mümkün kılan da bu.</text></svg>
@@ -430,8 +553,8 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-<a id="s13"></a>
-## 13 · MAF ne kaybettirdi
+<a id="s14"></a>
+## 14 · MAF ne kaybettirdi
 
 | Yetenek | AutoGen | MAF |
 |---|---|---|
@@ -458,8 +581,8 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-<a id="s14"></a>
-## 14 · Geçiş haritası
+<a id="s15"></a>
+## 15 · Geçiş haritası
 
 Microsoft'un kendi göç kılavuzundan **[kaynak]**:
 
