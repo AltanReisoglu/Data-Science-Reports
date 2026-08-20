@@ -47,10 +47,11 @@ def autogen_maf() -> str:
 7. [Beş takım tipi ve faturaları](#s7)
 8. [Durmayı öğretmek](#s8)
 9. [Sekiz resmî desen](#s9)
-10. [Ölçülmüş tuzaklar](#s10)
-11. [MAF: halef ne getirdi](#s11)
-12. [MAF: ne kaybettirdi](#s12)
-13. [Geçiş haritası](#s13)
+10. [Built-in tool'lar — ve neden yok](#s10)
+11. [Ölçülmüş tuzaklar](#s11)
+12. [MAF: halef ne getirdi](#s12)
+13. [MAF: ne kaybettirdi](#s13)
+14. [Geçiş haritası](#s14)
 
 ---
 
@@ -227,7 +228,97 @@ anlatılan yapılar.
 
 ---
 
-## 10 · Ölçülmüş tuzaklar
+## 10 · Built-in tool'lar — ve neden yok
+
+{svg("f_tools_component", "Tool: fonksiyon + şema")}
+
+En sık yanılınan yer. **AutoGen hazır tool ile gelmiyor.** `autogen_ext.tools`
+altında yedi modül var ve altısı **adaptör** — tool değil **[ölçüldü]**:
+
+| Modül | Ne veriyor | Kurulu mu |
+|---|---|---|
+| `code_execution` | `PythonCodeExecutionTool` — **tek gerçek tool** | ✔ |
+| `mcp` | `StdioMcpToolAdapter` · `SseMcpToolAdapter` · `McpWorkbench` | ✔ |
+| `langchain` | `LangChainToolAdapter` — LangChain tool'unu sarmalıyor | ✔ |
+| `azure` | Azure AI Search adaptörü | ekstra gerekiyor |
+| `graphrag` | GraphRAG adaptörü | ekstra gerekiyor |
+| `http` | HTTP çağrısı tool'u | ekstra gerekiyor |
+| `semantic_kernel` | SK tool adaptörü | ekstra gerekiyor |
+
+`autogen-ext`'in **38 ayrı ekstrası** var (`docker`, `grpc`, `http-tool`,
+`file-surfer`, `jupyter-executor`…). Yetenekler paket içinde değil, **kurulum
+seçeneklerinde**.
+
+### Tool'u kim veriyor — üç sistem
+
+| | Hazır tool | Nereden |
+|---|---:|---|
+| **AutoGen** | **~1** | Kendin yazıyorsun |
+| **MAF** | 6 hosted sözleşme | `SupportsCodeInterpreterTool` · `SupportsWebSearchTool` · `SupportsFileSearchTool` · `SupportsImageGenerationTool` · `SupportsShellTool` · `SupportsMCPTool` **[ölçüldü]** |
+| **OpenClaw** | **51** (44'ü canlı) | Çekirdekte, 11 grupta |
+
+> **Sonuç:** AutoGen bir **motor**, bir asistan değil. Tool yazmak senin işin —
+> ve bu bir eksiklik değil, ama *"kurdum, dosya okusun"* beklentisiyle gelen
+> herkes buraya çarpıyor.
+
+### Tool nasıl yazılıyor
+
+Bir fonksiyon + docstring yetiyor; şema **imzadan** çıkarılıyor:
+
+```python
+def scan_facts(query: str) -> str:
+    "Son taramanın özetini döndürür."      # docstring = tarif = arayüz
+    ...
+
+FunctionTool(scan_facts, description=scan_facts.__doc__)
+```
+
+Modele giden fonksiyon değil, **şeması**:
+
+```json
+{{"name": "scan_facts",
+ "description": "Son taramanın özetini döndürür.",
+ "parameters": {{"type": "object",
+                "properties": {{"query": {{"type": "string"}}}},
+                "required": ["query"]}}}}
+```
+
+**Üç kural:**
+
+1. **Docstring arayüzdür** — modelin o tool'a *ne zaman* uzanacağına karar
+   verdiği tek metin. Dokümantasyon değil.
+2. **Şemalar her turda ödeniyor.** 17 tool = her istekte 17 şema; `docs/06`
+   bunun canlı bir zaman aşımına yol açtığını kaydediyor.
+3. **Tip ipucu zorunlu.** `query: str` yoksa şema üretilemiyor.
+
+### Workbench — liste değil, **kaynak**
+
+{svg("f_workbench_component", "Üç kaynak, tek arayüz")}
+
+```python
+AssistantAgent(tools=[a, b], workbench=wb)
+# ValueError: Tools cannot be used with a workbench.
+```
+
+İkisi aynı anda olamıyor, çünkü aynı soruyu **farklı zamanda** cevaplıyorlar.
+Liste ajan yazılırken donuyor; kaynak her turda sorulabiliyor — MCP sunucusu
+tool listesini çalışma zamanında verdiği için tek doğru soyutlama bu.
+
+Kapıyı oraya koymanın sebebi: workbench, yerel bir Python fonksiyonuyla uzak bir
+MCP tool'unu **aynı gören tek yer**. Kural, ajan yazılırken **var olmayan**
+tool'lar için de geçerli oluyor.
+
+### Model istemcileri
+
+{svg("f_model_clients", "İstemci ve model_info")}
+
+**Tuzak:** OpenAI-*uyumlu* bir endpoint kullanıyorsan `model_info` **zorunlu** —
+yoksa `model_info is required when model name is not a valid OpenAI model`.
+Bu projede ilk çarpılan duvar buydu.
+
+---
+
+## 11 · Ölçülmüş tuzaklar
 
 {svg("f_gotchas", "Hiçbiri istisna fırlatmıyor")}
 
@@ -248,7 +339,7 @@ anlatılan yapılar.
 
 ---
 
-## 11 · MAF ne getirdi
+## 12 · MAF ne getirdi
 
 {svg("f_components", "MAF'ın eklediği katmanlar")}
 
@@ -277,7 +368,7 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-## 12 · MAF ne kaybettirdi
+## 13 · MAF ne kaybettirdi
 
 | Yetenek | AutoGen | MAF |
 |---|---|---|
@@ -304,7 +395,7 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-## 13 · Geçiş haritası
+## 14 · Geçiş haritası
 
 Microsoft'un kendi göç kılavuzundan **[kaynak]**:
 
@@ -533,25 +624,123 @@ sayıyor, token değil**.
 
 ## 10 · Zamanlama
 
-{svg("f_task_stack", "Zamanlama yığını")}
+{svg("f_task_stack", "Zamanlama yığını — altı mekanizma, altı ayrı soru")}
 
-{svg("f_task_axes", "Üç eksen, tip düzeyinde ayrılmış")}
+Bu bölüm wiki'nin en uzunu, çünkü **AutoGen'de karşılığı hiç yok** ve bir kurumda
+en çok istenen şey bu. Kaynak: `packages/gateway-protocol/src/schema/cron.ts`.
 
-Beş zamanlama türü var ve **ikisi zamana bakmıyor** — koşul gözcüsü zamana değil
-**duruma** bağlanıyor.
+### Beş tür — ve ikisi zamana hiç bakmıyor
 
-### Cron'un OR tuzağı
+Şema **kapalı bir birleşim** (`Type.Union`), yani altıncı bir tür uydurulamıyor
+**[kaynak]**:
 
-Gün alanları **OR**'lanıyor: `0 9 * * 1` ile `0 9 1 * *` birlikte yazılırsa hem
-pazartesileri hem ayın birinde koşuyor. OpenClaw bunu **ayrı işler açarak**
-çözüyor.
+| Tür | Ne zaman tetikliyor | Alanlar |
+|---|---|---|
+| `at` | Bir kez, belirli anda | `at` |
+| `every` | Her N milisaniyede | `everyMs` · `anchorMs` |
+| `cron` | Cron ifadesine göre | `expr` · `tz` · `staggerMs` |
+| **`on-exit`** | İzlenen komut **çıkınca** | `command` · `cwd` |
+| **`stream`** | Komutun **çıktı satırından** | `command` · `mode` · `match` · `batchMs` |
+
+Son ikisi zamanlayıcı değil, **olay kaynağı**. `on-exit` izlenen bir komut
+bittiğinde bir kez tetikliyor; `stream` uzun ömürlü bir komutun stdout/stderr
+satırlarından.
+
+> **Ve `on-exit`'in kod yorumu tek başına bir tasarım dersi:** watcher, turun
+> süreç ağacında değil **gateway'in `ProcessSupervisor`'ında** koşuyor. Yani turu
+> bitirmek watcher'ı öldürmüyor. Sahiplik doğru yere konmuş.
+
+### İki incelik — ikisi de ölçekte fark ediyor
+
+**① Yük dağıtma (`staggerMs`).** Saat başına denk gelen tekrarlı işler
+kendiliğinden **5 dakikaya kadar** kaydırılıyor — yüz iş aynı anda uyanıp yük
+tepesi yapmasın diye. `--exact` ile kapatılıyor **[kaynak]**.
+
+**② Cron'un OR tuzağı.** Ayın-günü ve haftanın-günü alanlarının ikisi de joker
+değilse, `croner` **ya biri ya öteki** eşleştiğinde tetikliyor:
+
+```bash
+# Niyet: "ayın 15'i, ama yalnız Pazartesiyse"
+0 9 15 * 1
+# Gerçek: her ayın 15'inde 9'da, VE her Pazartesi 9'da
+# → ayda 0–1 yerine 5–6 kez
+```
+
+Standart Vixie cron davranışı, yani hata değil. Ama bir kurumsal asistanda
+**"ayda beş kez rapor gönderdi" bir arıza kaydıdır.** Çözüm: croner'ın `+`
+değiştiricisi (`0 9 15 * +1`) ya da bir alanı işin içinde kontrol etmek.
+
+### Koşul gözcüsü — zamana değil **duruma** bağlanmak
+
+Zamanlamanın en az konuşulan türü. *"Her sabah 9'da bak"* değil, **"şu koşul
+doğru olduğunda haber ver."**
+
+Fark pratik: zamana bağlı bir iş, hiçbir şey değişmediğinde de koşuyor ve her
+koşusu para. Duruma bağlı olan yalnız değiştiğinde uyanıyor.
+
+Bizim `gateway/cron.py`'de karşılığı `Threshold` — ve bilerek **aptal**: yıldız
+farkı, yeni başvuru, adı geçme. Model çağrısı değil.
+
+> **Neden model değil:** token harcayıp token harcamaya karar veren bir bildirici
+> kötü bir takas. Ve *"beni neden uyandırdı"* sorusunun bir insanın okuyabileceği
+> cevabı olmalı.
 
 ### Task defteri — zamanlayıcı değil, **kayıt**
 
 {svg("f_task_lifecycle", "Bir işin yaşam döngüsü")}
 
-Defter ne zaman koşacağına karar vermiyor; ne koştuğunu **yazıyor**. İkisini
+Defter **ne zaman koşacağına karar vermiyor**; ne koştuğunu yazıyor. İkisini
 karıştırmak, yeniden başlatmada geçmiş işleri yeniden oynatmaya götürüyor.
+
+Doğru davranış: süreç yeniden başladığında **geçmiş işleri tekrar oynatmıyor,
+yeniden zamanlıyor.** Bir gecede kaçırılan üç koşu, sabah üç kez arka arkaya
+koşmuyor.
+
+### Üç eksen — ve tip düzeyinde ayrılmış olmaları
+
+{svg("f_task_axes", "Ne zaman · nerede · nereye")}
+
+| Eksen | Soru |
+|---|---|
+| **Zamanlama** | Ne zaman koşacak? |
+| **Oturum hedefi** | Hangi bağlamda koşacak? |
+| **Teslimat** | Sonuç nereye gidecek? |
+
+Üçü **ayrı alanlar**, ve ayrı olmaları bir kaza değil: bir işi "her sabah koş"
+diye kurmakla "sonucu Telegram'a at" demek iki farklı karar, ve ikincisi
+**dışarı mesaj gönderiyor** — yani onay kapısının konusu.
+
+### Taze oturum kuralı
+
+**Zamanlanmış koşu kendi oturumunu alıyor.** Tek uzun ömürlü oturum kullanan bir
+iş her önceki koşuyu bağlamında biriktiriyor:
+
+* her gün **pahalılaşıyor**
+* ve sonunda bu sabahın verisi yerine **geçen haftanın hafızasından** cevap
+  veriyor
+
+Hiçbiri hata vermiyor; iş "çalışıyor" görünüyor.
+
+### Yoklama yanlış şekil
+
+{svg("f_threads", "Yoklama yerine olay")}
+
+*"Her 30 saniyede bak, değişti mi"* bir zamanlayıcı deseni değil, bir zamanlayıcı
+**eksikliğinin** belirtisi. `on-exit` ve `stream` tam olarak bunun yerine var.
+
+### Bizde bugün
+
+| | Durum |
+|---|---|
+| Çevirmen (`scheduler.py`) | **bağlı** — Türkçe ifadeyi cron şekline çeviriyor, üç biçim kabul ediyor |
+| Yerli zamanlayıcı (`gateway/cron.py`) | **yazıldı, 19 test, bağlanmadı** |
+| Koşul gözcüsü (`Threshold`) | `cron.py` içinde, bağlı değil |
+
+**Dürüst sınır:** zamanlama yalnız OpenClaw'ın Gateway'i koşarken çalışıyor. Bu
+makinede systemd *kullanıcı* servisi, `Linger=no` → oturum bitince duruyor.
+Sessizce ateşlemeyi bırakmış bir iş, bir zamanlayıcının **en kötü arızası** — o
+yüzden liste, Gateway'e ulaşılamamasını *boş liste değil, kendi durumu* olarak
+raporluyor.
 
 ---
 

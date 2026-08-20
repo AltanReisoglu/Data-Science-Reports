@@ -22,10 +22,11 @@
 7. [Beş takım tipi ve faturaları](#s7)
 8. [Durmayı öğretmek](#s8)
 9. [Sekiz resmî desen](#s9)
-10. [Ölçülmüş tuzaklar](#s10)
-11. [MAF: halef ne getirdi](#s11)
-12. [MAF: ne kaybettirdi](#s12)
-13. [Geçiş haritası](#s13)
+10. [Built-in tool'lar — ve neden yok](#s10)
+11. [Ölçülmüş tuzaklar](#s11)
+12. [MAF: halef ne getirdi](#s12)
+13. [MAF: ne kaybettirdi](#s13)
+14. [Geçiş haritası](#s14)
 
 ---
 
@@ -262,7 +263,113 @@ anlatılan yapılar.
 ---
 
 <a id="s10"></a>
-## 10 · Ölçülmüş tuzaklar
+## 10 · Built-in tool'lar — ve neden yok
+
+<div align="center">
+<svg viewBox="0 0 600 150" width="600" height="150"><path d="M15,25 L145,25 L145,69 L15,69 Z" fill="#f8f9fa" stroke="none"/><path d="M14.3,23.7 Q80.0,22.5 147.3,24.4 M147.4,23.3 Q146.0,47.0 147.1,69.8 M147.5,71.0 Q80.0,69.4 14.3,71.0 M13.8,71.2 Q13.1,47.0 14.8,23.8" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><path d="M13.5,23.8 Q80.0,23.0 144.8,25.4 M146.1,23.0 Q145.7,47.0 145.4,69.7 M145.5,69.6 Q80.0,71.3 14.8,71.3 M12.8,71.1 Q13.1,47.0 12.4,23.2" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><text x="80.0" y="46.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">Python fonksiyonu</text><text x="80.0" y="57.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">tip ipuçları + docstring</text><path d="M148.1,46.1 Q166.0,47.1 184.8,47.7" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M148.7,46.6 Q166.0,46.1 184.0,47.2" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M184.0,47.0 L178.0,51.6" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M184.0,47.0 L177.3,42.4" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M187,17 L325,17 L325,77 L187,77 Z" fill="#ebfbee" stroke="none"/><path d="M185.0,16.9 Q256.0,14.9 327.2,15.6 M326.9,17.2 Q325.5,47.0 326.9,78.3 M325.4,78.3 Q256.0,76.9 185.3,77.7 M186.0,76.4 Q185.7,47.0 185.8,16.0" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><path d="M186.7,14.9 Q256.0,17.5 325.7,16.8 M327.2,14.6 Q327.0,47.0 326.6,78.2 M325.6,77.4 Q256.0,76.4 185.0,77.3 M186.3,77.3 Q185.5,47.0 185.0,17.2" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><text x="256.0" y="46.2" font-size="8.4" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">FunctionTool</text><text x="256.0" y="57.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">şema TÜRETİLİYOR</text><path d="M329.5,46.2 Q346.0,46.2 364.8,47.8" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M328.9,45.4 Q346.0,47.8 364.8,48.5" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M364.0,47.0 L358.2,51.2" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M364.0,47.0 L357.1,42.1" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M367,25 L473,25 L473,69 L367,69 Z" fill="#e7f5ff" stroke="none"/><path d="M366.7,22.9 Q420.0,23.1 474.2,24.8 M474.7,25.0 Q473.9,47.0 474.7,68.4 M474.2,71.0 Q420.0,69.4 365.2,68.9 M365.8,68.9 Q365.2,47.0 366.9,24.3" fill="none" stroke="#1971c2" stroke-width="1.6" stroke-linecap="round"/><path d="M365.5,22.7 Q420.0,23.6 472.8,25.2 M474.1,24.2 Q474.6,47.0 474.8,68.9 M472.8,68.8 Q420.0,70.4 365.6,70.1 M365.6,70.2 Q365.7,47.0 364.5,25.1" fill="none" stroke="#1971c2" stroke-width="1.6" stroke-linecap="round"/><text x="420.0" y="46.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">modele giden</text><text x="420.0" y="57.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">JSON şema</text><path d="M475.7,47.7 Q494.0,46.2 510.4,45.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M474.8,47.3 Q494.0,46.2 512.8,48.5" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M512.0,47.0 L505.8,51.7" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M512.0,47.0 L505.7,42.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M515,25 L587,25 L587,69 L515,69 Z" fill="#fff4e6" stroke="none"/><path d="M512.5,25.3 Q551.0,25.4 587.4,23.8 M587.8,25.3 Q587.2,47.0 588.5,68.9 M586.5,70.6 Q551.0,68.6 513.4,71.5 M513.0,69.2 Q513.5,47.0 514.7,23.7" fill="none" stroke="#e8590c" stroke-width="1.6" stroke-linecap="round"/><path d="M515.3,24.7 Q551.0,24.3 589.0,23.3 M588.0,23.0 Q588.8,47.0 588.8,70.2 M587.1,69.7 Q551.0,69.7 515.1,70.4 M514.2,70.1 Q513.7,47.0 515.1,24.4" fill="none" stroke="#e8590c" stroke-width="1.6" stroke-linecap="round"/><text x="551.0" y="50.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">çağrı</text><text x="186" y="96" font-size="7.4" fill="#2f9e44" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">docstring = modelin NE ZAMAN çağıracağına karar verdiği metin</text><text x="186" y="110" font-size="7.4" fill="#c92a2a" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">tip ipucu yoksa model ne göndereceğini bilemiyor</text><text x="14" y="138" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Tool bir kod parçası; ajan onu modelin ürettiği fonksiyon çağrısına karşılık koşturuyor. Yazdığın açıklama, arayüzün kendisi.</text></svg>
+</div>
+
+<sub>▲ Tool: fonksiyon + şema · düzenlemek için: [`f_tools_component.excalidraw`](diagrams/wiki/f_tools_component.excalidraw) → excalidraw.com'a sürükle</sub>
+
+
+En sık yanılınan yer. **AutoGen hazır tool ile gelmiyor.** `autogen_ext.tools`
+altında yedi modül var ve altısı **adaptör** — tool değil **[ölçüldü]**:
+
+| Modül | Ne veriyor | Kurulu mu |
+|---|---|---|
+| `code_execution` | `PythonCodeExecutionTool` — **tek gerçek tool** | ✔ |
+| `mcp` | `StdioMcpToolAdapter` · `SseMcpToolAdapter` · `McpWorkbench` | ✔ |
+| `langchain` | `LangChainToolAdapter` — LangChain tool'unu sarmalıyor | ✔ |
+| `azure` | Azure AI Search adaptörü | ekstra gerekiyor |
+| `graphrag` | GraphRAG adaptörü | ekstra gerekiyor |
+| `http` | HTTP çağrısı tool'u | ekstra gerekiyor |
+| `semantic_kernel` | SK tool adaptörü | ekstra gerekiyor |
+
+`autogen-ext`'in **38 ayrı ekstrası** var (`docker`, `grpc`, `http-tool`,
+`file-surfer`, `jupyter-executor`…). Yetenekler paket içinde değil, **kurulum
+seçeneklerinde**.
+
+### Tool'u kim veriyor — üç sistem
+
+| | Hazır tool | Nereden |
+|---|---:|---|
+| **AutoGen** | **~1** | Kendin yazıyorsun |
+| **MAF** | 6 hosted sözleşme | `SupportsCodeInterpreterTool` · `SupportsWebSearchTool` · `SupportsFileSearchTool` · `SupportsImageGenerationTool` · `SupportsShellTool` · `SupportsMCPTool` **[ölçüldü]** |
+| **OpenClaw** | **51** (44'ü canlı) | Çekirdekte, 11 grupta |
+
+> **Sonuç:** AutoGen bir **motor**, bir asistan değil. Tool yazmak senin işin —
+> ve bu bir eksiklik değil, ama *"kurdum, dosya okusun"* beklentisiyle gelen
+> herkes buraya çarpıyor.
+
+### Tool nasıl yazılıyor
+
+Bir fonksiyon + docstring yetiyor; şema **imzadan** çıkarılıyor:
+
+```python
+def scan_facts(query: str) -> str:
+    "Son taramanın özetini döndürür."      # docstring = tarif = arayüz
+    ...
+
+FunctionTool(scan_facts, description=scan_facts.__doc__)
+```
+
+Modele giden fonksiyon değil, **şeması**:
+
+```json
+{"name": "scan_facts",
+ "description": "Son taramanın özetini döndürür.",
+ "parameters": {"type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"]}}
+```
+
+**Üç kural:**
+
+1. **Docstring arayüzdür** — modelin o tool'a *ne zaman* uzanacağına karar
+   verdiği tek metin. Dokümantasyon değil.
+2. **Şemalar her turda ödeniyor.** 17 tool = her istekte 17 şema; `docs/06`
+   bunun canlı bir zaman aşımına yol açtığını kaydediyor.
+3. **Tip ipucu zorunlu.** `query: str` yoksa şema üretilemiyor.
+
+### Workbench — liste değil, **kaynak**
+
+<div align="center">
+<svg viewBox="0 0 600 176" width="600" height="176"><path d="M211,11 L389,11 L389,49 L211,49 Z" fill="#f8f0fc" stroke="none"/><path d="M210.3,9.4 Q300.0,10.0 391.4,10.7 M389.9,11.1 Q389.6,30.0 390.7,50.3 M389.8,51.5 Q300.0,51.4 210.2,49.6 M208.9,49.5 Q210.2,30.0 210.9,9.9" fill="none" stroke="#5f3dc4" stroke-width="1.6" stroke-linecap="round"/><path d="M211.5,10.1 Q300.0,9.6 389.8,8.7 M390.0,9.3 Q389.8,30.0 391.4,50.4 M391.2,49.7 Q300.0,49.9 211.5,50.6 M209.9,51.5 Q209.8,30.0 210.3,8.4" fill="none" stroke="#5f3dc4" stroke-width="1.6" stroke-linecap="round"/><text x="300.0" y="29.2" font-size="8.6" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">Workbench</text><text x="300.0" y="40.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">list_tools / call_tool</text><path d="M21,85 L179,85 L179,127 L21,127 Z" fill="#ebfbee" stroke="none"/><path d="M19.7,83.4 Q100.0,85.3 180.0,83.1 M180.4,83.9 Q179.7,106.0 179.9,127.5 M181.1,126.6 Q100.0,127.3 20.4,129.0 M20.9,129.4 Q20.9,106.0 20.4,85.1" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><path d="M19.2,84.7 Q100.0,84.9 180.4,84.1 M181.4,85.0 Q180.5,106.0 180.9,127.2 M179.0,127.6 Q100.0,129.2 19.5,128.8 M21.6,126.6 Q19.8,106.0 19.7,85.2" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linecap="round"/><text x="100.0" y="105.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">StaticWorkbench</text><text x="100.0" y="116.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">elindeki fonksiyonlar</text><path d="M221,85 L379,85 L379,127 L221,127 Z" fill="#e7f5ff" stroke="none"/><path d="M220.5,85.1 Q300.0,84.0 380.4,82.9 M381.5,83.7 Q380.8,106.0 380.1,126.8 M379.5,126.9 Q300.0,128.0 220.6,128.6 M221.1,129.5 Q220.2,106.0 221.1,82.6" fill="none" stroke="#1971c2" stroke-width="1.6" stroke-linecap="round"/><path d="M220.5,85.2 Q300.0,84.1 380.1,83.8 M379.1,85.1 Q380.4,106.0 378.5,128.8 M378.6,127.0 Q300.0,126.3 219.3,129.0 M221.3,128.3 Q220.6,106.0 220.1,84.0" fill="none" stroke="#1971c2" stroke-width="1.6" stroke-linecap="round"/><text x="300.0" y="105.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">McpWorkbench</text><text x="300.0" y="116.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">stdio ya da HTTP</text><path d="M421,85 L579,85 L579,127 L421,127 Z" fill="#fff4e6" stroke="none"/><path d="M420.7,83.3 Q500.0,84.2 581.3,83.0 M579.9,82.5 Q579.2,106.0 578.7,128.5 M578.7,126.5 Q500.0,126.5 419.5,128.9 M419.7,127.3 Q419.5,106.0 418.4,82.7" fill="none" stroke="#e8590c" stroke-width="1.6" stroke-linecap="round"/><path d="M420.4,84.7 Q500.0,83.5 580.5,85.3 M580.4,84.7 Q579.8,106.0 579.4,129.6 M581.3,127.9 Q500.0,129.3 419.1,127.5 M418.9,126.6 Q420.1,106.0 419.2,85.5" fill="none" stroke="#e8590c" stroke-width="1.6" stroke-linecap="round"/><text x="500.0" y="105.2" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">GatedWorkbench</text><text x="500.0" y="116.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">bizim — kapı</text><path d="M99.5,82.6 Q100.4,68.0 99.1,52.8" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M99.5,83.5 Q99.9,68.0 98.7,54.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M100.0,54.0 L103.6,60.8" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M100.0,54.0 L96.2,60.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M298.8,83.4 Q300.2,68.0 301.4,54.6" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M300.6,81.8 Q300.3,68.0 299.3,53.2" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M300.0,54.0 L304.3,59.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M300.0,54.0 L296.0,59.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M501.1,82.4 Q499.4,68.0 500.2,54.7" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M500.2,81.4 Q500.6,68.0 501.5,52.7" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M500.0,54.0 L504.2,60.4" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M500.0,54.0 L495.4,59.9" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><text x="20" y="148" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Tool tek bir arayüz; workbench BİR KOLEKSİYON — durum ve kaynak paylaşan tool'lar, tek tip sonuç.</text><text x="20" y="164" font-size="7.6" fill="#8a5208" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Ajan hangisiyle konuştuğunu bilmiyor. Kapıyı araya koymayı mümkün kılan tek şey bu.</text></svg>
+</div>
+
+<sub>▲ Üç kaynak, tek arayüz · düzenlemek için: [`f_workbench_component.excalidraw`](diagrams/wiki/f_workbench_component.excalidraw) → excalidraw.com'a sürükle</sub>
+
+
+```python
+AssistantAgent(tools=[a, b], workbench=wb)
+# ValueError: Tools cannot be used with a workbench.
+```
+
+İkisi aynı anda olamıyor, çünkü aynı soruyu **farklı zamanda** cevaplıyorlar.
+Liste ajan yazılırken donuyor; kaynak her turda sorulabiliyor — MCP sunucusu
+tool listesini çalışma zamanında verdiği için tek doğru soyutlama bu.
+
+Kapıyı oraya koymanın sebebi: workbench, yerel bir Python fonksiyonuyla uzak bir
+MCP tool'unu **aynı gören tek yer**. Kural, ajan yazılırken **var olmayan**
+tool'lar için de geçerli oluyor.
+
+### Model istemcileri
+
+<div align="center">
+<svg viewBox="0 0 600 186" width="600" height="186"><path d="M191,9 L409,9 L409,41 L191,41 Z" fill="#f8f0fc" stroke="none"/><path d="M189.0,9.4 Q300.0,8.1 410.4,8.3 M408.7,8.9 Q409.4,25.0 409.1,41.2 M410.8,43.4 Q300.0,42.6 190.7,41.4 M189.3,41.1 Q189.5,25.0 190.0,8.0" fill="none" stroke="#5f3dc4" stroke-width="1.6" stroke-linecap="round"/><path d="M189.1,9.2 Q300.0,6.6 410.6,6.7 M409.8,7.6 Q409.5,25.0 411.0,42.6 M409.6,42.1 Q300.0,42.2 191.1,42.7 M188.5,41.5 Q189.4,25.0 189.3,8.9" fill="none" stroke="#5f3dc4" stroke-width="1.6" stroke-linecap="round"/><text x="300.0" y="24.2" font-size="8.6" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">ChatCompletionClient</text><text x="300.0" y="35.0" font-size="6.8" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">protokol sınıfı</text><path d="M61,63 L539,63 L539,80 L61,80 Z" fill="#e7f5ff" stroke="none"/><path d="M58.8,61.7 Q300.0,62.4 540.2,61.9 M540.6,61.3 Q540.2,71.5 541.6,80.6 M541.0,80.5 Q300.0,81.0 61.3,81.2 M59.2,80.5 Q60.0,71.5 60.1,63.0" fill="none" stroke="#1971c2" stroke-width="1.1" stroke-linecap="round"/><path d="M61.1,63.4 Q300.0,60.8 538.7,62.5 M538.7,63.5 Q540.2,71.5 539.2,80.7 M540.3,82.3 Q300.0,80.3 61.5,80.9 M61.1,79.9 Q59.7,71.5 59.6,61.1" fill="none" stroke="#1971c2" stroke-width="1.1" stroke-linecap="round"/><text x="70" y="75" font-size="6.8" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">OpenAIChatCompletionClient</text><text x="300" y="75" font-size="7.2" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">OpenAI + uyumlu (Gemini…)</text><path d="M299.1,45.0 Q299.8,51.0 300.2,58.4" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M299.5,43.0 Q299.8,51.0 300.8,58.4" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M300.0,58.0 L295.7,51.3" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M300.0,58.0 L303.7,51.7" fill="none" stroke="#1e1e1e" stroke-width="1.4" stroke-linecap="round"/><path d="M61,87 L539,87 L539,104 L61,104 Z" fill="#e7f5ff" stroke="none"/><path d="M59.4,84.4 Q300.0,86.6 539.9,85.1 M540.7,86.0 Q539.8,95.5 538.7,105.6 M540.8,105.9 Q300.0,105.1 58.9,104.3 M58.7,103.9 Q60.0,95.5 60.7,84.6" fill="none" stroke="#1971c2" stroke-width="1.1" stroke-linecap="round"/><path d="M58.8,87.3 Q300.0,85.1 540.7,86.8 M539.1,87.0 Q539.8,95.5 539.5,104.6 M539.3,104.6 Q300.0,106.5 61.0,105.0 M60.3,104.4 Q59.8,95.5 61.0,85.5" fill="none" stroke="#1971c2" stroke-width="1.1" stroke-linecap="round"/><text x="70" y="99" font-size="6.8" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">AzureOpenAIChatCompletionClient</text><text x="300" y="99" font-size="7.2" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Azure OpenAI</text><path d="M61,111 L539,111 L539,128 L61,128 Z" fill="#e7f5ff" stroke="none"/><path d="M59.6,110.3 Q300.0,109.0 540.5,109.3 M540.5,109.1 Q540.0,119.5 539.4,128.8 M538.8,128.3 Q300.0,127.9 61.3,129.1 M60.1,130.5 Q59.6,119.5 60.0,110.9" fill="none" stroke="#1971c2" stroke-width="1.1" stroke-linecap="round"/><path d="M58.8,111.2 Q300.0,111.2 538.5,108.7 M539.7,110.8 Q539.9,119.5 539.8,129.2 M540.7,130.2 Q300.0,128.8 61.5,128.7 M58.5,129.7 Q60.4,119.5 60.3,108.6" fill="none" stroke="#1971c2" stroke-width="1.1" stroke-linecap="round"/><text x="70" y="123" font-size="6.8" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">AzureAIChatCompletionClient</text><text x="300" y="123" font-size="7.2" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">GitHub + Azure barındırılan</text><path d="M61,135 L539,135 L539,152 L61,152 Z" fill="#ebfbee" stroke="none"/><path d="M60.7,132.5 Q300.0,133.2 539.7,134.6 M540.1,132.5 Q540.2,143.5 538.8,151.6 M539.7,153.9 Q300.0,153.0 60.7,153.8 M59.9,154.6 Q59.6,143.5 60.1,134.4" fill="none" stroke="#2f9e44" stroke-width="1.1" stroke-linecap="round"/><path d="M58.9,135.6 Q300.0,135.1 539.6,134.0 M538.6,134.8 Q539.6,143.5 538.8,153.9 M540.8,153.0 Q300.0,153.7 60.6,154.3 M60.9,152.1 Q60.2,143.5 60.8,134.5" fill="none" stroke="#2f9e44" stroke-width="1.1" stroke-linecap="round"/><text x="70" y="147" font-size="6.8" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">ReplayChatCompletionClient</text><text x="300" y="147" font-size="7.2" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">deterministik kuru mod</text><text x="60" y="176" font-size="7.6" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Hepsi aynı protokolü uyguluyor — ajan hangisiyle konuştuğunu bilmiyor. Kuru mod istemcisi de bir istemci.</text></svg>
+</div>
+
+<sub>▲ İstemci ve model_info · düzenlemek için: [`f_model_clients.excalidraw`](diagrams/wiki/f_model_clients.excalidraw) → excalidraw.com'a sürükle</sub>
+
+
+**Tuzak:** OpenAI-*uyumlu* bir endpoint kullanıyorsan `model_info` **zorunlu** —
+yoksa `model_info is required when model name is not a valid OpenAI model`.
+Bu projede ilk çarpılan duvar buydu.
+
+---
+
+<a id="s11"></a>
+## 11 · Ölçülmüş tuzaklar
 
 <div align="center">
 <svg viewBox="0 0 600 200" width="600" height="200"><path d="M17,11 L583,11 L583,39 L17,39 Z" fill="#fff5f5" stroke="none"/><path d="M17.1,8.7 Q300.0,10.0 583.6,8.6 M583.0,9.4 Q583.8,25.0 585.0,38.6 M583.4,41.0 Q300.0,41.2 15.9,40.4 M15.1,39.8 Q16.5,25.0 14.9,10.9" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.8,9.5 Q300.0,8.3 584.2,9.0 M583.4,9.9 Q583.5,25.0 585.4,40.3 M583.1,41.3 Q300.0,40.6 16.7,40.4 M17.3,38.8 Q16.1,25.0 15.6,11.0" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="23" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">max_tool_iterations</text><text x="28" y="35" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: 1</text><text x="210" y="29" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">model tool sonucunu GÖRMEDEN cevaplar</text><path d="M17,49 L583,49 L583,77 L17,77 Z" fill="#fff5f5" stroke="none"/><path d="M16.4,48.5 Q300.0,48.6 583.9,48.2 M585.4,47.3 Q584.1,63.0 583.2,77.4 M584.4,78.3 Q300.0,79.2 14.6,77.2 M15.3,78.5 Q16.5,63.0 15.7,46.9" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.4,47.2 Q300.0,49.7 584.3,47.4 M582.5,47.8 Q583.6,63.0 584.4,78.8 M582.6,77.9 Q300.0,79.4 16.3,77.9 M15.3,78.7 Q15.5,63.0 16.1,49.4" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="61" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">model_context</text><text x="28" y="73" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: yok</text><text x="210" y="67" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">ajanın belleği yoktur</text><path d="M17,87 L583,87 L583,115 L17,115 Z" fill="#fff5f5" stroke="none"/><path d="M16.4,86.3 Q300.0,84.4 583.8,84.6 M583.4,84.9 Q584.1,101.0 585.1,114.7 M585.3,117.4 Q300.0,117.7 16.5,116.0 M14.6,115.2 Q16.3,101.0 16.0,84.8" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.3,85.2 Q300.0,87.4 584.3,87.1 M585.2,86.9 Q583.8,101.0 584.2,117.3 M583.3,115.1 Q300.0,114.6 14.9,116.7 M16.1,117.6 Q16.4,101.0 15.5,85.1" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="99" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">model_client_stream</text><text x="28" y="111" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: False</text><text x="210" y="105" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">token akışı hiç yayılmaz</text><path d="M17,125 L583,125 L583,153 L17,153 Z" fill="#fff5f5" stroke="none"/><path d="M16.6,123.8 Q300.0,123.5 585.4,123.6 M584.7,124.1 Q583.6,139.0 585.5,154.6 M585.6,154.7 Q300.0,152.6 15.8,153.3 M15.5,155.4 Q16.5,139.0 15.3,123.1" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><path d="M16.5,122.9 Q300.0,125.6 583.9,123.2 M584.5,124.6 Q584.1,139.0 585.3,155.6 M583.4,155.6 Q300.0,154.7 16.1,154.8 M15.0,153.3 Q15.6,139.0 15.7,123.8" fill="none" stroke="#c92a2a" stroke-width="1.3" stroke-linecap="round"/><text x="28" y="137" font-size="8.2" fill="#1e1e1e" font-family="DejaVu Sans Mono, monospace">sonlandırma</text><text x="28" y="149" font-size="6.8" fill="#c92a2a" font-family="DejaVu Sans Mono, monospace">varsayılan: yok</text><text x="210" y="143" font-size="8.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">takım tavansız koşar</text><text x="16" y="176" font-size="9" fill="#c92a2a" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Dördünün ortak yanı: HİÇBİRİ HATA VERMEZ.</text><text x="16" y="190" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Sistem çalışır, sonuç yanlış olur — ve aramak için önce yanlış olduğunu bilmen gerekir.</text></svg>
@@ -288,8 +395,8 @@ anlatılan yapılar.
 
 ---
 
-<a id="s11"></a>
-## 11 · MAF ne getirdi
+<a id="s12"></a>
+## 12 · MAF ne getirdi
 
 <div align="center">
 <svg viewBox="0 0 600 156" width="600" height="156"><path d="M13,9 L391,9 L391,27 L13,27 Z" fill="#e7f5ff" stroke="none"/><path d="M13.2,8.7 Q202.0,6.3 390.5,8.2 M393.2,9.1 Q392.2,18.0 391.4,28.3 M391.3,27.8 Q202.0,28.0 11.7,27.9 M12.7,26.5 Q12.4,18.0 11.5,9.5" fill="none" stroke="#1971c2" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3,8.5 Q202.0,8.9 392.6,6.9 M391.3,7.0 Q392.1,18.0 392.6,26.5 M392.7,29.3 Q202.0,29.2 11.4,29.1 M10.9,29.3 Q12.3,18.0 10.9,7.9" fill="none" stroke="#1971c2" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="22" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Model Clients</text><text x="160" y="22" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:1984</text><text x="216" y="22" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">sağlayıcıya konuşan şey</text><path d="M13,33 L391,33 L391,51 L13,51 Z" fill="#f8f0fc" stroke="none"/><path d="M10.7,32.5 Q202.0,30.5 393.1,30.8 M392.4,32.3 Q392.1,42.0 390.8,52.6 M393.4,52.5 Q202.0,53.4 12.5,53.4 M11.0,52.4 Q11.8,42.0 13.3,33.4" fill="none" stroke="#5f3dc4" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3,31.6 Q202.0,33.1 392.9,32.4 M392.8,32.0 Q391.7,42.0 392.5,51.1 M392.8,52.7 Q202.0,52.8 10.5,51.1 M12.2,51.5 Q11.9,42.0 11.6,33.4" fill="none" stroke="#5f3dc4" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="46" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Model Context</text><text x="160" y="46" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:2341</text><text x="216" y="46" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">modele NE gideceğine karar veren şey</text><path d="M13,57 L391,57 L391,75 L13,75 Z" fill="#ebfbee" stroke="none"/><path d="M11.8,57.4 Q202.0,55.6 391.4,56.1 M393.1,57.0 Q392.3,66.0 391.2,76.4 M393.1,76.0 Q202.0,76.9 11.3,77.5 M12.2,77.5 Q12.0,66.0 11.3,55.9" fill="none" stroke="#2f9e44" stroke-width="1.2" stroke-linecap="round"/><path d="M11.5,57.1 Q202.0,57.5 392.4,57.5 M393.2,56.0 Q391.9,66.0 391.1,75.5 M392.4,75.9 Q202.0,76.0 11.6,75.3 M12.6,76.4 Q12.0,66.0 10.5,55.2" fill="none" stroke="#2f9e44" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="70" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Tools</text><text x="160" y="70" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:2473</text><text x="216" y="70" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">modelin çağırabildiği fonksiyonlar</text><path d="M13,81 L391,81 L391,99 L13,99 Z" fill="#fff4e6" stroke="none"/><path d="M12.0,79.3 Q202.0,80.6 392.3,78.5 M393.4,79.5 Q392.0,90.0 390.9,100.6 M391.5,99.2 Q202.0,99.6 10.4,98.7 M11.7,101.1 Q12.2,90.0 13.5,80.8" fill="none" stroke="#e8590c" stroke-width="1.2" stroke-linecap="round"/><path d="M10.8,81.3 Q202.0,79.5 390.9,78.9 M391.3,79.3 Q392.1,90.0 391.0,98.6 M393.4,98.7 Q202.0,101.7 11.8,100.5 M13.2,101.5 Q12.1,90.0 12.3,79.8" fill="none" stroke="#e8590c" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="94" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Workbench (+ MCP)</text><text x="160" y="94" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:2841</text><text x="216" y="94" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">tool'ların toplandığı arayüz</text><path d="M13,105 L391,105 L391,123 L13,123 Z" fill="#fff5f5" stroke="none"/><path d="M11.5,103.0 Q202.0,104.5 391.9,104.0 M391.9,103.6 Q392.2,114.0 390.7,125.5 M392.2,122.7 Q202.0,123.9 11.4,122.5 M12.5,124.0 Q12.3,114.0 12.6,103.8" fill="none" stroke="#c92a2a" stroke-width="1.2" stroke-linecap="round"/><path d="M13.6,102.8 Q202.0,104.1 392.6,103.7 M390.9,104.3 Q392.2,114.0 390.7,125.0 M391.4,123.8 Q202.0,124.3 11.7,123.8 M11.7,123.2 Q11.8,114.0 12.8,104.3" fill="none" stroke="#c92a2a" stroke-width="1.2" stroke-linecap="round"/><text x="22" y="118" font-size="8" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold">Code Executors</text><text x="160" y="118" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace">05:3054</text><text x="216" y="118" font-size="7.4" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">kodu nerede koşturacağın</text><path d="M413,9 L587,9 L587,123 L413,123 Z" fill="#f8f9fa" stroke="none"/><path d="M411.5,7.5 Q500.0,7.5 589.5,8.5 M589.3,8.7 Q586.4,66.0 588.4,123.4 M586.8,123.9 Q500.0,123.6 412.6,124.0 M412.5,124.3 Q412.0,66.0 412.2,8.2" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><path d="M412.2,6.4 Q500.0,7.6 588.4,7.1 M586.6,8.1 Q587.4,66.0 587.4,123.9 M588.7,125.1 Q500.0,122.8 412.2,125.2 M413.2,123.1 Q413.8,66.0 410.8,7.5" fill="none" stroke="#868e96" stroke-width="1.6" stroke-linecap="round"/><text x="500.0" y="23" font-size="8.4" fill="#1e1e1e" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif" font-weight="bold" text-anchor="middle">Component config</text><text x="500" y="30" font-size="6.6" fill="#767d84" font-family="DejaVu Sans Mono, monospace" text-anchor="middle">05:1888</text><text x="424" y="56" font-size="6.6" fill="#454c53" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">dump_component / load_component</text><text x="424" y="70" font-size="7" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">her bileşen JSON'a yazılıp</text><text x="424" y="82" font-size="7" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">geri yüklenebiliyor</text><text x="424" y="100" font-size="7" fill="#2f9e44" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">→ yapılandırma kod değil VERİ</text><text x="12" y="146" font-size="7.6" fill="#767d84" font-family="Comic Sans MS, Comic Neue, DejaVu Sans, sans-serif">Beşi de değiştirilebilir yüzey. Bir ajan bunların hangi uygulamasıyla konuştuğunu bilmiyor — kapıyı kurmayı mümkün kılan da bu.</text></svg>
@@ -323,8 +430,8 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-<a id="s12"></a>
-## 12 · MAF ne kaybettirdi
+<a id="s13"></a>
+## 13 · MAF ne kaybettirdi
 
 | Yetenek | AutoGen | MAF |
 |---|---|---|
@@ -351,8 +458,8 @@ Bu, §5'teki sessiz kardeş kaybının kökeni.
 
 ---
 
-<a id="s13"></a>
-## 13 · Geçiş haritası
+<a id="s14"></a>
+## 14 · Geçiş haritası
 
 Microsoft'un kendi göç kılavuzundan **[kaynak]**:
 
