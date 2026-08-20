@@ -473,6 +473,36 @@ OpenClaw bunun bugün çalışan, olgun bir örneği.
 
 {svg("f_oc_arch", "Gateway, ajan, kanallar, node'lar")}
 
+### Paket haritası — kod nasıl bölünmüş
+
+{svg("f_packages", "22 paket · her ilginç parça ayrı")}
+
+Bir sistemin nasıl düşünüldüğünü öğrenmenin en hızlı yolu, kodun nasıl
+bölündüğüne bakmaktır. En büyük üçü:
+
+| Paket | Dosya | İşi |
+|---|---:|---|
+| `ai` | 118 | Model sağlayıcılarıyla konuşuyor |
+| `gateway-protocol` | 108 | Kontrol düzleminin **tipli şeması** |
+| `memory-host-sdk` | 83 | Bellek sağlayıcılarının uyması gereken **sözleşme** |
+
+Üçünün ayrı olması bir tercih: model erişimi, kontrol düzlemi ve bellek
+birbirinden bağımsız değiştirilebilsin diye. Kontrol düzleminin **kendi şema
+paketi** olması, protokolün koddan önce geldiğini gösteriyor.
+
+### Sessiz altyapı — görünmeyen yarı
+
+Beş paket hiçbir özellik listesinde yer almıyor, ama biri eksik olduğunda hemen
+fark ediliyor:
+
+| Paket | Ne yapıyor |
+|---|---|
+| `normalization-core` | Farklı kanallardan gelen içeriği **tek biçime** indiriyor |
+| `markdown-core` | Modelin yazdığını her kanalın kaldırabileceği biçime çeviriyor — WhatsApp'ın markdown'ı Slack'inki değil |
+| `terminal-core` | TUI çıktısı |
+| `retry` | Yeniden deneme politikası |
+| `net-policy` | Ağ erişim kuralları |
+
 **Tek Gateway süreci.** Oturumlar, onaylar, zamanlama, kanallar hepsi orada.
 Kurulu sistemde ölçüldü:
 
@@ -797,12 +827,94 @@ gerçekten rapor göndermesini sağlayan şey bu.
 
 {svg("f_self_learning", "Düzeltmeyi skill'e çevirmek")}
 
+### Built-in tool kataloğu — ve dağılımın anlattığı
+
+{svg("f_tool_catalog", "51 tool · 11 grup")}
+
+Bir ajanın ne yapabildiğini elindeki tool listesi belirliyor. Asıl bilgi sayıda
+değil **dağılımda**:
+
+| Grup | Tool | Ne anlama geliyor |
+|---|---:|---|
+| `sessions` | **15** | Alt-ajan başlatmak, iş devretmek, cevabını beklemek, aralarında mesajlaşmak |
+| dosya işlemleri | 4 | — |
+| komut çalıştırma | 3 | — |
+
+Yatırımın büyük kısmı dosyaya ya da kabuğa değil, **ajanlar arası koordinasyona**
+yapılmış. Bir harness'ın ne için tasarlandığını en iyi bu oran anlatıyor.
+
+### "Kaç tool var?" — üç cevap, üçü de doğru
+
+{svg("f_profiles", "51 · 44 · doküman tablosu")}
+
+| Sayı | Ne sayıyor |
+|---:|---|
+| **51** | Kaynak kodda tanımlı |
+| **44** | Canlı gateway'in gerçekten sunduğu **[ölçüldü]** |
+| başka | Dokümandaki tablo — **eskimiş** |
+
+Aradaki fark filtrelerde eriyor, ve daralma **üç aşamada**: profil bir taban
+liste veriyor → `allow`/`deny` onu kesiyor → sandbox'tayken sandbox politikası
+bir kez daha kesiyor.
+
+> **Üçü de yalnız daraltıyor; hiçbiri listeye tool ekleyemiyor.** Bir yetkilendirme
+> katmanının doğru yönü bu — genişleyebilen bir filtre, filtre değildir.
+
+### Koşan bir tura müdahale etmenin dört yolu
+
+{svg("f_session_tools", "/steer · /btw · /goal · /loop")}
+
+Sıradan bir sohbet arayüzünde mesajı gönderdikten sonra yapabileceğin tek şey
+beklemektir. Bu dört komut aynı soruya farklı cevaplar veriyor: **tur çoktan
+başlamışken ne yapabilirsin?**
+
+| Komut | Ne yapıyor |
+|---|---|
+| `/steer` | Koşan turu **yönlendiriyor**. Runtime müdahaleyi kabul etmezse mesajı çöpe atmıyor, sıradan bir prompt olarak gönderiyor |
+| `/btw` | Araya **yan soru** sokuyor ve cevabı konuşma geçmişine eklemiyor — asıl işin bağlamını kirletmiyor |
+| `/goal` | Oturuma **kalıcı bir hedef** bağlıyor; hem operatör hem model aynı hedefi görüyor |
+| `/loop` | Konuşmaya bağlı, **kendini tekrarlayan** bir iş kuruyor |
+
+Canlı ölçümde `commands.list` **89 komut** döndürüyor; dördü bu grupta
+**[ölçüldü]**.
+
+> **Karşılaştırma:** AutoGen'de koşan bir turun içine girmenin **hiçbir yolu
+> yok**. Tur başladıktan sonra tek seçenek beklemek ya da iptal etmek.
+
 ### Doğrulanmamış olanlar
 
-| Ne | Durum |
-|---|---|
-| **Lobster** — tipli iş akışı runtime'ı | **[teyitsiz]** — resmî **eklenti**, çekirdekte değil, kurmadık. Katalog: *"typed pipelines + resumable approvals"* |
-| **Code Mode / Swarm** | **[teyitsiz]** — okundu, koşturulmadı |
+Aşağıdaki iki başlık **koşturulmadı.** Şema, katalog tarifinin ve resmî
+belgelerin okunmasından çiziliyor — ölçümden değil. Ayrımın görünür kalması
+için buraya konuldular, önceki bölümlere değil.
+
+#### Lobster — tipli iş akışı runtime'ı · **[teyitsiz]**
+
+{svg("f_lobster", "Tek çağrı · gömülü kapılar · devam token'ı — [teyitsiz]")}
+
+Katalog kaydı doğrulandı **[kaynak]**: `@openclaw/lobster`, *"Lobster workflow
+tool plugin (typed pipelines + resumable approvals)"*, `source: official`,
+`minHostVersion >= 2026.4.25`. **Çekirdekte değil, ayrı bir eklenti**, ve bu
+kurulumda yüklü değil.
+
+Anlattığı fikir — katalog tarifinden okunuyor:
+
+* Çok adımlı bir işi modele orkestra ettirirsen **her adım ayrı bir tur** olur;
+  dört adım dört model çağrısı, ve her turda bütün bağlam yeniden gönderilir.
+* Tipli boru hattı orkestrasyonu modelden alıp **runtime'a** veriyor: model bir
+  kez konuşuyor, ara sonuçlar prompt'a hiç uğramıyor.
+* Yan etkili bir adımda akış **duruyor** ve bir **devam token'ı** dönüyor —
+  onaydan sonra baştan değil, kaldığı yerden.
+
+> **Kapıyı runtime tutuyor, model değil.** Model *"bu sefer onay sormayayım"*
+> diye karar veremiyor — kapı boru hattının parçası, erişebileceği bir yerde
+> değil. Aynı ilke bizim workbench kapımızda da geçerli.
+
+#### Code Mode / Swarm · **[teyitsiz]**
+
+Katalog büyüdükçe bütün tool şemalarını prompt'a koymak imkânsızlaşıyor.
+**Code Mode** bunu şöyle çözüyor: model tool şemalarını görmüyor, küçük bir
+köprüye `search` · `describe` · `call` yazıyor. **Swarm** aynı köprüden
+eşzamanlı alt-ajanlar başlatıyor.
 
 ---
 
