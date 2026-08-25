@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>Agent Reliability — Hap Bilgi</title>
+<style>
+@page { size: A4; margin: 9mm 9mm 7mm 9mm; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  font-family: "Noto Sans","DejaVu Sans","Liberation Sans",sans-serif;
+  font-size: 7.6pt; line-height: 1.29; color: #16181d; margin: 0;
+}
+.page { page-break-after: always; height: 278mm; display: flex; flex-direction: column;
+        overflow: hidden; }
+.page > .foot { margin-top: auto; }
+.page:last-child { page-break-after: auto; }
+
+h1 { font-size: 14pt; margin: 0 0 .8mm; letter-spacing: -.3px; }
+h1 .sub { font-weight: 400; color: #6b7280; font-size: 9pt; letter-spacing: 0; }
+h2 {
+  font-size: 8.8pt; margin: 3.2mm 0 1.2mm; padding: .7mm 0 .6mm;
+  border-bottom: 1.6pt solid #16181d; letter-spacing: .3px; text-transform: uppercase;
+}
+h2 .n { color: #b91c1c; margin-right: 1.5mm; font-variant-numeric: tabular-nums; }
+h3 { font-size: 7.9pt; margin: 2mm 0 .8mm; color: #b91c1c; letter-spacing: .2px; }
+p { margin: 0 0 1.1mm; }
+.hdr { display:flex; justify-content:space-between; align-items:flex-end;
+       border-bottom: 2.5pt solid #16181d; padding-bottom: 1.5mm; margin-bottom: 1mm; }
+.hdr .meta { text-align:right; font-size: 7pt; color:#6b7280; line-height:1.45; }
+
+table { width: 100%; border-collapse: collapse; margin: .8mm 0 1.5mm; font-size: 7.0pt; }
+th { text-align: left; font-size: 6.3pt; text-transform: uppercase; letter-spacing: .5px;
+     color: #6b7280; border-bottom: .8pt solid #9ca3af; padding: .6mm 1.3mm .5mm 0; font-weight: 700; }
+td { padding: .6mm 1.3mm .6mm 0; border-bottom: .3pt solid #e5e7eb; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+code, .mono { font-family: "DejaVu Sans Mono","Liberation Mono",monospace; font-size: 6.6pt;
+              background: #f1f2f4; padding: 0 .7mm; border-radius: 1.5px; }
+pre { font-family:"DejaVu Sans Mono",monospace; font-size:6.4pt; line-height:1.3;
+      background:#f6f7f9; border-left:2pt solid #16181d; padding:1.2mm 1.7mm; margin:1mm 0 1.5mm;
+      white-space:pre; overflow:hidden; }
+b, strong { font-weight: 700; }
+.big { font-size: 10.2pt; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing:-.3px; }
+.red { color: #b91c1c; }
+
+.q { border-left: 2pt solid #b91c1c; padding: .6mm 0 .6mm 2.2mm; margin: 1.1mm 0 1.5mm;
+     font-style: italic; color: #374151; }
+.q b { font-style: normal; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 5mm; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 4mm; }
+
+.box { border: .8pt solid #16181d; padding: 1.2mm 1.7mm; margin: 1mm 0 1.5mm; }
+.box.fill { background: #f6f7f9; border: none; border-left: 2.5pt solid #16181d; }
+.box .t { font-weight: 700; font-size: 7.6pt; display:block; margin-bottom: .8mm; }
+
+ul, ol { margin: .5mm 0 1.4mm; padding-left: 4mm; list-style-position: outside; }
+li { margin-bottom: .5mm; }
+ul.tight li { margin-bottom: .35mm; }
+
+.tag { display:inline-block; font-size:6.2pt; font-weight:700; letter-spacing:.4px;
+       padding: .2mm 1mm; border-radius:2px; background:#16181d; color:#fff; vertical-align:1px; }
+.tag.k { background:#166534; } .tag.t { background:#1e40af; }
+.tag.o { background:#92400e; } .tag.m { background:#b91c1c; }
+
+.lvl { font-weight:700; color:#fff; background:#16181d; padding: .15mm 1.1mm;
+       border-radius:2px; font-size:6.4pt; }
+.foot { margin-top: 1.8mm; padding-top: .9mm; border-top: .8pt solid #9ca3af;
+        font-size: 6.6pt; color: #6b7280; display:flex; justify-content:space-between; }
+</style></head><body>
+
+<!-- ============ SAYFA 1 ============ -->
+<section class="page">
+<div class="hdr">
+  <h1>Agent Reliability <span class="sub">— Loop Detection &amp; Task Budget Kontrolleri</span></h1>
+  <div class="meta">Sunum hap bilgi · Ağustos 2026<br>
+  <span class="tag k">K</span> kod okundu &nbsp; <span class="tag t">T</span> tam metin &nbsp;
+  <span class="tag o">Ö</span> özet &nbsp; <span class="tag m">M</span> kendi ölçümüm</div>
+</div>
+
+<h2><span class="n">01</span>Problem — tek cümlede</h2>
+<div class="grid2">
+<div>
+<p><b>Model tek başına durur.</b> Sorarsın, cevap verir, biter. <b>Ajan = model + döngü</b> —
+ve döngüyü kesme sorusu modelde hiç yoktu.</p>
+<p>En doğal cevap "model kendi karar versin". Pratikte en kötü cevap: model her turda yalnızca
+<b>bir sonraki adıma</b> bakıyor. Kaç kez aynı şeyi denediğini, ne harcadığını görmüyor.</p>
+<div class="q">"Her döngüye modelin yargısına bağlı olmayan sert bir durdurma gerekiyor, çünkü
+model, işin bitip bitmediği konusunda <b>yanılması en muhtemel bileşendir</b>." <br>— Arize</div>
+</div>
+<div>
+<div class="box"><span class="t">Anthropic referans computer-use döngüsü <span class="tag k">K</span></span>
+<pre>while True:
+    response = model(messages)
+    if not tool_use:
+        return messages      # tek cikis
+    result = run_tools(...)
+    messages.append(result)</pre>
+<p style="margin:0"><b>Tur sayacı yok · döngü tespiti yok · bütçe yok.</b><br>
+Kesme yetkisi tamamen modelde — "yanılması en muhtemel bileşen"de.</p></div>
+</div>
+</div>
+
+<h2><span class="n">02</span>Kanıt — üç ölçüm</h2>
+<div class="grid3">
+<div>
+<h3>MAST <span class="tag t">T</span></h3>
+<p>1642 açıklamalı yürütme izi, 7 framework, 14 hata modu.</p>
+<table><tr><td>Adım tekrarı <span style="color:#6b7280">(en sık)</span></td><td class="n"><b>%15,7</b></td></tr>
+<tr><td>Durma koşulunu tanımama</td><td class="n"><b>%12,4</b></td></tr>
+<tr><td><b>Toplam</b></td><td class="n"><b class="red">%28,1</b></td></tr></table>
+<p>Bütün hataların dörtte birinden fazlası tek başlıkta: <b>ne zaman duracağını bilmiyor.</b></p>
+</div>
+<div>
+<h3>Token Budgets <span class="tag t">T</span></h3>
+<p>21 framework, 2023–2026, <b>63 doğrulanmış üretim olayı.</b> Her biri GitHub issue +
+maintainer beyanı + dolar zararı ile. Cohen's κ = 0,837.</p>
+<div class="q" style="margin-top:1.5mm">"Katalogda, bir kullanıcı <b>parasını ödemeden önce</b>
+engellenmiş tek bir bütçe aşımı vakası bulamadık."</div>
+<p>Düzeltmeler aynı gün geliyor — <b>ama fatura geldikten sonra.</b></p>
+</div>
+<div>
+<h3>Somut olaylar <span class="tag t">T</span></h3>
+<p><b>MAST-014</b> — tek bir gözlemci LLM çağrısında <b>2 milyon token</b>. Gözlemlenebilirlik
+katmanının kendisi maliyet amplifikatörü olmuş.</p>
+<p><b>MAST-004</b> — <code>TokenLimiter</code> döngü iterasyonu başına tetiklenmiyor.
+<b>Sınır var, yanlış yerde.</b></p>
+</div>
+</div>
+
+<h2><span class="n">03</span>Sektör ne yapıyor — 31 harness, kaynak kodundan <span class="tag k">K</span></h2>
+<div class="grid2">
+<div>
+<h3>Varsayılan sınırlar</h3>
+<table>
+<tr><th>Harness</th><th>Varsayılan</th></tr>
+<tr><td>smolagents</td><td><code>max_steps = 20</code></td></tr>
+<tr><td>LangGraph</td><td><code>recursion_limit = 25</code></td></tr>
+<tr><td>CrewAI</td><td><code>max_iter = 25</code></td></tr>
+<tr><td>pydantic-ai</td><td><code>request_limit = 50</code></td></tr>
+<tr><td>OpenHands</td><td><code>max_iteration_per_run = 500</code></td></tr>
+<tr><td><b>Google ADK <code>LoopAgent</code></b></td><td><b class="red"><code>max_iterations = None</code> → sınırsız</b></td></tr>
+</table>
+<div class="box fill"><span class="t">Doküman ≠ kod — Hermes, aynı dosyada</span>
+<code>init_agent(max_iterations=…)</code> gerçek varsayılan <b>sys.maxsize</b> <span class="mono">(:523)</span><br>
+aynı fonksiyonun docstring'i: <b>"default: 90"</b> <span class="mono">(:603)</span></div>
+</div>
+<div>
+<h3>Asıl bulgu</h3>
+<p class="big red">24 harness'ın 12'sinde mekanizma var — varsayılanda KAPALI</p>
+<table>
+<tr><td>Gemini CLI</td><td><code>maxSessionTurns ?? -1</code>, kontrol <code>&gt; 0</code> ile korunuyor <span class="mono">config.ts:1243</span></td></tr>
+<tr><td>Continue</td><td><code>depth &gt; 50</code> + <code>NODE_ENV==="test"</code> → üretimde hiç tetiklenmiyor</td></tr>
+<tr><td>OpenClaw</td><td><code>tools.loopDetection.enabled</code> = <b>false</b></td></tr>
+<tr><td>openclaude</td><td><b>sıfır</b> döngü tespiti; <code>maxTurns</code> optional, varsayılansız</td></tr>
+</table>
+<div class="box"><span class="t">"Var mı" yanlış soru → <b>"Varsayılanda açık mı?"</b></span>
+<b>İkinci kör nokta:</b> çoğu dedektör yalnız <b>ardışık</b> aynı çağrıyı sayıyor.<br>
+<code>A→A→A</code> yakalanıyor &nbsp;·&nbsp; <code class="red">A→B→A→B</code> hiçbir çağrı ardışık tekrarlamıyor.<br>
+İlk 22'lik taramada bunu yakalayan: <b>2 tane</b> (Gemini CLI k≤5, OpenHands k=2).</div>
+</div>
+</div>
+
+<div class="foot"><span>Agent Reliability — Loop Detection &amp; Task Budget</span><span>1 / 4</span></div>
+</section>
+
+<!-- ============ SAYFA 2 ============ -->
+<section class="page">
+<div class="hdr"><h1>17 Zihniyet <span class="sub">— basitten karmaşığa altı seviye</span></h1>
+<div class="meta">Ölçüt: ne kadar durum tutuyor · kaç kavram gerekiyor · sisteme nereden dokunuyor</div></div>
+
+<table style="margin-top:2mm">
+<tr><th style="width:9mm">#</th><th style="width:33mm">Zihniyet</th><th style="width:31mm">Kaynak</th>
+    <th>Ayırt edici mekanizma</th><th style="width:26mm">En zayıf yanı</th></tr>
+
+<tr><td colspan="5" style="border-bottom:none;padding-top:1.4mm"><span class="lvl">SEVİYE 1 · SAYAÇ</span>
+ &nbsp;<span style="color:#6b7280">Bir tamsayı. Durum yok, karşılaştırma yok. Yazması bir öğleden sonra · O(1)</span></td></tr>
+<tr><td class="n">1</td><td><b>Modele sorma, say</b><br><code>arize-control</code></td><td>Arize — Agent Control Loop</td>
+<td>5 durma koşulu + hiyerarşi; <b>adım limiti birincil</b> (modelin hiçbir sözüne bağlı değil).
+Her koşuma <b>durma sebebi etiketi</b>: <code>completed / max_steps / budget / timeout / error</code></td>
+<td>Ne olduğunu söylemez, sadece "çok oldu"</td></tr>
+<tr><td class="n">2</td><td><b>Seçeneksiz bırak</b><br><code>agentscope-grace</code></td><td>AgentScope</td>
+<td>Limit dolunca 5 turluk lütuf + <b><code>tool_choice</code> kilidi</b> — ajan yeni araç çağıramaz, yalnız cevap üretir</td>
+<td>Lütuf turları da para yakar</td></tr>
+<tr><td class="n">3</td><td><b>Uyarma bile</b><br><code>hermes-no-pressure</code></td><td>Hermes <span class="mono">agent_init.py:986</span></td>
+<td>Adım ekseninde <b>hiç ara uyarı yok.</b> Tükenmede tek mesaj + bir lütuf çağrısı + metin gelmezse zorla özet</td>
+<td>Ajan sona kadar bütçesini bilmez</td></tr>
+<tr><td class="n">4</td><td><b>Modele saatini göster</b><br><code>claude-advisory</code></td><td>Claude Task Budgets</td>
+<td>Prompt'a geri sayım; <b>tavsiye, zorlama değil</b> — model aşabilir. Amaç durdurmak değil <b>öngörülebilir iniş</b></td>
+<td>Bütçe yetersizse model işi hiç denemiyor</td></tr>
+
+<tr><td colspan="5" style="border-bottom:none;padding-top:1.4mm"><span class="lvl">SEVİYE 2 · PENCERE</span>
+ &nbsp;<span style="color:#6b7280">Son N adımı tut, karşılaştır. Bedeli: <b>"aynı şey" ne demek?</b></span></td></tr>
+<tr><td class="n">5</td><td><b>Çeşitliliği ölç</b><br><code>strands-entropy</code></td><td>Strands</td>
+<td>Tekrarı tanımlamaktan kaç: <code>len(set(pencere)) &lt; eşik</code>. <b>Tek kural, bütün desenler</b> — A-B-A-B dahil, k taraması gerekmiyor</td>
+<td>Meşru dar alan çalışması da düşük çeşitlilik</td></tr>
+<tr><td class="n">6</td><td><b>Aynı çağrıyı say</b><br><code>openhands-stuck</code></td><td>OpenHands <span class="mono">stuck_detector.py</span></td>
+<td>5 desen, eşikler <b>4/3/3/6</b>, pencere 20. Kimlik alanlarını bilerek atar.
+<b><code>STUCK</code> ayrı terminal durum</b> — ne başarı ne hata</td>
+<td>İmza normalizasyonu yanlışsa sessizce hiçbir şey bulmaz</td></tr>
+<tr><td class="n">7</td><td><b>Çözüm de sorun olabilir</b><br><code>openclaw-pingpong</code></td><td>OpenClaw 2026.7.1 <span class="tag k">K</span></td>
+<td><code>genericRepeat</code>/<code>knownPollNoProgress</code>/<code>pingPong</code>; kademe <b>10→20→30</b>;
+parmak izi = araç+arg+<b>sonuç</b>; <b>compaction sonrası 3 deneme koruması</b></td>
+<td>Varsayılanda kapalı; 160 run-retry sınırı çok gevşek</td></tr>
+<tr><td class="n">8</td><td><b>Hareket ≠ ilerleme</b><br><code>loopguard-dignity</code></td><td>Ne Zaman Durması Gerektiğini Bilen Ajanlar</td>
+<td>Eyleme değil <b>sonuca</b> bak: son 3 <code>state_hash</code> aynıysa dur. Araç başına retry.
+<b>Çekimser kalma = meşru sonuç</b> (<code>NEEDS_INPUT</code>). 4 alanlı durma raporu</td>
+<td>Hızlı+ucuz döngüler sınırlar dolmadan çok döner</td></tr>
+
+<tr><td colspan="5" style="border-bottom:none;padding-top:1.4mm"><span class="lvl">SEVİYE 3 · DÜNYA</span>
+ &nbsp;<span style="color:#6b7280">Davranışı bırak, <b>kanıta</b> geç. En tehlikeli hata döngü değil — <b>yanlış işi doğru sanmak</b></span></td></tr>
+<tr><td class="n">9</td><td><b>"Bitirdim" bir istektir</b><br><code>verify-gate</code></td><td>Loop Engineering</td>
+<td>Bitirme iddiası bir kapıya bağlı. Kapı açılmazsa <b>koşum bitmez</b> — doğrulama sonucu gözleme geri döner, ajan kendi hatasını düzeltir</td>
+<td>Ajan hiç "bitirdim" demezse kapı hiç açılmaz</td></tr>
+<tr><td class="n">10</td><td><b>Suç araçta olabilir</b><br><code>galileo-breaker</code></td><td>Galileo AI</td>
+<td>Sayı değil <b>oran</b>: aracın son çağrılarının yüzde kaçı hata verdi. Devre kesici <b>araç başına</b></td>
+<td>Kalıcı bozuk araçla geçici hatayı ayırt etmesi eşiğe bağlı</td></tr>
+<tr><td class="n">11</td><td><b>Doları say</b><br><code>agentbudget-dollar</code></td><td>AgentBudget</td>
+<td><b>Nihai cevap payı</b> (sert limit erken tetiklenir, ajan toparlayabilir) · iç içe alt bütçe ·
+<b>zaman pencereli</b> tespit ("dakikada 10 çağrı") · <code>terminated_by</code></td>
+<td>Fiyat tablosu bakım gerektirir</td></tr>
+
+<tr><td colspan="5" style="border-bottom:none;padding-top:1.4mm"><span class="lvl">SEVİYE 4 · ŞEKİL</span>
+ &nbsp;<span style="color:#6b7280">Tespiti bırak, mimariyi değiştir. Mevcut ajana <b>sonradan eklenemez</b></span></td></tr>
+<tr><td class="n">12</td><td><b>Serbestliği kısıtla</b><br><code>modexa-statemachine</code></td><td>Modexa</td>
+<td>ANLA→TOPLA→EYLEM→DOĞRULA→YANIT→DEVRET, yalnız izinli geçiş. <b><code>DOĞRULA→TOPLA</code> yok.</b>
+5 basamaklı geri dönüş merdiveni; "kullanıcıya sor" birinci sınıf sonuç</td>
+<td>Öngörülemez işler makineye sığmaz</td></tr>
+<tr><td class="n">13</td><td><b>Koşmadan yakala</b><br><code>autogen-static</code></td><td>AutoGen <code>GraphFlow</code></td>
+<td>Graf doğrulamasında <code>Cycle detected without exit condition</code> → sistem <b>hiç başlamaz</b>.
+Çalışma zamanında 0 maliyet, 0 yanlış pozitif</td>
+<td>Yalnız <b>yapısal</b> döngü; model içi takılmayı görmez</td></tr>
+
+<tr><td colspan="5" style="border-bottom:none;padding-top:1.4mm"><span class="lvl">SEVİYE 5 · KADEME</span>
+ &nbsp;<span style="color:#6b7280">Çok sinyal + basamaklı müdahale + geri alma. <b>Durum makinesi artık dedektörün içinde</b></span></td></tr>
+<tr><td class="n">14</td><td><b>Kural koy, ihlali söyle, geri sar</b><br><code>telemetry-repair</code></td><td>Real-Time Detection and Repair <span class="tag t">T</span></td>
+<td>3 deterministik kontrol + checkpoint'e geri sarma. Onarım mesajı <b>"hangi kontrol düştü"</b></td>
+<td>Checkpoint tutmak mimariye ciddi yük; <b>döngüde onarım işe yaramıyor</b></td></tr>
+<tr><td class="n">15</td><td><b>Altı ucuz sinyal</b><br><code>pi-signature</code></td><td>pi-anti-doom-loop</td>
+<td><b>≥%55 kelime örtüşmesi</b> ile yakın-benzer metin — gömme modeli yok, sadece kelime sayma.
+Metin: yönlendir→kes · Araç: engelle→sebep→turu bitir</td>
+<td>Altı sinyal × ayrı eşik × iki merdiven — yanlış uygulanırsa sessizce ölür</td></tr>
+
+<tr><td colspan="5" style="border-bottom:none;padding-top:1.4mm"><span class="lvl">SEVİYE 6 · KARAR</span>
+ &nbsp;<span style="color:#6b7280">"Ne zaman dur" yanlış soru</span></td></tr>
+<tr><td class="n">16</td><td><b>Tavan değil, tahsis</b><br><code>voi-allocation</code></td><td>Inference-Time Budget Control <span class="tag t">T</span></td>
+<td><b>Birim bütçe başına fayda.</b> Çift bütçe (araç + token).
+Baskı <b>en kritik eksene</b> göre: <code>ρ = 1 − min(…)</code>. Erken cevabı engelleyen guard'lar</td>
+<td>Döngünün <b>içine</b> girer — yanlış ayarlanırsa ajanı bozar. Bol bütçede kazanç erir</td></tr>
+<tr><td class="n">17</td><td><b>Eşiği ölç</b><br><code>improvement-loop</code></td><td>OpenAI cookbook + 2 kaynak</td>
+<td>Müdahale yok, sadece iz. Tavanı <b>başarılı koşum dağılımından</b> (p99). Eşikler prompt'la
+<b>birlikte sürümlensin</b>, terfi kapısından geçsin</td>
+<td>Bu koşumu kurtarmaz; veri birikmesini bekler</td></tr>
+</table>
+
+<div class="box fill" style="margin-top:2mm"><span class="t">Hiçbirinin çözemediği bir döngü sebebi — Modexa</span>
+Ajanın <b>"yanlış yapmamak" üzerine optimize edilmesi.</b> Aşırı tedbir teşvik eden bir prompt, en güvenli yolu
+"bir kez daha doğrula" yapıyor. Ajan bozuk değil — <b>tam da söylendiği gibi davranıyor.</b>
+<i>"Bir sorun çözücü inşa etmediniz. Bir riskten kaçınma makinesi inşa ettiniz."</i>
+→ Kaynağı kod değil <b>prompt</b>; 17 mekanizmanın hiçbiri çözmüyor, hepsi ancak sonucu kesiyor.</div>
+
+<div class="foot"><span>17 zihniyet · 6 seviye</span><span>2 / 4</span></div>
+</section>
+
+<!-- ============ SAYFA 3 ============ -->
+<section class="page">
+<div class="hdr"><h1>Alıntılanabilir Sayılar <span class="sub">— ve üç karşıtlık</span></h1>
+<div class="meta">Her sayının kaynağı ve doğrulama etiketi var</div></div>
+
+<h2><span class="n">04</span>Sunumda söylenecek sayılar</h2>
+<table>
+<tr><th style="width:38mm">Sayı</th><th>Ne diyor</th><th style="width:44mm">Kaynak</th></tr>
+<tr><td><span class="big red">%96</span> / <b>0 yanlış pozitif</b></td>
+<td>3 deterministik kural (toplam tutarlılığı · gerekli araç kapsaması · araç sözleşmesi) hataların %96'sını yakalıyor,
+<b>0/63 yanlış alarm.</b> Eğitilmiş istatistiksel monitör: <b>%54 / 11-63 = %17.</b>
+<b>Basit olan, karmaşık olanı hem yakalamada hem yanlış alarmda yeniyor.</b></td>
+<td>Real-Time Detection and Repair <span class="tag t">T</span></td></tr>
+
+<tr><td><span class="big red">%45</span> vs %36</td>
+<td>Onarımda ajana <b>"hangi kontrol düştü"</b> demek (%45), <b>doğru cevabı vermekten</b> (%36) iyi.
+Hiçbir şey demeden yeniden dene: %16. → Cevabı verince ajan kopyalar, <b>neden</b> yanıldığını anlamaz.</td>
+<td>aynı kaynak <span class="tag t">T</span></td></tr>
+
+<tr><td><b>F1</b> <span class="big">0,63 → 0,43</span></td>
+<td>Bütçe-bağımlı ceza bileşeni çıkarılınca performans <b>her</b> veri setinde düşüyor.
+Ana sonuç "puanlama kullandık" değil — <b>kalan bütçeyi eylem seçimine açıkça katmak.</b></td>
+<td>Inference-Time Budget Control <span class="tag t">T</span></td></tr>
+
+<tr><td><b>20,91 → 15,23 sn</b> <span class="red">(−%27,2)</span></td>
+<td>Kontrolcü <b>ek hesap katmanı olmasına rağmen</b> süreyi düşürüyor — önlenen aramaların ağ gecikmesi,
+puanlama maliyetinden onlarca kat büyük. <b>"Kontrol yavaşlatır" itirazının cevabı.</b></td>
+<td>aynı kaynak <span class="tag t">T</span></td></tr>
+
+<tr><td><b>$2,45</b> vs <b>$134,50</b> <span class="red">≈55×</span><br><b>36 koşumun 21'i</b></td>
+<td>Warming (GPT-4) %93,2 doğruluk / $2,45 · LATS (GPT-4) %88,0 / $134,50 — <b>pahalı arama, eşit ya da
+daha kötü doğruluk.</b> Ve daha yüksek "reasoning effort" 36 koşumun 21'inde doğruluğu <b>artırmıyor.</b>
+<b>Bütçeyi büyütmek çözüm değil.</b></td>
+<td>AI Agents That Matter <span class="tag t">T</span><br>Holistic Agent Leaderboard <span class="tag t">T</span></td></tr>
+</table>
+
+<h2><span class="n">05</span>Üç karşıtlık — sunumun en öğretici kısmı</h2>
+<div class="grid3">
+<div class="box"><span class="t">Uyar mı, uyarma mı?</span>
+<b>Claude:</b> modele geri sayımı göster, kendini ayarlasın.<br>
+<b>Hermes</b> <span class="mono">agent_init.py:986</span> — denedi, <b>kaldırdı</b>:
+<i>"Ara basınç uyarıları yok — modelleri karmaşık görevlerde erken pes ettiriyordu."</i><br><br>
+Ama aynı sistem <b>süre</b> ekseninde %80'de uyarıyor.<br>
+<b>→ Eksene göre karar ver.</b> Adımda uyarma, sürede uyar.</div>
+
+<div class="box"><span class="t">Tavan mı, tahsis mi?</span>
+<b>16 strateji:</b> "ne zaman dur?" — tavana kadar ajan ne yaparsa yapsın.<br>
+<b>voi-allocation:</b> "parayı nereye harca?" — aynı bütçeyle daha iyi sonuç.<br><br>
+<b>→ İkisi de gerekli.</b> Tahsis tavana kadarki yolu verimli kullanır; tavan, tahsis yanılırsa keser.</div>
+
+<div class="box"><span class="t">Guardrail mi, mimari mi?</span>
+<b>17 zihniyet:</b> model döngüde, biz sınırlıyoruz.<br>
+<b>OpenAdapt</b> reddediyor: görevi bir kez göster, <b>deterministik programa derle</b>.<br>
+<i>"Sağlıklı koşumlar hiçbir üretken model çağrısı yapmaz."</i><br><br>
+<b>→ Döngüde model yoksa döngü de yok.</b> Bedeli: yalnız tekrarlanan işler.</div>
+</div>
+
+<h2><span class="n">06</span>PoC — <code>cua_lab</code> · 8/17 zihniyet kodda, seçilebilir <span class="tag m">M</span></h2>
+<div class="grid2">
+<div>
+<p>Bağımlılık yok · API anahtarı yok · <b>46 test</b>. <code>--strategy a,b</code> ile üst üste konabiliyor.
+Hata <b>modelde değil ortamda</b>: 5 senaryo × 5 model.</p>
+<pre style="font-size:6.1pt;line-height:1.26">senaryo: dead_button   model: stubborn
+strateji            durum              sebep               adim   token      $
+none                CEILING            hard_ceiling         300  105000  1.050
+openhands-stuck     STUCK              cycle_k2               3    1050  0.011
+strands-entropy     STUCK              low_diversity          6    2100  0.021
+loopguard-dignity   NEEDS_INPUT        abstain_need_input     7    2450  0.025
+agentbudget-dollar  BUDGET_EXHAUSTED   budget_steps          12    3850  0.038
+arize-control       BUDGET_EXHAUSTED   max_steps             13    4200  0.042
+galileo-breaker     CEILING            hard_ceiling         300  105000  1.050  &lt;- kor nokta
+verify-gate         CEILING            hard_ceiling         300  105000  1.050  &lt;- kor nokta</pre>
+<p><b>Sekiz zihniyet, sekiz farklı sonuç.</b> Son iki satır kasıtlı: <code>galileo-breaker</code>
+hata oranına bakar, bu senaryoda hata yok; <code>verify-gate</code> bitirme iddiası bekler, ajan
+hiç "bitirdim" demez. <b>Kör noktalar tabloda görünüyor</b> — "tek katman yetmez"in kanıtı.</p>
+<pre>her zihniyetin kendi yakaladigi senaryo
+broken_tool + patient      galileo-breaker  DEGRADED  tool_circuit_open
+healthy     + liar         verify-gate      DEGRADED  verify_failed
+dead_button + alternating  strands-entropy  STUCK     low_diversity  (A-B-A-B)
+
+KONTROL — healthy / flaky / silent_success: 8 sutunun 8'i de none ile
+          BIREBIR AYNI (ayni adim, ayni token). 46 test kilitliyor.</pre>
+<p></div>
+<div>
+<h3>PoC'nin öğrettiği üç şey</h3>
+<div class="box fill"><b>1 · İki mekanizma birbirini maskeliyor.</b>
+<code>max_replans=3</code> retry döngüsünü dedektörden <b>önce</b> yakaladı. Koşum doğru durdu,
+<b>teşhis kayboldu.</b> → Bütçe <i>bir şeyin</i>, döngü tespiti <i>neyin</i> yanlış gittiğini söyler.</div>
+<div class="box fill"><b>2 · Gevşek sinyal sıkıyı gizliyor.</b>
+"İlerleme yok" dönüşümlü döngüyü "ilerleme yok" diye raporladı — doğru ama işe yaramaz teşhis.
+→ En gevşek sinyalin eşiği <b>en yüksek</b> olmalı, <b>en son</b> tetiklenmeli.</div>
+<div class="box fill"><b>3 · Kaynağın sayıları taşınmıyor.</b>
+<code>loopguard</code>'ın <code>no_progress=3</code> · <code>retries=2</code> eşikleri <code>flaky</code>
+izinde meşru koşumu <b>başarıdan bir adım önce</b> kesiyor (ölçülmüş değerimiz 8). Ayrıca
+<code>dict[araç,int]</code> metin ajanı varsayıyor — computer use'da <code>left_click</code> işin %90'ı.
+→ <b>Zihniyet doğru, sayılar başka alandan.</b></div>
+</div>
+</div>
+
+<h2 style="margin-top:2.4mm"><span class="n">10</span>Canlı demo — kopyala-yapıştır</h2>
+<div class="grid2">
+<div>
+<pre style="font-size:5.9pt;line-height:1.26">cd reliability_study/cua_lab      # komutlarin onune: python3 -m
+# model: stubborn = sikisan (varsayilan) | patient = cozen
+
+# kontrolsuz -> 300 adim, tavana carpiyor
+cua_lab.cli run --strategy none --scenario dead_button
+# dedektor acik -> 3 adimda duruyor
+cua_lab.cli run --strategy openhands-stuck --scenario dead_button
+# yan yana tablo  (sunumun ana ciktisi)
+cua_lab.cli compare --scenario dead_button --strategies all
+# verify-gate: yapmadan "bitirdim" diyeni yakalar
+cua_lab.cli compare --scenario healthy --model liar --strategies none,verify-gate
+# ust uste koyma
+cua_lab.cli run --strategy verify-gate,arize-control --model liar
+# KONTROL: butun sutunlar birebir ayni olmali
+cua_lab.cli compare --scenario flaky --strategies all --model patient
+cua_lab.cli replay &lt;trace.jsonl&gt;      # izi adim adim oynat</pre>
+</div>
+<div>
+<h3>Demo sırasında söylenecekler</h3>
+<ul class="tight">
+<li><b>1'de:</b> "Anthropic'in referans döngüsü. 300'de duruyor çünkü demo güvenliği için
+tavan koydum — <b>gerçek üretimde o tavan da yok.</b>"</li>
+<li><b>2'de:</b> "Aynı model, aynı bozuk ortam. Tek fark bir dedektör. <b>3 adım, 1 sent.</b>"</li>
+<li><b>4'te — asıl gösterilecek:</b> "Meşru retry. İki sütun <b>birebir aynı</b> — guardrail
+çalışan koşuma tek token bindirmiyor. <b>Dedektörün ikinci sınavı budur.</b>"</li>
+</ul>
+<p style="margin-top:1.2mm;font-size:7pt"><b>Senaryolar:</b> <code>dead_button</code> ·
+<code>broken_tool</code> · <code>flaky</code> · <code>silent_success</code> · <code>healthy</code> &nbsp;
+<b>Modeller:</b> <code>stubborn</code> · <code>alternating</code> (A-B-A-B) · <code>liar</code> ·
+<code>patient</code> · <code>solver</code></p>
+</div>
+
+<div class="foot"><span>Sayılar · karşıtlıklar · PoC · demo</span><span>3 / 4</span></div>
+</section>
+
+<!-- ============ SAYFA 4 ============ -->
+<section class="page">
+<div class="hdr"><h1>Entegrasyon &amp; Savunma <span class="sub">— gereklilikler, itirazlar, kaynak künyesi</span></h1>
+<div class="meta">Slayt 32 karşılığı</div></div>
+
+<h2><span class="n">07</span>Entegrasyon gereklilikleri</h2>
+<div class="grid2">
+<div>
+<h3>Zorunlu — bunlar olmadan hiçbiri çalışmaz</h3>
+<ol>
+<li><b>İterasyon başına span.</b> Bütün koşum tek span'sa 4–19. adımların aynı çağrı olduğunu göremezsin.
+Loop detection her şeyden önce bir <b>gözlemlenebilirlik</b> gereksinimi.</li>
+<li><b>İmza normalizasyonu.</b> Hangi alanlar her turda değişiyor, hangileri anlam taşıyor — envanteri
+çıkarılmalı. Sisteme özel; kütüphane halletmiyor. <b>Yanlış yaparsan sessizce çalışmayan dedektör.</b></li>
+<li><b>Terminal durum ayrımı.</b> <code>completed / max_steps / budget / timeout / error / stuck</code>
+ayrı ayrı — tek başarı oranına karışmadan.</li>
+<li><b>Çok eksenli sayaç.</b> Adım · replan · token · süre · dolar. Tek eksen diğerlerini gizler.</li>
+<li><b>Nihai cevap payı.</b> Sert limit biraz erken tetiklensin ki ajan elindekini toparlasın.</li>
+</ol>
+<h3>Tavsiye edilen</h3>
+<ol start="6">
+<li>Kapatma anahtarı olsun ama <b>varsayılan AÇIK</b> — 12/24 harness'ın yaptığı hata.</li>
+<li>Eşikler prompt'la <b>birlikte sürümlensin</b>, terfi kapısından geçsin.</li>
+<li>Yanlış pozitif için <b>ayrı kontrol koşumları</b> — CI'da, "tetiklenmemeli" testleri.</li>
+</ol>
+</div>
+<div>
+<h3>Nereden başlanmalı</h3>
+<div class="box"><p class="big" style="margin:0 0 1mm">1 → 6 → 2</p>
+<b>1 · Sayaç</b> — bir öğleden sonra. Sert durdurma + durma sebebi kaydı.<br>
+<b>6 · Ölç</b> — izleri topla, eşikleri dağılımdan çıkar (p99).<br>
+<b>2 · Pencere</b> — dedektörleri <b>ölçülmüş eşiklerle</b> yaz.<br><br>
+<i>Eşiği ölçmeden pencere yazmak, hangi sayıyı yazacağını bilmeden yazmak demek.</i></div>
+
+<h3>Dezavantajlar — dürüst liste</h3>
+<ul class="tight">
+<li><b>Yanlış pozitif gerçek maliyet.</b> Meşru toplu işlem döngü sayılabilir.</li>
+<li><b>Sessizce ölebiliyorlar</b> — ve <b>testleri geçerler</b>, çünkü testler "yakaladı mı" diye bakar.</li>
+<li><b>Eşikler tahmin.</b> Dar limit grafikte "model kötüleşti" gibi görünür.</li>
+<li><b>Birbirlerini maskeliyorlar.</b> Sıralama ve eşik dengesi tasarım işi.</li>
+<li><b>Kapsam sınırlı.</b> Doğrulama kapısı ajan bitirmezse sessiz; statik analiz model içi takılmayı görmez; tahsis bol bütçede erir.</li>
+<li><b>Uyarı geri tepebilir</b> — adım ekseninde ölçülmüş.</li>
+<li><b>Prompt kaynaklı döngüyü hiçbiri çözmüyor.</b></li>
+</ul>
+</div>
+</div>
+
+<h2><span class="n">08</span>Beklenen sorular — hazır cevaplar</h2>
+<div class="grid2">
+<div>
+<p><b>"Hepsini uygulamak gerekiyor mu?"</b> Hayır. Seviye 1 tek başına vakaların çoğunu durduruyor —
+ama <i>neden</i> durduğunu söylemiyor. Kaç katman, teşhis ihtiyacına bağlı.</p>
+<p><b>"Gerçek modelle test ettin mi?"</b> Hayır — bilinçli. Kontrol mekanizmasını göstermek için girdi
+<b>deterministik</b> olmalı. Gerçek LLM'le aynı döngüler çıkar ama her koşumda farklı, üstelik para yakar.
+HF Inference bağlantısı son fazda.</p>
+<p><b>"Eşikleri nereden aldın?"</b> Kaynaklardan (OpenHands 4/3/3/6, OpenClaw 10/20/30). <b>Tahmin olduğunu
+kabul ediyorum</b> — 17 numara tam olarak bunun eleştirisi. Doğrusu kendi dağılımından çıkarmak.</p>
+</div>
+<div>
+<p><b>"Yanlış pozitif riski?"</b> Ölçtüğüm kadarıyla kontrol senaryolarında sıfır — ama iki senaryo gerçek
+çeşitlilik değil. Literatürden: deterministik kontroller <b>0/63</b>, istatistiksel <b>%17</b>.
+Deterministik tercih etme gerekçem bu.</p>
+<p><b>"Ne kadar iş?"</b> Seviye 1 bir öğleden sonra. En büyük kalem <b>gözlemlenebilirlik</b>
+(iterasyon başına span) — mevcut loglama şemasına dokunuyor. Dedektörlerin kendisi birkaç yüz satır.</p>
+<p><b>"IAL-SCAN / statik analiz neden yok?"</b> O çalışma dağıtımdan <b>önce</b> kodu okuyor — CI'a giren
+bir şey. Bizim ihtiyacımız çalışma anı. Ondan alınan tek şey <b>soru biçimi</b>: "döngü var mı" değil,
+<i>"ajanik bir geri besleme yolu, maliyetli bir işlemi etkili bir sınır olmadan tekrar tekrar çalıştırabilir mi?"</i></p>
+</div>
+</div>
+
+<h2><span class="n">09</span>Kaynak künyesi — her sayının nereden geldiği</h2>
+<table style="font-size:6.5pt">
+<tr><th style="width:52mm">Sayı / iddia</th><th>Kaynak</th><th style="width:16mm">Etiket</th></tr>
+<tr><td>%15,7 · %12,4 (adım tekrarı, durma koşulu)</td><td><i>Why Do Multi-Agent LLM Systems Fail?</i> — 1642 iz, 7 framework</td><td><span class="tag t">T</span> tam metin</td></tr>
+<tr><td>63 olay · "ödemeden önce engellenmiş tek vaka yok"</td><td><i>Token Budgets: An Empirical Catalog</i> — 21 framework, κ=0,837</td><td><span class="tag t">T</span> kısmi</td></tr>
+<tr><td><code>while True</code>, sayaç yok</td><td><code>anthropics/claude-quickstarts</code> → <code>computer_use_demo/loop.py</code></td><td><span class="tag k">K</span> kod</td></tr>
+<tr><td><code>maxSessionTurns ?? -1</code></td><td>Gemini CLI <code>packages/core/src/config/config.ts:1243</code></td><td><span class="tag k">K</span> kendim</td></tr>
+<tr><td><code>depth &gt; 50</code> + <code>NODE_ENV==="test"</code></td><td>Continue <code>gui/src/redux/thunks/streamNormalInput.ts:80</code></td><td><span class="tag k">K</span> kendim</td></tr>
+<tr><td><code>loopDetection.enabled = false</code> · 10/20/30</td><td>openclaw 2026.7.1-2 — bu makinedeki kurulum</td><td><span class="tag k">K</span> yerel</td></tr>
+<tr><td><code>max_iterations = None</code> (sınırsız)</td><td>Google ADK <code>LoopAgent</code></td><td><span class="tag k">K</span> kod</td></tr>
+<tr><td>4/3/3/6, pencere 20, <code>STUCK</code> terminal</td><td>OpenHands <code>software-agent-sdk</code> → <code>stuck_detector.py</code></td><td><span class="tag k">K</span> kod</td></tr>
+<tr><td>"erken pes ettiriyordu" · <code>sys.maxsize</code> vs docstring "90"</td><td>Hermes <code>agent_init.py:986–991</code> · <code>:523</code> / <code>:603</code></td><td><span class="tag k">K</span> birebir</td></tr>
+<tr><td>%16 / %36 / %36 / %45 · %96-0FP vs %54-%17</td><td><i>Real-Time Detection and Repair of LLM Agent Failures</i></td><td><span class="tag t">T</span> tam metin</td></tr>
+<tr><td>F1 0,63→0,43 · 20,91→15,23 sn</td><td><i>Inference-Time Budget Control for LLM Search Agents</i></td><td><span class="tag t">T</span> tam metin</td></tr>
+<tr><td>$2,45 vs $134,50 (≈55×) · 36 koşumun 21'i</td><td><i>AI Agents That Matter</i> · <i>Holistic Agent Leaderboard</i></td><td><span class="tag t">T</span> tam metin</td></tr>
+<tr><td>300/105000/$1,050 vs 3/1050/$0,011 · kontrol birebir</td><td><code>cua_lab</code> — kendi koşumum, tekrarlanabilir</td><td><span class="tag m">M</span> ölçüldü</td></tr>
+</table>
+
+<div class="box fill" style="margin-top:2mm"><span class="t">Kapanış — tek cümle</span>
+Model döngüyü kesemez; <b>kesme kararı için gereken bilgi onun görüş alanında değil.</b>
+Kesme yetkisi dışarıda olmalı — ve dışarısı <b>ne olduğunu da söyleyebilmeli.</b><br><br>
+<i>"Her ajan döngüsünün <b>tasarlanmış bir çıkışı</b> olmalıdır — başarı, geri dönüş, sorma veya devretme.
+'Sonsuza kadar dene' değil. 'Umarım model çözer' değil."</i> &nbsp;— Modexa</div>
+
+<div class="foot"><span>Kaynaklar: <code>sources_list/</code> · <code>cua_lab/docs/</code> · <code>sunum_metni.md</code></span><span>4 / 4</span></div>
+</section>
+</body></html>

@@ -1,0 +1,5 @@
+# Ajanın kısıtlı kabuğunun çalışma dizini — koşum artıkları, kod değil
+agentcli/agentcli-calisma/
+# Koşum izleri
+*.jsonl
+traces/
