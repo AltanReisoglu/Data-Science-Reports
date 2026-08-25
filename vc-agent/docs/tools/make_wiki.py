@@ -12,18 +12,33 @@ okuyucusu farklı: **arayarak geliyor.** Bir soruyla açıyor, cevabı alıp
 kapatıyor, ve büyük ihtimalle bir daha açmıyor. Yirmi dosyaya bölünmüş bir
 wiki'de o kişi doğru dosyayı bulamıyor; tek dosyada `Ctrl+F` yetiyor.
 
-### Neden gömülü SVG, neden ayrıca .excalidraw
+### Neden bağlı .svg, neden ayrıca .excalidraw
 
 Markdown `.excalidraw` dosyasını **render etmiyor** — Confluence de, GitHub de,
 Obsidian'ın çoğu kurulumu da. Bir wiki'de görünmeyen şema, olmayan şemadır.
-O yüzden çizimler `<svg>` olarak gömülü: her yerde açılıyor, dış dosyaya
-bağımlı değil, ve elle çizilmiş görünüyor — çünkü bu bir düşünme aracı, bitmiş
-bir ürün değil.
 
-Ama gömülü SVG **düzenlenemiyor.** Birinin bir kutuyu değiştirmesi gerektiğinde
+Şemalar bir süre `<svg>` olarak **gömülüydü** ve GitHub'da bozuldu: GitHub'ın
+markdown temizleyicisi `svg`/`path`/`text` etiketlerini beyaz listesinde
+tutmuyor, etiketleri atıp içlerindeki metin düğümlerini bırakıyor. Şemanın
+yerinde yapışık bir etiket duvarı kalıyordu ("autogen_extdış dünyamodel
+istemcileri…"). Hata da vermiyor — sessizce bozuluyor.
+
+O yüzden çizimler artık ayrı `.svg` dosyaları ve `<img>` ile bağlanıyorlar:
+`img` üç motorda da beyaz listede, relative yoldaki SVG GitHub'da render
+ediliyor. Dosyalar `viewBox`'a bağlı olduğu için ölçek de korunuyor.
+
+İki şey standalone dosyada gömülüde olmayan biçimde gerekiyor ve
+`standalone_svg()` ikisini de ekliyor: `xmlns` (dosya olarak açıldığında
+zorunlu, HTML içine gömülüyken değil) ve opak bir zemin dikdörtgeni — zemin
+saydam bırakılırsa GitHub'ın koyu temasında koyu metin koyu üstüne düşüyor.
+
+Ama SVG **düzenlenemiyor.** Birinin bir kutuyu değiştirmesi gerektiğinde
 kaynağa ihtiyacı var. O yüzden aynı şemalar `.excalidraw` olarak da yazılıyor
 ve wiki her şemanın altından onlara bağ veriyor: okumak için SVG, değiştirmek
 için Excalidraw.
+
+Not: `.svg` ve `.excalidraw` dosyalarının ikisi de **depoya girmek zorunda.**
+Bağlanan ama commit edilmemiş dosya GitHub'da kırık resim demek.
 
 Şemalar `docs/diagrams/figures.py`'den geliyor — desteyle **aynı** çizimler.
 Wiki'ye ayrı şema çizmek, aynı sistem hakkında iki ayrı resim demekti ve
@@ -33,6 +48,7 @@ ikisinden biri eskirdi.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -53,16 +69,46 @@ WIKIS: list[tuple[str, str]] = [
 ]
 
 
-def svg(name: str, caption: str) -> str:
-    """Bir şemayı gömülü SVG olarak yaz, altına kaynak bağını koy.
+def natural_size(body: str) -> tuple[float, float]:
+    """`viewBox`'tan doğal ölçü. Şemanın oranı tek yerde yazılı: çizimin kendisinde."""
+    m = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', body)
+    return (float(m.group(1)), float(m.group(2))) if m else (600.0, 300.0)
 
-    Genişlik `100%` DEĞİL: bazı wiki motorları `<svg>`'yi blok yapmıyor ve
-    şema paragrafın içine biniyor. `viewBox` zaten oranı taşıyor.
+
+def standalone_svg(name: str) -> str:
+    """Gömülü parçayı kendi başına açılabilen bir `.svg` dosyasına çevir.
+
+    İki ekleme, ikisi de yalnız dosya olarak gerekiyor:
+
+    `xmlns` — HTML içine gömülüyken tarayıcı ad alanını zaten SVG sayıyor,
+    dosya olarak açıldığında saymıyor ve hiçbir şey çizilmiyor.
+
+    Zemin dikdörtgeni — çizimin metni koyu (`#1e1e1e`). Zemin saydam kalırsa
+    GitHub'ın koyu temasında `<img>` koyu zemine düşüyor ve yazı okunmuyor.
     """
     body = getattr(figures, name)()
+    w, h = natural_size(body)
+    return body.replace(
+        "<svg ",
+        '<svg xmlns="http://www.w3.org/2000/svg" ', 1,
+    ).replace(
+        ">", f'><rect width="{w}" height="{h}" fill="#ffffff"/>', 1,
+    )
+
+
+def svg(name: str, caption: str) -> str:
+    """Bir şemayı bağlı `.svg` olarak yaz, altına düzenlenebilir kaynağın bağını koy.
+
+    Genişlik `100%` DEĞİL: bazı wiki motorları resmi blok yapmıyor ve şema
+    paragrafın içine biniyor. Doğal genişlik `viewBox`'tan geliyor; yükseklik
+    verilmiyor ki dar ekranda oran bozulmadan küçülsün.
+    """
+    w, _ = natural_size(getattr(figures, name)())
     link = f"diagrams/wiki/{name}.excalidraw"
     return (
-        f'<div align="center">\n{body}\n</div>\n\n'
+        f'<p align="center">'
+        f'<img src="diagrams/wiki/{name}.svg" alt="{caption}" width="{w:.0f}">'
+        f"</p>\n\n"
         f"<sub>▲ {caption} · düzenlemek için: [`{name}.excalidraw`]({link}) "
         f"→ excalidraw.com'a sürükle</sub>\n"
     )
@@ -81,14 +127,12 @@ def scene_from_svg(name: str) -> dict:
     """
     import base64
 
-    body = getattr(figures, name)()
+    # Sahnedeki resim de standalone: Excalidraw dosyayı kendi başına açıyor,
+    # yani gömülü parçanın `xmlns`'siz hâli burada da çizilmiyordu.
+    body = standalone_svg(name)
     data = base64.b64encode(body.encode("utf-8")).decode("ascii")
     fid = f"fig-{name}"
-    # viewBox'tan doğal ölçü; sahne o oranda açılsın.
-    import re
-
-    m = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', body)
-    w, h = (float(m.group(1)), float(m.group(2))) if m else (600.0, 300.0)
+    w, h = natural_size(body)
     return {
         "type": "excalidraw",
         "version": 2,
@@ -123,8 +167,6 @@ def anchors(text: str) -> str:
     metnine değil **sırasına** bağlanıyor: başlık yeniden yazıldığında da bağ
     kırılmıyor.
     """
-    import re
-
     n = 0
     out = []
     for line in text.split("\n"):
@@ -568,10 +610,13 @@ if __name__ == "__main__":
                 names.append(n)
 
     SCENES.mkdir(parents=True, exist_ok=True)
-    for stale in SCENES.glob("*.excalidraw"):
-        if stale.stem not in names:
-            stale.unlink()          # artık bağlanmayan sahne kalmasın
+    for pattern in ("*.excalidraw", "*.svg"):
+        for stale in SCENES.glob(pattern):
+            if stale.stem not in names:
+                stale.unlink()      # artık bağlanmayan şema kalmasın
     for name in names:
+        # Okunan dosya ve düzenlenen dosya, ikisi de aynı `figures.py`'den.
+        (SCENES / f"{name}.svg").write_text(standalone_svg(name), encoding="utf-8")
         (SCENES / f"{name}.excalidraw").write_text(
             json.dumps(scene_from_svg(name), ensure_ascii=False), encoding="utf-8")
 
@@ -579,8 +624,11 @@ if __name__ == "__main__":
         text = texts[filename]
         text = anchors(text)
         (ROOT / filename).write_text(text, encoding="utf-8")
-        embedded, linked = text.count("<svg"), len(used_figures(text))
-        assert embedded == linked, f"{filename}: {embedded} svg, {linked} bağ"
+        shown, linked = text.count("<img src="), len(used_figures(text))
+        assert shown == linked, f"{filename}: {shown} resim, {linked} bağ"
+        # Gömülü SVG geri sızmasın: GitHub `<svg>`'yi temizliyor ve şema
+        # sessizce bir metin duvarına dönüşüyor.
+        assert "<svg" not in text, f"{filename}: gömülü <svg> GitHub'da bozulur"
         print(f"{filename:26s} {len(text.splitlines()):>4} satır  "
-              f"{embedded:>2} şema  {len(text)/1024:>4.0f} KB")
-    print(f"{'diagrams/wiki':26s} {len(names):>4} .excalidraw (hepsi bağlı)")
+              f"{shown:>2} şema  {len(text)/1024:>4.0f} KB")
+    print(f"{'diagrams/wiki':26s} {len(names):>4} .svg + .excalidraw (hepsi bağlı)")
