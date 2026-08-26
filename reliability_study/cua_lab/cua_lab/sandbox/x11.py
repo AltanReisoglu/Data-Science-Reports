@@ -106,6 +106,23 @@ class X11Sandbox:
         """Yakalanacak genişlik — HUD panelinin solunda kesiliyor."""
         return max(320, self.width - self.hud_width)
 
+    @property
+    def olcek(self) -> float:
+        """MODEL uzayı → GERÇEK ekran çarpanı.
+
+        `frame()` görüntüyü `shrink` genişliğine indiriyor; model o küçük
+        görüntüye bakıp koordinat veriyor. Gerçek ekrana basmadan önce bu
+        çarpanla büyütmek ZORUNLU.
+
+        Ölçüldü: bu uygulanmadığında model 1280x720 karede ekranın altındaki
+        başlatıcıya nişan aldı, tık 1920x1080 ekranda y=690'a — yani ortaya —
+        düştü. Hiçbir şey olmadı, model tekrar denedi, koşum 14 adım boyunca
+        aynı iki noktaya tıklayıp bütçeden düştü.
+        """
+        if not self.arac.pil or self.capture_w <= self.shrink:
+            return 1.0
+        return self.capture_w / self.shrink
+
     def start(self) -> None:
         self.width, self.height = self._ekran_boyutu()
         self._bildir("baslat", f"{self.display} · {self.width}x{self.height} · "
@@ -242,7 +259,7 @@ class X11Sandbox:
         im = Image.open(io.BytesIO(ham)).convert("RGB")
         # Ölçek YAKALANAN genişliğe göre — HUD kesildiği için ekran genişliği
         # değil. Karıştırılırsa her tıklama sağa kayar.
-        olcek = self.capture_w / self.shrink
+        olcek = self.olcek
         im = im.resize((self.shrink, max(1, int(im.height / olcek))), Image.LANCZOS)
         buf = io.BytesIO()
         im.save(buf, "PNG", optimize=True)
@@ -280,10 +297,15 @@ class X11Sandbox:
         """
         aktif = self.aktif_pencere()
         cx, cy = self._imlec()
-        # Görüntü de gidiyor; metin yalnızca görüntüde OKUNAMAYAN şeyi taşıyor:
-        # imlecin gerçek yeri, odaktaki pencere, ekran boyutu.
-        return (f"aktif pencere: {aktif[:50]}  ·  imlec: ({cx},{cy})  ·  "
-                f"ekran: {self.width}x{self.height}")
+        # Boyutlar MODELIN GORDUGU uzayda bildiriliyor, gercek ekran
+        # cozunurlugunde degil. Once gercek 1920x1080 yaziliyordu ama gorsel
+        # 1280x720 gidiyordu; iki farkli uzay soylenince model hangisine gore
+        # koordinat verecegini bilemiyordu. Tek uzay: gordugu kare.
+        o = self.olcek
+        mw, mh = int(self.capture_w / o), int(self.height / o)
+        return (f"aktif pencere: {aktif[:50]}  ·  "
+                f"imlec: ({int(cx / o)},{int(cy / o)})  ·  "
+                f"gorunen alan: {mw}x{mh} (koordinatlari BU uzayda ver)")
 
     # -- eylem yurutme -----------------------------------------------------
 
@@ -294,7 +316,15 @@ class X11Sandbox:
         except Abort:
             raise
 
-        hedef = (int(args["x"]), int(args["y"])) if "x" in args and "y" in args else None
+        # Model koordinati KUCULTULMUS karenin uzayinda veriyor; gercek ekrana
+        # basmadan once buyutuluyor. Bu satir olmadan her tik `olcek` kati
+        # yukari-sola kayiyordu.
+        if "x" in args and "y" in args:
+            o = self.olcek
+            hedef = (int(round(int(args["x"]) * o)),
+                     int(round(int(args["y"]) * o)))
+        else:
+            hedef = None
         self._son_hedef = hedef
         self._bildir("bakiyor", self._bakis_metni(act, args, hedef))
 

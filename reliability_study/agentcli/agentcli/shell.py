@@ -36,7 +36,7 @@ try:
 except ImportError:
     readline = None
 
-KOMUTLAR = ["--case", "--kategori", "--strategy", "--model", "--url", "--workdir", "--budget",
+KOMUTLAR = ["--case", "--kategori", "--izle", "--strategy", "--model", "--url", "--workdir", "--budget",
             "--screen", "--browser", "--tema", "--panel", "--desktop", "--info",
             "--status",
             "--help",
@@ -59,7 +59,8 @@ class Uygulama:
         self.limits = BudgetLimits(max_steps=14, max_replans=5, max_tokens=60000,
                                    max_seconds=240.0, max_cost_usd=0.5)
         self.panel_acik = True
-        self.masaustu = None            # --desktop ile aciliyor
+        self.masaustu = None
+        self.izleyici = None            # --desktop ile aciliyor
         self.browser: Browser | None = None
         self.terminal = Terminal(self.kok)
         self._model: VLMModel | None = None
@@ -149,6 +150,7 @@ class Uygulama:
             ("--browser", "tarayıcıyı görünür/gizli yap"),
             ("--tema", "beyaz arka planı aç/kapa"),
             ("--panel", "sağ üst canlı kısıt panelini aç/kapa"),
+            ("--izle", "ajanın GÖRDÜĞÜ kareyi ve sıradaki eylemi sağ şeritte aç"),
             ("--desktop", "GERÇEK masaüstü aracı: kapalı → salt okuma → tam"),
             ("--info", "seçili zihniyeti anlat"),
             ("--status", "mevcut ayarlar"),
@@ -232,7 +234,16 @@ class Uygulama:
         print(f"\n  {T.DIM}beklenen:{T.RESET} {c.bekleniyor}")
         br = self._tarayici()
         print(f"  {T.DIM}{br.goto(c.url)[:70]}{T.RESET}")
-        self.kos(c.gorev, f"senaryo: {c.ad}")
+        # Case sahte masaustu istiyorsa GERCEK masaustunun yerine o gecer;
+        # kullanicinin makinesine dokunulmuyor, onay da gerekmiyor.
+        sahte = None
+        if getattr(c, "masaustu", None):
+            from .sahte import SahteMasaustu
+            sahte = SahteMasaustu(olcek_uygula=(c.masaustu == "duzgun"))
+            print(f"  {T.DIM}sahte masaüstü: 1920x1080 · modele 1280x720 gidiyor"
+                  f" · ölçek {'UYGULANIYOR' if c.masaustu == 'duzgun' else 'UYGULANMIYOR'}"
+                  f"{T.RESET}")
+        self.kos(c.gorev, f"senaryo: {c.ad}", masaustu=sahte)
 
     def kategori_kos(self, arg: str = "") -> None:
         """Bir zihniyet ailesinin TAMAMINI aynı göreve karşı gerçekten koştur.
@@ -355,6 +366,29 @@ class Uygulama:
         for a in sorted(degisen):
             print(f"    {T.AMBER}~{T.RESET} {a}  {T.DIM}({oncesi[a]} → {sonrasi[a]} B){T.RESET}")
 
+    def _izleyici_ac_kapa(self) -> None:
+        """Ekranın sağ şeridine canlı bakış penceresi.
+
+        Panelden farkı: panel METİN (kısıtlar ne durumda), izleyici GÖRSEL
+        (modele hangi kare gitti, nereye dokunmak üzere). Terminalde ekran
+        görüntüsü basılamıyor — GNOME Terminal grafik protokolü desteklemiyor.
+        """
+        from .izle import Izleyici
+        if self.izleyici is not None:
+            self.izleyici.kapat(); self.izleyici = None
+            print(f"  {T.GREEN}✓{T.RESET} canlı bakış: kapalı")
+            return
+        self.izleyici = Izleyici()
+        adres = self.izleyici.basla()
+        print(f"  {T.GREEN}✓{T.RESET} canlı bakış: {T.B}AÇIK{T.RESET}"
+              f"{T.DIM} — ekranın sağ şeridi · {adres}{T.RESET}")
+        print(f"  {T.DIM}  modele giden kare + sıradaki eylem. Masaüstü "
+              f"eylemlerinde hedefin üstünde artı işareti.{T.RESET}")
+        if self.masaustu is not None:
+            self.masaustu.sandbox.gozlemci = self.izleyici.gozlemci()
+            print(f"  {T.DIM}  masaüstü gözlemcisi bağlandı — tıklamadan "
+                  f"ÖNCE haber veriyor{T.RESET}")
+
     def _masaustu_kademe(self) -> None:
         """Üç kademe: kapalı → salt okuma → tam kontrol.
 
@@ -364,6 +398,8 @@ class Uygulama:
         from .tools.desktop import Desktop
         if self.masaustu is None:
             self.masaustu = Desktop(allow_input=False)
+            if self.izleyici is not None:
+                self.masaustu.sandbox.gozlemci = self.izleyici.gozlemci()
             print(f"  {T.AMBER}✓{T.RESET} masaüstü: {T.B}SALT OKUMA{T.RESET}"
                   f"{T.DIM} — ekranı görür, ne yapacağını söyler, DOKUNMAZ{T.RESET}")
             print(f"  {T.DIM}  ekran görüntün artık VLM'e gidiyor: o anda ekranda "
@@ -381,6 +417,8 @@ class Uygulama:
                 print(f"  {T.DIM}vazgeçildi — salt okuma devam{T.RESET}"); return
             self.masaustu.stop()
             self.masaustu = Desktop(allow_input=True)
+            if self.izleyici is not None:
+                self.masaustu.sandbox.gozlemci = self.izleyici.gozlemci()
             print(f"  {T.RED}✓ masaüstü: TAM KONTROL{T.RESET}"
                   f"{T.DIM} — gerçek fare/klavye. Silme tuşları ve terminal "
                   f"pencereleri hâlâ engelli.{T.RESET}")
@@ -409,7 +447,7 @@ class Uygulama:
 
     # ------------------------------------------------------------ koşum
 
-    def kos(self, gorev: str, mod: str = "görev") -> None:
+    def kos(self, gorev: str, mod: str = "görev", masaustu=None) -> None:
         br = self._tarayici()
         model = self._vlm()
         oncesi = self._dizin_durumu()
@@ -419,7 +457,8 @@ class Uygulama:
             panel = Panel(aktif=self.panel_acik)
             ajan = Ajan(gorev, model, br, self.terminal, self.strateji,
                         limits=self.limits, rapor=rapor, gorsel=self.gorsel,
-                        panel=panel, desktop=self.masaustu)
+                        panel=panel, desktop=masaustu or self.masaustu,
+                        izleyici=self.izleyici)
             try:
                 res = ajan.kos()
             finally:
@@ -432,9 +471,10 @@ class Uygulama:
             print(f"\n  {T.AMBER}kesildi{T.RESET}\n"); return
         rapor.kapanis(res)
         self._dizin_ozeti(oncesi)
-        if self.masaustu is not None:
-            print(f"  {T.DIM}masaüstü: {self.masaustu.rapor()}{T.RESET}")
-            for e in self.masaustu.engellenen[-4:]:
+        aktif_masaustu = masaustu or self.masaustu
+        if aktif_masaustu is not None:
+            print(f"  {T.DIM}masaüstü: {aktif_masaustu.rapor()}{T.RESET}")
+            for e in aktif_masaustu.engellenen[-4:]:
                 print(f"    {T.RED}✕ {e}{T.RESET}")
         if self.terminal.engellenen:
             print(f"  {T.RED}engellenen komutlar{T.RESET}")
@@ -479,6 +519,8 @@ class Uygulama:
         k, arg = parca[0], (parca[1].strip() if len(parca) > 1 else "")
         if k in ("--quit", "--exit"):
             self._tarayici_kapat()
+            if self.izleyici is not None:
+                self.izleyici.kapat()
             print(f"  {T.DIM}görüşürüz{T.RESET}")
             T.beyaz_kapat()
             raise SystemExit(0)
@@ -526,6 +568,8 @@ class Uygulama:
                   f"{T.DIM}  (kapalıyken yalnız DOM metni gider — çok daha ucuz){T.RESET}")
         elif k == "--desktop":
             self._masaustu_kademe()
+        elif k == "--izle":
+            self._izleyici_ac_kapa()
         elif k == "--panel":
             self.panel_acik = not self.panel_acik
             print(f"  {T.GREEN}✓{T.RESET} canlı panel: "

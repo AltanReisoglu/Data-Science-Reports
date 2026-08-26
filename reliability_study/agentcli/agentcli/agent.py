@@ -34,6 +34,26 @@ from .panel import Panel                                # noqa: E402
 from .render import Rapor                               # noqa: E402
 
 
+def _ozet_args(args: dict, n: int = 54) -> str:
+    metin = ", ".join(f"{k}={v}" for k, v in (args or {}).items())
+    return metin if len(metin) <= n else metin[:n] + "…"
+
+
+def _hedef_cikar(ad: str, args: dict):
+    """Eylemin ekrandaki HEDEF noktasi — izleyicinin artı işareti için.
+
+    Yalniz masaustu araclarinda anlamli: tarayici tarafinda model koordinat
+    vermiyor, numara veriyor (set-of-marks) ve gercek koordinat DOM'dan
+    geliyor — orada artı isareti cizecek bir sey yok.
+    """
+    if not ad.startswith("desktop."):
+        return None
+    try:
+        return (int(args["x"]), int(args["y"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 @dataclass
 class Sonuc:
     status: Status
@@ -95,7 +115,7 @@ class Ajan:
     def __init__(self, gorev: str, model, browser, terminal, strateji: str,
                  limits: BudgetLimits | None = None, rapor: Rapor | None = None,
                  gorsel: bool = True, panel: Panel | None = None,
-                 golge: bool = True, desktop=None):
+                 golge: bool = True, desktop=None, izleyici=None):
         self.gorev, self.model = gorev, model
         self.browser, self.terminal = browser, terminal
         # Masaustu araci OPSIYONEL. Verilmezse `desktop.*` cagrisi
@@ -109,6 +129,10 @@ class Ajan:
                           detector=LoopDetector(), budget=BudgetEnforcer(limits),
                           trace=TraceWriter(None))
         self.panel = panel
+        # Canli izleyici: ajanin GORDUGU kare + SIRADAKI eylem, ekranin sag
+        # seridinde. Terminal paneli metin; bu gorsel. Ikisi ayri soru
+        # cevapliyor: panel "kisitlar ne durumda", izleyici "nereye dokunacak".
+        self.izleyici = izleyici
         # Doğrulama GÖREVE ÖZEL. Zihniyetler bunu `ctx.extra` üzerinden
         # okuyor; koymazsak `cua_lab`'ın sentetik form kontrolüne düşüyorlar
         # ve her bitirme iddiasını reddediyorlar.
@@ -167,6 +191,8 @@ class Ajan:
                            else self.browser.screenshot())
             except Exception:
                 pass
+        if self.izleyici is not None:
+            self.izleyici.kare(png)
         return istem, png
 
     # -- araç yürütme ------------------------------------------------------
@@ -271,6 +297,13 @@ class Ajan:
         return v
 
     def _panel_ciz(self) -> None:
+        if self.izleyici is not None:
+            s_, l_ = self.ctx.budget.state, self.ctx.budget.limits
+            self.izleyici.adim(self.ctx.step, [
+                ("adım", s_.steps, l_.max_steps or 0),
+                ("token", s_.tokens, l_.max_tokens or 0),
+                ("süre", round(s_.seconds), round(l_.max_seconds or 0)),
+                ("replan", s_.replans, l_.max_replans or 0)])
         if not self.panel:
             return
         aktif = self.stack.items[0].snapshot() if self.stack.items else {}
@@ -384,8 +417,23 @@ class Ajan:
             if (r := self._uygula(self._golge("on_action", aev, self.ctx, self.stack.on_action(aev, self.ctx)), span)):
                 return r
 
+            hedef = _hedef_cikar(ad, args)
+            if self.izleyici is not None:
+                # Yurutmeden ONCE. Sonradan raporlayan bir gosterge kacis kolu
+                # olarak ise yaramaz — kullanicinin yetisebilmesi gerekiyor.
+                self.izleyici.eylem(f"{ad}({_ozet_args(args)})", "bekle", hedef)
             cikti, hata, engel = self._arac_calistir(karar)
             self.rapor.sonuc(cikti, hata=hata, engel=engel)
+            if self.izleyici is not None:
+                # Hedef SILINMIYOR. Eylem oncesi gorunum milisaniyelik kaliyor
+                # ve kullanici arti isaretini hic goremiyordu — olculdu, dort
+                # tiklik bir kosumda hedef her seferinde `None` yakalandi.
+                # Isaret bir sonraki eyleme kadar duruyor: "nereye tikladi"
+                # sorusu "nereye tiklayacak" kadar degerli — olcek kaymasinda
+                # nisanin DOGRU, tikin bosa gittigini gosteren tek kanit bu.
+                self.izleyici.eylem(
+                    f"{ad}({_ozet_args(args)})  →  {str(cikti).strip()[:90]}",
+                    "engel" if engel else ("bekle" if hata else "yap"), hedef)
             if self.panel:
                 self.panel.ekle_hareket(
                     f"{'✕' if engel else ('!' if hata else '·')} {ad} "
