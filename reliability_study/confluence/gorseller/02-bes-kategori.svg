@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
+  <rect width="1240" height="700" fill="#FFFFFF"/>
+
+  <text x="40" y="46" font-size="24" font-weight="600" fill="#17141F">Beş çözüm kategorisi</text>
+  <text x="40" y="72" font-size="14.5" fill="#4A4553">On yedi yaklaşım, tek soru: “şimdi durmalı mı?” — beş farklı bakış açısından. Sıra = uygulama önceliği.</text>
+
+  <!-- sutun basliklari -->
+  <g font-size="11.5" fill="#7A7387" font-weight="600" letter-spacing="1">
+    <text x="46" y="118">KATEGORİ</text>
+    <text x="240" y="118">NEYE BAKAR</text>
+    <text x="580" y="118">NE YAKALAR</text>
+    <text x="880" y="118">KÖR NOKTASI</text>
+  </g>
+  <line x1="40" y1="128" x2="1200" y2="128" stroke="#17141F" stroke-width="1.6"/>
+
+  <!-- SAYAC -->
+  <g>
+    <rect x="40" y="140" width="1160" height="96" fill="#FCFBFD"/>
+    <rect x="40" y="140" width="4" height="96" fill="#5F0087"/>
+    <text x="60" y="172" font-size="19" font-weight="600" fill="#5F0087">SAYAÇ</text>
+    <text x="60" y="194" font-size="12" fill="#7A7387">4 yaklaşım</text>
+    <text x="60" y="214" font-size="11.5" fill="#008700" font-weight="600">önce bunu koy</text>
+    <text x="240" y="168" font-size="13.5" fill="#17141F">Bir sayı tutar: adım, replan,</text>
+    <text x="240" y="188" font-size="13.5" fill="#17141F">token, süre, dolar.</text>
+    <text x="240" y="210" font-size="12.5" fill="#7A7387">Modele sormaz.</text>
+    <text x="580" y="168" font-size="13.5" fill="#17141F">Her hata modunu, eninde sonunda.</text>
+    <text x="580" y="190" font-size="12.5" fill="#7A7387">Bilmediği hata modu yoktur.</text>
+    <text x="880" y="168" font-size="13.5" fill="#AF0000">Nedeni AÇIKLAMAZ —</text>
+    <text x="880" y="188" font-size="13.5" fill="#AF0000">yalnızca eşiği bildirir.</text>
+    <text x="880" y="210" font-size="12.5" fill="#7A7387">Teşhis için pencere katmanı gerekir.</text>
+  </g>
+
+  <!-- PENCERE -->
+  <g>
+    <rect x="40" y="240" width="1160" height="96" fill="#FFFFFF"/>
+    <rect x="40" y="240" width="4" height="96" fill="#005FAF"/>
+    <text x="60" y="272" font-size="19" font-weight="600" fill="#005FAF">PENCERE</text>
+    <text x="60" y="294" font-size="12" fill="#7A7387">5 yaklaşım</text>
+    <text x="240" y="268" font-size="13.5" fill="#17141F">Son N olayı karşılaştırır.</text>
+    <text x="240" y="290" font-size="12.5" fill="#7A7387">İmza tekrarı, çevrim, çeşitlilik,</text>
+    <text x="240" y="308" font-size="12.5" fill="#7A7387">ekran hash’i.</text>
+    <text x="580" y="268" font-size="13.5" fill="#17141F">Döngüyü tespit eder ve</text>
+    <text x="580" y="288" font-size="13.5" fill="#17141F">NEDENİNİ raporlar.</text>
+    <text x="580" y="310" font-size="12.5" fill="#7A7387">hangi çağrı, kaç kez</text>
+    <text x="880" y="268" font-size="13.5" fill="#AF0000">İçerik her adımda değişiyorsa</text>
+    <text x="880" y="288" font-size="13.5" fill="#AF0000">etkisizdir.</text>
+    <text x="880" y="310" font-size="12.5" fill="#7A7387">sonsuz sayfalamada ilerleme gerçektir</text>
+  </g>
+
+  <!-- DUNYA -->
+  <g>
+    <rect x="40" y="340" width="1160" height="96" fill="#FCFBFD"/>
+    <rect x="40" y="340" width="4" height="96" fill="#008787"/>
+    <text x="60" y="372" font-size="19" font-weight="600" fill="#008787">DÜNYA</text>
+    <text x="60" y="394" font-size="12" fill="#7A7387">3 yaklaşım</text>
+    <text x="60" y="414" font-size="11.5" fill="#AF5F00" font-weight="600">en yüksek getiri</text>
+    <text x="240" y="368" font-size="13.5" fill="#17141F">Modelin dışından kanıt toplar.</text>
+    <text x="240" y="390" font-size="12.5" fill="#7A7387">Dosya gerçekten var mı,</text>
+    <text x="240" y="408" font-size="12.5" fill="#7A7387">ekran gerçekten değişti mi.</text>
+    <text x="580" y="368" font-size="13.5" fill="#17141F">Döngü İÇERMEYEN hataları:</text>
+    <text x="580" y="388" font-size="13.5" font-weight="600" fill="#17141F">bitirme iddiası hatası.</text>
+    <text x="580" y="410" font-size="12.5" fill="#7A7387">tekrar da yok, hata da yok</text>
+    <text x="880" y="368" font-size="13.5" fill="#AF0000">Bitirme iddiası üretilmezse</text>
+    <text x="880" y="388" font-size="13.5" fill="#AF0000">kapı hiç çalışmaz.</text>
+    <text x="880" y="410" font-size="12.5" fill="#7A7387">bütçe katmanıyla birlikte zorunlu</text>
+  </g>
+
+  <!-- SEKIL -->
+  <g>
+    <rect x="40" y="440" width="1160" height="96" fill="#FFFFFF"/>
+    <rect x="40" y="440" width="4" height="96" fill="#AF5F00"/>
+    <text x="60" y="472" font-size="19" font-weight="600" fill="#AF5F00">ŞEKİL</text>
+    <text x="60" y="494" font-size="12" fill="#7A7387">2 yaklaşım</text>
+    <text x="240" y="468" font-size="13.5" fill="#17141F">Döngünün biçimini kısıtlar.</text>
+    <text x="240" y="490" font-size="12.5" fill="#7A7387">İzinli geçiş tablosu +</text>
+    <text x="240" y="508" font-size="12.5" fill="#7A7387">beş basamaklı geri dönüş.</text>
+    <text x="580" y="468" font-size="13.5" fill="#17141F">Sıra ihlallerini ve</text>
+    <text x="580" y="488" font-size="13.5" fill="#17141F">doğrulamasız ilerlemeyi.</text>
+    <text x="580" y="510" font-size="12.5" fill="#7A7387">“kullanıcıya sor” tanımlı bir sonuçtur</text>
+    <text x="880" y="468" font-size="13.5" fill="#AF0000">Esnekliği azaltır; modellenemeyen</text>
+    <text x="880" y="488" font-size="13.5" fill="#AF0000">iş makineye sığmaz.</text>
+    <text x="880" y="510" font-size="12.5" fill="#7A7387">statik doğrulama koşumda tetiklenmez</text>
+  </g>
+
+  <!-- KARAR -->
+  <g>
+    <rect x="40" y="540" width="1160" height="96" fill="#FCFBFD"/>
+    <rect x="40" y="540" width="4" height="96" fill="#7A7387"/>
+    <text x="60" y="572" font-size="19" font-weight="600" fill="#4A4553">KARAR</text>
+    <text x="60" y="594" font-size="12" fill="#7A7387">2 yaklaşım</text>
+    <text x="60" y="614" font-size="11.5" fill="#008787" font-weight="600">durdurmaz</text>
+    <text x="240" y="568" font-size="13.5" fill="#17141F">Bütçeyi tavan değil</text>
+    <text x="240" y="588" font-size="13.5" fill="#17141F">tahsis olarak ele alır.</text>
+    <text x="240" y="610" font-size="12.5" fill="#7A7387">hangi eylem, hangi eşik</text>
+    <text x="580" y="568" font-size="13.5" fill="#17141F">Yetersiz kanıtla verilen</text>
+    <text x="580" y="588" font-size="13.5" fill="#17141F">erken cevabı engeller.</text>
+    <text x="880" y="568" font-size="13.5" fill="#AF0000">Koşumu SONLANDIRMAZ.</text>
+    <text x="880" y="588" font-size="13.5" fill="#AF0000">Tek başına koruma sağlamaz.</text>
+  </g>
+
+  <line x1="40" y1="656" x2="1200" y2="656" stroke="#17141F" stroke-width="1.6"/>
+  <text x="40" y="682" font-size="14" fill="#17141F">
+    <tspan font-weight="600">Önerilen üretim dizilimi üç katman:</tspan>
+    bir PENCERE (döngüyü tespit eder) + bir DÜNYA (bitirme iddiasını doğrular) + bir SAYAÇ (maliyeti sınırlar).
+  </text>
+</svg>

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="620" viewBox="0 0 1240 620" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="ok" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4A4553"/>
+    </marker>
+    <marker id="okmor" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#5F0087"/>
+    </marker>
+  </defs>
+  <rect width="1240" height="620" fill="#FFFFFF"/>
+
+  <text x="40" y="46" font-size="24" font-weight="600" fill="#17141F">Ajan döngüsü ve kontrol noktaları</text>
+  <text x="40" y="72" font-size="14.5" fill="#4A4553">Kontroller döngünün dışında değil, döngü içindeki beş kancada çalışır. Her kanca farklı bir soruyu yanıtlar.</text>
+
+  <!-- ana dongu kutulari -->
+  <g>
+    <rect x="40" y="140" width="150" height="66" rx="3" fill="#F1EFF5" stroke="#DFDAE7" stroke-width="1.5"/>
+    <text x="115" y="171" font-size="15" font-weight="600" text-anchor="middle" fill="#17141F">GÖREV</text>
+    <text x="115" y="191" font-size="12" text-anchor="middle" fill="#7A7387">kullanıcı isteği</text>
+
+    <rect x="290" y="140" width="150" height="66" rx="3" fill="#FFFFFF" stroke="#005FAF" stroke-width="2"/>
+    <text x="365" y="171" font-size="15" font-weight="600" text-anchor="middle" fill="#005FAF">MODEL</text>
+    <text x="365" y="191" font-size="12" text-anchor="middle" fill="#7A7387">ekran + DOM → karar</text>
+
+    <rect x="540" y="140" width="150" height="66" rx="3" fill="#FFFFFF" stroke="#005FAF" stroke-width="2"/>
+    <text x="615" y="171" font-size="15" font-weight="600" text-anchor="middle" fill="#005FAF">ARAÇ</text>
+    <text x="615" y="191" font-size="12" text-anchor="middle" fill="#7A7387">tıkla / yaz / komut</text>
+
+    <rect x="790" y="140" width="150" height="66" rx="3" fill="#FFFFFF" stroke="#005FAF" stroke-width="2"/>
+    <text x="865" y="171" font-size="15" font-weight="600" text-anchor="middle" fill="#005FAF">GÖZLEM</text>
+    <text x="865" y="191" font-size="12" text-anchor="middle" fill="#7A7387">yeni ekran durumu</text>
+
+    <rect x="1040" y="140" width="160" height="66" rx="3" fill="#EAF5EA" stroke="#008700" stroke-width="2"/>
+    <text x="1120" y="171" font-size="15" font-weight="600" text-anchor="middle" fill="#008700">BİTİŞ</text>
+    <text x="1120" y="191" font-size="12" text-anchor="middle" fill="#7A7387">“bitirdim” iddiası</text>
+  </g>
+
+  <!-- oklar -->
+  <line x1="190" y1="173" x2="282" y2="173" stroke="#4A4553" stroke-width="1.8" marker-end="url(#ok)"/>
+  <line x1="440" y1="173" x2="532" y2="173" stroke="#4A4553" stroke-width="1.8" marker-end="url(#ok)"/>
+  <line x1="690" y1="173" x2="782" y2="173" stroke="#4A4553" stroke-width="1.8" marker-end="url(#ok)"/>
+  <line x1="940" y1="173" x2="1032" y2="173" stroke="#4A4553" stroke-width="1.8" marker-end="url(#ok)"/>
+
+  <!-- geri donus -->
+  <path d="M 865 206 L 865 250 L 365 250 L 365 214" fill="none" stroke="#4A4553" stroke-width="1.8"
+        stroke-dasharray="5 4" marker-end="url(#ok)"/>
+  <rect x="418" y="238" width="396" height="24" fill="#FFFFFF"/>
+  <text x="616" y="255" font-size="12.5" text-anchor="middle" fill="#7A7387">döngü — sonlandıran bir kısıt tanımlı değilse süresizdir</text>
+
+  <!-- kancalar -->
+  <g font-size="12">
+    <g>
+      <line x1="236" y1="206" x2="236" y2="300" stroke="#5F0087" stroke-width="1.6" marker-end="url(#okmor)"/>
+      <rect x="120" y="304" width="232" height="86" rx="3" fill="#F0E7F7" stroke="#5F0087" stroke-width="1.5"/>
+      <text x="134" y="325" font-size="12.5" font-weight="600" fill="#5F0087">1 · before_step</text>
+      <text x="134" y="345" fill="#17141F">Adımı atmaya bütçem var mı?</text>
+      <text x="134" y="363" fill="#4A4553">SAYAÇ · KARAR</text>
+      <text x="134" y="381" fill="#7A7387">adım / token / süre / dolar</text>
+    </g>
+    <g>
+      <line x1="490" y1="206" x2="490" y2="300" stroke="#5F0087" stroke-width="1.6" marker-end="url(#okmor)"/>
+      <rect x="374" y="304" width="232" height="86" rx="3" fill="#F0E7F7" stroke="#5F0087" stroke-width="1.5"/>
+      <text x="388" y="325" font-size="12.5" font-weight="600" fill="#5F0087">2 · on_action</text>
+      <text x="388" y="345" fill="#17141F">Bu çağrıyı daha önce yaptım mı?</text>
+      <text x="388" y="363" fill="#4A4553">PENCERE · ŞEKİL</text>
+      <text x="388" y="381" fill="#7A7387">imza tekrarı, izinli geçiş</text>
+    </g>
+    <g>
+      <line x1="740" y1="206" x2="740" y2="300" stroke="#5F0087" stroke-width="1.6" marker-end="url(#okmor)"/>
+      <rect x="628" y="304" width="232" height="86" rx="3" fill="#F0E7F7" stroke="#5F0087" stroke-width="1.5"/>
+      <text x="642" y="325" font-size="12.5" font-weight="600" fill="#5F0087">3 · on_observation</text>
+      <text x="642" y="345" fill="#17141F">Dünya gerçekten değişti mi?</text>
+      <text x="642" y="363" fill="#4A4553">PENCERE · DÜNYA</text>
+      <text x="642" y="381" fill="#7A7387">ekran hash’i, hata oranı</text>
+    </g>
+    <g>
+      <line x1="1000" y1="206" x2="1000" y2="300" stroke="#5F0087" stroke-width="1.6" marker-end="url(#okmor)"/>
+      <rect x="882" y="304" width="238" height="86" rx="3" fill="#F0E7F7" stroke="#5F0087" stroke-width="1.5"/>
+      <text x="896" y="325" font-size="12.5" font-weight="600" fill="#5F0087">4 · on_finish_claim</text>
+      <text x="896" y="345" fill="#17141F">İddia gerçeğe uyuyor mu?</text>
+      <text x="896" y="363" fill="#4A4553">DÜNYA</text>
+      <text x="896" y="381" fill="#7A7387">dosya var mı, ekran doğru mu</text>
+    </g>
+  </g>
+
+  <!-- 5. kanca -->
+  <rect x="120" y="430" width="1000" height="62" rx="3" fill="#FBF3E8" stroke="#AF5F00" stroke-width="1.5"/>
+  <text x="136" y="452" font-size="12.5" font-weight="600" fill="#AF5F00">5 · on_stop</text>
+  <text x="136" y="474" font-size="13" fill="#17141F">Durma nedenini kaydet. “Limit doldu” yetersizdir: hangi eksen doldu, ne denendi, ne bulundu, önerilen sonraki adım.</text>
+
+  <line x1="40" y1="524" x2="1200" y2="524" stroke="#DFDAE7" stroke-width="1"/>
+  <text x="40" y="552" font-size="13.5" fill="#17141F">
+    <tspan font-weight="600">Temel ilke:</tspan> döngüyü sonlandırma yetkisi modele bırakılırsa, görüş alanı en dar bileşene verilmiş olur.
+  </text>
+  <text x="40" y="574" font-size="13.5" fill="#4A4553">Model her turda yalnızca önündeki bağlama bakar; kaç kez aynı şeyi denediğini ve o ana kadar ne harcadığını görmez.</text>
+  <text x="40" y="598" font-size="12" fill="#7A7387">Agent Reliability · Loop Detection &amp; Task Budget</text>
+</svg>
