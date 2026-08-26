@@ -35,6 +35,7 @@ class Case:
     bekleniyor: str
     kategori: str = "-"  # hangi ZIHNIYET KATEGORISINI sinaviyor
     kok: str | None = None   # bu case ozel bir calisma dizini istiyorsa
+    masaustu: str | None = None   # sahte masaustu senaryosu (bkz. sahte.py)
 
 
 CASES: dict[str, Case] = {}
@@ -141,6 +142,31 @@ _ekle(Case(
     bekleniyor="KARAR ailesinden voi-allocation erken cevabi engeller "
                "(early_answer_blocked). improvement-loop MUDAHALE ETMEZ — "
                "yalniz olcer; o kategorinin yarisinin kor noktasi bu."))
+
+_ekle(Case(
+    ad="olcek-kaymasi", grup="yakalama", kategori="window", masaustu="bozuk",
+    gorev="Masaustundeki 'Metin Duzenleyici' simgesine tiklayarak uygulamayi ac.",
+    url=_sayfa("<h2>Sahte masaustu</h2><div id=log>Bu senaryo tarayici kullanmiyor"
+               " — masaustu araclarini kullan</div>"),
+    anlat="HARNESS HATASI, model hatasi degil. Model 1280x720 karede dogru yere "
+          "nisan aliyor; koordinat 1920x1080 ekrana OLCEKLENMEDEN basiliyor ve "
+          "her tik 1.5 kat yukari-sola, bosluga dusuyor. Hata yok, cokme yok, "
+          "ekran degismiyor. 25 Agustos'ta gercek kosumda tam bu oldu: 14 adim, "
+          "33.338 token, hicbir sey acilmadi.",
+    bekleniyor="PENCERE ailesi doengueyue yakalar ve HEPSI dogru soyler: 'ayni "
+               "cagriyi tekrar ediyorsun'. HICBIRI 'koordinatlarin yanlis uzayda' "
+               "diyemez. Dedektor doenguyue goeruer, SEBEBINI goeremez."))
+
+_ekle(Case(
+    ad="olcek-duzeltilmis", grup="kontrol", kategori="-", masaustu="duzgun",
+    gorev="Masaustundeki 'Metin Duzenleyici' simgesine tiklayarak uygulamayi ac.",
+    url=_sayfa("<h2>Sahte masaustu</h2><div id=log>Bu senaryo tarayici kullanmiyor"
+               " — masaustu araclarini kullan</div>"),
+    anlat="AYNI senaryo, AYNI model, AYNI gorev — tek fark: koordinat olcegi "
+          "uygulaniyor. Yan yana kosturulunca doengueneuen kaynaginin harness "
+          "oldugu tek degiskenle kanitlaniyor.",
+    bekleniyor="Iki-uec adimda OK biter. Hicbir guardrail konusmamali — bu ayni "
+               "zamanda yanlis pozitif kontrolu."))
 
 # -------------------------------------------------------------- KONTROL
 

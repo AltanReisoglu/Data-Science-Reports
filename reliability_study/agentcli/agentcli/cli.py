@@ -47,7 +47,20 @@ def _ortam(a):
     return br, Terminal(kok), kok
 
 
-def _kos(a, gorev: str, url: str | None, strateji: str, mod: str):
+def _sahte_masaustu(c):
+    """Case sahte masaüstü istiyorsa onu kur.
+
+    Ölçek kayması GERÇEK donanımda tekrarlanabilir değil (ve tehlikeli);
+    sentetik masaüstü aynı hatayı tek bir boolean ile açıp kapatıyor.
+    """
+    if not getattr(c, "masaustu", None):
+        return None
+    from .sahte import SahteMasaustu
+    return SahteMasaustu(olcek_uygula=(c.masaustu == "duzgun"))
+
+
+def _kos(a, gorev: str, url: str | None, strateji: str, mod: str,
+         masaustu=None):
     br, term, kok = _ortam(a)
     try:
         model = VLMModel(a.model, gorsel=not a.gorselsiz)
@@ -56,9 +69,11 @@ def _kos(a, gorev: str, url: str | None, strateji: str, mod: str):
         if url:
             br.goto(url)
         ajan = Ajan(gorev, model, br, term, strateji, limits=_limits(a),
-                    rapor=rapor, gorsel=not a.gorselsiz)
+                    rapor=rapor, gorsel=not a.gorselsiz, desktop=masaustu)
         res = ajan.kos()
         rapor.kapanis(res)
+        if masaustu is not None:
+            print(f"  {T.DIM}masaüstü: {masaustu.rapor()}{T.RESET}\n")
         if term.engellenen:
             print(f"  {T.RED}engellenen komutlar{T.RESET}")
             for e in term.engellenen:
@@ -113,7 +128,8 @@ def cmd_case(a) -> int:
     print(f"\n  {T.DIM}case{T.RESET} {T.B}{c.ad}{T.RESET} {T.DIM}({c.grup}){T.RESET}")
     for s in T.sar(c.anlat, T.en() - 4):
         print(f"  {T.DIM}{s}{T.RESET}")
-    res = _kos(a, c.gorev, c.url, a.strategy, f"case: {c.ad}")
+    res = _kos(a, c.gorev, c.url, a.strategy, f"case: {c.ad}",
+               masaustu=_sahte_masaustu(c))
     return 0 if res.status.clean else 1
 
 
