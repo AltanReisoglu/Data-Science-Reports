@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<title>PoC Demo Akışı</title>
+<style>
+@page { size: A4; margin: 9mm 9mm 7mm 9mm; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family:"Noto Sans","DejaVu Sans","Liberation Sans",sans-serif;
+       font-size:7.7pt; line-height:1.3; color:#16181d; margin:0; }
+.page { page-break-after: always; height: 278mm; display:flex; flex-direction:column;
+        overflow:hidden; }
+.page:last-child { page-break-after:auto; }
+.page > .foot { margin-top:auto; }
+h1 { font-size:14pt; margin:0 0 .8mm; letter-spacing:-.3px; }
+h1 .sub { font-weight:400; color:#6b7280; font-size:9pt; letter-spacing:0; }
+h2 { font-size:8.8pt; margin:3.4mm 0 1.4mm; padding:.7mm 0 .6mm;
+     border-bottom:1.6pt solid #16181d; letter-spacing:.3px; text-transform:uppercase; }
+h2 .n { color:#b91c1c; margin-right:1.5mm; font-variant-numeric:tabular-nums; }
+h2 .t { float:right; font-weight:400; text-transform:none; letter-spacing:0;
+        color:#6b7280; font-size:7.4pt; }
+p { margin:0 0 1.1mm; }
+.hdr { display:flex; justify-content:space-between; align-items:flex-end;
+       border-bottom:2.5pt solid #16181d; padding-bottom:1.5mm; margin-bottom:1mm; }
+.hdr .meta { text-align:right; font-size:7pt; color:#6b7280; line-height:1.45; }
+table { width:100%; border-collapse:collapse; margin:.8mm 0 1.5mm; font-size:7pt; }
+th { text-align:left; font-size:6.3pt; text-transform:uppercase; letter-spacing:.5px;
+     color:#6b7280; border-bottom:.8pt solid #9ca3af; padding:.6mm 1.3mm .5mm 0; font-weight:700; }
+td { padding:.6mm 1.3mm .6mm 0; border-bottom:.3pt solid #e5e7eb; vertical-align:top; }
+tr:last-child td { border-bottom:none; }
+code,.mono { font-family:"DejaVu Sans Mono","Liberation Mono",monospace; font-size:6.6pt;
+             background:#f1f2f4; padding:0 .7mm; border-radius:1.5px; }
+pre { font-family:"DejaVu Sans Mono",monospace; font-size:6.2pt; line-height:1.28;
+      background:#f6f7f9; border-left:2pt solid #16181d; padding:1.2mm 1.7mm;
+      margin:1mm 0 1.5mm; white-space:pre; overflow:hidden; }
+pre.cmd { background:#111418; color:#e6e8eb; border-left:2pt solid #b91c1c; }
+pre.cmd b { color:#7dd3a0; font-weight:400; }
+b,strong { font-weight:700; }
+.red{color:#b91c1c} .grn{color:#166534} .amb{color:#92400e}
+.q { border-left:2pt solid #b91c1c; padding:.6mm 0 .6mm 2.2mm; margin:1.1mm 0 1.5mm;
+     font-style:italic; color:#374151; }
+.q b { font-style:normal; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 5mm; }
+.box { border:.8pt solid #16181d; padding:1.2mm 1.7mm; margin:1mm 0 1.5mm; }
+.box.fill { background:#f6f7f9; border:none; border-left:2.5pt solid #16181d; }
+.box.say { background:#fffbeb; border:none; border-left:2.5pt solid #92400e; }
+.box .t { font-weight:700; font-size:7.4pt; display:block; margin-bottom:.7mm; }
+ul,ol { margin:.5mm 0 1.4mm; padding-left:4mm; }
+li { margin-bottom:.5mm; }
+.step { display:flex; gap:2mm; align-items:baseline; margin-top:2.2mm; }
+.step .num { font-size:12pt; font-weight:700; color:#b91c1c; min-width:7mm;
+             font-variant-numeric:tabular-nums; line-height:1; }
+.step .ttl { font-weight:700; font-size:8.4pt; }
+.step .why { color:#6b7280; font-size:7pt; }
+.foot { margin-top:1.8mm; padding-top:.9mm; border-top:.8pt solid #9ca3af;
+        font-size:6.6pt; color:#6b7280; display:flex; justify-content:space-between; }
+</style></head><body>
+
+<!-- ===================== SAYFA 1 ===================== -->
+<section class="page">
+<div class="hdr">
+  <h1>PoC Demo Akışı <span class="sub">— ekipte ne gösterip ne söyleyeceğim</span></h1>
+  <div class="meta">Agent Reliability · Loop Detection &amp; Task Budget<br>
+  <code>cua_lab</code> · 16 strateji + 1 varyant · 79 test</div>
+</div>
+
+<h2><span class="n">00</span>Demo öncesi — 2 dakika<span class="t">sunumdan önce yap</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cd ~/Desktop/Data-Science-Reports/reliability_study/cua_lab
+python3 -m cua_lab.cli</pre>
+<ul>
+<li>Terminali <b>en az 100 sütun</b> yap, yazı tipini büyüt.</li>
+<li><b>Bir kez prova koş</b> — ilk çalıştırmada Python <code>__pycache__</code> yazıyor, o gecikme sunumda olmasın.</li>
+<li><code>--model hf</code> kullanacaksan <b>interneti kontrol et</b>; kullanmayacaksan hiç açma.</li>
+<li>Bu ekranı açık bırak: <code>docs/zihniyetler.md</code> — soru gelirse kaynağı gösterirsin.</li>
+</ul>
+</div>
+<div>
+<div class="box fill"><span class="t">Anlatım sırası — teori ile demo iç içe</span>
+Brief üç teslimat istiyor. Demoyu <b>ikinci teslimatın kanıtı</b> olarak değil,
+<b>birinci teslimatın anlatım aracı</b> olarak kullan: her teorik iddiadan sonra
+onu ekranda göster.
+<table style="margin-top:1.2mm">
+<tr><th>Brief maddesi</th><th>Demo adımı</th></tr>
+<tr><td>"kontrolsüz koşum öngörülemez tüketir"</td><td><b>1</b></td></tr>
+<tr><td>"kontrollerin devreye girdiğini gösteren PoC"</td><td><b>2</b></td></tr>
+<tr><td>"çalışma prensibi, tespit mantıkları"</td><td><b>3 · 4</b></td></tr>
+<tr><td>"ve <b>sınırları</b>"</td><td><b>5 · 6</b></td></tr>
+<tr><td>"max steps / replans / tokens / süre"</td><td><b>7</b></td></tr>
+<tr><td>"avantajlar, <b>dezavantajlar</b>"</td><td><b>5 · 6</b></td></tr>
+</table></div>
+</div>
+</div>
+
+<h2><span class="n">01</span>Problem — kontrolsüz koşum<span class="t">~2 dk</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--strategy</b>        → 17  (none)
+cua ▸ <b>Formu doldur ve gonder</b></pre>
+<pre>CEILING · hard_ceiling
+adim  300   token 105000   maliyet $1.0500</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Bu <b>Anthropic'in referans computer-use döngüsü</b>. Kodun kalbi <code>while True</code> —
+tur sayacı yok, döngü tespiti yok, bütçe yok. Tek çıkış modelin araç çağırmayı bırakması.
+<br><br>300'de durdu çünkü <b>ben demo güvenliği için bir tavan koydum.</b> Gerçek referans
+kodda o tavan da yok."
+<div class="q" style="margin-bottom:0">Brief'in cümlesi: <b>"kontrolsüz bir koşum döngüye
+girip token ve GPU kapasitesini öngörülemez şekilde tüketebiliyor."</b> — İşte bu.</div>
+</div>
+</div>
+
+<h2><span class="n">02</span>Kontrol devrede<span class="t">~1 dk</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--strategy</b>        → 5  (openhands-stuck)
+cua ▸ <b>Formu doldur ve gonder</b></pre>
+<pre>STUCK · cycle_k2
+adim    3   token   1050   maliyet $0.0105
+
+durma raporu
+  neden durdu  : tekrar deseni tespit edildi (cycle_k2)
+  ne denendi   : 3 adim, son eylem: left_click({'x':200,'y':200})
+  ne bulundu   : ekran son 4 adimda 1 farkli durum gordu
+  sonraki adim : farkli bir yaklasim ya da insan mudahalesi</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Aynı model, aynı bozuk ortam. Tek fark bir dedektör.
+<b>300 adım → 3. 105 bin token → 1050. Bir dolar → bir sent.</b>
+<br><br>Ama asıl bakmanızı istediğim <b>alt kısım</b>: sadece durmadı, <b>ne olduğunu da
+söyledi</b>. 'cycle_k2' — iki adımlık bir çevrimde dönüyordu. Bu bilgi olmadan
+sadece 'çok adım attı' bilirdiniz."
+<br><br><b>100× fark.</b>
+</div>
+</div>
+
+<h2><span class="n">03</span>Aynı problem, üç farklı teşhis<span class="t">~3 dk · demonun kalbi</span></h2>
+<p>Aynı görevi üç zihniyetle koştur. <b>Üçü de doğru durduruyor — ama farklı şey söylüyorlar.</b></p>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--strategy</b>  → 9  (loopguard-dignity)
+cua ▸ <b>Formu doldur ve gonder</b>
+cua ▸ <b>--strategy</b>  → 1  (arize-control)
+cua ▸ <b>Formu doldur ve gonder</b></pre>
+<pre>openhands-stuck    STUCK              cycle_k2              3 adim
+loopguard-dignity  NEEDS_INPUT        abstain_need_input    7 adim
+arize-control      BUDGET_EXHAUSTED   max_steps            13 adim</pre>
+<div class="box fill" style="margin-top:1.2mm"><span class="t">loopguard'ın raporunu oku</span>
+<pre style="margin:0;background:none;border:none;padding:0">neden durdu  : ilerleme durdu — devam etmek yerine cekimser
+               kaliyorum (yenilgi degil, ayri bir sonuc)
+sonraki adim : SORU: hedef buton tiklanabilir durumda mi?
+               Cevap gelmezse elimdekiyle raporlarim.</pre></div>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Üç farklı <b>terminal durum</b>: <b>STUCK</b>, <b>NEEDS_INPUT</b>, <b>BUDGET_EXHAUSTED</b>.
+Üçü de doğru. Ama teşhisleri farklı:
+<ul style="margin-top:1mm">
+<li><b>openhands</b> deseni adlandırıyor — 'iki adımlık çevrim'</li>
+<li><b>loopguard</b> kullanıcıya <b>soru soruyor</b> — çekimser kalmak yenilgi değil, ayrı bir sonuç</li>
+<li><b>arize</b> sadece 'çok oldu' diyor — ama <b>kandırılamaz</b></li>
+</ul>
+Çalışmamın bütün tezi bu farkta: <b>'ne zaman dur' tek soru değil. 'Durunca ne söyle' de bir soru.</b>"
+<br><br>→ <code>--info</code> bas: seçili zihniyetin <b>kaynağını, neden gerektiğini, tetiklenince
+ne yaptığını ve neyi kaçırdığını</b> ekranda gösterir.
+</div>
+</div>
+
+<div class="foot"><span>PoC Demo Akışı — cua_lab</span><span>1 / 3</span></div>
+</section>
+
+<!-- ===================== SAYFA 2 ===================== -->
+<section class="page">
+<div class="hdr"><h1>Demo — devamı <span class="sub">sınırlar, dezavantajlar, bütçe eksenleri</span></h1>
+<div class="meta">4–8. adımlar · ~10 dk</div></div>
+
+<h2><span class="n">04</span>Kör nokta: A-B-A-B<span class="t">~1 dk</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--model</b>     → 1  (alternating)
+cua ▸ <b>--strategy</b>  → 5  (openhands-stuck)
+cua ▸ <b>Formu doldur ve gonder</b>
+cua ▸ <b>--strategy</b>  → 8  (strands-entropy)
+cua ▸ <b>Formu doldur ve gonder</b></pre>
+<pre>openhands-stuck   cycle_k4        5 adim
+strands-entropy   low_diversity   6 adim</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Model artık <b>iki nokta arasında gidip geliyor</b>: A-B-A-B. Bu dizide
+<b>hiçbir çağrı bir öncekiyle aynı değil</b> — ardışık tekrar sayan dedektörlerin
+sayacı her adımda sıfırlanır ve hiç konuşmaz.
+<br><br>Taradığım <b>ilk 22 harness'ın sadece 2'si</b> bunu yakalıyordu.
+<br><br>İkisi de yakaladı ama farklı yoldan: openhands <b>çevrim tarıyor</b>,
+strands <b>tek satırla çeşitlilik sayıyor</b> — <code>len(set(pencere)) &lt; esik</code>."
+</div>
+</div>
+
+<h2><span class="n">05</span>Yanlış pozitif — demonun EN ÖNEMLİ ekranı<span class="t">~2 dk</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--scenario</b>  → 3  (flaky · MESRU retry)
+cua ▸ <b>--model</b>     → 5  (solver)
+cua ▸ <b>--compare</b></pre>
+<pre>strateji            durum   sebep      adim   token       $
+none                OK      finished      6    1900   0.019
+openhands-stuck     OK      finished      6    1900   0.019
+loopguard-dignity   OK      finished      6    1900   0.019
+arize-control       OK      finished      6    1900   0.019
+pi-signature        OK      finished      6    1900   0.019
+...  16 satirin 16'si da BIREBIR AYNI</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE — burada yavaşla</span>
+"Ortam hâlâ bozuk: <code>flaky</code> senaryosunda araç iki kez hata veriyor, üçüncüde
+çalışıyor. Bu <b>meşru bir retry</b> — kesilmemesi gerekiyor.
+<br><br><b>On altı sütunun on altısı da <code>none</code> ile birebir aynı.</b> Aynı adım,
+aynı token, aynı dolar.
+<br><br>Yani guardrail <b>çalışan bir koşuma tek token bindirmiyor</b> ve meşru
+tekrar denemeyi kesmiyor.
+<div class="q" style="margin-bottom:0">Bir dedektörün <b>ikinci sınavı</b>, yakalamaması
+gerekeni rahat bırakmaktır. Yalnızca yakaladıklarını gösteren bir demo, yanlış pozitif
+oranı hakkında <b>hiçbir şey</b> söylemez — 'her koşumu döngü sayan' bir dedektör de o
+demoyu geçerdi."</div>
+<b>108 kombinasyonda 0 yanlış pozitif</b>, ve bunu bir test kilitliyor.
+</div>
+</div>
+
+<h2><span class="n">06</span>Sınırlar: kör noktalar ve çakışma<span class="t">~2 dk · dezavantaj bölümü</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--scenario</b>  → 2  (dead_button)
+cua ▸ <b>--model</b>     → 6  (stubborn)
+cua ▸ <b>--compare</b></pre>
+<pre>BU KOSUMDA AYIRT EDILEMEYENLER (1 kume)
+  autogen-static = galileo-breaker = improvement-loop
+  = none = telemetry-repair = verify-gate = voi-allocation
+    galileo-breaker:  hata ORANINA bakar; broken_tool ile ayrisir
+    verify-gate:      bitirme iddiasi bekler; --model liar ile ayrisir
+    improvement-loop: MUDAHALE ETMEZ; farki rapor alaninda
+    autogen-static:   hicbir butce ekseni acik degilken ayrisir</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Altı strateji burada <b>hiç durduramadı</b> — ve bu bir kusur değil, <b>kör noktaları</b>.
+<code>verify-gate</code> bitirme iddiası bekliyor, ajan hiç 'bitirdim' demiyor;
+<code>galileo-breaker</code> hata oranına bakıyor, bu senaryoda hiç hata yok.
+<br><br>PoC bunu <b>kendisi raporluyor</b> ve her biri için <b>ayrıştırıcı koşulu</b> veriyor.
+İki ayrı satır görmek, iki ayrı zihniyet görmek değildir.
+<br><br><b>Buradan çıkan ders: tek katman yetmiyor.</b> <code>--strategy</code>'de virgülle
+üst üste koyabiliyorsun."</div>
+</div>
+<pre class="cmd">cua ▸ <b>--scenario</b> → 1 (healthy) · <b>--model</b> → 3 (liar) · <b>--compare</b>
+   none  OK  finished  1 adim      ← yapilmamis isi teslim etti
+   verify-gate  DEGRADED  verify_failed  3 adim   ← reddetti</pre>
+
+<h2><span class="n">07</span>Bütçe eksenleri — brief'in kalemleri<span class="t">~2 dk</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--budget</b>
+      max_steps  [12] ▸ <b>3</b>
+cua ▸ <b>--strategy</b> → 5 (openhands-stuck) · gorev
+cua ▸ <b>--strategy</b> → 1 (arize-control)   · gorev</pre>
+<pre>--max-steps 3   openhands-stuck   cycle_k2     ← limit ETKISIZ
+--max-steps 3   arize-control     max_steps    ← limit ETKILI</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Brief dört kalem istiyor: <b>max steps / replans / tokens / süre</b>. Ben bir de
+<b>dolar</b> ekseni ekledim — token bir vekil ölçü, iki model arasında on beş kat fiyat
+farkı olabiliyor.
+<br><br>Ama asıl göstermek istediğim şu: <b>aynı limit, farklı sonuç.</b>
+<code>openhands-stuck</code> bir pencere dedektörü, bütçe kancası hiç yok — limiti
+umursamıyor. <code>arize-control</code> sayaç kategorisinden, ilk baktığı şey o.
+<div class="q" style="margin-bottom:0"><b>Limit koymak yetmiyor; birinin onu uygulaması
+gerekiyor.</b> Taradığım 24 harness'ın 12'sinde mekanizma <b>var ama varsayılanda
+kapalı</b>.</div></div>
+</div>
+
+<div class="foot"><span>4–7. adımlar</span><span>2 / 3</span></div>
+</section>
+
+<!-- ===================== SAYFA 3 ===================== -->
+<section class="page">
+<div class="hdr"><h1>Kapanış, kurtarma, sorular <span class="sub">8. adım + demo aksarsa ne yapacaksın</span></h1>
+<div class="meta">~5 dk + soru</div></div>
+
+<h2><span class="n">08</span>İz ve kanıt<span class="t">~1 dk</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--trace</b>
+cua ▸ <b>Formu doldur ve gonder</b>
+# ayri terminalde:
+python3 -m cua_lab.cli replay izler/openhands-stuck.jsonl</pre>
+<pre>    # eylem        ekran         karar     sebep
+    0 left_click   80f21d78b1a6  continue
+    1 left_click   80f21d78b1a6  continue
+!!  2 left_click   80f21d78b1a6  stop      cycle_k2</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Ekran hash'i <b>üç adım boyunca hiç değişmiyor</b> — döngünün kanıtı burada, ve
+dedektörün 'nereden anladığı' sorusunun cevabı bu.
+<br><br>Her iterasyon <b>ayrı bir span</b>. Arize'ın gerekliliği: <i>'bütün koşum tek bir
+span'sa 4–19. adımların aynı çağrı olduğunu göremezsin.'</i> Loop detection her şeyden
+önce bir <b>gözlemlenebilirlik</b> gereksinimi — entegrasyon listemin birinci maddesi bu."
+</div>
+</div>
+
+<h2><span class="n">09</span>İsteğe bağlı: gerçek model<span class="t">internet gerekir</span></h2>
+<div class="grid2">
+<div>
+<pre class="cmd">cua ▸ <b>--model</b>  → 2  (hf)
+cua ▸ <b>--budget</b>    max_seconds ▸ <b>60</b>
+cua ▸ <b>--strategy</b> → 5 (openhands-stuck)
+cua ▸ <b>Gonder butonuna bas</b></pre>
+<pre>OLCULEN (Llama-3.1-8B, healthy senaryosu):
+  none              40 adim  17623 tok   (kestim, 300'e gidiyordu)
+  openhands-stuck    3 adim    987 tok
+  arize-control      9 adim   2924 tok   sebep: budget_SECONDS</pre>
+</div>
+<div class="box say"><span class="t">SÖYLE</span>
+"Bu sentetik değil. <b>Gerçek bir model, hiçbir şey bozuk değilken kendiliğinden
+döngüye girdi</b> — 40 çağrının 40'ı <code>left_click</code>, 34'ü birebir aynı argümanla.
+<br><br>Ve beklemediğim bir şey oldu: <code>arize-control</code> <b>süre ekseninden</b>
+durdu, adımdan değil. Betikli modellerde koşumlar 0,01 saniye sürüyordu, süre ekseni hiç
+bağlamıyordu. <b>Gerçek çıkarım yavaş olunca bağlayan eksen değişti.</b>
+<br><br>Çok eksenli bütçeyi şimdiye kadar kaynaklara dayanarak savunuyordum; artık kendi
+ölçümüm var."
+<br><br><b class="red">⚠ <code>hf</code> ile <code>none</code> seçme</b> — bütçe kancası yok,
+300 gerçek API çağrısına gider.
+</div>
+</div>
+
+<h2><span class="n">10</span>Demo aksarsa — kurtarma planı</h2>
+<table>
+<tr><th style="width:38mm">Olursa</th><th>Ne yap / ne söyle</th></tr>
+<tr><td>Komut bulunamadı</td><td><code>cd</code> yanlış klasörde. Paket <code>cua_lab/</code> <b>içinden</b> import ediliyor.</td></tr>
+<tr><td>Bilinmeyen strateji hatası</td><td>Belgede olup kodda olmayan bir isim yazdın — CLI zaten temiz mesaj basıyor ve mevcut listeyi veriyor. <b>Bu bir demo fırsatı:</b> "17 kaynağı belgeledim, 16'sı kodda; çalıştığını gösteremediğimi çalışıyor diye sunmuyorum."</td></tr>
+<tr><td><code>hf</code> takılıyor / internet yok</td><td>Ctrl-C, <code>--model</code> → <code>stubborn</code>. Sayıları slaytan oku: <b>40 adım → 3 adım.</b></td></tr>
+<tr><td>Tablo terminale sığmıyor</td><td>Terminali genişlet ya da <code>--compare</code> yerine tek tek <code>run</code>.</td></tr>
+<tr><td>Beklenmedik sonuç çıktı</td><td><b>Gizleme, oku.</b> "Bu benim beklediğim değil — nedenini birlikte bakalım" demek, çalışmanın yöntemine uygun. İzi <code>replay</code> ile aç.</td></tr>
+</table>
+
+<h2><span class="n">11</span>Beklenen sorular — hazır cevaplar</h2>
+<div class="grid2">
+<div>
+<p><b>"Ortam sentetik, gerçek bir masaüstü değil."</b><br>
+Doğru. Ölçtüğüm şey ortamın gerçekliği değil, <b>kontrolün devreye girip girmediği</b>.
+Sentetik ortam <b>deterministik</b> — kontrol testinin (16 sütun birebir aynı) mümkün
+olmasının sebebi bu; gerçek masaüstünde saat ve imleç her karede hash'i değiştirirdi.
+Modelin gerçekten döngüye girdiğini <code>hf</code> ile ayrıca gösterdim.</p>
+<p><b>"Eşikleri nereden aldın?"</b><br>
+Kaynaklardan — OpenHands 4/3/3/6, OpenClaw 10/20/30. <b>Tahmin olduğunu kabul ediyorum</b>,
+ve 16 numaralı zihniyet (<code>improvement-loop</code>) tam olarak bunun eleştirisi.
+Bir kaynağın sayısını <b>ölçerek düzelttiğim</b> bir vaka da var: <code>loopguard</code>'ın
+eşikleri meşru koşumu başarıdan bir adım önce kesiyordu.</p>
+</div>
+<div>
+<p><b>"Hepsini uygulamak gerekiyor mu?"</b><br>
+Hayır. <b>Öncelik 1</b> tek başına vakaların çoğunu durduruyor — ama <i>neden</i> durduğunu
+söylemiyor. Önerim: <b>1 → 16 → 5</b>. Önce sert tavan, sonra izleri toplayıp eşikleri ölç,
+sonra dedektörleri <b>ölçülmüş eşiklerle</b> yaz.</p>
+<p><b>"Yanlış pozitif riski?"</b><br>
+Ölçtüğüm 108 kombinasyonda sıfır — ama bu iki senaryo, gerçek çeşitlilik değil.
+Literatürden: deterministik kontroller <b>0/63</b>, istatistiksel yaklaşımlar <b>%17</b>.
+Deterministik kuralları tercih etme gerekçem bu.</p>
+<p><b>"Ne kadar iş?"</b><br>
+Öncelik 1 bir öğleden sonra. En büyük kalem <b>gözlemlenebilirlik</b> (iterasyon başına
+span) — mevcut loglama şemasına dokunuyor.</p>
+</div>
+</div>
+
+<div class="box fill"><span class="t">Kapanış — tek cümle</span>
+Model döngüyü kesemez; <b>kesme kararı için gereken bilgi onun görüş alanında değil.</b>
+Kesme yetkisi dışarıda olmalı — ve dışarısı <b>ne olduğunu da söyleyebilmeli.</b>
+<br><br><i>"Her ajan döngüsünün <b>tasarlanmış bir çıkışı</b> olmalıdır — başarı, geri dönüş,
+sorma veya devretme. 'Sonsuza kadar dene' değil. 'Umarım model çözer' değil."</i> — Modexa
+</div>
+
+<div class="foot"><span>8–11 · kurtarma · sorular</span><span>3 / 3</span></div>
+</section>
+</body></html>

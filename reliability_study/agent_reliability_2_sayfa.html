@@ -1,0 +1,349 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<title>Agent Reliability — Tek Sayfa</title>
+<style>
+@page{size:A4;margin:8mm 8mm 6mm 8mm}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{zoom:0.90;font:6.4pt/1.22 "Noto Sans","DejaVu Sans",sans-serif;color:#16181d}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;
+     border-bottom:1.8pt solid #16181d;padding-bottom:.7mm;margin-bottom:1mm}
+h1{font-size:13pt;letter-spacing:-.3px}
+h1 span{font-weight:400;color:#6b7280;font-size:8.6pt}
+.meta{text-align:right;font-size:6.6pt;color:#6b7280;line-height:1.35}
+h2{font-size:8pt;letter-spacing:.4px;text-transform:uppercase;
+   border-bottom:1.1pt solid #16181d;padding-bottom:.25mm;margin:1mm 0 .5mm}
+h2 .n{color:#b91c1c;margin-right:1.2mm}
+h2 .r{float:right;font-weight:400;text-transform:none;letter-spacing:0;color:#6b7280;font-size:6pt}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 3mm}
+.g2{display:grid;grid-template-columns:1.35fr 1fr;gap:0 3.5mm}
+table{width:100%;border-collapse:collapse;font-size:5.9pt;line-height:1.2}
+th{text-align:left;font-size:5.6pt;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;
+   border-bottom:.7pt solid #9ca3af;padding:.3mm .8mm .25mm 0;font-weight:700}
+td{padding:.5mm .9mm .5mm 0;border-bottom:.25pt solid #e5e7eb;vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.kat td{background:#16181d;color:#fff;font-weight:700;font-size:6pt;
+          letter-spacing:.4px;padding:.25mm .5mm}
+tr.kat td span{font-weight:400;opacity:.75;letter-spacing:0}
+code{font-family:"DejaVu Sans Mono",monospace;font-size:5.5pt;background:#f1f2f4;padding:0 .4mm}
+b{font-weight:700}.red{color:#b91c1c}.grn{color:#166534}
+.kirilim td{border:none;padding:0}
+.k{font-family:"DejaVu Sans Mono",monospace;font-size:5.2pt;line-height:1.3;
+   background:#eef0f3;border-left:1pt solid #16181d;padding:.25mm .4mm;margin:.25mm 0;
+   white-space:pre;overflow:hidden;display:block}
+.q{border-left:1.5pt solid #b91c1c;padding:.3mm 0 .3mm 1.4mm;margin:.6mm 0;font-style:italic;color:#374151}
+.q b{font-style:normal}
+.box{border-left:1.6pt solid #16181d;background:#f6f7f9;padding:.45mm .8mm;margin:.35mm 0}
+.box .t{font-weight:700;display:block;margin-bottom:.4mm}
+ul{margin:.2mm 0 .5mm;padding-left:2.5mm}li{margin-bottom:.15mm}
+.big{font-size:10pt;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.foot{margin-top:.5mm;padding-top:.35mm;border-top:.7pt solid #9ca3af;
+      font-size:5pt;color:#6b7280;display:flex;justify-content:space-between}
+</style></head><body>
+
+<div class="hdr">
+  <h1>Agent Reliability <span>— Loop Detection &amp; Task Budget Kontrolleri</span></h1>
+  <div class="meta">14 zihniyet · PoC'de 16 strateji + 1 varyant<br>sayfada yok: <code>improvement-loop</code> · <code>autogen-static</code> (<code>compare</code>'de <code>none</code>'dan ayrışmıyor)<br>
+  <code>cua_lab</code> 79 test · 0 yanlış pozitif · kaynaklar <code>sources_list/</code></div>
+</div>
+
+<!-- ============ NEDEN ============ -->
+<h2><span class="n">01</span>Bu problem neden var<span class="r">kaynak: <code>loop_budget_medium2</code> (Modexa) · <code>loop_budget_source</code></span></h2>
+<div class="g3">
+
+<div>
+<div class="box" style="margin-top:0"><span class="t">Tanım</span>
+Otonom bir sistemin <b>karar ver → araç çağır → gözlemle → gözden geçir → tekrarla</b> döngüsünü
+sürdürmesi, ama <b>bir sonuca varmaması</b>. Modexa'nın ifadesiyle: <i>"sistemlerin ilerleme kaydetmeyi
+bıraktıktan çok sonra bile düşünmeye, araç çağırmaya, tekrar denemeye veya yeniden planlamaya devam
+etmesi."</i></div>
+
+<p><b>Neden bu soru modelde yoktu:</b> bir dil modeli tek başına durur — sorarsınız, cevap verir, biter.
+<b>Ajan = model + döngü.</b> Ajanın bütün gücü buradan gelir, ama modelde hiç olmayan bir soru da
+buradan doğar: <b class="red">bu döngüyü kim kesecek?</b></p>
+
+<p style="margin-top:.6mm">En doğal cevap "model kendisi karar versin"; pratikte en kötü cevap bu. Sebep modelin zekâsı
+değil <b>görüş alanı</b>: her turda önündeki konuşmaya bakıp bir sonraki adımı seçiyor,
+<b>kaç kez aynı şeyi denediğini ve ne harcadığını görmüyor</b>.</p>
+
+<div class="q">"Ajanlar, insanların döngüye girmesiyle <b>aynı nedenden</b> dolayı döngüye girerler:
+<b>ilerleme kaydetmediklerinin farkında değildirler.</b>"</div>
+
+<p style="margin-top:.5mm"><b>Dışarıdan nasıl görünür:</b> sonsuz tekrarlar ("belki araç başarısız oldu?") ·
+bitmeyen aramalar ("bir kaynak daha bulayım") · özeleştiri sarmalları ("cevabım yanlış olabilir") ·
+araç ping-pong'u (A→B→A→B) · plan çalkantısı (her adımda planı baştan yaz).</p>
+<p><b>Ajan sürekli hareket halindedir ama sistem ilerlemiyordur.</b>
+<b class="red">Hareket etmek, ilerlemek demek değildir.</b></p>
+</div>
+
+<div>
+<div class="box" style="margin-top:0;border-left-color:#b91c1c"><span class="t">Beş gerçek sebep — Modexa</span>
+<b>Çoğu döngü "kötü modellerden" kaynaklanmaz. Kötü teşvikler ve eksik kısıtlamalardan kaynaklanır.</b></div>
+<table>
+<tr><td style="width:4mm"><b>1</b></td><td><b>Açık bir "bitti" tanımının olmaması.</b> İnsanların içsel bir
+"bu kadar yeterli" algısı vardır; siz vermedikçe ajanların yoktur. Prompt "kapsamlı ol · doğrula ·
+hiçbir şeyi kaçırma" diyorsa, ajana <b>sonsuza kadar arama yapmasını</b> söylemişsinizdir.
+<i>"Ajan bozuk değildir. Sadece verdiğiniz emirlere itaat ediyordur."</i></td></tr>
+<tr><td><b>2</b></td><td><b>Güvenilmez araçlar + naif retry.</b> Araç tutarsızsa (zaman aşımı, hız sınırı,
+kısmi yanıt) ajan bunu "tekrar dene, ama biraz farklı" diye yorumlar. Üst sınır yoksa
+<b>sistem bir slot makinesine dönüşür</b>.</td></tr>
+<tr><td><b>3</b></td><td><b>Belirsiz hedef.</b> "Şunu düzelt" bir gereksinim değildir. Başarı kriteri
+belirsizse ajan yorumlar arasında gidip gelir — <i>"saatlerce aynı paragrafı yeniden yazan bir öğrenci
+gibi"</i>. <b>Hedef belirsizliği, sistem üzerinde döngü baskısı yaratır.</b></td></tr>
+<tr><td><b>4</b></td><td><b>Bağlam her adımda kötüleşir.</b> Her adım yeni token ekler: loglar, kısmi
+planlar, araç çıktıları. Sonunda ajan <b>kendi kafa karışıklığının dağınık bir transkripti üzerinden</b>
+mantık yürütmeye başlar — ve kafa karışıklığı daha fazlasını besler.</td></tr>
+<tr><td><b class="red">5</b></td><td><b class="red">Ajanın "yanlış yapmamak" üzerine optimize edilmesi.</b>
+Aşırı tedbir teşvik eden bir prompt'ta en güvenli yol <b>"bir kontrol daha yap"</b> olur.
+<i>"Bir sorun çözücü inşa etmediniz. <b>Bir riskten kaçınma makinesi</b> inşa ettiniz."</i>
+<span style="color:#6b7280">Bu sebep başka hiçbir kaynakta yok — ve kaynağı kod değil <b>prompt</b>,
+yani bu sayfadaki <b>hiçbir mekanizma onu çözmüyor</b>.</span></td></tr>
+</table>
+<div class="box" style="border-left-color:#b91c1c"><span class="t">Zihinsel model</span>
+Ajanları <b>arama algoritması</b> gibi düşünün. Şunlardan yoksun bir arama başıboş dolaşır:
+<b>durma koşulu · bütçe · ilerleme sezgiseli</b>. Yani <b>döngüler eksik kısıtlamalardır</b>.
+<br><b class="red">Çözüm "ajana durmasını söylemek" değildir — sisteme durması için MEKANİK NEDENLER vermektir.</b></div>
+</div>
+
+<div>
+<table>
+<tr><th colspan="2">ÖLÇÜLMÜŞ KANIT — teorik değil</th></tr>
+<tr><td><b>MAST</b> · 1642 iz, 7 framework — adım tekrarı %15,7 (en sık) + durma koşulunu tanımama %12,4</td>
+<td class="n"><b class="red">%28,1</b></td></tr>
+<tr><td><b>Token Budgets</b> · 21 framework — "katalogda bir kullanıcı <b>parasını ödemeden önce</b> engellenmiş tek bir vaka yok"</td>
+<td class="n"><b>63</b> olay</td></tr>
+<tr><td><b>Anthropic referans döngüsü</b> — <code>while True</code>, tur sayacı yok, döngü tespiti yok, bütçe yok</td>
+<td class="n"><b>0</b> kontrol</td></tr>
+<tr><td><b>31 harness</b> kaynak kodundan — mekanizma <b>var ama varsayılanda kapalı</b> · ADK <code>LoopAgent</code>: <code>None</code>=sınırsız</td>
+<td class="n"><b class="red">12/24</b></td></tr>
+<tr><td><b>A-B-A-B döngü</b> — ardışık tekrar sayanın sayacı her adımda sıfırlanır</td>
+<td class="n"><b class="red">2/22</b></td></tr>
+<tr><td><b>Gerçek LLM, sağlıklı senaryo</b> <span style="color:#6b7280">(kendi ölçümüm)</span> — hiçbir şey bozuk değilken 40 çağrının 40'ı aynı tıklama</td>
+<td class="n"><b class="red">40/40</b></td></tr>
+</table>
+<div class="box"><span class="t">Doğru soru</span>
+"Bu framework'te loop detection <b>var mı</b>" değil — <b>"varsayılanda açık mı".</b>
+Hermes'te aynı fonksiyonun gerçek varsayılanı <code>sys.maxsize</code>, docstring'i <code>"default: 90"</code>.</div>
+<div class="q" style="margin-bottom:0">"Ajanlar sadece yanıldıkları için başarısız olmazlar.
+<b>Israrcı oldukları için</b> başarısız olurlar. Ve ısrar pahalıdır."
+<br>"Durma koşulları olmayan otonomi, sadece bir <b>yangındır</b>."</div>
+</div>
+</div>
+
+<h2><span class="n">02</span>Çözüm kategorileri — beşi de aynı soruya farklı cevap<span class="r">sıra = uygulama önceliği · sayılar: <code>dead_button</code> senaryosu · kontrolsüz = 300 adım / 105.000 token / $1,050</span></h2>
+<table>
+<tr><th style="width:27mm">zihniyet</th><th style="width:47mm">nasıl davranır — kaynağın ayırt edici fikri</th>
+<th style="width:41mm">tetiklendiğinde ne yapar</th><th class="n">durum</th><th class="n">adım</th><th class="n">$</th>
+<th>neyi kaçırır</th></tr>
+
+<tr class="kat"><td colspan="7">SAYAÇ &nbsp;<span>— ne yaptığını anlamaya çalışma, kaç yaptığını say · bir tamsayı, durum yok, O(1) · dördü de AYNI sayacı kullanıyor, fark sayaç dolduğunda ne olduğu</span></td></tr>
+<tr><td><b>1 arize-control</b><br><span style="color:#6b7280">Arize — Agent Control Loop</span></td>
+<td>Beş eksende sayar: <b>adım · replan · token · süre · dolar</b>. Aralarında hiyerarşi var — <b>adım limiti birincil</b>, çünkü diğer sinyaller yorum gerektirir ("görev tamamlandı" modelin görüşü, "hata" tanıma bağlı) ama <b>on iki adım attıysa on iki adım atmıştır</b>.</td>
+<td><b>SERT keser</b> — lütuf turu yok, cevap payı yok. İkinci katkısı: <b>durma sebebini kaydeder</b>. "%70 başarı" diyen bir sistemde kalan %30'un ne olduğu her şeyi değiştirir: hepsi limitte bitiyorsa limit dar, hepsi hata veriyorsa araçlar bozuk.</td>
+<td class="n">BUDGET_<br>EXHAUSTED</td><td class="n">13</td><td class="n">0,042</td>
+<td><b>Ne olduğunu söylemez</b> — sadece "çok oldu". Kandırılamaz ama teşhis değil, tavandır. Pencere dedektörüyle birlikte şart.</td></tr>
+
+<tr><td><b>2 budget-grace</b><br><span style="color:#6b7280">AgentScope + Hermes<br><i>2 varyant</i></span></td>
+<td>Aynı sayaç. Gözlemi şu: <b>sert tavan ajanı işin ortasında keser ve o ana kadarki iş çöpe gider</b> — sonucu toparlayacak bütçesi kalmamıştır. Ama "lütfen bitir" demek de yetmez, model dinlemeyebilir.</td>
+<td>Limit dolunca <b>1–5 ek tur</b> verir ve <b>araç seçimini kilitler</b>: ajan yeni araç çağıramaz, yalnız cevap üretebilir. Nazik rica değil <b>mekanik kısıt</b>. Zorla biten koşum <code>OK</code> dönmez — tükeniş görünür kalır.</td>
+<td class="n">DEGRADED</td><td class="n">13</td><td class="n">0,042</td>
+<td>Lütuf turları da para yakar. <b>İki varyant farkı</b>: AgentScope 5 tur/uyarı yok · Hermes 1 tur/yalnız <b>süre</b> ekseninde uyarı.</td></tr>
+
+<tr><td><b>3 claude-advisory</b><br><span style="color:#6b7280">Claude Task Budgets</span></td>
+<td>Tam tersini savunur: <b>dışarıdan kesmek kaba</b>. Geri sayımı <b>prompt'a enjekte eder</b>, model kalan bütçesini görür ve işi kendi toparlar. <span class="red">Hermes ile karşıtlık:</span> Hermes bunu denedi ve kaldırdı — <i>"ara basınç uyarıları modelleri karmaşık görevlerde erken pes ettiriyordu."</i></td>
+<td><b>Tavsiye, zorlama değil</b> — model, kesilmesi bitirilmesinden zararlıysa bütçeyi aşabilir. Amaç durdurmak değil <b>öngörülebilir iniş</b>. Bizim aldığımız ders: <b>eksene göre karar ver</b> — adımda uyarma, sürede uyar.</td>
+<td class="n">BUDGET_<br>EXHAUSTED</td><td class="n">13</td><td class="n">0,042</td>
+<td>Zorlayıcı değil; model dinlemezse hiçbir koruma yok. Ve bütçe yetersizse model <b>işi hiç denemiyor</b> — "her ihtimale karşı düşük tutayım" geri tepiyor.</td></tr>
+
+<tr><td><b>4 agentbudget-dollar</b><br><span style="color:#6b7280">AgentBudget</span></td>
+<td>Token bir <b>vekil ölçü</b>: iki model arasında 15× fiyat farkı olabilir, aynı token sayısı çok farklı fatura üretir. Sistemin dışındaki <b>gerçek birimi</b> sayar. Ayrıca tekrar tespitini zamana bağlar: "on çağrı" değil <b>"bir dakikada on çağrı"</b> — yavaş ama kronik döngü sayı eşiğine hiç ulaşmadan saatlerce yakar.</td>
+<td><b>Nihai cevap payı %15</b>: sert limit erken tetiklenir, ajan tavana çarptığında elinde hâlâ "bulduklarımı özetleyeyim" diyecek bütçe kalır. <code>terminated_by</code> ile hangi eksenin bitirdiği kaydedilir.</td>
+<td class="n">BUDGET_<br>EXHAUSTED</td><td class="n">12</td><td class="n">0,038</td>
+<td>Fiyat tablosu bakım ister; model değişince yanlış sayar. Rezerv oranı da tahmin — nihai cevabın gerçek maliyetinden ölçülmeli.</td></tr>
+
+<tr class="kat"><td colspan="7">PENCERE &nbsp;<span>— son N olayı tut, karşılaştır · sayacın söyleyemediğini söyler: NE yanlış gidiyor · bedeli tek soru: "aynı şey" ne demek?</span></td></tr>
+<tr><td><b>5 openhands-stuck</b><br><span style="color:#6b7280">OpenHands <code>stuck_detector.py</code></span></td>
+<td><b>Ne yapar:</b> her eylemin bir <b>parmak izini</b> çıkarır, son 20 olayda beş ayrı desen arar — her birine ayrı eşik: aynı eylem+gözlem <b>4</b> · aynı eylem+hata <b>3</b> · monolog <b>3</b> · A-B-A-B <b>6</b> · context-window.
+<b>Nasıl anlar:</b> imzayı kurarken <b>her turda zaten değişen alanları atar</b>. Atmazsan iki özdeş çağrı asla eşit çıkmaz — dedektör çalışır, log basar, <b>hiçbir zaman hiçbir şey bulmaz</b>.
+<span class="k">imza = sha256(kind + name + payload)
+ATILAN: tool_call_id, timestamp, request_id,
+        trace_id, seed, nonce
+pencere = son 20 olay (son USER mesajindan)</span></td>
+<td>Kademelendirme <b>yok</b> — doğrudan durur. "Sıkıştıysan sıkışmışsındır." Ve <code>STUCK</code> <b>ayrı bir terminal durum</b>: ne başarı ne hata, üçüncü bir sonuç.</td>
+<td class="n grn">STUCK</td><td class="n grn"><b>3</b></td><td class="n grn"><b>0,011</b></td>
+<td>İmza normalizasyonu yanlışsa <b>dedektör çalışır, log basar, hiçbir zaman hiçbir şey bulmaz</b> — ve testleri geçer. Hata türlerinin en kötüsü.</td></tr>
+
+<tr><td><b>6 openclaw-pingpong</b><br><span style="color:#6b7280">OpenClaw 2026.7.1</span></td>
+<td>Üretimde yıllanmış hâli. Dedektörlerin <b>adı var</b>: <code>genericRepeat</code> / <code>knownPollNoProgress</code> / <code>pingPong</code> — hangi dedektörün konuştuğunu bilmek, ne olduğunu bilmek demek. Parmak izi = araç + argüman + <b>sonuç</b> hash'i.</td>
+<td>Üç kademe <b>10 → 20 → 30</b> (uyarı → kritik → küresel devre kesici). Ve bir olgunluk göstergesi: <b>sıkıştırma sonrası ayrı koruma</b> — bağlam sıkıştırmanın kendisi döngü üretebiliyor, üç deneme boyunca özel gözetim.</td>
+<td class="n">STUCK</td><td class="n">11</td><td class="n">0,038</td>
+<td>Kaynakta <code>enabled</code> varsayılanı <b>false</b>. Üçüncü kademeye kadar çok para yanar — bizim ölçümde 11 adım, openhands 3.</td></tr>
+
+<tr><td><b>7 pi-signature</b><br><span style="color:#6b7280">pi-anti-doom-loop</span></td>
+<td><b>Kapattığı boşluk:</b> ajan aynı şeyi <b>farklı kelimelerle</b> söylüyor — <code>ls -la</code> / <code>ls -al</code> / <code>ls -a -l</code>. Parmak izleri farklı, imza dedektörü göremez.
+<b>Nasıl anlar:</b> iki mesajın <b>ortak kelime oranına</b> bakar — küme kesişimi. Gömme modeli yok: deterministik, anında, bedava. Yanına 5 sinyal daha, ayrı eşiklerle.
+<span class="k">A, B = set(m1.lower().split()), set(m2...)
+ortusme = len(A & B) / max(len(A), len(B))
+if ortusme >= 0.55:  ayni adimin yeniden ifadesi</span></td>
+<td>Kademeli: metin döngüsünde <b>önce yönlendir, sonra kes</b>; araç çağrısında <b>engelle → sebebini söyle → turu bitir</b>. Engellenen çağrı pencereye girmez, ayrı bir blok sayacı tutulur.</td>
+<td class="n">STUCK</td><td class="n">4</td><td class="n">0,014</td>
+<td>6 sinyal × ayrı eşik × iki müdahale merdiveni × sayaç sıfırlama kuralları. Doğru uygulamak için hepsini akılda tutmak gerekiyor; yanlış uygulanırsa <b>sessizce ölür</b>.</td></tr>
+
+<tr><td><b>8 strands-entropy</b><br><span style="color:#6b7280">Strands SDK</span></td>
+<td>Tekrarın <b>tanımından kaçar</b>. Herkes tanım bataklığına giriyor: ardışık mı sayalım? A-B-A-B olursa? A-B-C-A-B-C olursa? Her desene ayrı tarama mı? Strands tersini sorar: <b>"son N adımda kaç FARKLI şey oldu?"</b> — <code>len(set(pencere)) &lt; eşik</code>, tek satır.</td>
+<td>Tek kural bütün desenleri yakalar; <b>k=1..12 çevrim taraması gerekmez</b>. <code>loop_budget_source</code> bağımsız olarak aynı fikre varmış — iki ayrı kaynak, aynı içgörü.</td>
+<td class="n">STUCK</td><td class="n">6</td><td class="n">0,021</td>
+<td>Meşru olarak dar alanda çalışan iş de düşük çeşitlilik gösterir — bir dosyayı defalarca düzenleyip test eden ajan aslında ilerliyordur.</td></tr>
+
+<tr><td><b>9 loopguard-dignity</b><br><span style="color:#6b7280">"Ne Zaman Durması Gerektiğini Bilen Ajanlar"</span></td>
+<td><b>Kapattığı kör nokta:</b> ajan her turda <b>gerçekten farklı</b> bir şey deniyor olabilir — hiçbir tekrar dedektörü tetiklenmez çünkü hiçbir şey tekrarlanmıyor, ama hiçbiri de işe yaramıyor.
+<b>Nasıl anlar:</b> eyleme değil <b>dünyanın durumuna</b> bakar — ekran hash'i 8 adım değişmediyse ilerleme yok. Ayrıca eylem başına retry sayar ve <b>ekran değişince sıfırlar</b>.
+<span class="k">son = ctx.screen_hashes[-8:]
+if len(son)==8 and len(set(son))==1:  DUR
+retries[(eylem, argüman)] >= 3:       DUR
+ekran degisti: retries.clear()  # ilerleyen retry,
+                                # tukenen retry degil</span></td>
+<td><b>Çekimser kalır</b> — <code>NEEDS_INPUT</code>, hata değil <b>ayrı bir sonuç</b>. Ve <b>dört alanlı rapor</b> üretir: ne denedi · ne buldu · neden durdu · sırada ne var. <i>"Bu, sonsuz döngüyü faydalı kısmi sonuca dönüştürür."</i></td>
+<td class="n">NEEDS_<br>INPUT</td><td class="n">7</td><td class="n">0,025</td>
+<td>Hızlı ve ucuz döngüler sınırlar dolmadan çok tur döner. <span class="grn">Kaynağın eşikleri (3 ve 2) bu alana taşınmadı — ölçtük, meşru koşumu <b>başarıdan bir adım önce</b> kesiyordu; 8'e çıkarıldı.</span></td></tr>
+
+<tr class="kirilim"><td colspan="7" style="page-break-before:always"></td></tr>
+<tr class="kat"><td colspan="7">DÜNYA &nbsp;<span>— davranışı bırak, KANITA geç · ajanın en tehlikeli hatası döngüye girmek değil (o gürültülü, fatura kabarır), yanlış işi doğru sanmak (o sessiz)</span></td></tr>
+<tr><td><b>10 verify-gate</b><br><span style="color:#6b7280">Loop Engineering</span></td>
+<td><b>Ne yapar:</b> model <code>Finish</code> dediğinde bu <b>kabul edilmez</b> — <code>on_finish_claim</code> kancası devreye girer.
+<b>Nasıl anlar:</b> kanıtı <b>ortamdan</b> okur, modele sormaz. Gerçek sistemde bu testi koşturmak, dosyayı okumak, dış servise sormaktır.
+<span class="k">def on_finish_claim(fin, ctx):
+    kanit = "gonderildi" in ctx.sandbox.describe()
+    if kanit: return CONTINUE          # kapi acildi
+    return self._reddet(...)           # NUDGE, sonra STOP</span></td>
+<td>Kanıt yoksa <b><code>NUDGE</code></b> → <b>koşum SÜRER</b>, red sebebi ajanın <b>gözlem akışına</b> girer ("ekranda kanıt yok, iş bitmedi") ve ajan hatasını düzeltebilir. 2 redde ısrar ederse <code>STOP</code>. Gerçek iz: <code>nudge → nudge → stop</code>, 3 adım.</td>
+<td class="n red">CEILING</td><td class="n red">300</td><td class="n red">1,050</td>
+<td><b>Kör nokta kancanın adında:</b> <code>on_finish_claim</code> — <b>iddia gelmezse kanca HİÇ çağrılmaz</b>. Gerçek LLM ile ölçüldü: 50 adım boyunca <code>continue</code>, en pahalı sütun. <span class="grn"><code>liar</code> modeli → DEGRADED 3 adım; <code>none</code> aynı koşumu <code>OK</code> sayıp yapılmamış işi teslim ediyor.</span></td></tr>
+
+<tr><td><b>11 telemetry-repair</b><br><span style="color:#6b7280">Real-Time Detection &amp; Repair</span></td>
+<td><b>Üç kural, sırayla; ilk düşenin ADI döner.</b> Sıra dıştan içe — sonuç zaten yanlışsa yolu inceleme.
+<b>Ne yapar:</b> tek kapı değil <b>üç ayrı kural</b>, sırayla — ve <b>ilk düşenin ADI</b> döner. Sıra dıştan içe: sonuç zaten yanlışsa yolu incelemeye gerek yok.
+<b>Nasıl anlar: 1)</b> ajanın iddiası ile dünyanın hâli çelişiyor mu &nbsp;<b>2)</b> görevin gerektirdiği çağrılar izde var mı (<b>küme kapsama</b>) &nbsp;<b>3)</b> araç boş çıktı mı döndürdü.
+<b>İstatistik değil kural</b> — eşik yok, model yok, kalibrasyon yok: ya sağlar ya sağlamaz.
+<span class="k"># 1 total_consistency — SONUC: iddia &lt;-&gt; dunya
+if "gonderildi" not in ekran and "gonder" in iddia:
+    dus("total_consistency")
+# 2 required_coverage — YOL: iz &lt;-&gt; gorevin geregi
+yapilan = {e.name for e in events if e.kind is ACTION}
+if not {"type","left_click"} &lt;= yapilan:
+    dus("required_coverage", eksik=gerekli-yapilan)
+# 3 tool_contract — GIRDI: donen &lt;-&gt; sozlesme
+for e in events[-6:]:
+    if e.kind is OBSERVATION and not e.payload["output"]:
+        dus("tool_contract")</span></td>
+<td>Checkpoint'e geri sarar ve <b>düşen kuralın ADINI</b> söyler. Ölçülen dört kademe: hiçbir şey deme <b>%16</b> · genel uyarı <b>%36</b> · <b>doğru cevabı ver %36</b> · <b class="grn">hangi kontrol düştü %45</b>. Cevabı verince ajan kopyalıyor, <b>neden</b> yanıldığını anlamıyor.</td>
+<td class="n red">CEILING</td><td class="n red">300</td><td class="n red">1,050</td>
+<td>Checkpoint tutmak mimariye ciddi yük. Ve <code>max_repairs=1</code> — <b>ikinci ihlalde onarım değil DURMA</b>, çünkü aynı çalışma ölçmüş: <b>döngüde yeniden çalıştırma aynı döngüyü üretiyor</b>. <span class="grn"><code>liar</code> → 2 adım</span></td></tr>
+
+<tr><td><b>12 galileo-breaker</b><br><span style="color:#6b7280">Galileo AI</span></td>
+<td><b>Ne yapar:</b> <b>araç başına</b> kayan bir pencere tutar; o aracın son çağrılarının <b>yüzde kaçının</b> hata verdiğine bakar.
+<b>Neden sayı değil oran:</b> "üç hata" bir araç <b>yüz kez</b> çağrıldıysa normaldir, <b>dört kez</b> çağrıldıysa değildir.
+Pencere <b>kaydığı için</b> oran düşerse kesici açılmaz — <code>flaky</code>'de meşru retry bu yüzden kesilmiyor.
+<span class="k">calls[arac] = deque(maxlen=5)   # arac BASINA
+calls[arac].append(hata_mi)     # [ok,hata,hata,hata]
+if len(calls[arac]) >= 4:
+    oran = sum(calls[arac])/len(calls[arac])  # .75
+    if oran >= 0.75:  KESICI AC</span></td>
+<td><b>İki kademe, bilerek ayrı.</b> <code>wasted_calls</code> → <b>kesmez, raporlar</b> (asıl dert kesmek değil, <i>"hakkında hiç ticket açılmayan hatayı"</i> görünür kılmak). <code>tool_circuit_open</code> → oran eşiği aşarsa keser. Raporu ajanı suçlamaz: <b>"ajan doğru davrandı; zafiyet araç katmanında."</b></td>
+<td class="n red">CEILING</td><td class="n red">300</td><td class="n red">1,050</td>
+<td>Bu senaryoda <b>hiç hata yok</b> — buton sessizce hiçbir şey yapıyor, bakacağı veri yok. Geçici ile kalıcı hatayı ayırması tamamen eşiğe bağlı. <span class="grn"><code>broken_tool</code> → DEGRADED 5 adım (2. hatada uyardı, 3'te kesti)</span></td></tr>
+
+<tr class="kat"><td colspan="7">ŞEKİL &nbsp;<span>— tespiti bırak, döngünün OLUŞMASINA izin verme · yanlış pozitif problemi hiç doğmaz çünkü tespit yok · bedeli: mevcut ajana sonradan eklenemez</span></td></tr>
+<tr><td><b>13 modexa-statemachine</b><br><span style="color:#6b7280">Modexa</span></td>
+<td>İzinli geçiş tablosu:<br>
+<code>ANLA→TOPLA·DEVRET</code><br>
+<code>TOPLA→EYLEM·TOPLA·DEVRET</code><br>
+<code>EYLEM→DOGRULA·DEVRET</code><br>
+<code>DOGRULA→YANIT·EYLEM·DEVRET</code><br>
+<b class="red">DOGRULA→TOPLA yok</b> — "doğrulayamadım, baştan toplayayım" döngüsü <b>imkânsız</b>.
+Ve <code>DOGRULA</code> boş bir geçiş değil <b>bir KAPI</b>: eylem gerçekten bir şey değiştirdi mi?</td>
+<td>Değiştirmediyse ajan kendi retry'ını <b>icat etmez</b>, <b>merdivene</b> girer — indeks yalnız <b>ileri</b>:
+<code>backoff</code> → <code>araç değiştir</code> → <code>kapsam daralt</code> → <b><code>kullanıcıya sor</code></b> → <code>elindekiyle cevapla</code>.
+Gerçek iz: 1→2→3. basamak, sonra çekimser. 4. basamağın sözleşmesi: <b>tek soru</b> · neyin değişeceğini açıkla · cevapsızlıkta varsayılan.</td>
+<td class="n">NEEDS_<br>INPUT</td><td class="n">8</td><td class="n">0,028</td>
+<td>Esnekliği azaltır; öngörülemez işler makineye sığmaz. Raporunun cümlesi zihniyetin özeti: <b>"döngü TESPİT edilmedi — oluşmasına izin verilmedi."</b> <span class="red">Kaynağın beşinci döngü sebebini <b>hiçbir mekanizma çözmüyor</b> — kaynağı kod değil prompt.</span></td></tr>
+
+<tr class="kat"><td colspan="7">KARAR &nbsp;<span>— "ne zaman dur" yanlış soru · diğer 13'ü döngünün KENARINDA durup izliyor, bu İÇİNE girip eylem seçimine karışıyor · tek başına koşumu korumaz</span></td></tr>
+<tr><td><b>14 voi-allocation</b><br><span style="color:#6b7280">Inference-Time Budget Control</span></td>
+<td>Bir tavan koyduğunuzda ajan tavana kadar istediğini yapar — <b>tavana nasıl geldiği umurunuzda değildir</b>. Oysa aynı bütçeyle daha iyi sonuç alınabilirdi. Eylemleri <b>birim bütçe başına faydaya</b> göre puanlar.<br>
+Baskı: <b>ρ = 1 − min(</b>kalan<sub>araç</sub>/B<sub>araç</sub>, kalan<sub>token</sub>/B<sub>token</sub><b>)</b><br>
+<b class="red">min, ortalama değil</b> — ve fark kritik: araması bitmiş (0/3) ama token'ı bol bir ajan için <b>ortalama → ρ≈0,35 "rahatım" (yanlış)</b>, <b>minimum → ρ=1,00 "aramam bitti" (doğru)</b>.</td>
+<td><b>Durdurmaz</b> — prompt'a baskı notu yazar, model karar verir. Üstte <b>deterministik guard</b>, çünkü saf optimizasyon tehlikeli: <b>"cevap ver" her zaman en ucuz eylemdir</b>, yani ρ arttıkça <b>otomatik kazanır</b> — cevabın doğruluğundan bağımsız. Ajan aceleyle kötü cevaba kaçar ve sistem bunu <b>başarı</b> sayar. Kanıt zayıfken <b>erken cevap engellenir</b>.</td>
+<td class="n red">CEILING</td><td class="n red">300</td><td class="n red">1,050</td>
+<td>Kör noktası <b>tanımından</b> geliyor: durdurmuyor. Sert tavanla birlikte kullanılmalı. Bol bütçede kazancı erir. <span class="grn">Ölçüldü: bütçe cezası çıkarılınca F1 <b>0,63 → 0,43</b> — ana sonuç "puanlama kullandık" değil, <b>kalan bütçeyi eylem seçimine katmak</b>.</span></td></tr>
+</table>
+
+<h2><span class="n">03</span>Peki bu bilgiyle ne yapacağız<span class="r">üç soru: kanıt ne kadar güçlü · riski ne · koymak için ne gerekiyor</span></h2>
+<div class="g3">
+
+<div>
+<div class="box" style="margin-top:0;border-left-color:#166534"><span class="t">A · Kanıt ne kadar güçlü?</span>
+Aşağıdaki üç sayı <b>başka çalışmaların ölçtükleri</b> — sunumda alıntılayabileceğin, tartışmaya kapalı bulgular.
+Dördüncü kutu <b>benim kendi ölçümüm</b>: aynı kod, tekrarlanabilir.</div>
+<table>
+<tr><th style="width:26mm">sayı</th><th>neyin göstergesi</th></tr>
+<tr><td><b class="grn">%96 / 0 yanlış pozitif</b><br><span style="color:#6b7280">istatistiksel monitör: %54 / %17</span></td>
+<td><b>Basit olan, karmaşık olanı yeniyor.</b> Üç deterministik kural, eğitilmiş bir davranış monitöründen
+hem daha çok yakalıyor hem <b>hiç yanlış alarm vermiyor</b>. → Önce kural yaz, model eğitme.</td></tr>
+<tr><td><b>%45</b> vs %36 vs %16<br><span style="color:#6b7280">4 onarım kademesi</span></td>
+<td><b>Ajana ne söylediğin, ne yaptığından önemli.</b> "Hangi kontrol düştü" demek, <b>doğru cevabı
+vermekten</b> iyi sonuç veriyor. → Dedektör tetiklenince <b>dedektörün adını</b> söyle.</td></tr>
+<tr><td><b>$2,45</b> vs <b>$134,50</b><br><span style="color:#6b7280">≈55× · aynı görev</span></td>
+<td><b>Bütçeyi büyütmek çözüm değil.</b> Pahalı arama yöntemi daha kötü doğruluk verdi; ayrıca 36 koşumun
+21'inde yüksek reasoning effort doğruluğu artırmadı. → Daha çok harcamak yerine <b>daha iyi durdur</b>.</td></tr>
+</table>
+<div class="box" style="border-left-color:#166534"><span class="t">Kendi ölçümüm — <code>cua_lab</code></span>
+<b>300 → 3 adım</b> · 105.000 → 1.050 token · $1,050 → $0,011 &nbsp;<b class="red">100× ucuz</b><br>
+<b>0 yanlış pozitif:</b> 18 strateji × 3 meşru senaryo × 2 model = <b>108 kombinasyon</b>; hepsinde sütunlar
+<code>none</code> ile <b>birebir aynı</b> — guardrail çalışan koşuma <b>tek token bindirmiyor</b>.<br>
+<span style="color:#6b7280">bağımlılık yok · 79 test · 16 strateji + 1 varyant</span></div>
+</div>
+
+<div>
+<div class="box" style="margin-top:0;border-left-color:#b91c1c"><span class="t">B · Riski ne? — "peki zararı yok mu" sorusunun cevabı</span>
+Bunlar <b>tek tek stratejilerin</b> değil, <b>yaklaşımın tamamının</b> ortak zayıflıkları. Sunumda önden
+söylemek, sorulmasını beklemekten iyi.</div>
+<table>
+<tr><th style="width:24mm">risk</th><th>ne demek</th></tr>
+<tr><td><b>Yanlış pozitif</b></td><td>Meşru bir toplu işlem "döngü" sayılıp kesilebilir. <b>Guardrail'in kendi zararı var</b> ve ölçülmeli.</td></tr>
+<tr><td><b>Sessizce ölme</b></td><td>İmza yanlışsa dedektör çalışır, log basar, <b>hiçbir şey bulmaz</b> — ve <b>testleri geçer</b>, çünkü testler "yakaladı mı" diye bakar.</td></tr>
+<tr><td><b>Eşikler tahmin</b></td><td>Dar bir limit grafikte <b>"model kötüleşti"</b> gibi görünür. Model aynıdır, limitin dardır — sessiz kalite gerilemesi.</td></tr>
+<tr><td><b>Maskeleme</b></td><td>Bütçe darsa dedektör hiç konuşamaz: koşum <b>doğru durur ama teşhis kaybolur</b>. Bütçe <i>bir şeyin</i>, döngü tespiti <i>neyin</i> yanlış gittiğini söyler.</td></tr>
+<tr><td><b>Dar kapsam</b></td><td>Tabloda <b>4 satır <code>CEILING</code></b> — kör noktalar. <b>Tek katman yetmiyor.</b> Ve uyarmak geri tepebilir (adım ekseninde ölçülmüş).</td></tr>
+<tr><td><b class="red">Prompt kaynaklı döngü</b></td><td><b class="red">Hiçbiri çözmüyor.</b> §01'in 5. sebebi: kaynağı kod değil, prompt.</td></tr>
+</table>
+</div>
+
+<div>
+<div class="box" style="margin-top:0"><span class="t">C · Koymak için ne gerekiyor?</span>
+Bir sisteme guardrail eklemeden <b>önce</b> hazır olması gereken beş şey. Bunlar olmadan yukarıdaki
+mekanizmaların hiçbiri çalışmaz.</div>
+<table>
+<tr><th style="width:5mm">#</th><th>gereklilik</th></tr>
+<tr><td><b>1</b></td><td><b>İterasyon başına span.</b> Koşum tek span'sa 4–19. adımların aynı çağrı olduğunu göremezsin.
+<b>Loop detection önce bir gözlemlenebilirlik gereksinimi</b>, sonra bir algoritma.</td></tr>
+<tr><td><b>2</b></td><td><b>İmza normalizasyonu.</b> Hangi alan her turda değişiyor, hangisi anlam taşıyor — envanteri çıkarılmalı.
+<b>Sisteme özel; kütüphane halletmiyor.</b> Yanlış yaparsan "sessizce ölme" riski.</td></tr>
+<tr><td><b>3</b></td><td><b>Terminal durum ayrımı.</b> <code>completed / max_steps / budget / timeout / error / stuck</code> ayrı ayrı
+kaydedilmeli — tek bir başarı oranı hepsini gizler.</td></tr>
+<tr><td><b>4</b></td><td><b>Çok eksenli sayaç.</b> Tek eksen diğerlerini gizler.
+<span class="grn">Ölçüldü: betikli modelde <b>adım</b> ekseni bağlıyordu, gerçek modelde <b>süre</b> ekseni —
+model hızı değişince bağlayan eksen değişti.</span></td></tr>
+<tr><td><b>5</b></td><td><b>Nihai cevap payı.</b> Sert limit biraz erken tetiklensin ki ajan elindekini toparlayıp sunabilsin —
+yoksa yapılan iş çöpe gider.</td></tr>
+</table>
+<div class="box"><span class="t">Ayrıca</span>
+Kapatma anahtarı olsun ama <b>varsayılan AÇIK</b> — taranan <b>24 harness'ın 12'sinin hatası</b> bu.
+Eşikler prompt'la <b>birlikte sürümlensin</b>. CI'da <b>"tetiklenmemeli"</b> koşumları olsun.</div>
+</div>
+</div>
+
+<div class="box" style="border-left-color:#b91c1c;margin-top:.8mm;padding:.6mm 1mm">
+<b class="big">NEREDEN BAŞLANMALI &nbsp;1 → ÖLÇ → 5</b> &nbsp; Önce <b>sert tavan</b> · sonra <b>izleri topla, p99'dan eşikleri çıkar</b> · sonra dedektörleri <b>ölçülmüş eşiklerle</b> yaz. <i>Eşiği ölçmeden dedektör yazmak, hangi sayıyı yazacağını bilmeden yazmaktır.</i>
+<br><b>Tek cümle:</b> Model döngüyü kesemez — gereken bilgi onun görüş alanında değil. Kesme yetkisi dışarıda olmalı, ve dışarısı <b>ne olduğunu da söyleyebilmeli.</b>
+<span style="color:#6b7280">&nbsp;·&nbsp; <code>sources_list/</code> · <code>cua_lab/docs/zihniyetler.md</code></span></div>
+</body></html>
