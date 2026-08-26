@@ -139,63 +139,126 @@ ne bulundu, önerilen sonraki adım.**
 
 ![Beş kontrol kategorisi](gorseller/02-bes-kategori.png)
 
-İncelenen yaklaşımlar aynı soruyu yanıtlar — *"şimdi durmalı mı?"* — ancak beş farklı bakış
-açısından. Sıralama uygulama önceliğini yansıtır.
+İncelenen on altı yaklaşım aynı soruyu yanıtlar — *"şimdi durmalı mı?"* — ancak beş farklı
+bakış açısından. Sıralama uygulama önceliğini yansıtır.
 
-### SAYAÇ — sayaç tut, eşiği aşınca sonlandır
+Her kategori bir **mekanizmayı** paylaşır; alt yaklaşımlar aynı mekanizmayı farklı ayarlarla
+kullanır. Aradaki fark akademik değildir: aynı kategori içindeki iki yaklaşım aynı koşumu
+farklı terminal durumla sonlandırabilir.
+
+---
+
+### 6.1 · SAYAÇ — sayaç tut, eşiği aşınca sonlandır
 
 Adım, replan, token, süre ve maliyet eksenlerinde sayaç tutar; modele danışmaz.
 En düşük maliyetli ve en düşük yanlış pozitif riskli katmandır.
 
-Kategori içinde dört ayrı davranış bulunur:
+| Yaklaşım | Mekanizma | Limit dolduğunda | Kendi sınırı |
+|---|---|---|---|
+| **`arize-control`**<br><sub>Arize control loop</sub> | Beş eksende sayaç; adım limiti birincil. Her koşumda durma nedeni kaydedilir | Sert durdurma, lütuf turu yok | Neden durduğunu söylemez |
+| **`budget-grace`**<br><sub>AgentScope `EXCEED_MAX_ITERS` + Hermes</sub> | Limit dolunca 1–5 ek tur; **araç seçimi kilitlenir** | Ajan yalnızca cevap üretebilir | Lütuf turları da maliyet yakar; uzun tutulursa tavan anlamsızlaşır |
+| **`claude-advisory`**<br><sub>Anthropic `task_budget`</sub> | Yönergeye geri sayım enjekte edilir | Zorlama yok, model aşabilir | Model uyarıyı yok sayarsa hiçbir koruma sağlamaz |
+| **`agentbudget-dollar`**<br><sub>agent budget framework</sub> | Dolar tavanı + **%15 nihai cevap payı**; zaman pencereli patlama tespiti | Ayrılan pay cevap üretimine kalır | Fiyat tablosu bakım gerektirir; model değişince yanlış sayar |
 
-| Yaklaşım | Limit dolduğunda |
-|---|---|
-| Sert durdurma | Koşum kesilir, ek tur verilmez |
-| Zarif bozulma | Sınırlı sayıda ek tur verilir, **araç seçimi kilitlenir**; ajan yalnızca cevap üretebilir |
-| Tavsiye | Yönergeye geri sayım eklenir, zorlama uygulanmaz |
-| Maliyet tavanı | Toplam bütçenin bir kısmı nihai cevap üretimi için ayrılır |
+**Eksen seçimi önemlidir.** Uyarı davranışı eksene göre değişir: iterasyon ekseninde ara
+uyarı vermenin modelleri erken pes ettirdiği gözlenmiştir; süre ekseninde ise %80 uyarısı
+yararlıdır. Tek bir "uyar / uyarma" kuralı yoktur.
 
-Bu ayrım pratikte anlamlıdır: sert durdurma uygulayan bir yapılandırma bütçe tükendiğinde
-cevapsız sonlanırken, zarif bozulma uygulayan yapılandırma aynı bütçeyle bir cevap
-üretebilir. **Aynı kategori içinde bile "durmak" tek bir davranış değildir.**
+**Kategori sınırı:** durma nedenini açıklamaz, yalnızca eşiğin aşıldığını bildirir.
+Teşhis için pencere tabanlı bir katman gerekir.
 
-**Sınır:** durma nedenini açıklamaz, yalnızca eşiğin aşıldığını bildirir. Teşhis için
-pencere tabanlı bir katman gerekir.
+---
 
-### PENCERE — son N olayı karşılaştır
+### 6.2 · PENCERE — son N olayı karşılaştır
 
-İmza tekrarı, ardışık olmayan çevrim taraması, eylem çeşitliliği ve ortam durumu
-karşılaştırması kullanır. Döngüyü tespit eder **ve nedenini raporlar**: hangi çağrı, kaç kez.
+Olay geçmişinde bir pencere tutar ve tekrar arar. Döngüyü tespit eder **ve nedenini
+raporlar**: hangi çağrı, kaç kez.
 
-**Sınır:** içerik her adımda değişiyorsa etkisizdir. Sonsuz sayfalama gibi senaryolarda ajan
-gerçekten ilerleme kaydeder; bu katman bir anomali göremez. Böyle durumlarda tek etkili
-kontrol bütçedir.
+| Yaklaşım | Mekanizma | Müdahale biçimi | Kendi sınırı |
+|---|---|---|---|
+| **`openhands-stuck`**<br><sub>OpenHands `stuck_detector`</sub> | Beş desen taraması: eylem-gözlem, eylem-hata, monolog, çevrim, bağlam penceresi. Eşikler 4/3/3/6 | **Doğrudan durdurur**, uyarı yok. Ayrı bir terminal durum üretir | İmza normalizasyonu hatalıysa sessizce hiçbir şey bulmaz ve testleri geçer |
+| **`openclaw-pingpong`**<br><sub>`tools.loopDetection`</sub> | Adlandırılmış dedektörler: `genericRepeat`, `knownPollNoProgress`, `pingPong`. Parmak izi = araç + argüman + **sonuç** | Üç kademe: 10 uyarı → 20 kritik → 30 kesici. Sıkıştırma sonrası ek koruma | Varsayılanda kapalı olabilir; üçüncü kademeye kadar önemli maliyet oluşur |
+| **`pi-signature`**<br><sub>anti-doom-loop</sub> | Altı ucuz sinyal; yakın-benzer metin için ≥%55 kelime örtüşmesi de sayılır | **Önce yönlendirir**, ısrar hâlinde keser | Altı sinyal × ayrı eşik × iki kademe; yanlış uygulanırsa sessizce etkisiz kalır |
+| **`strands-entropy`**<br><sub>Strands SDK</sub> | Tekrarı değil **farklılığı** sayar: son N adımda kaç farklı eylem yürütüldü | Çeşitlilik eşiğin altına düşerse durdurur | Meşru olarak dar alanda çalışan iş de düşük çeşitlilik gösterir |
+| **`loopguard-dignity`** | Ortam durumu hash'i değişmiyorsa ilerleme yok sayılır; eylem başına deneme hakkı ayrıca izlenir | **Çekimser kalır** — hata değil, girdi bekleyen ayrı bir sonuç. Dört alanlı rapor üretir | Hızlı ve ucuz döngüler sınırlar dolmadan çok tur dönebilir |
 
-### DÜNYA — modelin dışından kanıt topla
+**Tek kural mı, çok sinyal mi?** `strands-entropy` tek bir kuralla bütün çevrim desenlerini
+yakalar ve eşik taraması gerektirmez; `pi-signature` daha ayrıntılı teşhis verir ancak
+kalibrasyon yükü yüksektir.
 
-Dosya gerçekten oluşmuş mu, ortam durumu gerçekten değişmiş mi, araç hangi oranda hata
-veriyor. **Döngü içermeyen hata sınıfını** yakalayan tek kategoridir ve getirisi en yüksek
-katmandır.
+**Kategori sınırı:** içerik her adımda değişiyorsa etkisizdir. Sonsuz sayfalama gibi
+senaryolarda ajan gerçekten ilerleme kaydeder; bu katman bir anomali göremez. Böyle
+durumlarda tek etkili kontrol bütçedir.
 
-**Sınır:** ajan bitirme iddiası üretmezse doğrulama kapısı hiç çalışmaz. Bütçe katmanıyla
-birlikte kullanılması zorunludur.
+---
 
-### ŞEKİL — döngünün biçimini kısıtla
+### 6.3 · DÜNYA — modelin dışından kanıt topla
 
-İzinli geçiş tablosu ve kademeli geri dönüş merdiveni tanımlar. Merdivenin son basamağı
-**kullanıcıya soru yöneltmektir**; bu bir hata değil, tanımlı bir sonuç türüdür.
+Kararı modelin beyanına değil ortamın gözlemlenebilir durumuna dayandırır.
+Döngü içermeyen hata sınıfını yakalayan tek kategoridir.
 
-**Sınır:** esnekliği azaltır. Önceden modellenemeyen işler durum makinesine sığmaz.
-Yalnızca statik doğrulama yapan varyantlar çalışma zamanında hiç tetiklenmez.
+| Yaklaşım | Mekanizma | Müdahale biçimi | Kendi sınırı |
+|---|---|---|---|
+| **`verify-gate`** | Bitirme iddiası geldiğinde testi / dosyayı / ortam durumunu sınar | Doğrulama geçmezse iddia **reddedilir**, koşum gözleme geri döner | Ajan bitirme iddiası üretmezse kapı hiç açılmaz |
+| **`telemetry-repair`** | Üç deterministik kontrol: `total_consistency` (iddia görülen veriden çıkıyor mu), `required_coverage` (gereken araçlar çağrıldı mı), `tool_contract` (sonuç beklenen biçimde mi) | Checkpoint'e geri sarar ve **hangi kontrolün düştüğünü** bildirir | Checkpoint tutmak mimari yük getirir; döngü içindeyken onarım etkisizdir, durdurmak gerekir |
+| **`galileo-breaker`** | Araç başına hata **oranı** izlenir (sayı değil); sessizce başarısız olan retry'lar da sayılır | Eşiği aşan araç için devre kesici açılır | Geçici ile kalıcı hatayı ayırması tamamen eşiğe bağlıdır |
 
-### KARAR — bütçeyi tavan değil tahsis olarak ele al
+`verify-gate` iddiayı sınar, `telemetry-repair` iddianın **hangi yönden** hatalı olduğunu
+söyler, `galileo-breaker` ise sorunu ajanda değil **araç katmanında** arar. Üçü farklı soruyu
+yanıtlar.
 
-Eylemleri birim bütçe başına beklenen faydaya göre sıralar; yetersiz kanıtla verilen erken
-cevabı engeller. Alternatif varyant hiç müdahale etmez, koşum sonunda başarılı koşum
-dağılımından eşik önerir.
+**Doğrulayıcı göreve özel olmalıdır.** Sabit bir başarı metni arayan genel bir kural, farklı
+görev tiplerinde her iddiayı reddeder. Doğrulama ölçütü görevden türetilmelidir.
 
-**Sınır:** her iki varyant da koşumu sonlandırmaz. Tek başlarına koruma sağlamazlar.
+**Kategori sınırı:** ajan bitirme iddiası üretmezse hiçbir yaklaşım tetiklenmez.
+Bütçe katmanıyla birlikte kullanılması zorunludur.
+
+---
+
+### 6.4 · ŞEKİL — döngünün biçimini kısıtla
+
+Tekrarı saymak yerine, döngünün alabileceği biçimleri önceden sınırlar.
+
+| Yaklaşım | Mekanizma | Müdahale biçimi | Kendi sınırı |
+|---|---|---|---|
+| **`modexa-statemachine`** | İzinli geçiş tablosu; doğrulama adımı bir kapıdır, atlanamaz | İhlalde merdivende bir basamak yükselir: geri çekil → alternatif yaklaşım → kapsamı daralt → **kullanıcıya sor** → sonlandır | Esnekliği azaltır; önceden modellenemeyen işler makineye sığmaz. Sonradan eklenmesi zordur |
+| **`autogen-static`**<br><sub>AutoGen `GraphFlow`</sub> | Koşum başlamadan graf taranır; çıkış koşulu olmayan çevrim aranır (`Cycle detected without exit condition`) | Böyle bir çevrim varsa **sistem hiç başlatılmaz** | Yalnızca yapısal döngüyü görür; modelin aynı düğümde takılmasını göremez |
+
+İkisi farklı zamanlarda çalışır: `modexa-statemachine` çalışma zamanında, `autogen-static`
+koşumdan önce. Statik doğrulama yanlış pozitif üretmez — çünkü çalışma zamanı davranışı
+hakkında hiçbir iddiada bulunmaz.
+
+**Kategori sınırı:** serbest biçimli, önceden modellenemeyen görevlerde uygulanamaz.
+
+---
+
+### 6.5 · KARAR — bütçeyi tavan değil tahsis olarak ele al
+
+Diğer dört kategori *"durmalı mı"* sorusunu yanıtlar; bu kategori *"kalan bütçe nereye
+harcanmalı"* sorusunu yanıtlar.
+
+| Yaklaşım | Mekanizma | Müdahale biçimi | Kendi sınırı |
+|---|---|---|---|
+| **`voi-allocation`**<br><sub>inference-time budget control</sub> | Eylemler birim bütçe başına beklenen faydaya göre puanlanır; bütçe baskısı arttıkça seçim daralır. Çift bütçe: araç + token | Yetersiz kanıtla verilen **erken cevabı engeller** | Koşumu sonlandırmaz. Bütçe bolken kazanç erir |
+| **`improvement-loop`** | Koşum izleri toplanır; başarılı koşum dağılımından p99 eşik türetilir. Sürümlenmiş yapılandırma + terfi kapısı | **Müdahale yok.** Sonraki tur için eşik önerisi üretir | Mevcut koşumu kurtarmaz; veri birikmesini bekler |
+
+**Kategori sınırı:** her iki yaklaşım da koşumu sonlandırmaz. Tek başlarına koruma
+sağlamazlar; diğer kategorilerin üzerine eklenen bir optimizasyon katmanıdır.
+
+---
+
+### 6.6 · Katman seçimi
+
+| Öncelik | Katman | Gerekçe |
+|---|---|---|
+| 1 | **SAYAÇ** | En ucuz, en düşük yanlış pozitif riski, doğrudan maliyet koruması |
+| 2 | **DÜNYA** | Diğer katmanların göremediği hata sınıfını kapsar |
+| 3 | **PENCERE** | Teşhis üretir: yalnızca "durdu" değil, "neden durdu" |
+| 4 | **ŞEKİL** | Görev yapısı önceden modellenebiliyorsa |
+| 5 | **KARAR** | İz verisi biriktikten sonra, kalibrasyon amacıyla |
+
+Katmanlar birleştirilebilir. Birleştirmede **ilk tetiklenen sonucu belirler**; bu nedenle
+sıralama, hangi teşhisin öne çıkacağını da belirler.
 
 ---
 
