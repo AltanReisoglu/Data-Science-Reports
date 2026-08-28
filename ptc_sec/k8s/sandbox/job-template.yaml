@@ -1,0 +1,43 @@
+# Faz 2 sandbox Job şablonu — sandbox_runner.py bunu metin olarak okuyup
+# {run_id} ve {tool_gateway_endpoint} yer tutucularını doldurur, sonra
+# yaml.safe_load ile kubernetes client'a verir (research.md §1, §5, §6).
+#
+# activeDeadlineSeconds/resources.limits: research.md §6.
+# ttlSecondsAfterFinished: research.md §5 (otomatik temizlik, Principle V).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ptc-sandbox-{run_id}
+  labels:
+    app: ptc-sandbox
+    ptc-run-id: "{run_id}"
+spec:
+  activeDeadlineSeconds: 30
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: ptc-sandbox
+        ptc-run-id: "{run_id}"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: sandbox
+          image: ptc-sandbox:local
+          imagePullPolicy: Never  # kind load docker-image ile yerelden yüklendi
+          env:
+            - name: TOOL_GATEWAY_ENDPOINT
+              value: "{tool_gateway_endpoint}"
+          volumeMounts:
+            - name: code
+              mountPath: /sandbox
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: code
+          configMap:
+            name: ptc-code-{run_id}
+

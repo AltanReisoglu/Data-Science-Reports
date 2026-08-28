@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kurumsal Asistan</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-top">
+        <h1>Kurumsal Asistan</h1>
+        <span class="connection-dot" id="connection-dot" title="Bağlantı durumu"></span>
+      </div>
+      <p class="subtitle">Yalnızca fiilen çağrılan kaynaklara dayanan, izlenebilir yanıtlar</p>
+    </header>
+
+    <main class="app-main">
+      <form id="question-form" class="question-form">
+        <input
+          type="text"
+          id="question-input"
+          placeholder="Bir soru sorun..."
+          autocomplete="off"
+          required
+        />
+        <button type="submit" id="submit-button">
+          <span class="button-label">Gönder</span>
+          <span class="spinner" hidden></span>
+        </button>
+      </form>
+
+      <div id="example-chips" class="example-chips">
+        <button type="button" class="chip" data-question="Uzaktan çalışma politikamız nedir?">
+          Uzaktan çalışma politikası
+        </button>
+        <button type="button" class="chip" data-question="Şu an açık kritik ticket sayısı kaç?">
+          Açık ticket sayısı
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="4 kaynaktaki tüm dokümanları tara, VPN konusunu geçen kaç tanesi var?"
+        >
+          VPN'i tüm kaynaklarda ara (PTC)
+        </button>
+      </div>
+
+      <section id="answer-area" class="answer-card" hidden>
+        <div class="answer-header">
+          <span id="grounded-badge" class="badge"></span>
+        </div>
+        <p id="answer-text" class="answer-text"></p>
+        <div class="answer-meta">
+          <div class="meta-row">
+            <span class="meta-label">Kaynaklar</span>
+            <span id="source-refs" class="meta-value">(yok)</span>
+          </div>
+          <div id="partial-failures" class="meta-row warning" hidden>
+            <span class="meta-label">Kısmi hatalar</span>
+            <span id="partial-failures-text" class="meta-value"></span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- T004/T014 — sol-alt "PTC yaşam döngüsü" paneli (spec.md US2) -->
+  <div id="ptc-panel" class="ptc-panel">
+    <div class="ptc-panel-header" id="ptc-panel-header">
+      <div class="traffic-lights">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <span class="ptc-panel-title">PTC Yaşam Döngüsü</span>
+      <span class="ptc-panel-toggle" id="ptc-panel-toggle">‒</span>
+    </div>
+    <div id="ptc-panel-log" class="ptc-panel-log">
+      <div class="line info">Bir PTC çalıştırması tetiklendiğinde burada canlı akacak…</div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

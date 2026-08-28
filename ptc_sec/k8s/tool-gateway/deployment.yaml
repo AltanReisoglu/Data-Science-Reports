@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-gateway
+  template:
+    metadata:
+      labels:
+        app: tool-gateway
+    spec:
+      containers:
+      - name: tool-gateway
+        image: tool-gateway:local
+        imagePullPolicy: Never # kind load docker-image ile yerelden yüklendi
+        ports:
+        - containerPort: 8443
+        envFrom:
+        - secretRef:
+            name: tool-gateway-env # kubectl create secret ile imperative oluşturulur (T010) — .env asla YAML'a gömülmez
