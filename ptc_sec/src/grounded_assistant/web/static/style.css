@@ -1,0 +1,427 @@
+/* Faz 4 — düz CSS, build aracı yok, harici hiçbir kaynak yok (Principle V).
+   Apple-esque tasarım: pill-shaped soru kutusu, yumuşak gölgeli kartlar,
+   macOS-tarzı daraltılabilir panel, karanlık mod desteği. */
+
+:root {
+  --bg: #f5f5f7;
+  --card-bg: #ffffff;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --border: rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --success-bg: #e8f8ee;
+  --success-text: #1e7e42;
+  --danger-bg: #fdecec;
+  --danger-text: #c0392b;
+  --panel-bg: rgba(30, 30, 32, 0.92);
+  --panel-text: #d4d4d8;
+  --chip-bg: rgba(0, 113, 227, 0.08);
+  --chip-text: var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --card-bg: #1c1c1e;
+    --text-primary: #f5f5f7;
+    --text-secondary: #98989d;
+    --accent: #0a84ff;
+    --accent-hover: #3b9dff;
+    --border: rgba(255, 255, 255, 0.1);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.5);
+    --success-bg: rgba(48, 209, 88, 0.15);
+    --success-text: #30d158;
+    --danger-bg: rgba(255, 69, 58, 0.15);
+    --danger-text: #ff6961;
+    --chip-bg: rgba(10, 132, 255, 0.15);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.app {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 24rem 1.5rem; /* alt boşluk: sabit PTC paneline yer aç */
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.header-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-header h1 {
+  font-size: 2.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.connection-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #a1a1a6;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.connection-dot.connected {
+  background: #28c840;
+  box-shadow: 0 0 0 3px rgba(40, 200, 64, 0.18);
+}
+
+.connection-dot.disconnected {
+  background: #ff5f57;
+  box-shadow: 0 0 0 3px rgba(255, 95, 87, 0.18);
+}
+
+.app-header .subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin: 0.4rem 0 0 0;
+}
+
+.question-form {
+  display: flex;
+  gap: 0.6rem;
+  background: var(--card-bg);
+  padding: 0.4rem;
+  border-radius: 980px; /* pill */
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.question-form:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+}
+
+#question-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0.7rem 1.1rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+#question-input::placeholder {
+  color: #a1a1a6;
+}
+
+#submit-button {
+  border: none;
+  background: var(--accent);
+  color: white;
+  padding: 0.7rem 1.4rem;
+  border-radius: 980px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#submit-button:hover {
+  background: var(--accent-hover);
+}
+
+#submit-button:active {
+  transform: scale(0.97);
+}
+
+#submit-button:disabled {
+  background: #a1a1a6;
+  cursor: default;
+}
+
+.spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.chip {
+  border: none;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  padding: 0.45rem 0.9rem;
+  border-radius: 980px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  font-family: inherit;
+}
+
+.chip:hover {
+  background: rgba(0, 113, 227, 0.16);
+  transform: translateY(-1px);
+}
+
+.answer-card {
+  margin-top: 1.75rem;
+  background: var(--card-bg);
+  border-radius: 18px;
+  padding: 1.75rem;
+  box-shadow: var(--shadow-md);
+  animation: fade-in 0.3s ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.answer-header {
+  margin-bottom: 0.75rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 980px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge.grounded {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.badge.not-grounded {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.answer-text {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 1.25rem 0;
+}
+
+.answer-meta {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.meta-row {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.meta-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.meta-value {
+  color: var(--text-primary);
+}
+
+.meta-row.warning .meta-value {
+  color: var(--danger-text);
+}
+
+/* Sol-alt, terminal benzeri, sabit, daraltılabilir PTC yaşam döngüsü paneli (US2). */
+.ptc-panel {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  width: 38rem;
+  max-width: calc(100vw - 2.5rem);
+  height: 19rem;
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--panel-text);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: height 0.25s ease;
+}
+
+.ptc-panel.collapsed {
+  height: auto;
+}
+
+.ptc-panel.collapsed .ptc-panel-log {
+  display: none;
+}
+
+.ptc-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f2f2f2;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ptc-panel.collapsed .ptc-panel-header {
+  border-bottom: none;
+}
+
+.traffic-lights {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.traffic-lights .dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+}
+
+.traffic-lights .dot.red {
+  background: #ff5f57;
+}
+
+.traffic-lights .dot.yellow {
+  background: #febc2e;
+}
+
+.traffic-lights .dot.green {
+  background: #28c840;
+}
+
+.ptc-panel-title {
+  flex: 1;
+}
+
+.ptc-panel-toggle {
+  color: #8e8e93;
+  font-size: 0.9rem;
+}
+
+.ptc-panel-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.9rem;
+  white-space: pre-wrap;
+  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.ptc-panel-log .line {
+  margin: 0.15rem 0;
+  animation: line-in 0.2s ease;
+}
+
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ptc-panel-log .line.denied {
+  color: #ff6b6b;
+}
+
+.ptc-panel-log .line.final-success {
+  color: #63e6be;
+}
+
+.ptc-panel-log .line.final-error {
+  color: #ff6b6b;
+}
+
+.ptc-panel-log .line.info {
+  color: #8e8e93;
+  font-style: italic;
+}
+
+.ptc-panel-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ptc-panel-log::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+@media (max-width: 40rem) {
+  .ptc-panel {
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    width: auto;
+    max-width: none;
+    height: 14rem;
+  }
+
+  .app {
+    padding-bottom: 18rem;
+  }
+}

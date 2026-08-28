@@ -1,0 +1,28 @@
+# Faz 2'nin çekirdeği (T016) — research.md §4.1.
+#
+# Sandbox pod'unun (job-template.yaml'daki `app: ptc-sandbox` etiketi) TEK
+# egress kuralı: Tool Gateway'e (identity-based `toEndpoints`, DNS'siz). Başka
+# HİÇBİR kural yok — Cilium'un default-deny'i geri kalan HER ŞEYİ (internet
+# dahil, kube-dns dahil) zaten kapatıyor. `sandbox_runner.py`, Tool Gateway'in
+# ClusterIP'sini DNS yerine doğrudan enjekte ettiği için sandbox'ın DNS'e hiç
+# ihtiyacı yok (bkz. tool_gateway_mcp.md'deki "Sandbox'a özel not").
+#
+# `toEndpoints`, Cilium'un identity-based modelidir: Tool Gateway pod'u yeniden
+# başlasa, IP'si değişse bile bu kural geçerli kalır (IP tabanlı bir
+# NetworkPolicy'nin aksine) — PTC_Egress_Policy_Cilium_eBPF_Technical_Reference.md §4.1.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: sandbox-egress
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ptc-sandbox
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app: tool-gateway
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
