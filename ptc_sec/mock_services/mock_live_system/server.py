@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from mock_services.mock_live_system.calculator import calculate
 from mock_services.mock_live_system.data import (
-    count_open_tickets,
+    count_open_tickets as count_open_tickets_impl,
     create_ticket,
     get_ticket,
     search_employees,
 )
+from mock_services.mock_live_system.web_search import search_web
 
 mcp = FastMCP("mock-live-system")
 
@@ -27,9 +29,11 @@ def get_ticket_status(ticket_id: str) -> dict:
 
 
 @mcp.tool()
-def list_open_tickets() -> dict:
-    """Açık ticket'ların (sahte) sayısını döndürür."""
-    return count_open_tickets()
+def count_open_tickets() -> dict:
+    """Açık ticket'ların (sahte) SAYISINI döndürür — {"open_count": int, "as_of": str}
+    şeklinde bir sözlük, ticket LİSTESİ DEĞİL. `len()` ile çağırma; asıl sayı için
+    `["open_count"]` alanını kullan."""
+    return count_open_tickets_impl()
 
 
 @mcp.tool()
@@ -42,6 +46,19 @@ def create_support_ticket(title: str, description: str) -> dict:
 def search_employee_directory(query: str) -> list[dict]:
     """Sahte personel dizininde isim veya departmana göre arama yapar."""
     return search_employees(query)
+
+
+@mcp.tool()
+def web_search(query: str) -> list[dict]:
+    """Genel internette gerçek bir web araması yapar (DuckDuckGo), başlık/link/
+    özet döndürür. Kurumsal olmayan, güncel/genel bilgi sorularında kullan."""
+    return search_web(query)
+
+
+@mcp.tool()
+def calculator(expression: str) -> dict:
+    """Bir aritmetik ifadeyi (+ - * / ** % //, parantez) güvenle hesaplar."""
+    return calculate(expression)
 
 
 if __name__ == "__main__":
