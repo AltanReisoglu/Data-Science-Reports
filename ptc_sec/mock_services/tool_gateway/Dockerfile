@@ -33,6 +33,16 @@ RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 # tam olarak bu yüzden gereksiz bir yeniden-indirme oldu).
 COPY sample_docs/ ./sample_docs/
 
+# indices/ — `python scripts/ingest_sample_docs.py` ile ÖNCEDEN (build zamanında,
+# laptop'tan, .env'deki gateway'e erişimle) hesaplanmış embedding'ler (2026-09-01).
+# Bunlar olmadan her `search_knowledge_base` çağrısı wiki/'deki ~400KB'lık dokümanı
+# canlı embed etmeye çalışıyordu — gateway 502 veriyordu (chunking + küçük
+# chunk_size ile bu da düzeltildi ama yine de ~30sn sürüyordu). Bu dosyalar
+# gömülünce çalışma zamanında sadece kısa SORGU metni embed ediliyor, dokümanlar
+# değil — tiktoken cache'iyle aynı mantık: "internete tam erişimin olduğu TEK an"
+# build zamanı, çalışma zamanı Cilium'la kısıtlı.
+COPY indices/ ./indices/
+
 EXPOSE 8443
 
 ENTRYPOINT ["python", "-m", "mock_services.tool_gateway.server"]
