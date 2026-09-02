@@ -109,6 +109,11 @@ class SandboxRun:
     finished_at: datetime | None = None
     tool_calls: list[LiveToolCall] = field(default_factory=list)
     result_text: str | None = None
+    # Altan'ın kararı (2026-08-30): result_text'ten AYRI bir alan — FR-011'in
+    # "başarısız bir çalıştırmadan tahmini değer üretilmez" invariantını
+    # bozmadan, "ne oldu" görünürlüğü için gerçek hata metnini taşır (yalnızca
+    # gözlemlenebilirlik amaçlı, LLM'e bir sonuçmuş gibi asla dönmez).
+    error_message: str | None = None
     denied_actions: list[DeniedAction] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -136,3 +141,11 @@ class DeniedAction:
     attempted_destination: str
     verdict: str
     observed_at: datetime
+    # Altan'ın kararı (2026-08-30): hangi pod'un denemesi olduğunu ayırt eder —
+    # "sandbox" (PTC job pod'u, Tool Gateway dışına çıkamaz) veya "tool-gateway"
+    # (Tool Gateway'in KENDİ egress'i, yalnızca 3 onaylı FQDN'e çıkabilir —
+    # ikinci savunma katmanı, PTC_Egress_Policy_OpenAI_Incident.md'nin dersi).
+    source_pod: str = "sandbox"
+    # Hubble'ın ham flow satırına benzer bir metin (terminaldeki `hubble observe`
+    # çıktısıyla birebir aynı biçimde) — panelde/CLI'de görünürlük için.
+    raw_flow: str = ""
