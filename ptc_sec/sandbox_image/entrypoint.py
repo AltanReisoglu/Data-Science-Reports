@@ -14,7 +14,7 @@ import asyncio
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastmcp import Client
 
@@ -22,13 +22,18 @@ TOOL_GATEWAY_ENDPOINT = os.environ["TOOL_GATEWAY_ENDPOINT"]
 CODE_PATH = "/sandbox/code.py"
 
 # Faz 1'in tool_policy.ALLOWED_TOOLS + LOCAL_TOOLS ile birebir aynı olmalı
-# (CapabilityGrant.allowed_tools, data-model.md). Faz 4'te 2 yeni tool eklendi.
+# (CapabilityGrant.allowed_tools, data-model.md). Faz 4'te 4 yeni tool eklendi.
 ALLOWED_TOOLS = (
     "search_knowledge_base",
     "get_ticket_status",
-    "list_open_tickets",
+    "count_open_tickets",
     "create_support_ticket",
     "search_employee_directory",
+    "web_search",
+    "calculator",
+    "fetch_url",
+    "resolve_dns",
+    "check_connectivity",
 )
 
 # LLM'in ürettiği kod, tool'ları normal bir Python fonksiyonu gibi pozisyonel
@@ -39,9 +44,14 @@ ALLOWED_TOOLS = (
 _ARG_NAMES: dict[str, tuple[str, ...]] = {
     "search_knowledge_base": ("query",),
     "get_ticket_status": ("ticket_id",),
-    "list_open_tickets": (),
+    "count_open_tickets": (),
     "create_support_ticket": ("title", "description"),
     "search_employee_directory": ("query",),
+    "web_search": ("query",),
+    "calculator": ("expression",),
+    "fetch_url": ("url",),
+    "resolve_dns": ("hostname",),
+    "check_connectivity": ("host", "port"),
 }
 
 
@@ -65,7 +75,7 @@ def _make_sync_tool(tool_name: str):
                 result = await client.call_tool(tool_name, kwargs)
                 return result.data if hasattr(result, "data") else str(result)
 
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         try:
             value = asyncio.run(_do())
         except Exception:
