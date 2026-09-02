@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 FAKE_TICKETS: dict[str, dict] = {
     "TCK-1001": {"status": "open", "last_updated": "2026-08-20T09:00:00Z"},
@@ -14,7 +14,11 @@ FAKE_TICKETS: dict[str, dict] = {
 # Faz 4 (tool sayısını artırma isteği, 2026-08-28) — sahte bir personel dizini.
 FAKE_EMPLOYEES: list[dict] = [
     {"name": "Ayşe Yılmaz", "department": "İnsan Kaynakları", "email": "ayse.yilmaz@kurum.example"},
-    {"name": "Mehmet Demir", "department": "Bilgi Teknolojileri", "email": "mehmet.demir@kurum.example"},
+    {
+        "name": "Mehmet Demir",
+        "department": "Bilgi Teknolojileri",
+        "email": "mehmet.demir@kurum.example",
+    },
     {"name": "Zeynep Kaya", "department": "Finans", "email": "zeynep.kaya@kurum.example"},
     {"name": "Ali Şahin", "department": "Bilgi Teknolojileri", "email": "ali.sahin@kurum.example"},
 ]
@@ -31,7 +35,7 @@ def get_ticket(ticket_id: str) -> dict | None:
 
 def count_open_tickets() -> dict:
     open_count = sum(1 for ticket in FAKE_TICKETS.values() if ticket["status"] == "open")
-    return {"open_count": open_count, "as_of": datetime.now(timezone.utc).isoformat()}
+    return {"open_count": open_count, "as_of": datetime.now(UTC).isoformat()}
 
 
 def create_ticket(title: str, description: str) -> dict:
@@ -43,7 +47,7 @@ def create_ticket(title: str, description: str) -> dict:
         "status": "open",
         "title": title,
         "description": description,
-        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "last_updated": datetime.now(UTC).isoformat(),
     }
     return {"ticket_id": ticket_id, **FAKE_TICKETS[ticket_id]}
 
