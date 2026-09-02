@@ -1,0 +1,23 @@
+# Tool Gateway'in kendi ingress'i — "supporting service" ilkesinin ingress yönü
+# (tool-gateway-egress.ciliumnetworkpolicy.yaml'ın egress'i kısıtlaması gibi, bu da
+# "Tool Gateway'e kim bağlanabilir" sorusunu kısıtlıyor). Cilium: "policy must be
+# configured on both sides" — sandbox-egress.ciliumnetworkpolicy.yaml zaten "sandbox
+# sadece Tool Gateway'e gidebilir" diyordu; bu dosya "Tool Gateway sadece sandbox'tan
+# gelen bağlantıyı kabul eder" diyerek aynı kuralı diğer taraftan tamamlıyor.
+# Bkz. PTC_Ingress_Policy_Implementation_Plan.md §2-3.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: tool-gateway-ingress
+spec:
+  endpointSelector:
+    matchLabels:
+      app: tool-gateway
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: ptc-sandbox
+    toPorts:
+    - ports:
+      - port: "8443"
+        protocol: TCP
