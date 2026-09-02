@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Kurumsal Asistan</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css"
+  />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -45,24 +54,34 @@
         >
           VPN'i tüm kaynaklarda ara (PTC)
         </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="fetch_url tool'unu kullanarak https://example.com adresine bir HTTP GET isteği at ve sonucu bana raporla."
+        >
+          example.com'a istek at (egress testi)
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="resolve_dns tool'unu kullanarak example.com'un DNS'ini çöz (bağlanmadan, sadece isim çözümü) ve sonucu raporla."
+        >
+          example.com'un DNS'ini çöz (sadece isim)
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="check_connectivity tool'unu kullanarak example.com:443'e ham bir TCP bağlantısı dene ve hangi aşamada ne olduğunu raporla."
+        >
+          example.com:443'e ham TCP dene
+        </button>
       </div>
 
-      <section id="answer-area" class="answer-card" hidden>
-        <div class="answer-header">
-          <span id="grounded-badge" class="badge"></span>
-        </div>
-        <p id="answer-text" class="answer-text"></p>
-        <div class="answer-meta">
-          <div class="meta-row">
-            <span class="meta-label">Kaynaklar</span>
-            <span id="source-refs" class="meta-value">(yok)</span>
-          </div>
-          <div id="partial-failures" class="meta-row warning" hidden>
-            <span class="meta-label">Kısmi hatalar</span>
-            <span id="partial-failures-text" class="meta-value"></span>
-          </div>
-        </div>
-      </section>
+      <button type="button" id="demo-escape-button" class="demo-escape-button">
+        🔓 Demo: Yasak Hedefe Erişim Dene (evil.com)
+      </button>
+
+      <div id="chat" class="chat"></div>
     </main>
   </div>
 
@@ -82,6 +101,9 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

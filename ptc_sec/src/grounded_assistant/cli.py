@@ -24,14 +24,19 @@ console = Console()
 
 
 def _build_answer(record: Trace, raw_text: str) -> Answer:
+    """Altan'ın kararı (2026-08-30): LLM'in kendi ürettiği `raw_text` artık HER
+    ZAMAN gösteriliyor — önceden `source_refs` boşsa bu metin sessizce atılıp
+    jenerik bir "veri bulunamadı" mesajıyla değiştiriliyordu. Bu, Principle I'in
+    kendisinden ("uydurulmuş bir OLGUSAL İDDİA'yı zeminliymiş gibi sunma")
+    daha katıydı — LLM hiç tool çağırmadan da dürüst/doğru bir şey söylemiş
+    olabilir (ör. "bu sistemde keyfi bir URL çekecek bir tool yok"), ama o
+    cevap hiç görülmeden atılıyordu. `grounded` rozeti (aşağıda) zemin olup
+    olmadığını göstermeye devam ediyor — Principle I'in "açıkça belirtme"
+    şartı bununla karşılanıyor; egress/Cilium kısıtlaması bu değişiklikten
+    hiç etkilenmiyor."""
     source_refs = record.source_refs()
     return Answer(
-        text=raw_text
-        if source_refs
-        else (
-            "Bu soruyla ilgili hiçbir erişim yolunda "
-            "(bilgi bankası, canlı sistem, PTC sandbox) veri bulunamadı."
-        ),
+        text=raw_text,
         grounded=bool(source_refs),
         access_paths_used=record.access_paths_used(),
         source_refs=source_refs,

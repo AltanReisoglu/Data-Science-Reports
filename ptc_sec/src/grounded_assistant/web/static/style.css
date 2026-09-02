@@ -1,6 +1,8 @@
 /* Faz 4 — düz CSS, build aracı yok, harici hiçbir kaynak yok (Principle V).
    Apple-esque tasarım: pill-shaped soru kutusu, yumuşak gölgeli kartlar,
-   macOS-tarzı daraltılabilir panel, karanlık mod desteği. */
+   macOS-tarzı daraltılabilir panel. Bilerek TEK tema (her zaman açık/beyaz) —
+   sistem karanlık modunda olsa bile demo sırasında tutarlı görünsün diye
+   otomatik karanlık mod desteği kaldırıldı (Altan'ın kararı, 2026-08-30). */
 
 :root {
   --bg: #f5f5f7;
@@ -16,29 +18,12 @@
   --success-text: #1e7e42;
   --danger-bg: #fdecec;
   --danger-text: #c0392b;
-  --panel-bg: rgba(30, 30, 32, 0.92);
-  --panel-text: #d4d4d8;
+  --panel-bg: rgba(255, 255, 255, 0.97);
+  --panel-header-bg: #f0f0f2;
+  --panel-text: #1d1d1f;
+  --panel-border: rgba(0, 0, 0, 0.1);
   --chip-bg: rgba(0, 113, 227, 0.08);
   --chip-text: var(--accent);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000;
-    --card-bg: #1c1c1e;
-    --text-primary: #f5f5f7;
-    --text-secondary: #98989d;
-    --accent: #0a84ff;
-    --accent-hover: #3b9dff;
-    --border: rgba(255, 255, 255, 0.1);
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.5);
-    --success-bg: rgba(48, 209, 88, 0.15);
-    --success-text: #30d158;
-    --danger-bg: rgba(255, 69, 58, 0.15);
-    --danger-text: #ff6961;
-    --chip-bg: rgba(10, 132, 255, 0.15);
-  }
 }
 
 * {
@@ -47,7 +32,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text-primary);
@@ -58,7 +43,7 @@ body {
 .app {
   max-width: 42rem;
   margin: 0 auto;
-  padding: 4rem 1.5rem 24rem 1.5rem; /* alt boşluk: sabit PTC paneline yer aç */
+  padding: 4rem 1.5rem 38rem 1.5rem; /* alt boşluk: sabit, büyütülmüş PTC paneline yer aç */
 }
 
 .app-header {
@@ -203,13 +188,29 @@ body {
   transform: translateY(-1px);
 }
 
-.answer-card {
-  margin-top: 1.75rem;
-  background: var(--card-bg);
-  border-radius: 18px;
-  padding: 1.75rem;
-  box-shadow: var(--shadow-md);
-  animation: fade-in 0.3s ease;
+.demo-escape-button {
+  display: block;
+  margin: 0.75rem auto 0;
+  border: 1px solid rgba(211, 47, 47, 0.4);
+  background: rgba(211, 47, 47, 0.08);
+  color: #d32f2f;
+  padding: 0.45rem 1rem;
+  border-radius: 980px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.demo-escape-button:hover:not(:disabled) {
+  background: rgba(211, 47, 47, 0.16);
+  transform: translateY(-1px);
+}
+
+.demo-escape-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 @keyframes fade-in {
@@ -223,7 +224,80 @@ body {
   }
 }
 
-.answer-header {
+/* Sohbet akışı — her soru/yanıt kalıcı bir balon olarak eklenir, önceki
+   silinmez (önceki tasarımın "tek yanıt alanı" sınırının yerine). */
+.chat {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.msg-user {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--accent);
+  color: white;
+  padding: 0.65rem 1.1rem;
+  border-radius: 18px 18px 4px 18px;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  animation: fade-in 0.25s ease;
+}
+
+.msg-assistant {
+  align-self: flex-start;
+  width: 100%;
+  background: var(--card-bg);
+  border-radius: 4px 18px 18px 18px;
+  padding: 1.5rem 1.75rem;
+  box-shadow: var(--shadow-md);
+  animation: fade-in 0.3s ease;
+}
+
+/* "Düşünüyor" balonu — yanıt gelene kadar, gerçek yanıtla yerinde değişir. */
+.msg-assistant.thinking {
+  padding: 1rem 1.5rem;
+  display: inline-flex;
+  width: auto;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 0.32rem;
+  align-items: center;
+}
+
+.thinking-dots span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  animation: bounce 1.1s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.msg-header {
   margin-bottom: 0.75rem;
 }
 
@@ -246,13 +320,49 @@ body {
   color: var(--danger-text);
 }
 
-.answer-text {
+.msg-text {
   font-size: 1.05rem;
   line-height: 1.55;
   margin: 0 0 1.25rem 0;
 }
 
-.answer-meta {
+/* marked.js'in ürettiği markdown içeriği için tipografi. */
+.msg-text p {
+  margin: 0 0 0.75rem 0;
+}
+
+.msg-text p:last-child {
+  margin-bottom: 0;
+}
+
+.msg-text ul,
+.msg-text ol {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.4rem;
+}
+
+.msg-text li {
+  margin: 0.25rem 0;
+}
+
+.msg-text strong {
+  font-weight: 600;
+}
+
+.msg-text code {
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  background: rgba(0, 113, 227, 0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.msg-text pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.msg-meta {
   border-top: 1px solid var(--border);
   padding-top: 1rem;
   display: flex;
@@ -285,9 +395,10 @@ body {
   position: fixed;
   left: 1.25rem;
   bottom: 1.25rem;
-  width: 38rem;
+  width: 56rem;
   max-width: calc(100vw - 2.5rem);
-  height: 19rem;
+  height: 34rem;
+  max-height: calc(100vh - 2.5rem);
   background: var(--panel-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -296,8 +407,8 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--panel-border);
   transition: height 0.25s ease;
 }
 
@@ -314,11 +425,11 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--panel-header-bg);
+  border-bottom: 1px solid var(--panel-border);
   font-size: 0.8rem;
   font-weight: 600;
-  color: #f2f2f2;
+  color: var(--text-primary);
   cursor: pointer;
   user-select: none;
 }
@@ -364,7 +475,7 @@ body {
   overflow-y: auto;
   padding: 0.6rem 0.9rem;
   white-space: pre-wrap;
-  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
   font-size: 0.8rem;
   line-height: 1.6;
 }
@@ -372,6 +483,22 @@ body {
 .ptc-panel-log .line {
   margin: 0.15rem 0;
   animation: line-in 0.2s ease;
+}
+
+/* highlight.js'in Python kod bloğu (job_created olayındaki kod) */
+.ptc-panel-log pre {
+  margin: 0.3rem 0 0.5rem 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  animation: line-in 0.2s ease;
+}
+
+.ptc-panel-log pre code.hljs {
+  padding: 0;
+  background: transparent;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
 }
 
 @keyframes line-in {
@@ -386,19 +513,29 @@ body {
 }
 
 .ptc-panel-log .line.denied {
-  color: #ff6b6b;
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.ptc-panel-log .line.denied-raw {
+  color: #8a8a8e;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .ptc-panel-log .line.final-success {
-  color: #63e6be;
+  color: #1e7e42;
+  font-weight: 600;
 }
 
 .ptc-panel-log .line.final-error {
-  color: #ff6b6b;
+  color: #d32f2f;
+  font-weight: 600;
 }
 
 .ptc-panel-log .line.info {
-  color: #8e8e93;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -407,7 +544,7 @@ body {
 }
 
 .ptc-panel-log::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 4px;
 }
 

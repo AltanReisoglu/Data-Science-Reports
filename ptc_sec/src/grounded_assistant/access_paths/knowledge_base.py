@@ -23,17 +23,55 @@ from grounded_assistant.trace import Trace
 SAMPLE_DOCS_DIR = Path(__file__).resolve().parents[3] / "sample_docs"
 INDEX_DIR = Path(__file__).resolve().parents[3] / "indices"
 
+# Canlı test (2026-09-01): wiki/'deki KKB faaliyet raporu bölümleri (38-93KB) tek
+# parça olarak embed edilince gateway'den "502 Upstream service error" dönüyordu
+# (~77sn'lik retry sonrası) — parçalamadan gönderilen istek boyutu için çok büyüktü.
+# 2000 karakter, hem bu sorunu önleyen hem RAG kalitesini artıran (küçük dokümanlar
+# zaten tek parça kalıyor, sadece dev dosyalar bölünüyor) güvenli bir sınır.
+_CHUNK_SIZE = 2000
+
+
+def _chunk_text(text: str, chunk_size: int = _CHUNK_SIZE) -> list[str]:
+    """Metni ~chunk_size karakterlik parçalara böler; kelime ortasında kesmemek
+    için en yakın boşluğa (makul bir sınır içinde) yuvarlar."""
+    if len(text) <= chunk_size:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        if end < len(text):
+            next_space = text.find(" ", end)
+            if next_space != -1 and next_space - end < 200:
+                end = next_space
+        chunks.append(text[start:end])
+        start = end
+    return chunks
+
 
 def load_documents(source_id: SourceId) -> list[IndexedDocument]:
-    """`scripts/ingest_sample_docs.py` da bunu kullanıyor, bu yüzden public."""
+    """`scripts/ingest_sample_docs.py` da bunu kullanıyor, bu yüzden public.
+
+    Her dosya, boyutu `_CHUNK_SIZE`'ı aşıyorsa birden fazla `IndexedDocument`'a
+    bölünür (`doc_id` sonuna `#chunkN` eklenir); aşmıyorsa tek parça kalır ve
+    `doc_id` eskisiyle birebir aynı kalır (geriye dönük uyumluluk)."""
     source_dir = SAMPLE_DOCS_DIR / source_id.value
     if not source_dir.is_dir():
         return []
-    return [
-        IndexedDocument(doc_id=f"{source_id.value}/{path.name}", text=path.read_text(encoding="utf-8"))
-        for path in sorted(source_dir.glob("*.md"))
-        if path.name != "README.md"
-    ]
+    documents: list[IndexedDocument] = []
+    for path in sorted(source_dir.glob("*.md")):
+        if path.name == "README.md":
+            continue
+        text = path.read_text(encoding="utf-8")
+        chunks = _chunk_text(text)
+        for i, chunk in enumerate(chunks):
+            doc_id = (
+                f"{source_id.value}/{path.name}"
+                if len(chunks) == 1
+                else f"{source_id.value}/{path.name}#chunk{i}"
+            )
+            documents.append(IndexedDocument(doc_id=doc_id, text=chunk))
+    return documents
 
 
 def _load_precomputed_vectors(
