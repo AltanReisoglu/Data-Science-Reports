@@ -13,21 +13,29 @@ from langchain.agents.middleware import HumanInTheLoopMiddleware
 from langchain.agents.middleware.human_in_the_loop import InterruptOnConfig
 from langgraph.types import Command
 
-# contracts/mock_live_system_mcp.md — canlı sistem tool'ları (Faz 4'te 2 yeni
+# contracts/mock_live_system_mcp.md — canlı sistem tool'ları (Faz 4'te 3 yeni
 # tool eklendi: create_support_ticket — durum DEĞİŞTİRDİĞİ için özellikle
-# onay-gerektiren bir aday; search_employee_directory — salt-okunur).
+# onay-gerektiren bir aday; search_employee_directory — salt-okunur;
+# web_search — GERÇEK bir dış hedefe (DuckDuckGo) çıkıyor, PoC'nin en hassas
+# tool'u, bu yüzden burada — onay-gerektiren tool'lar arasında).
 ALLOWED_TOOLS = (
     "get_ticket_status",
-    "list_open_tickets",
+    "count_open_tickets",
     "create_support_ticket",
     "search_employee_directory",
+    "web_search",
+    "fetch_url",
+    "resolve_dns",
+    "check_connectivity",
 )
 
 # Onaylı-kanal/gateway gerektirmeyen, yerel (dış sisteme çıkmayan) tool'lar.
 # `run_ptc_code` (Faz 2, T014) burada — kendisi Tool Gateway'e çıkmıyor, bunun
 # yerine ayrı bir Kubernetes pod'unu tetikliyor; asıl kısıtlama bu middleware'de
-# değil, o pod'un CiliumNetworkPolicy'sinde (research.md §4.1).
-LOCAL_TOOLS = ("search_knowledge_base", "run_ptc_code")
+# değil, o pod'un CiliumNetworkPolicy'sinde (research.md §4.1). `calculator`
+# (Faz 4) de burada — tamamen yerel/ağsız, `eval()` değil kısıtlı bir AST
+# yürütücüsü kullanıyor (mock_live_system/calculator.py).
+LOCAL_TOOLS = ("search_knowledge_base", "run_ptc_code", "calculator")
 
 # Agent'a eklenmesine izin verilen TÜM tool'lar — assert_known_tools bununla
 # karşılaştırır (bkz. graph.py). Yeni bir tool buraya (ya ALLOWED_TOOLS ya

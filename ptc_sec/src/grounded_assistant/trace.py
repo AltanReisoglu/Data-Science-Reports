@@ -33,6 +33,41 @@ class TraceEntry:
 class Trace:
     def __init__(self) -> None:
         self._entries: list[TraceEntry] = []
+        self._turn_start: int = 0
+
+    def mark(self) -> int:
+        """Altan'ın kararı (2026-08-31, web UI'de bulunan gerçek bir hata):
+        web/app.py, tek bir WebSocket bağlantısı boyunca (konuşma hafızasını
+        korumak için) AYNI Trace nesnesini tüm sorularda paylaşıyor — bu
+        olmadan, ikinci sorunun cevabı BİRİNCİ sorunun kayıtlarını da 'kaynak'
+        sayıyordu (ör. bir soru timeout olsa bile önceki başarılı kayıtlar
+        yüzünden 'grounded' görünüyordu). `mark()`/`since()` çifti, her turun
+        SADECE kendi eklediği kayıtları görmesini sağlar.
+
+        Aynı zamanda `_turn_start`'ı da günceller (2026-09-01, Altan'ın kararı)
+        — `run_ptc_code`'un (graph.py) bir turda kaç kez sandbox çalıştırdığını
+        sayabilmesi için (bkz. `sandbox_run_count`); agent, bir hedef
+        engellendiğinde sınırsız tekrar deneyip her seferinde yeni bir
+        ConfigMap+Job+Pod yaratabiliyordu — bu, o davranışı sınırlamanın
+        temeli."""
+        self._turn_start = len(self._entries)
+        return self._turn_start
+
+    def sandbox_run_count(self) -> int:
+        """Bu TURDA (en son `mark()` çağrısından bu yana) kaç `SandboxRun`
+        kaydedildiğini döner — `run_ptc_code`'un retry sınırı için."""
+        return sum(
+            1
+            for entry in self._entries[self._turn_start :]
+            if entry.access_path is AccessPath.PTC_SANDBOX and not entry.detail.startswith("denied:")
+        )
+
+    def since(self, mark: int) -> "Trace":
+        """`mark()`'tan bu yana eklenen kayıtları İÇEREN yeni, bağımsız bir
+        Trace görünümü döner — orijinal `_entries` listesini paylaşmaz."""
+        view = Trace()
+        view._entries = list(self._entries[mark:])
+        return view
 
     def record_kb_source(self, source: KnowledgeBaseSource, timestamp: datetime) -> None:
         self._entries.append(
