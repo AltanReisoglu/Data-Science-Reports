@@ -24,12 +24,28 @@ from grounded_assistant.agent import graph
 
 # T009: CLI ile aynı mantık, tek kaynak (Principle V) — ayrı bir "web DTO" icat edilmiyor.
 from grounded_assistant.cli import _build_answer
+from grounded_assistant.ptc.sandbox_runner import run_sandbox
 from grounded_assistant.trace import Trace
 
 load_dotenv()
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _QUEUE_SENTINEL = object()
+
+# Altan'ın kararı (2026-08-30): sunumda "engelleme" senaryosunu göstermek için
+# LLM'in o an ne yazacağına güvenmiyoruz — model, kendi güvenlik hizalaması
+# nedeniyle "ağa bağlanmaya çalışan kod yaz" isteklerini tutarsız biçimde
+# reddedebiliyor (bulundu, 2026-08-30: aynı "evil.com" isteği bir turda 16
+# denied_action üretirken, başka bir turda LLM doğrudan reddetti). Bu yüzden
+# demo_escape mesajı, agent'ı/LLM'i HİÇ devreye sokmadan doğrudan run_sandbox'ı
+# sabit bir kodla çalıştırır — sahnede her zaman aynı, garanti sonucu üretir.
+_DEMO_ESCAPE_CODE = """import socket
+try:
+    socket.create_connection(("evil.com", 443), timeout=5)
+    set_result("BAGLANTI KURULDU (beklenmeyen!)")
+except Exception as e:
+    set_result(f"Engellendi: {e}")
+"""
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
@@ -75,9 +91,30 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         while True:
             message = await websocket.receive_json()
+
+            if message.get("type") == "demo_escape":
+                # Agent/LLM'i atlayıp doğrudan sandbox'ı çalıştırır (yukarıdaki
+                # not) — sonucu answer/chat balonu değil, ayrı bir demo_result
+                # mesajıyla bildirir (bu bir soru-cevap turu değil).
+                drain_task = asyncio.create_task(_drain_ptc_events(websocket, event_queue))
+                run = await asyncio.to_thread(
+                    run_sandbox, _DEMO_ESCAPE_CODE, on_event=event_queue.put
+                )
+                event_queue.put(_QUEUE_SENTINEL)
+                await drain_task
+                await websocket.send_json(
+                    {
+                        "type": "demo_result",
+                        "status": run.status.value,
+                        "denied_count": len(run.denied_actions),
+                    }
+                )
+                continue
+
             if message.get("type") != "question":
                 continue
 
+            turn_mark = trace.mark()
             drain_task = asyncio.create_task(_drain_ptc_events(websocket, event_queue))
             try:
                 # invoke_and_resolve artık native async (graph.py'de düzeltilen
@@ -94,7 +131,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             await drain_task
 
             raw_text = result["messages"][-1].content
-            answer = _build_answer(trace, raw_text)
+            # trace.since(turn_mark): agent/checkpointer (konuşma hafızası için)
+            # tüm oturum boyunca AYNI kalıyor, ama grounding/kaynak hesaplaması
+            # yalnızca BU turda eklenen kayıtları görmeli (bkz. trace.py'deki not).
+            answer = _build_answer(trace.since(turn_mark), raw_text)
             await websocket.send_json(
                 {
                     "type": "answer",

@@ -12,11 +12,19 @@ from grounded_assistant.retrieval.bm25_index import IndexedDocument
 
 def build_embeddings() -> OpenAIEmbeddings:
     """Diğer modüller (ör. scripts/ingest_sample_docs.py) tarafından da kullanılıyor,
-    bu yüzden public."""
+    bu yüzden public.
+
+    Canlı test (2026-09-01): chunking (bkz. knowledge_base._chunk_text) tek başına
+    yetmedi — `embed_documents`, varsayılan `chunk_size` (1000) ile TÜM parçaları
+    (wiki kaynağında 201 parça, ~400KB) yine TEK bir HTTP isteğinde gönderiyordu,
+    gateway yine "502 Upstream service error" verdi. Küçük bir `chunk_size` (16),
+    isteği birden fazla küçük HTTP çağrısına bölüyor — canlı doğrulandı (16 parça,
+    ~32KB, 3.2sn'de başarılı)."""
     return OpenAIEmbeddings(
         base_url=os.environ["LLM_BASE_URL"],
         api_key=os.environ["LLM_API_KEY"],
         model="Qwen3-Embedding-8B",
+        chunk_size=16,
     )
 
 
