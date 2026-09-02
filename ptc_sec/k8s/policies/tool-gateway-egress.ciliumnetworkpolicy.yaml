@@ -34,7 +34,16 @@ spec:
     # bu kural normal şartlarda hiç kullanılmaz — savunma amaçlı (defense in
     # depth) tutuluyor.
     - matchName: "openaipublic.blob.core.windows.net"
+    # web_search tool'unun (Faz 4, tool sayısını artırma isteği, 2026-08-30)
+    # TEK dış hedefi — API anahtarı gerektirmeyen, sunucu-render'lı bir arama
+    # uç noktası. Yeni bir tool = yeni bir onaylı hedef: Principle II'nin
+    # "her yeni dış erişim açıkça onaylanmalı" ilkesinin somut bir örneği.
+    - matchName: "html.duckduckgo.com"
     toPorts:
     - ports:
       - port: "443"
         protocol: TCP
+      serverNames:
+        - "mia.csp.kloudeks.com"
+        - "openaipublic.blob.core.windows.net"
+        - "html.duckduckgo.com"
