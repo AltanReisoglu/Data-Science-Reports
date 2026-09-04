@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kurumsal Asistan</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css"
+  />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-top">
+        <h1>Kurumsal Asistan</h1>
+        <span class="connection-dot" id="connection-dot" title="Bağlantı durumu"></span>
+        <a class="durum-link" href="/durum" title="Pod'lar, ağ akışları ve artifact deposu">Sistem durumu →</a>
+      </div>
+      <p class="subtitle">Yalnızca fiilen çağrılan kaynaklara dayanan, izlenebilir yanıtlar</p>
+    </header>
+
+    <main class="app-main">
+      <form id="question-form" class="question-form">
+        <input
+          type="text"
+          id="question-input"
+          placeholder="Bir soru sorun..."
+          autocomplete="off"
+          required
+        />
+        <button type="submit" id="submit-button">
+          <span class="button-label">Gönder</span>
+          <span class="spinner" hidden></span>
+        </button>
+      </form>
+
+      <div id="example-chips" class="example-chips">
+        <button type="button" class="chip" data-question="Uzaktan çalışma politikamız nedir?">
+          Uzaktan çalışma politikası
+        </button>
+        <button type="button" class="chip" data-question="Şu an açık kritik ticket sayısı kaç?">
+          Açık ticket sayısı
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="4 kaynaktaki tüm dokümanları tara, VPN konusunu geçen kaç tanesi var?"
+        >
+          VPN'i tüm kaynaklarda ara (PTC)
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="fetch_url tool'unu kullanarak https://example.com adresine bir HTTP GET isteği at ve sonucu bana raporla."
+        >
+          example.com'a istek at (egress testi)
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="resolve_dns tool'unu kullanarak example.com'un DNS'ini çöz (bağlanmadan, sadece isim çözümü) ve sonucu raporla."
+        >
+          example.com'un DNS'ini çöz (sadece isim)
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="check_connectivity tool'unu kullanarak example.com:443'e ham bir TCP bağlantısı dene ve hangi aşamada ne olduğunu raporla."
+        >
+          example.com:443'e ham TCP dene
+        </button>
+      </div>
+
+      <button type="button" id="demo-escape-button" class="demo-escape-button">
+        🔓 Demo: Yasak Hedefe Erişim Dene (evil.com)
+      </button>
+
+      <div id="chat" class="chat"></div>
+    </main>
+  </div>
+
+  <!-- T004/T014 — sol-alt "PTC yaşam döngüsü" paneli (spec.md US2) -->
+  <div id="ptc-panel" class="ptc-panel">
+    <div class="ptc-panel-header" id="ptc-panel-header">
+      <div class="traffic-lights">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <span class="ptc-panel-title">PTC Yaşam Döngüsü</span>
+      <span class="ptc-panel-toggle" id="ptc-panel-toggle">‒</span>
+    </div>
+    <div id="ptc-panel-log" class="ptc-panel-log">
+      <div class="line info">Bir PTC çalıştırması tetiklendiğinde burada canlı akacak…</div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
