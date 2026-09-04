@@ -1,0 +1,29 @@
+# Agent-local state (may hold credentials/tokens) — spec-kit installer flags this
+.claude/settings.local.json
+
+# Kimlik bilgileri
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Faz 1 — önceden hesaplanmış embedding index'leri (üretilmiş artifact)
+indices/
+
+# Faz 4 — ham kaynak PDF (39MB); içeriği sample_docs/wiki/*.md'ye çıkarıldı,
+# ham dosyanın kendisi hiçbir yerde okunmuyor (Altan'ın kararı, 2026-08-28).
+sample_docs/kkbfaaliyetraporu2024.pdf
+
+# pptx sunumu üretmek için kurulan npm bağımlılığı (pptxgenjs).
+# Kaynağa girmiyor: sunum tek seferlik bir çıktı, üretim yolunun parçası değil.
+node_modules/
+package.json
+package-lock.json
+
+# Kopyalanmış agent skill'leri — araç, proje kodu değil (pptx üretimi vb.)
+.agents/
+.claude/skills/
+.ruff_cache/

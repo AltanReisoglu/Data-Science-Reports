@@ -1,0 +1,33 @@
+# Tool Gateway — artık YALNIZCA tool proxy'si.
+#
+# 2026-09-04'te buradan üç şey kaldırıldı: artifact bucket'ının ConfigMap+Secret
+# referansları, kapsam imza sırrı, ve metadata PVC'si. Hepsi artifact işiyle
+# birlikte `artifact-service`'e taşındı.
+#
+# Ağ kuralını kaldırmak (tool-gateway-egress'ten `app: minio`) tek başına
+# yetmezdi: kimlik bilgisi pod'un ortamında durmaya devam ederdi. En küçük
+# yetki, rotayı da sırrı da almayı gerektiriyor — bu pod artık MinIO'nun ne
+# adresini ne de anahtarını biliyor.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-gateway
+  template:
+    metadata:
+      labels:
+        app: tool-gateway
+    spec:
+      containers:
+      - name: tool-gateway
+        image: tool-gateway:local
+        imagePullPolicy: Never # kind load docker-image ile yerelden yüklendi
+        ports:
+        - containerPort: 8443
+        envFrom:
+        - secretRef:
+            name: tool-gateway-env # kubectl create secret ile imperative oluşturulur (T010) — .env asla YAML'a gömülmez

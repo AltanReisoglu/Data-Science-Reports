@@ -1,0 +1,82 @@
+# Faz 2 sandbox Job şablonu — sandbox_runner.py bunu metin olarak okuyup
+# {run_id} ve {tool_gateway_endpoint} yer tutucularını doldurur, sonra
+# yaml.safe_load ile kubernetes client'a verir (research.md §1, §5, §6).
+#
+# activeDeadlineSeconds/resources.limits: research.md §6.
+# ttlSecondsAfterFinished: research.md §5 (otomatik temizlik, Principle V).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ptc-sandbox-{run_id}
+  labels:
+    app: ptc-sandbox
+    ptc-run-id: "{run_id}"
+spec:
+  activeDeadlineSeconds: 30
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: ptc-sandbox
+        ptc-run-id: "{run_id}"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: sandbox
+          image: ptc-sandbox:local
+          imagePullPolicy: Never  # kind load docker-image ile yerelden yüklendi
+          env:
+            - name: TOOL_GATEWAY_ENDPOINT
+              value: "{tool_gateway_endpoint}"
+            # Artifact Service (2026-09-04): artifact baytları ARTIK BURADAN
+            # gidip geliyor, gateway'den değil. Gateway yalnızca tool proxy'si.
+            - name: ARTIFACT_SERVICE_ENDPOINT
+              value: "{artifact_service_endpoint}"
+            # Kapsam jetonu (2026-09-03): bu çalıştırmanın HANGİ workflow adına
+            # konuştuğunu kanıtlar. `sandbox_runner` imzalar, Artifact Service
+            # doğrular. Boşsa sandbox artifact API'sini hiç görmez.
+            #
+            # Sandbox bu jetonu okuyabilir (kendi ortam değişkeni) ama BAŞKA bir
+            # workflow için geçerli bir jeton üretemez — imza anahtarı onda yok.
+            - name: PTC_SCOPE_TOKEN
+              value: "{scope_token}"
+            # Yalnızca `/workflows/{{id}}/artifacts` yolunu kurmak için. Yetki
+            # bundan DEĞİL jetondan geliyor: servis yoldaki değeri jetondakiyle
+            # karşılaştırır, uymazsa 404 döner.
+            - name: PTC_WORKFLOW_ID
+              value: "{workflow_id}"
+          volumeMounts:
+            - name: code
+              mountPath: /sandbox
+            # Yazılabilir scratch: kök dosya sistemi salt-okunur, kodun geçici
+            # dosya yazacak bir yeri olmalı (Parquet ara dosyaları vb.).
+            # `sizeLimit` aşılırsa pod tahliye edilir — kota bedavaya geliyor.
+            - name: scratch
+              mountPath: /scratch
+            # Çıktı süpürmesi (2026-09-03): LLM'in put_artifact() API'sini
+            # HİÇ bilmeden yazdığı sıradan kod (`df.to_csv("/output/x.csv")`)
+            # için emniyet ağı. `entrypoint.py`'nin `_ciktilari_supur`'u,
+            # script bitince (başarı ya da hata fark etmeksizin) bu dizinin
+            # ÜST DÜZEYİNİ artifact'e çevirir. `/scratch`ten AYRI: scratch
+            # süpürülmez, her geçici dosya artifact'e dönerdi.
+            #
+            # Endüstri emsali: Anthropic'in `$OUTPUT_DIR`'ı, OpenAI Code
+            # Interpreter'ın `/mnt/data`'sı — ikisi de aynı deseni kullanıyor.
+            - name: output
+              mountPath: /output
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: code
+          configMap:
+            name: ptc-code-{run_id}
+        - name: scratch
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: output
+          emptyDir:
+            sizeLimit: 512Mi
+
