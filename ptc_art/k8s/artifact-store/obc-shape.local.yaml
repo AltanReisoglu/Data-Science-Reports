@@ -1,0 +1,30 @@
+# Gerçek bir ObjectBucketClaim'in ürettiği ConfigMap+Secret çiftinin YEREL
+# taklidi. Alan adları OBC ile birebir aynı — kod tarafında fark yok.
+#
+# OpenShift'te bu dosya UYGULANMAZ; OBC bunları kendisi üretir.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: artifact-bucket
+  labels: {app: ptc-artifacts}
+data:
+  BUCKET_NAME: "ptc-artifacts"
+  BUCKET_HOST: "minio.default.svc.cluster.local"
+  BUCKET_PORT: "9000"
+  BUCKET_REGION: ""
+  # OBC'nin şemasında YOK, bizim eklediğimiz: OBC bir TLS bayrağı vermiyor ve
+  # kod porttan çıkarım yapıyor (443 → TLS). MinIO 9000'de düz HTTP konuştuğu
+  # için burada açıkça kapatıyoruz.
+  BUCKET_TLS: "false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: artifact-bucket
+  labels: {app: ptc-artifacts}
+type: Opaque
+stringData:
+  # YEREL GELİŞTİRME DEĞERLERİ — bu dosya yalnızca kind içindir.
+  # OpenShift'te bu Secret'ı OBC üretir ve anahtarları NooBaa atar.
+  AWS_ACCESS_KEY_ID: "ptcartifacts"
+  AWS_SECRET_ACCESS_KEY: "ptcartifacts-local-dev"
