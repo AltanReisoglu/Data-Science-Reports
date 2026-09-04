@@ -1,0 +1,79 @@
+# Artifact Service — artifact işi 2026-09-04'te Tool Gateway'den buraya taşındı.
+#
+# Bu pod'un MinIO kimlik bilgisi ve kayıt defteri VAR, internete çıkışı YOK.
+# Tool Gateway'in ise onaylı FQDN'leri var, MinIO'ya rotası YOK. İkisini ayrı
+# tutmanın amacı bu: tek bir servisin ele geçirilmesi hem depoya hem internete
+# erişim vermesin (OpenAI'nin Ağustos 2026 olayından çıkan ders).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artifact-service
+spec:
+  # TEK replika — metadata SQLite ve PVC ReadWriteOnce. Çok replikaya çıkmak
+  # önce Postgres'e geçmeyi gerektirir (bkz. karar dokümanı).
+  replicas: 1
+  selector:
+    matchLabels:
+      app: artifact-service
+  template:
+    metadata:
+      labels:
+        app: artifact-service
+    spec:
+      securityContext:
+        # PVC'nin grup sahipliği — metadata DB'sinin yazılabilmesi için.
+        # OpenShift'te SCC kendi aralığından atar; bu satır orada SİLİNMELİ.
+        fsGroup: 1000670000
+      containers:
+      - name: artifact-service
+        image: artifact-service:local
+        imagePullPolicy: Never # kind load docker-image ile yerelden yüklendi
+        ports:
+        - containerPort: 8080
+        env:
+        # Kayıt defteri: pod'un /tmp'i DEĞİL, kalıcı volume. Aksi halde baytlar
+        # MinIO'da kalırken kayıtlar pod ile birlikte gider ve yetim blob
+        # birikir — 2026-09-02'de gerçekten yaşandı, 9 objenin 2'si yetim kaldı.
+        - name: PTC_METADATA_DB
+          value: /var/lib/ptc/artifacts.db
+        volumeMounts:
+        - name: metadata
+          mountPath: /var/lib/ptc
+        envFrom:
+        # Artifact deposu bağlantısı. Bu iki referansın ADI önemli: OpenShift'te
+        # aynı adı bir ObjectBucketClaim üretir, yerelde
+        # k8s/artifact-store/obc-shape.local.yaml elle yazar. Deployment
+        # DEĞİŞMEZ — göçte yalnızca bu kaynakları kimin ürettiği değişir.
+        - configMapRef:
+            name: artifact-bucket   # BUCKET_NAME / BUCKET_HOST / BUCKET_PORT
+        - secretRef:
+            name: artifact-bucket   # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+        # Kapsam jetonlarını doğrulayan ortak sır. Sandbox'a ASLA verilmez;
+        # sandbox'ın eline yalnızca imzalanmış jeton geçer.
+        - secretRef:
+            name: ptc-scope-signing
+        # TTL reaper'ın /admin/reap'i çağırırken kullandığı jeton. Kapsam
+        # jetonundan AYRI: sandbox'ın elindeki jeton bu uç noktaya yetmemeli.
+        - secretRef:
+            name: ptc-admin-token
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 2
+          periodSeconds: 5
+      volumes:
+      - name: metadata
+        persistentVolumeClaim:
+          claimName: artifact-service-metadata
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: artifact-service
+spec:
+  selector:
+    app: artifact-service
+  ports:
+  - port: 8080
+    targetPort: 8080

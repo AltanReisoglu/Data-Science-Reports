@@ -1,0 +1,91 @@
+# Artifact Service'in ingress + egress'i (2026-09-04).
+#
+# "Supporting service" ilkesinin ikinci uygulaması: agent'ın kısıtlı olması
+# yetmez, agent'ın eriştiği HER servisin kendi egress'i de kısıtlanmalı
+# (PTC_Egress_Policy_OpenAI_Incident.md'nin dersi).
+#
+# Bu servisin kimlik bilgisi ve kayıt defteri var — yani ele geçirilirse
+# artifact'lerin tamamı okunabilir. Bu yüzden İNTERNETE ÇIKIŞI YOK:
+#
+#     artifact-service → minio    ✓
+#     artifact-service → kube-dns ✓  (yalnızca ad çözümlemesi için — aşağıya bak)
+#     artifact-service → internet ✗
+#
+# Tool Gateway'in tam tersi: onun internete çıkışı var, deposu yok. Tek bir
+# workload'ın compromise'ı ikisini birden vermesin diye.
+#
+# DNS NEDEN GEREKLİ — ölçülmüş bir hata (2026-09-04): bu dosya ilk yazıldığında
+# DNS kuralı YOKTU, gerekçe olarak da "FQDN kuralı kullanmıyoruz, DNS'e ihtiyaç
+# yok" yazılmıştı. YANLIŞ. `toEndpoints` ağ YOLUNU açar, ama minio istemcisi
+# önce `BUCKET_HOST`'u (minio.default.svc.cluster.local) çözmek zorunda —
+# çözemeyince ilk istekte asılı kaldı. Tek worker'lı uvicorn bloke olunca
+# readiness probe de zaman aşımına düştü ve pod sağlıksız göründü; asıl neden
+# ise iki katman aşağıdaydı.
+#
+# Bu, 2026-09-03'te gateway→MinIO yolunda yaşananın aynısı: sessiz asılma,
+# çünkü default-deny paketleri düşürür, reddetmez. Aynı hatayı iki kez yapmamak
+# için not: `toEndpoints` DNS'i KAPSAMAZ, ad kullanan her istemciye ayrıca
+# kube-dns izni gerekir.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: artifact-service-egress
+spec:
+  endpointSelector:
+    matchLabels:
+      app: artifact-service
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        app: minio
+    toPorts:
+    - ports:
+      - port: "9000"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+---
+# Ingress: YALNIZCA sandbox. Ajanın kendisi (web/app pod'u) artifact'leri
+# doğrudan okumaz — manifest'i orchestrator üzerinden alır. Yüzeyi dar tutmak
+# için burada da açık bir izin listesi var; Cilium'un default-deny'i gerisini
+# kapatıyor.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: artifact-service-ingress
+spec:
+  endpointSelector:
+    matchLabels:
+      app: artifact-service
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: ptc-sandbox
+    # TTL reaper (CronJob). Ayrı bir kimlik: yalnızca /admin/reap'i çağırıyor ve
+    # o uç nokta kapsam jetonuyla DEĞİL ayrı bir yönetim jetonuyla korunuyor.
+    - matchLabels:
+        app: artifact-reaper
+    # Ajan pod'u (2026-09-04) — artifact manifestini LİSTELEMEK için.
+    #
+    # Yalnızca `GET /workflows/{id}/artifacts` çağırıyor: isimler, tipler,
+    # boyutlar. BAYT ÇEKMİYOR — içerik yolu sandbox'ta kalıyor. Google ADK'nın
+    # `LoadArtifactsTool` deseni: "isim ucuz, içerik pahalı".
+    #
+    # NOT: ajan şu an laptop'ta çalışıyor ve cluster'a `kubectl port-forward` ile
+    # ulaşıyor (port-forward API sunucusundan geçtiği için bu kural onu
+    # ilgilendirmiyor). Bu satır, ajan cluster İÇİNE taşındığında gerekli olacak.
+    - matchLabels:
+        app: grounded-assistant
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP

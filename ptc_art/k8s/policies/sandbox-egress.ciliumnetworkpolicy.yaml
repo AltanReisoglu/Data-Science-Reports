@@ -1,0 +1,45 @@
+# Faz 2'nin çekirdeği (T016) — research.md §4.1.
+#
+# Sandbox pod'unun (job-template.yaml'daki `app: ptc-sandbox` etiketi) egress
+# kuralları: SADECE iki cluster-içi hedef. Başka HİÇBİR kural yok — Cilium'un
+# default-deny'i geri kalan HER ŞEYİ (internet dahil, kube-dns dahil, MinIO
+# dahil) zaten kapatıyor. `sandbox_runner.py` her iki servisin de ClusterIP'sini
+# DNS yerine doğrudan enjekte ettiği için sandbox'ın DNS'e hiç ihtiyacı yok
+# (bkz. tool_gateway_mcp.md'deki "Sandbox'a özel not").
+#
+# `toEndpoints`, Cilium'un identity-based modelidir: hedef pod yeniden başlasa,
+# IP'si değişse bile bu kural geçerli kalır (IP tabanlı bir NetworkPolicy'nin
+# aksine) — PTC_Egress_Policy_Cilium_eBPF_Technical_Reference.md §4.1.
+#
+# 2026-09-04: ikinci hedef (artifact-service) eklendi. Sandbox artık artifact
+# baytlarını gateway üzerinden değil doğrudan bu servisten alıp veriyor.
+#
+# MinIO BU LİSTEDE DEĞİL ve olmayacak: sandbox'a depoya doğrudan rota açmak,
+# ağ politikasının göremediği ikinci bir çıkış vermek olurdu. Presigned URL de
+# aynı sebeple kullanılmıyor — asıl darboğaz gateway'in araya girmesi değil
+# base64+MCP taşımasıydı, ve onu akışlı HTTP zaten çözüyor.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: sandbox-egress
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ptc-sandbox
+  egress:
+    # Tool'lar (search_knowledge_base, web_search, ...) — artifact YOK.
+    - toEndpoints:
+        - matchLabels:
+            app: tool-gateway
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+    # Artifact baytları ve kayıt defteri.
+    - toEndpoints:
+        - matchLabels:
+            app: artifact-service
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP

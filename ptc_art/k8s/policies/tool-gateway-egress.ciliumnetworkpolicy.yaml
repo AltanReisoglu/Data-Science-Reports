@@ -1,0 +1,63 @@
+# Tool Gateway'in kendi egress'i — "supporting service" ilkesi
+# (PTC_Egress_Policy_OpenAI_Incident.md'nin dersi: agent'ın kısıtlı olması
+# yetmez, agent'ın eriştiği servisin de kendi egress'i kısıtlanmalı).
+#
+# Tool Gateway'in TEK dış hedefi: .env'deki embedding/LLM gateway'i.
+# Bkz. specs/002-ptc-code-sandbox/research.md §4.2.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: tool-gateway-egress
+spec:
+  endpointSelector:
+    matchLabels:
+      app: tool-gateway
+  egress:
+  # MinIO KURALI KALDIRILDI (2026-09-04).
+  #
+  # 2026-09-03'te eklenmişti: artifact tool'ları bu pod'daydı ve depoya
+  # bağlanması gerekiyordu. Artık artifact işi `artifact-service`'e taşındı,
+  # dolayısıyla bu pod'un depoya erişim GEREKÇESİ kalmadı — ve gerekçesi kalmayan
+  # bir kanal kapatılır.
+  #
+  # Kazanç somut: Tool Gateway'in internete (üç FQDN) çıkışı var. Eğer MinIO'ya
+  # da rotası olsaydı, bu pod'un ele geçirilmesi hem depoyu hem interneti aynı
+  # anda verirdi — OpenAI'nin Ağustos 2026 olayında Artifactory'nin oynadığı
+  # köprü rolünün ta kendisi. Şimdi iki yetenek iki ayrı pod'da:
+  #
+  #     tool-gateway     → internet ✓   depo ✗
+  #     artifact-service → internet ✗   depo ✓
+  - toEndpoints: # DNS çözümlemesi için (FQDN kuralı DNS'e ihtiyaç duyar)
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+  - toFQDNs:
+    - matchName: "mia.csp.kloudeks.com"
+    # tiktoken'ın cl100k_base varsayılan encoding tablosunu indirdiği adres
+    # (langchain_openai, tiktoken'a tanıdık gelmeyen bir model adı — bizim
+    # durumumuzda "Qwen3-Embedding-8B" — gördüğünde buna düşüyor). Bilinçli
+    # olarak eklendi (2026-08-28, Altan'ın kararı) — bkz. plan.md "6. bulgu".
+    # Dockerfile artık bu dosyayı build zamanında önceden gömüyor, bu yüzden
+    # bu kural normal şartlarda hiç kullanılmaz — savunma amaçlı (defense in
+    # depth) tutuluyor.
+    - matchName: "openaipublic.blob.core.windows.net"
+    # web_search tool'unun (Faz 4, tool sayısını artırma isteği, 2026-08-30)
+    # TEK dış hedefi — API anahtarı gerektirmeyen, sunucu-render'lı bir arama
+    # uç noktası. Yeni bir tool = yeni bir onaylı hedef: Principle II'nin
+    # "her yeni dış erişim açıkça onaylanmalı" ilkesinin somut bir örneği.
+    - matchName: "html.duckduckgo.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+      serverNames:
+        - "mia.csp.kloudeks.com"
+        - "openaipublic.blob.core.windows.net"
+        - "html.duckduckgo.com"
