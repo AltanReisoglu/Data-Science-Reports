@@ -1,0 +1,68 @@
+# TTL reaper (2026-09-04) — süresi dolmuş artifact'leri toplar.
+#
+# NEDEN GEREKLİYDİ: `ttl_seconds` şemada vardı, `MetadataStore.expired()` vardı,
+# `ArtifactService.delete()` vardı — ama üçünü çağıran kimse yoktu. Yani TTL
+# yazılıydı ama çalışmıyordu. Artifact'ler sonsuza kadar birikiyordu.
+#
+# NEDEN İŞİ KENDİSİ YAPMIYOR: kayıt defteri SQLite ve PVC ReadWriteOnce — aynı
+# anda tek yazıcı olabilir. Bu pod DB'yi kendisi açsaydı ya PVC'yi mount
+# edemezdi ya da eşzamanlı yazıcı olup bozulma riski doğururdu.
+#
+#     CronJob  = zamanlayıcı        (yeniden deneme, geçmiş, gözlemlenebilirlik)
+#     Servis   = tek yazıcı         (SQLite kısıtı korunuyor)
+#
+# Postgres'e geçilince bu kısıt kalkar ve reaper işi kendisi yapabilir. O gün
+# gelene kadar bölünme böyle.
+#
+# GÜVENLİK: `PTC_ADMIN_TOKEN` yalnızca burada ve serviste. Sandbox'ın elindeki
+# kapsam jetonu bu uç noktaya YETMEZ — LLM'in ürettiği kodun toplu silme
+# tetikleyebilmesi, emniyet ağı olarak kurduğumuz kalıcılığı tek çağrıda geri
+# alabilirdi.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: artifact-reaper
+spec:
+  # Saat başı. TTL'ler saatler/günler mertebesinde; daha sık koşmanın faydası yok.
+  schedule: "0 * * * *"
+  # Bir tur uzarsa ikincisini başlatma — servis tek yazıcı, sıraya girsinler.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Süpürme idempotent: yarım kalan tur bir sonrakinde tamamlanır.
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: artifact-reaper
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: reaper
+            image: artifact-service:local
+            imagePullPolicy: Never
+            env:
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ptc-admin-token
+                  key: PTC_ADMIN_TOKEN
+            command:
+            - python
+            - -c
+            - |
+              import json, os, urllib.request
+              istek = urllib.request.Request(
+                  "http://artifact-service:8080/admin/reap",
+                  method="POST",
+                  headers={"X-Admin-Token": os.environ["ADMIN_TOKEN"]},
+              )
+              with urllib.request.urlopen(istek, timeout=300) as y:
+                  sonuc = json.load(y)
+              print(json.dumps(sonuc))
+              # Kısmi hata Job'u BAŞARISIZ yapar: sessizce geçmesin, CronJob
+              # geçmişinde görünsün ve backoffLimit bir kez daha denesin.
+              if sonuc.get("hatali"):
+                  raise SystemExit(1)
