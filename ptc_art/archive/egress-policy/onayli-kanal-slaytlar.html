@@ -1,0 +1,981 @@
+<title>Onaylı Kanal</title>
+<style>
+  :root {
+    --bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --border: #D9DFEA;
+    --text: #131B2B;
+    --text-dim: #5B6B85;
+    --accent: #0B8577;
+    --accent-soft: #0B85771A;
+    --danger: #C7293B;
+    --danger-soft: #C7293B1A;
+    --gold: #9C7A2E;
+    --term-bg: #0B0F18;
+    --term-text: #D9E1EE;
+    --term-dim: #6B7890;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0A0F1A;
+      --surface: #121A2B;
+      --border: #263452;
+      --text: #E8ECF5;
+      --text-dim: #8391AE;
+      --accent: #2FD9C0;
+      --accent-soft: #2FD9C022;
+      --danger: #FF5C6C;
+      --danger-soft: #FF5C6C22;
+      --gold: #C9A15C;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0A0F1A;
+    --surface: #121A2B;
+    --border: #263452;
+    --text: #E8ECF5;
+    --text-dim: #8391AE;
+    --accent: #2FD9C0;
+    --accent-soft: #2FD9C022;
+    --danger: #FF5C6C;
+    --danger-soft: #FF5C6C22;
+    --gold: #C9A15C;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  .deck {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    transition: transform 0.5s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+
+  .slide {
+    flex: 0 0 100vw;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 3.2rem 5rem 2.4rem;
+    position: relative;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .slide-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-top: 1.6rem;
+    gap: 1.9rem;
+    max-width: 62rem;
+  }
+
+  .slide-body.wide { max-width: 100%; }
+
+  h1 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    font-size: 3.2rem;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.98rem;
+    color: var(--text-dim);
+    margin: 0 0 -0.6rem;
+  }
+
+  p.lede {
+    font-size: 1.28rem;
+    line-height: 1.55;
+    color: var(--text-dim);
+    max-width: 42rem;
+    margin: 0;
+  }
+
+  .quote {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 2rem;
+    line-height: 1.35;
+    max-width: 46rem;
+    text-wrap: balance;
+    position: relative;
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 1.15rem 1.5rem;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .quote cite {
+    display: block;
+    font-style: normal;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-weight: 400;
+    margin-top: 1rem;
+    letter-spacing: 0.02em;
+  }
+
+  .term {
+    background: var(--term-bg);
+    color: var(--term-text);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.86rem;
+    line-height: 1.65;
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+    border: 1px solid #232E42;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .term .dim { color: var(--term-dim); }
+  .term .ok { color: #2FD9C0; }
+  .term .bad { color: #FF6B7A; font-weight: 600; }
+  .term .comment { color: #5A6784; font-style: italic; }
+
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.4rem;
+    align-items: start;
+  }
+
+  .layer-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    width: fit-content;
+  }
+
+  .layer-tag .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  ol.steps, ul.limits {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    max-width: 44rem;
+  }
+
+  ol.steps li {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: 1rem;
+    align-items: baseline;
+    font-size: 1.08rem;
+    line-height: 1.5;
+  }
+
+  ol.steps li .n {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.9rem;
+    width: 100%;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .card .term-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .card .term-def {
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .card .term-ex {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    margin-top: 0.2rem;
+  }
+
+  ul.limits li {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr;
+    gap: 0.9rem;
+    font-size: 1.05rem;
+    line-height: 1.55;
+    color: var(--text);
+  }
+
+  ul.limits li::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    margin-top: 0.5rem;
+    border-radius: 50%;
+    background: var(--danger);
+  }
+
+  ul.limits li strong {
+    display: block;
+    grid-column: 2;
+    margin-bottom: 0.15rem;
+  }
+  ul.limits li span.sub {
+    display: block;
+    grid-column: 2;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+
+  figure { margin: 0; }
+  figcaption {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    margin-top: 0.8rem;
+    max-width: 40rem;
+  }
+
+  .flow-allowed { stroke: var(--accent); fill: none; }
+  .flow-blocked { stroke: var(--danger); fill: none; stroke-dasharray: 5 5; }
+  .box { fill: var(--surface); stroke: var(--border); }
+  .box-text { fill: var(--text); font-family: "IBM Plex Sans", sans-serif; font-weight: 600; }
+  .label-text { fill: var(--text-dim); font-family: "IBM Plex Mono", monospace; }
+  .label-blocked { fill: var(--danger); font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .policy-text { fill: var(--accent); font-family: "IBM Plex Mono", monospace; font-weight: 500; }
+
+  /* footer chrome */
+  .slide.dark {
+    --surface: #121A2B;
+    --border: #263452;
+    --text: #E8ECF5;
+    --text-dim: #8391AE;
+    --accent: #2FD9C0;
+    --accent-soft: #2FD9C022;
+    --danger: #FF5C6C;
+    --gold: #C9A15C;
+    background: #0B0F18;
+    color: #E8ECF5;
+  }
+
+  .stat-num {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    font-size: 3.6rem;
+    line-height: 1;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-lbl {
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+    margin-top: 0.35rem;
+  }
+
+  .chrome-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  .wordmark .mark {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--gold);
+    display: inline-block;
+  }
+
+  .slide-index {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* nav controls */
+  .nav {
+    position: fixed;
+    bottom: 1.4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 10;
+  }
+
+  .nav button {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .dots { display: flex; gap: 0.4rem; }
+  .dots .d {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .dots .d.active { background: var(--accent); transform: scale(1.4); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .deck { transition: none; }
+  }
+
+  @media screen and (max-width: 900px) {
+    .slide { padding: 2rem 1.6rem 1.6rem; }
+    h1 { font-size: 2rem; }
+    .cols { grid-template-columns: 1fr; }
+    .quote { font-size: 1.4rem; }
+  }
+</style>
+
+<div class="deck" id="deck">
+
+  <!-- Slide 1 — Title -->
+  <!-- Slide 1 — Title -->
+  <section class="slide dark">
+    <div class="eyebrow">GÜVENLİK POC · CANLI DEMO</div>
+    <div class="slide-body wide" style="justify-content:center">
+      <div class="cols" style="align-items:center;gap:4.5rem">
+        <div>
+          <h1>Onaylı Kanal Dışına<br>Çıkış Yok</h1>
+          <p class="lede" style="margin-top:1.5rem">PTC (Programmatic Tool Calling) ile çalışan bir kurumsal asistanın, ürettiği kodun ağ erişimini eBPF/Cilium ile kernel seviyesinde nasıl kısıtladığını gösteren bir kavram kanıtı.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1.8rem">
+          <div><div class="stat-num">2</div><div class="stat-lbl">katmanlı Cilium egress politikası —<br>sandbox ve Tool Gateway ayrı ayrı kısıtlı</div></div>
+          <div><div class="stat-num">3</div><div class="stat-lbl">onaylı dış hedef — isim bazlı (SNI),<br>geri kalan her yer kapalı</div></div>
+          <div><div class="stat-num">0</div><div class="stat-lbl">başarılı kaçış — canlı olarak,<br>kernel sayaçlarıyla doğrulandı</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">01 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 2 — eBPF + Cilium merged -->
+  <section class="slide">
+    <div class="eyebrow">01 · TEMEL · eBPF</div>
+    <div class="slide-body wide">
+      <div class="cols">
+        <div style="display:flex;flex-direction:column;gap:1rem;justify-content:center">
+          <h1 style="font-size:2.1rem">eBPF Nedir</h1>
+          <p class="lede" style="font-size:1.05rem">Linux kernel'inin içine güvenli (sandboxed), küçük programlar takmayı sağlayan genel amaçlı bir motor — kernel modülü yazıp kernel'i yeniden derlemeden. Ağa ya da Kubernetes'e özgü değil.</p>
+          <div class="quote" style="font-size:1.05rem;padding-left:1.1rem">eBPF, kernel'in birden çok noktasına (sistem çağrısı, ağ paketi, fonksiyon izleme) program takılmasına izin verir — bizim hikâyemizdeki nokta: ağ paketi (<code>tc</code> hook'u).</div>
+        </div>
+        <figure>
+          <svg viewBox="0 0 380 420" role="img" aria-label="Paket, Application'dan Socket'e, oradan eBPF programina, sonra TCP/IP yigina ve NIC'e dogru akar; eBPF programi bu akisin ortasinda durur ve ALLOW ya da DROP karari verir." style="width:100%;max-width:380px;height:auto;max-height:56vh;margin:0 auto;display:block">
+            <rect x="80" y="10" width="200" height="46" rx="8" class="box"/>
+            <text x="180" y="38" text-anchor="middle" class="box-text" font-size="14">Application</text>
+            <line x1="180" y1="56" x2="180" y2="86" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+
+            <rect x="80" y="86" width="200" height="46" rx="8" class="box"/>
+            <text x="180" y="114" text-anchor="middle" class="box-text" font-size="14">Socket</text>
+            <line x1="180" y1="132" x2="180" y2="162" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+
+            <rect x="50" y="162" width="260" height="66" rx="8" class="box" style="stroke:var(--accent);stroke-width:2"/>
+            <text x="180" y="190" text-anchor="middle" class="policy-text" font-size="14">eBPF programı</text>
+            <text x="180" y="210" text-anchor="middle" class="label-text" font-size="10">tc hook · karar burada verilir</text>
+            <line x1="180" y1="228" x2="180" y2="258" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+
+            <rect x="80" y="258" width="200" height="46" rx="8" class="box"/>
+            <text x="180" y="286" text-anchor="middle" class="box-text" font-size="14">TCP/IP yığını</text>
+            <line x1="180" y1="304" x2="180" y2="334" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+
+            <rect x="80" y="334" width="200" height="46" rx="8" class="box"/>
+            <text x="180" y="362" text-anchor="middle" class="box-text" font-size="14">NIC (ağ kartı)</text>
+
+            <line x1="310" y1="182" x2="352" y2="212" class="flow-blocked" stroke-width="2" marker-end="url(#arrowBlocked)"/>
+            <text x="356" y="222" text-anchor="start" class="label-blocked" font-size="11">DROP</text>
+          </svg>
+          <figcaption>eBPF, socket ile ağ kartı arasındaki tek karar noktası — DROP kararı verilirse paket TCP/IP yığınına hiç ulaşmaz.</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">02 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide — Cilium, dedicated -->
+  <section class="slide">
+    <div class="eyebrow">02 · TEMEL · CILIUM</div>
+    <div class="slide-body wide">
+      <div class="cols">
+        <div style="display:flex;flex-direction:column;gap:0.9rem;justify-content:center">
+          <h1 style="font-size:2.1rem">eBPF Üzerine Kurulu<br>Bir Ürün</h1>
+          <p class="lede" style="font-size:1.05rem">Cilium, eBPF'i ALTYAPI olarak kullanan, Kubernetes ağ/güvenlik/gözlemlenebilirlik SORUNUNU çözen spesifik bir yazılım projesi. Motor eBPF, Cilium o motoru kullanan arabalardan biri (bpftrace/Falco/Katran gibi diğerleri de var).</p>
+          <div class="quote" style="font-size:1.05rem;padding-left:1.1rem">Bu sunumdaki her kavram — <code>CiliumNetworkPolicy</code>, kimlik modeli, <code>toFQDNs</code>, Hubble — Cilium'a ait, eBPF'in kendisine değil.</div>
+        </div>
+        <figure>
+          <svg viewBox="0 0 480 400" role="img" aria-label="Cilium'un durdugu yer yukaridan asagiya: Kubernetes API sunucusu, cilium-agent (node basina, userspace, pod/politika bilgisini izler ve eBPF programlarina derler), eBPF (kernel icinde, tc hook, gercek karari verir), en altta gercek ag paketi." style="width:100%;height:auto;max-height:56vh">
+            <rect x="90" y="10" width="300" height="56" rx="8" class="box"/>
+            <text x="240" y="36" text-anchor="middle" class="box-text" font-size="13">Kubernetes API Sunucusu</text>
+            <text x="240" y="54" text-anchor="middle" class="label-text" font-size="10">pod'lar, etiketler, CiliumNetworkPolicy</text>
+
+            <line x1="240" y1="66" x2="240" y2="96" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+            <text x="330" y="86" text-anchor="middle" class="label-text" font-size="9">izler (watch)</text>
+
+            <rect x="60" y="96" width="360" height="70" rx="8" class="box" style="stroke:var(--accent);stroke-width:1.8"/>
+            <text x="240" y="126" text-anchor="middle" class="policy-text" font-size="14">cilium-agent</text>
+            <text x="240" y="146" text-anchor="middle" class="label-text" font-size="10">userspace, DaemonSet — node başına 1 tane (BURASI Cilium)</text>
+            <text x="240" y="160" text-anchor="middle" class="label-text" font-size="10">identity atar, DNS proxy'yi barındırır, Hubble'ı besler</text>
+
+            <line x1="240" y1="166" x2="240" y2="196" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+            <text x="345" y="186" text-anchor="middle" class="label-text" font-size="9">eBPF'e derler/yükler</text>
+
+            <rect x="20" y="196" width="440" height="90" rx="8" class="box" style="stroke:var(--danger);stroke-width:1.2;stroke-dasharray:4 3"/>
+            <text x="240" y="218" text-anchor="middle" class="label-blocked" font-size="10" letter-spacing="1">KERNEL SPACE</text>
+            <rect x="45" y="228" width="390" height="46" rx="6" class="box"/>
+            <text x="240" y="248" text-anchor="middle" class="box-text" font-size="12">eBPF (tc hook) — asıl ALLOW/DENY kararı BURADA</text>
+            <text x="240" y="264" text-anchor="middle" class="label-text" font-size="9">mikrosaniyeler içinde, kernel'den hiç çıkmadan</text>
+
+            <line x1="240" y1="286" x2="240" y2="316" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+
+            <rect x="130" y="316" width="220" height="46" rx="8" class="box"/>
+            <text x="240" y="344" text-anchor="middle" class="box-text" font-size="12">Gerçek ağ paketi</text>
+          </svg>
+          <figcaption>Cilium = <code>cilium-agent</code> — Kubernetes'in bilgisini eBPF'e çeviren, node başına çalışan userspace köprü. Asıl karar bir kat altında, kernel'de.</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">03 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide — Mechanism + K8s concepts + Hubble merged -->
+  <section class="slide">
+    <div class="eyebrow">03 · NASIL ÇALIŞIYOR</div>
+    <div class="slide-body wide">
+      <h1 style="font-size:2rem">YAML'dan Kernel'e</h1>
+      <div class="cols">
+        <ol class="steps">
+          <li><span class="n">01</span><span>Biz <strong>YAML</strong> yazarız — <code>CiliumNetworkPolicy</code></span></li>
+          <li><span class="n">02</span><span><strong>cilium-agent</strong> (node başına 1, Kubernetes API'sini izler)</span></li>
+          <li><span class="n">03</span><span>YAML'ı <strong>eBPF bytecode</strong>'una derler</span></li>
+          <li><span class="n">04</span><span>Pod'un ağ arayüzüne (<strong>tc hook</strong>) yükler</span></li>
+          <li><span class="n">05</span><span>Paket gelince kernel anında çalıştırır → <strong>ALLOW/DROP</strong></span></li>
+        </ol>
+        <div style="display:flex;flex-direction:column;gap:0.7rem">
+          <div class="card-grid" style="grid-template-columns:1fr 1fr">
+            <div class="card">
+              <span class="term-name">Pod</span>
+              <span class="term-def">En küçük birim — tek IP paylaşan container grubu.</span>
+            </div>
+            <div class="card">
+              <span class="term-name">Service</span>
+              <span class="term-def">Bir grup pod'un önündeki sabit isim+IP.</span>
+            </div>
+            <div class="card">
+              <span class="term-name">Node / Cluster</span>
+              <span class="term-def">Tek makine / bunların bütünü.</span>
+            </div>
+            <div class="card">
+              <span class="term-name">Workload</span>
+              <span class="term-def">Pod'ları nasıl çalıştıracağını tanımlar (Deployment/Job).</span>
+            </div>
+          </div>
+          <p class="lede" style="font-size:0.92rem">Hubble, aynı eBPF altyapısını GÖZLEMLEMEK için kullanır — her kararı "flow" olarak akıtır (<code>verdict</code>: FORWARDED/DROPPED/...; <code>identity/ip/fqdn/port/http-*</code> ile filtrelenebilir).</p>
+        </div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">04 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 4 — Problem + Principle -->
+  <section class="slide">
+    <div class="eyebrow">04 · SORUN VE İLKE</div>
+    <div class="slide-body">
+      <h1>Kod Yazabilen Bir Asistan,<br>Sızdırabilen Bir Asistandır</h1>
+      <p class="lede">Güçlü bir AI agent yalnızca metin üretmez — kod yazabilir, dış sistemlere bağlanabilir. Sınırsız internet erişimi, üretilen her kod satırını potansiyel bir veri sızıntı noktası hâline getirir.</p>
+      <blockquote class="quote" style="margin-top:0.6rem">
+        "Sandbox/agent ortamlarının dış ağ erişimi eBPF/Cilium ile merkezi olarak kontrol edilir. Sadece onaylı tool/API kanallarına erişim verilerek veri sızıntısı engellenir."
+        <cite>— Principle II, PTC Egress Policy</cite>
+      </blockquote>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">05 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 5 — Architecture + Layer evidence + TCP timing merged -->
+  <section class="slide">
+    <div class="eyebrow">05 · MİMARİ VE KANIT</div>
+    <div class="slide-body wide">
+      <h1 style="font-size:1.9rem">İki Katmanlı Savunma</h1>
+      <figure>
+        <svg viewBox="0 -72 980 307" role="img" aria-label="Agentic core kullanicinin kendi bilgisayarinda (laptop) calisir ve Kubernetes Job olusturarak sandbox pod'u ayaga kaldirir. Sandbox pod ve Tool Gateway kind cluster icindedir. Sandbox pod yalnizca Tool Gateway'e baglanabilir; Tool Gateway ise yalnizca 3 onayli dis hedefe baglanabilir. Diger her yer engellenir." style="width:100%;height:auto;max-height:56vh">
+          <defs>
+            <marker id="arrowAllowed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" class="flow-allowed" style="fill:var(--accent);stroke:none"/>
+            </marker>
+            <marker id="arrowBlocked" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" style="fill:var(--danger);stroke:none"/>
+            </marker>
+          </defs>
+          <rect x="8" y="-72" width="300" height="84" rx="10" style="fill:none;stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:5 4"/>
+          <text x="20" y="-58" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="0.08em" style="fill:var(--text-dim)">SENİN BİLGİSAYARIN · LAPTOP</text>
+          <rect x="20" y="-50" width="276" height="52" rx="8" class="box" style="stroke:var(--gold);stroke-width:1.6"/>
+          <text x="158" y="-28" text-anchor="middle" class="box-text" font-size="15">Agentic Core</text>
+          <text x="158" y="-11" text-anchor="middle" class="label-text" font-size="11">LangGraph asistan · web arayüzü</text>
+          <line x1="115" y1="2" x2="115" y2="72" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+          <text x="128" y="44" class="label-text" font-size="11">Kubernetes Job oluşturur</text>
+          <rect x="8" y="52" width="575" height="140" rx="10" style="fill:none;stroke:var(--text-dim);stroke-width:1.2;stroke-dasharray:5 4"/>
+          <text x="571" y="68" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="0.08em" style="fill:var(--text-dim)">KIND CLUSTER · KUBERNETES</text>
+          <rect x="20" y="80" width="190" height="80" rx="8" class="box"/>
+          <text x="115" y="115" text-anchor="middle" class="box-text" font-size="15">Sandbox Pod</text>
+          <text x="115" y="135" text-anchor="middle" class="label-text" font-size="11">LLM kodu burada çalışır</text>
+          <line x1="210" y1="120" x2="365" y2="120" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+          <text x="288" y="105" text-anchor="middle" class="label-text" font-size="11">toEndpoints · 8443</text>
+          <rect x="375" y="80" width="190" height="80" rx="8" class="box"/>
+          <text x="470" y="115" text-anchor="middle" class="box-text" font-size="15">Tool Gateway</text>
+          <text x="470" y="135" text-anchor="middle" class="label-text" font-size="11">Gerçek tool implementasyonları</text>
+          <line x1="565" y1="120" x2="720" y2="120" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+          <text x="642" y="105" text-anchor="middle" class="label-text" font-size="11">toFQDNs · 443</text>
+          <rect x="730" y="60" width="230" height="120" rx="8" class="box"/>
+          <text x="845" y="88" text-anchor="middle" class="box-text" font-size="13">3 Onaylı Hedef</text>
+          <line x1="750" y1="100" x2="940" y2="100" stroke="var(--border)"/>
+          <text x="845" y="125" text-anchor="middle" class="label-text" font-size="10">html.duckduckgo.com</text>
+          <text x="845" y="145" text-anchor="middle" class="label-text" font-size="10">mia.csp.kloudeks.com</text>
+          <text x="845" y="165" text-anchor="middle" class="label-text" font-size="10">openaipublic.blob.core.windows.net</text>
+          <line x1="90" y1="160" x2="90" y2="205" class="flow-blocked" stroke-width="2" marker-end="url(#arrowBlocked)"/>
+          <text x="90" y="224" text-anchor="middle" class="label-blocked" font-size="12">İnternet — DNS bile yok</text>
+          <line x1="450" y1="160" x2="450" y2="205" class="flow-blocked" stroke-width="2" marker-end="url(#arrowBlocked)"/>
+          <text x="450" y="224" text-anchor="middle" class="label-blocked" font-size="12">Diğer her yer — reddedilir</text>
+        </svg>
+      </figure>
+      <div class="card-grid">
+        <div class="card">
+          <span class="term-name">Katman 1 kanıtı</span>
+          <span class="term-def">Sandbox DNS'i bile çözemez — <code>evil.com</code>'a bağlantı denemesi CoreDNS'e ulaşmadan (16 ayrı DROPPED paket) düşer.</span>
+        </div>
+        <div class="card">
+          <span class="term-name">Katman 2 kanıtı</span>
+          <span class="term-def">Tool Gateway'de DNS serbest ama TCP sadece 3 FQDN'e — <code>example.com</code> denemesi "Network is unreachable" ile biter.</span>
+        </div>
+        <div class="card">
+          <span class="term-name">Karar tam olarak ne zaman</span>
+          <span class="term-def">İlk pakette (SYN) — el sıkışma hiç başlamadan. TCP'nin "kurulu" durumu hiç oluşmaz.</span>
+        </div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">06 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 6 — Ports + Traceability + Lifecycle merged -->
+  <section class="slide">
+    <div class="eyebrow">06 · OPERASYONEL GERÇEKLER</div>
+    <div class="slide-body wide">
+      <h1 style="font-size:2rem">Portlar, İzlenebilirlik, Ömür</h1>
+      <div class="card-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card">
+          <span class="term-name">8443 / TCP</span>
+          <span class="term-def">Sandbox → Tool Gateway. Tek izin verilen port.</span>
+        </div>
+        <div class="card">
+          <span class="term-name">443 / TCP</span>
+          <span class="term-def">Tool Gateway → 3 onaylı FQDN.</span>
+        </div>
+        <div class="card">
+          <span class="term-name">53 / UDP</span>
+          <span class="term-def">Tool Gateway → CoreDNS, serbest ama TCP'den ayrı kısıtlı.</span>
+        </div>
+        <div class="card" style="border-color:var(--danger)">
+          <span class="term-name" style="color:var(--danger)">80 / TCP</span>
+          <span class="term-def">Asla onaylı değil — hangi port olursa olsun aynı şekilde engellenir.</span>
+        </div>
+      </div>
+      <figure style="margin:0.4rem 0 0">
+        <svg viewBox="0 0 1002 150" role="img" aria-label="Bir sandbox calistirmasinin omru: configmap_created, job_created, tool_call, denied_action ve final adimlari sirayla akar; tum bu sure en fazla 30 saniyedir ve bitiminde ConfigMap ile Job acikca silinir." style="width:100%;height:auto">
+          <defs>
+            <marker id="tlArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9 z" style="fill:var(--text-dim)"/>
+            </marker>
+          </defs>
+          <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="500" style="fill:var(--text-dim)">BİR SANDBOX'IN ÖMRÜ — PTC panelinde her adım canlı akar, hiçbiri gizlenmez</text>
+          <rect x="0" y="26" width="178" height="52" rx="9" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.4"/>
+          <text x="89" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" style="fill:var(--accent)">configmap_created</text>
+          <text x="89" y="65" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" style="fill:var(--text-dim)">kod ConfigMap'e yazılır</text>
+          <line x1="182" y1="52" x2="200" y2="52" style="stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#tlArrow)"/>
+          <rect x="205" y="26" width="178" height="52" rx="9" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.4"/>
+          <text x="294" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" style="fill:var(--accent)">job_created</text>
+          <text x="294" y="65" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" style="fill:var(--text-dim)">pod doğar · Pending→Running</text>
+          <line x1="387" y1="52" x2="405" y2="52" style="stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#tlArrow)"/>
+          <rect x="410" y="26" width="178" height="52" rx="9" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.4"/>
+          <text x="499" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" style="fill:var(--accent)">tool_call</text>
+          <text x="499" y="65" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" style="fill:var(--text-dim)">onaylı kanaldan geçer</text>
+          <line x1="592" y1="52" x2="610" y2="52" style="stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#tlArrow)"/>
+          <rect x="615" y="26" width="178" height="52" rx="9" style="fill:var(--surface);stroke:var(--danger);stroke-width:1.4"/>
+          <text x="704" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" style="fill:var(--danger)">denied_action</text>
+          <text x="704" y="65" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" style="fill:var(--text-dim)">onaysız çıkış reddedilir</text>
+          <line x1="797" y1="52" x2="815" y2="52" style="stroke:var(--text-dim);stroke-width:1.4" marker-end="url(#tlArrow)"/>
+          <rect x="820" y="26" width="178" height="52" rx="9" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.4"/>
+          <text x="909" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" style="fill:var(--accent)">final</text>
+          <text x="909" y="65" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10" style="fill:var(--text-dim)">sonuç döner</text>
+          <line x1="0" y1="98" x2="1002" y2="98" style="stroke:var(--border);stroke-width:1"/>
+          <line x1="0" y1="93" x2="0" y2="103" style="stroke:var(--border);stroke-width:1"/>
+          <line x1="1002" y1="93" x2="1002" y2="103" style="stroke:var(--border);stroke-width:1"/>
+          <text x="501" y="118" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" style="fill:var(--text)">en fazla 30 saniye</text>
+          <text x="501" y="140" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" style="fill:var(--text-dim)">Biter bitmez ConfigMap + Job açıkça silinir — hiçbir zaman kalıcı iz bırakmaz.</text>
+        </svg>
+      </figure>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">07 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 7 — Shared-IP weakness (kept) -->
+  <section class="slide">
+    <div class="eyebrow">07 · BULUNAN ZAFİYET</div>
+    <div class="slide-body wide">
+      <div class="cols">
+        <div style="display:flex;flex-direction:column;gap:1.2rem;justify-content:center">
+          <h1 style="font-size:2.2rem">Aynı IP,<br>Farklı İsim</h1>
+          <p class="lede" style="font-size:1.05rem"><code>toFQDNs</code>, onaylı ismi DNS yanıtından öğrendiği IP üzerinden takip eder — ama eBPF'in paket üzerinde görebildiği tek şey hedef IP'dir, hangi ismin istendiği değil. Onaylı isimle AYNI IP'yi paylaşan başka bir isim de aynı geçişi alır.</p>
+          <div class="quote" style="font-size:1.1rem;padding-left:1.2rem">Varsayım değil — canlı DNS sorgusuyla doğrulandı. Paylaşılan CDN/altyapı senaryolarında gerçek bir sızıntı yolu.</div>
+        </div>
+        <div class="term">
+<span class="comment"># Tool Gateway'den iki farklı isim, canlı DNS sorgusu</span>
+socket.gethostbyname(<span class="ok">"mia.csp.kloudeks.com"</span>)
+<span class="dim">→ 185.199.89.67   (onaylı FQDN)</span>
+
+socket.gethostbyname(<span class="bad">"console-mia.csp.kloudeks.com"</span>)
+<span class="dim">→ 185.199.89.67   (listede YOK — ama aynı IP)</span>
+
+<span class="comment"># TCP bağlantı denemesi — ikisi de</span>
+<span class="comment"># AYNI IP'ye gittiği için...</span>
+<span class="bad">ALLOWED</span> <span class="dim">— Cilium ismi değil, sadece</span>
+  <span class="dim">185.199.89.67'yi kontrol edebiliyor</span></div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">08 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 8 — Fix (SNI) + Before/After merged -->
+  <section class="slide">
+    <div class="eyebrow">08 · DÜZELTME VE KANIT</div>
+    <div class="slide-body wide">
+      <h1 style="font-size:1.9rem">SNI: Zarfın Üzerindeki Adres</h1>
+      <div class="cols">
+        <div class="term" style="font-size:0.8rem;line-height:1.7">
+<span class="dim">    toPorts:
+    - ports:
+        - port: "443"
+          protocol: TCP</span>
+      <span class="ok">serverNames:</span>              <span class="ok">#</span> <span class="policy-text">yeni</span>
+      <span class="ok">- mia.csp.kloudeks.com
+      - openaipublic.blob.core.windows.net
+      - html.duckduckgo.com</span>
+
+<span class="comment"># TLS ClientHello'nun SNI alanı düz metin</span>
+<span class="comment"># — Envoy şifre çözmeden okuyabiliyor</span></div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem">
+          <div class="layer-tag" style="border-color:var(--danger);color:var(--danger);width:fit-content;padding:0.5rem 0.9rem"><span class="dot" style="background:var(--danger)"></span>ÖNCE: Hubble <strong>FORWARDED</strong> — bağlantı tamamlandı</div>
+          <div class="layer-tag" style="width:fit-content;padding:0.5rem 0.9rem"><span class="dot"></span>SONRA: SYN/ACK yine <strong>ALLOWED</strong> (aynı IP)...</div>
+          <div class="layer-tag" style="border-color:var(--accent);color:var(--accent);width:fit-content;padding:0.5rem 0.9rem"><span class="dot"></span>...ama ClientHello sonrası <strong>l7-request DROPPED</strong> — bağlantı TAMAMLANMADI</div>
+          <p class="lede" style="font-size:0.92rem;margin-top:0.2rem">Paylaşılan IP hâlâ orada — L3/L4 hâlâ aldanıyor. Fark, artık bunu yakalayan bir L7/SNI katmanının (<code>cilium-envoy</code>) var olması. Canlı test edildi.</p>
+        </div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">09 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 9 — Honest limits + Attack tree + Numbers + Cost note merged -->
+  <section class="slide">
+    <div class="eyebrow">09 · SINIRLAR VE ETKİ</div>
+    <div class="slide-body wide">
+      <h1 style="font-size:1.8rem">Dört Yol, Dört Sonuç</h1>
+      <figure>
+        <svg viewBox="0 0 1000 250" role="img" aria-label="Veri sizintisi girisimi dort dala ayrilir: sandboxtan dogrudan cikis, paylasilan-IP bypass ve Tool Gateway'in kendisi ele gecirilmesi engellenir; DNS sorgu icerigi (tunneling) ise bilinen bir sinirlama olarak acik." style="width:100%;height:auto;max-height:34vh">
+          <rect x="400" y="5" width="200" height="40" rx="8" class="box" style="stroke:var(--text-dim)"/>
+          <text x="500" y="30" text-anchor="middle" class="box-text" font-size="12">Veri Sızıntısı Girişimi</text>
+          <line x1="450" y1="45" x2="120" y2="90" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+          <line x1="480" y1="45" x2="380" y2="90" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+          <line x1="520" y1="45" x2="640" y2="90" class="flow-allowed" stroke-width="2" marker-end="url(#arrowAllowed)"/>
+          <line x1="550" y1="45" x2="880" y2="90" class="flow-blocked" stroke-width="2" marker-end="url(#arrowBlocked)"/>
+          <rect x="20" y="90" width="200" height="40" rx="8" class="box" style="stroke:var(--accent);stroke-width:1.6"/>
+          <text x="120" y="114" text-anchor="middle" class="box-text" font-size="11">Sandbox'tan doğrudan çıkış</text>
+          <rect x="20" y="140" width="200" height="30" rx="8" class="box" style="stroke:var(--accent)"/>
+          <text x="120" y="160" text-anchor="middle" class="policy-text" font-size="10">KAPALI — DNS yok</text>
+          <rect x="280" y="90" width="200" height="40" rx="8" class="box" style="stroke:var(--accent);stroke-width:1.6"/>
+          <text x="380" y="114" text-anchor="middle" class="box-text" font-size="11">Paylaşılan-IP bypass</text>
+          <rect x="280" y="140" width="200" height="30" rx="8" class="box" style="stroke:var(--accent)"/>
+          <text x="380" y="160" text-anchor="middle" class="policy-text" font-size="10">KAPALI — serverNames/SNI</text>
+          <rect x="540" y="90" width="200" height="40" rx="8" class="box" style="stroke:var(--accent);stroke-width:1.6"/>
+          <text x="640" y="114" text-anchor="middle" class="box-text" font-size="11">Tool Gateway ele geçirilirse</text>
+          <rect x="540" y="140" width="200" height="30" rx="8" class="box" style="stroke:var(--accent)"/>
+          <text x="640" y="160" text-anchor="middle" class="policy-text" font-size="10">KAPALI — egress kısıtlı</text>
+          <rect x="780" y="90" width="200" height="40" rx="8" class="box" style="stroke:var(--danger);stroke-width:1.6"/>
+          <text x="880" y="114" text-anchor="middle" class="box-text" font-size="11">DNS sorgu içeriği (tunneling)</text>
+          <rect x="780" y="140" width="200" height="30" rx="8" class="box" style="stroke:var(--danger)"/>
+          <text x="880" y="160" text-anchor="middle" class="label-blocked" font-size="10">AÇIK — bilinen sınırlama</text>
+        </svg>
+      </figure>
+      <div class="card-grid">
+        <div class="card">
+          <span class="term-name">100 satır YAML, 0 bağımlılık</span>
+          <span class="term-def">SNI düzeltmesi tek bir policy alanı — <code>cilium-envoy</code> zaten kuruluydu.</span>
+        </div>
+        <div class="card" style="border-color:var(--accent)">
+          <span class="term-name" style="color:var(--accent)">2 zafiyet bulundu</span>
+          <span class="term-def">Paylaşılan-IP (kapatıldı) + Tool Gateway ingress açığı (düzeltme hazır).</span>
+        </div>
+        <div class="card">
+          <span class="term-name">~7sn/çalıştırma maliyeti</span>
+          <span class="term-def">K8s+Cilium setup bedeli — <code>SandboxWarmPool</code>/Firecracker/WASM ile ~ms'ye indirilebilir (ayrı araştırma).</span>
+        </div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">10 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 10 — Live demo + Closing merged -->
+  <section class="slide dark">
+    <div class="eyebrow">10 · CANLI DEMO VE SONUÇ</div>
+    <div class="slide-body wide">
+      <h1>Şimdi Canlı Gösterelim</h1>
+      <div class="cols" style="gap:4.5rem;align-items:start">
+        <ol class="steps">
+          <li><span class="n">01</span><span>Sıradan + çok adımlı bir soru — PTC üzerinden, tek/çoklu tool</span></li>
+          <li><span class="n">02</span><span>Kaçış denemesi (DNS seviyesi) + <code>fetch_url</code> ile Tool Gateway'in kendi bloğu</span></li>
+          <li><span class="n">03</span><span>Prompt-injection senaryosu — agent kansa bile engellenir</span></li>
+        </ol>
+        <div>
+          <p class="lede" style="margin:0;font-size:1.12rem">Sandbox, hiçbir zaman "kısıtlı internet" görmüyor — tek bir onaylı kapıdan başka hiçbir şey görmüyor. Geri kalan her şey, o kapının arkasında, kendi sınırlarıyla duruyor.</p>
+          <p class="quote" style="font-size:1.85rem;margin-top:1.6rem">Erişim değil,<br>kanal onaylanır.</p>
+        </div>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">11 / 12</div>
+    </div>
+  </section>
+
+  <!-- Slide 11 — Optimization alternatives (appendix) -->
+  <section class="slide">
+    <div class="eyebrow">11 · EK · MALİYET VE ALTERNATİFLER</div>
+    <div class="slide-body wide">
+      <h1 style="font-size:1.8rem">Aynı Güvenlik, Daha Az Maliyet?</h1>
+      <figure style="margin:0">
+        <svg viewBox="0 0 1000 108" role="img" aria-label="Bir PTC calistirmasinin 7.21 saniyelik maliyetinin dagilimi: 3.08 saniye scheduler ve Cilium CNI kurulumu, 4.10 saniye poll araligi ve temizlik. Alternatiflerin hedefi 3.08 saniyelik kisim." style="width:100%;height:auto">
+          <text x="0" y="12" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="500" style="fill:var(--text-dim)">BİR PTC ÇALIŞTIRMASI — 7.21 sn (canlı ölçüldü) · ilk 0.03 sn K8s API yazmaları</text>
+          <rect x="0" y="24" width="4" height="30" rx="1" style="fill:var(--text-dim)"/>
+          <rect x="4" y="24" width="427" height="30" rx="2" style="fill:var(--accent)"/>
+          <rect x="431" y="24" width="569" height="30" rx="2" style="fill:var(--gold);opacity:0.45"/>
+          <text x="4" y="72" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" style="fill:var(--accent)">3.08 sn · Scheduler + Cilium CNI</text>
+          <text x="4" y="88" font-family="IBM Plex Mono, monospace" font-size="10" style="fill:var(--text-dim)">(IPAM + identity + eBPF attach)</text>
+          <text x="4" y="105" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" style="fill:var(--accent)">↑ Alternatiflerin hedefi tam olarak bu kısım</text>
+          <text x="439" y="72" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" style="fill:var(--text)">4.10 sn · Poll aralığı + cleanup</text>
+          <text x="439" y="88" font-family="IBM Plex Mono, monospace" font-size="10" style="fill:var(--text-dim)">kendi implementasyon detayımız — ayrıca düşürülebilir</text>
+        </svg>
+      </figure>
+      <div class="card-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card" style="border-color:var(--accent)">
+          <span class="term-name" style="color:var(--accent)">SandboxWarmPool</span>
+          <span class="term-def"><strong style="color:var(--text)">~%90 ↓ · saniye altı.</strong> Ağı hazır pod havuzundan "claim" edilir. Kubernetes SIG-Apps'in resmi projesi — hazır CRD.<br><span style="color:var(--text-dim)">Bedel: boşta duran pod'lar kaynak tüketir.</span></span>
+        </div>
+        <div class="card">
+          <span class="term-name">1 Pod / N Container</span>
+          <span class="term-def"><strong style="color:var(--text)">CNI bedeli N'e bölünür.</strong> Aynı IP, aynı identity → politika hepsine otomatik uygulanır.<br><span style="color:var(--text-dim)">Bedel: "boş slot" takibini kendin yazarsın.</span></span>
+        </div>
+        <div class="card">
+          <span class="term-name">Firecracker microVM</span>
+          <span class="term-def"><strong style="color:var(--text)">p50 3.2 ms restore.</strong> Hazır microVM'in bellek anlık görüntüsü geri yüklenir (AWS Lambda SnapStart).<br><span style="color:var(--text-dim)">Bedel: K8s'i bırakıp kendi orkestrasyonun. Cilium K8s'siz de çalışır.</span></span>
+        </div>
+        <div class="card">
+          <span class="term-name">WASM / WASI</span>
+          <span class="term-def"><strong style="color:var(--text)">En hafif — kernel devreye girmez.</strong> Ham socket dil seviyesinde yok; Cilium'a ihtiyaç azalır.<br><span style="color:var(--text-dim)">Bedel: Python'u WASM'a taşımak başlı başına problem.</span></span>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.66rem;letter-spacing:0.09em;color:var(--text-dim);margin-bottom:0.55rem">DONANIM AYAK İZİ — ÖLÇEKLENEBİLİRLİK AÇISINDAN</div>
+        <div class="card-grid">
+          <div class="card">
+            <span class="term-name">500m CPU · 256Mi RAM</span>
+            <span class="term-def">Bir çalıştırmanın <strong style="color:var(--text)">sert tavanı</strong>. <code>requests</code> tanımlı olmadığı için Kubernetes bunu <code>limits</code>'e eşitliyor — yani scheduler bu kaynağı peşinen ayırıyor (canlı doğrulandı).</span>
+          </div>
+          <div class="card">
+            <span class="term-name">~30 eşzamanlı sandbox</span>
+            <span class="term-def">Bu tek node'da (16 vCPU · 15 GiB) <strong style="color:var(--text)">CPU-bağımlı tavan</strong>. RAM ~60'a, pod yuvası 96'ya yeterdi — darboğaz CPU. Ölçek = node eklemek.</span>
+          </div>
+          <div class="card">
+            <span class="term-name">Süresiz tüketim mümkün değil</span>
+            <span class="term-def"><code>activeDeadlineSeconds: 30</code> · <code>backoffLimit: 0</code> · <code>ttlSecondsAfterFinished: 300</code> · tur başına en fazla <strong style="color:var(--text)">2</strong> çalıştırma. Kötü niyetli kod en fazla 0.5 çekirdeği 30 saniye meşgul edebilir.</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--danger);background:var(--danger-soft)">
+        <span class="term-name" style="color:var(--danger)">CANLI ÖLÇÜM — "1 Pod / N Container"ın gizli maliyeti</span>
+        <span class="term-def">Aynı pod'daki container'lar birbirine <code>localhost</code> üzerinden ulaşır. Bu trafik <code>veth</code>'ten geçmediği için eBPF hook'una <strong style="color:var(--text)">hiç uğramaz</strong> — Hubble'da arattık: <strong style="color:var(--danger)">0 flow.</strong> Cilium bu kanalı ne görebilir ne engelleyebilir. → Bu model seçilirse slot'lar <strong style="color:var(--text)">hiç port açmamalı</strong> (pull modeli). Bugünkü "her run = ayrı pod" tasarımında bu kanal yapısal olarak yoktur.</span>
+      </div>
+    </div>
+    <div class="chrome-footer">
+      <div class="wordmark"><span class="mark"></span>KKB · PTC Egress Policy</div>
+      <div class="slide-index">12 / 12</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button id="prevBtn" aria-label="Önceki slayt">‹</button>
+  <div class="dots" id="dots"></div>
+  <button id="nextBtn" aria-label="Sonraki slayt">›</button>
+</div>
+
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script>
+(function () {
+  const deck = document.getElementById('deck');
+  const slides = deck.querySelectorAll('.slide');
+  const dotsContainer = document.getElementById('dots');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  let current = 0;
+
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'd' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dotsContainer.appendChild(d);
+  });
+  const dots = dotsContainer.querySelectorAll('.d');
+
+  function render() {
+    deck.style.transform = `translateX(-${current * 100}vw)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === slides.length - 1;
+  }
+
+  function goTo(i) {
+    current = Math.max(0, Math.min(slides.length - 1, i));
+    render();
+  }
+
+  prevBtn.addEventListener('click', () => goTo(current - 1));
+  nextBtn.addEventListener('click', () => goTo(current + 1));
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { goTo(current + 1); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { goTo(current - 1); e.preventDefault(); }
+  });
+
+  let touchStartX = null;
+  window.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  window.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 60) goTo(current + (dx < 0 ? 1 : -1));
+    touchStartX = null;
+  });
+
+  render();
+})();
+</script>

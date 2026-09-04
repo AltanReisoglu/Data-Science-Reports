@@ -1,0 +1,16 @@
+# OPENSHIFT YOLU — ODF/NooBaa (MCG) kuruluysa.
+#
+# Bu tek kaynak üç şeyi birden yapar:
+#   1. Bucket'ı yaratır
+#   2. YALNIZCA o bucket'a yetkili bir uygulama hesabı açar
+#   3. Bağlantı bilgilerini `artifact-bucket` adlı ConfigMap + Secret olarak yazar
+#
+# Adın `artifact-bucket` olması önemli: Tool Gateway deployment'ı envFrom ile
+# bu adı referans veriyor, yerelde de aynı ad kullanılıyor.
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: artifact-bucket
+spec:
+  generateBucketName: ptc-artifacts
+  storageClassName: openshift-storage.noobaa.io

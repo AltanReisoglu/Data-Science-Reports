@@ -1,0 +1,2 @@
+PTC: egress policy (eBPF / Cilium) — only via approved tool channels
+Sandbox veya agent ortamlarının dış ağ erişiminin eBPF/Cilium ile merkezi olarak kontrol edilmesidir. Sadece onaylı tool/API kanallarına erişim verilerek veri sızıntısı ve yetkisiz dış bağlantılar engellenir.

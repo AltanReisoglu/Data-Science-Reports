@@ -1,0 +1,84 @@
+# YEREL GELİŞTİRME İÇİN. OpenShift'te bunun yerine objectbucketclaim.yaml.
+#
+# OpenShift uyumlu yazıldı (kind'da da çalışır):
+#   - runAsUser YOK — SCC rastgele UID atar, imaj buna dayanmalı
+#   - runAsNonRoot + seccomp + tüm capability'ler düşürülmüş
+#   - veri PVC'de (emptyDir değil) — "durable depo" iddiasıyla tutarlı olsun
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  labels: {app: minio}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels: {app: minio}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: minio}
+  template:
+    metadata:
+      labels: {app: minio}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+        # OpenShift'in `restricted-v2` SCC'si namespace'e ayrılmış aralıktan
+        # RASTGELE bir UID atar. Burada bilerek o aralıktan görünen yüksek bir
+        # değer veriyoruz — amaç imajın sabit bir UID'ye bağımlı OLMADIĞINI
+        # yerelde kanıtlamak. (kind'da kimse UID atamadığı için, satır olmadan
+        # `runAsNonRoot` + root imajı = CreateContainerConfigError.)
+        #
+        # OpenShift'e taşırken bu İKİ SATIR SİLİNMELİ: SCC kendi aralığından
+        # atar, elle verilen bir UID aralık dışındaysa pod reddedilir.
+        runAsUser: 1000670000
+        # PVC'nin grup sahipliği — rastgele UID'nin /data'ya yazabilmesi
+        # yalnızca bununla mümkün.
+        fsGroup: 1000670000
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            # MinIO'nun kök kimlik bilgileri. OBC yolunda bunun karşılığı,
+            # NooBaa'nın bucket'a kilitli uygulama hesabıdır.
+            - name: MINIO_ROOT_USER
+              valueFrom: {secretKeyRef: {name: artifact-bucket, key: AWS_ACCESS_KEY_ID}}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: {secretKeyRef: {name: artifact-bucket, key: AWS_SECRET_ACCESS_KEY}}
+          ports:
+            - {containerPort: 9000, name: s3}
+            - {containerPort: 9001, name: console}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          readinessProbe:
+            httpGet: {path: /minio/health/ready, port: 9000}
+            initialDelaySeconds: 3
+          resources:
+            requests: {cpu: "100m", memory: "256Mi"}
+            limits: {cpu: "1", memory: "1Gi"}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: minio-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels: {app: minio}
+spec:
+  selector: {app: minio}
+  ports:
+    - {name: s3, port: 9000, targetPort: 9000}
+    - {name: console, port: 9001, targetPort: 9001}
