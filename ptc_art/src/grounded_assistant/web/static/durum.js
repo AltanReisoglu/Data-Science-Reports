@@ -239,27 +239,55 @@ function ciz_artifactler(a) {
     return bos(el, "Bu tarayıcıda oturum yok. Önce sohbet ekranını açın, ya da "
       + "adres satırına ?session=<uuid> ekleyin.");
   }
-  kapsam.textContent = `workflow ${String(a.workflow_id).slice(0, 8)}… · ${a.kayitlar.length} artifact`;
+  // 2026-09-06: liste artık TENANT genelinde (sandbox da böyle görüyor).
+  // Etiket "workflow X" deseydi, başka çalıştırmaların çıktılarını bu
+  // oturumunmuş gibi gösterirdi.
+  // BU OTURUM ÖNCE. Liste tenant genelinde ve tarihe göre sıralı olduğu için
+  // kullanıcının kendi çıktıları başka çalıştırmaların arasına karışıyordu —
+  // 86 satırlık bir tabloda kendi işini bulmak imkânsızdı.
+  const bu = a.kayitlar.filter(k => k.workflow_id === a.workflow_id);
+  const digerleri = a.kayitlar.filter(k => k.workflow_id !== a.workflow_id);
+  a = { ...a, kayitlar: [...bu, ...digerleri] };
+  kapsam.textContent =
+    `${bu.length} bu oturumda · ${digerleri.length} başka çalıştırmalardan`;
   if (!a.kayitlar.length)
     return bos(el, "Bu oturumda henüz artifact üretilmedi.");
-  el.innerHTML = `<table class="veri"><thead><tr>
-      <th>Ad</th><th>Tip</th><th>Boyut</th><th>Node</th><th>Üretilme</th><th>ID</th>
+  el.innerHTML = `<div class="artifact-kaydir"><table class="veri"><thead><tr>
+      <th class="soy-sutun" title="Soy ağacı"></th>
+      <th>Ad</th><th>Tip</th><th>Boyut</th><th>Workflow</th><th>Node</th><th>Üretilme</th><th>ID</th>
     </tr></thead><tbody>` +
     a.kayitlar.map(k => `<tr class="artifact-satir" data-id="${esc(k.artifact_id)}"
         title="İçeriği görmek için tıkla">
+      <td class="soy-sutun"><button class="soy-dugme" data-soy="${esc(k.artifact_id)}"
+          data-ad="${esc(k.name)}"
+          title="Bu artifact'ten türeyenleri diyagramda göster">⑂</button></td>
       <td><strong>${esc(k.name)}</strong></td>
       <td><span class="tip">${esc((k.type || "").replace("system.", ""))}</span></td>
       <td class="sayi">${boyut(k.size_bytes)}</td>
+      <td class="mono ${k.workflow_id === a.workflow_id ? "bu-oturum" : ""}"
+          title="${esc(k.workflow_id || "")}">${
+        k.workflow_id === a.workflow_id ? "bu oturum" : esc(String(k.workflow_id || "—").slice(0, 8))
+      }</td>
       <td class="mono">${esc(k.node_id || "—")}</td>
       <td class="sayi">${esc((k.created_at || "").slice(11, 19))}</td>
       <td class="mono">${esc(k.artifact_id)}</td>
-    </tr>`).join("") + `</tbody></table>`;
+    </tr>`).join("") + `</tbody></table></div>`;
 
   // Satıra tıklayınca içeriği aç. Tablo her yenilemede yeniden çiziliyor,
   // o yüzden dinleyici tabloya (kapsayıcıya) bağlanıyor — tek tek satırlara
   // değil; yoksa 5 saniyede bir yeniden bağlamak gerekirdi.
   el.querySelectorAll(".artifact-satir").forEach(tr => {
     tr.addEventListener("click", () => onizlemeAc(tr.dataset.id, tr));
+  });
+
+  // Soy düğmesi: satır tıklamasıyla ÇAKIŞMAMALI (o içerik önizlemesi açıyor),
+  // bu yüzden `stopPropagation`. İki farklı soru, iki farklı yüzey:
+  // satır = "içinde ne var", düğme = "bundan ne türedi".
+  el.querySelectorAll(".soy-dugme").forEach(b => {
+    b.addEventListener("click", (olay) => {
+      olay.stopPropagation();
+      soyOdakla(b.dataset.soy, b.dataset.ad);
+    });
   });
 
   // `?onizle=<artifact_id>` — belirli bir artifact'in içeriğine DERİN BAĞLANTI.
@@ -311,6 +339,18 @@ async function onizlemeAc(id, satir) {
 function onizlemeGovdesi(d) {
   if (d.hata) return `<p class="hata">${esc(d.hata)}</p>`;
   if (d.bilgi) return `<p class="bos">${esc(d.bilgi)}</p>`;
+  // Görsel ve PDF: sunucu base64 data URI olarak gönderiyor. `src`/`data`
+  // doğrudan atanıyor ama içerik ARTIFACT'TEN geliyor — yani LLM'in ürettiği
+  // veri. Bu yüzden data URI'nin tipi SUNUCUDA sabitleniyor (`image/*` ya da
+  // `application/pdf`); burada tip pazarlığı yapılmıyor.
+  if (d.gorsel) return `<div class="onizleme-gorsel">`
+    + `<img src="${d.gorsel}" alt="artifact görseli" />`
+    + `<p class="kart-not" style="text-align:left">${boyut(d.bayt)}</p></div>`;
+  if (d.pdf) return `<div class="onizleme-pdf">`
+    + `<object data="${d.pdf}" type="application/pdf" width="100%" height="480">`
+    + `<p class="bos">Tarayıcı PDF'i gömülü gösteremedi.</p></object>`
+    + `<p class="kart-not" style="text-align:left">`
+    + (d.sayfa ? `${d.sayfa} sayfa · ` : "") + `${boyut(d.bayt)}</p></div>`;
   if (d.metin) return `<pre class="onizleme-metin">${esc(d.metin)}</pre>`;
   if (d.tablo) {
     const t = d.tablo;
@@ -335,6 +375,7 @@ async function yenile() {
     ciz_akislar(d.akislar);
     if (!d.akislar.error) haritayiKur(d.akislar.kenarlar);
     ciz_artifactler(d.artifactler);
+    if (typeof soyCiz === "function") soyCiz(d.artifactler, d.podlar);
     $("yenileme").textContent = "güncellendi " + new Date().toLocaleTimeString("tr-TR");
   } catch (e) {
     $("yenileme").textContent = "sunucuya ulaşılamıyor";

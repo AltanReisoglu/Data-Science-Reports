@@ -106,6 +106,23 @@ async def artifact_onizleme(artifact_id: str, session: str | None = None) -> dic
     )
 
 
+@app.get("/api/artifact/{artifact_id}/soy")
+async def artifact_soy(artifact_id: str, session: str | None = None) -> dict:
+    """Bu artifact'in ATALARI ve ÜRÜNLERİ — panelin soy grafiği.
+
+    `parents` kayıt defterinde baştan beri vardı ama hiçbir yerde
+    OKUNMUYORDU. Sandbox artık soyu otomatik dolduruyor (okunan girdiler →
+    üretilen çıktının ebeveyni); bu uç nokta onu görünür kılıyor.
+    """
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    if not session:
+        return {"hata": "Oturum yok"}
+    return await asyncio.to_thread(
+        durum_modulu.soy_agaci, session, artifact_id, _kapsam_jetonu
+    )
+
+
 @app.get("/api/akis")
 async def canli_akis() -> StreamingResponse:
     """Hubble'dan canlı ağ akışı — Server-Sent Events.

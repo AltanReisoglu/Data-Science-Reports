@@ -21,9 +21,9 @@
       <div class="header-top">
         <h1>Kurumsal Asistan</h1>
         <span class="connection-dot" id="connection-dot" title="Bağlantı durumu"></span>
-        <a class="durum-link" href="/durum" title="Pod'lar, ağ akışları ve artifact deposu">Sistem durumu →</a>
+        <a class="durum-link" href="/durum" title="Artifact deposu, veri akışı ve çalıştırmalar">Artifact deposu →</a>
       </div>
-      <p class="subtitle">Yalnızca fiilen çağrılan kaynaklara dayanan, izlenebilir yanıtlar</p>
+      <p class="subtitle">Sandbox her çalıştırmada ölür; ürettiği kalır — <code>/output</code>'a yazılan her şey artifact olur</p>
     </header>
 
     <main class="app-main">
@@ -42,45 +42,45 @@
       </form>
 
       <div id="example-chips" class="example-chips">
-        <button type="button" class="chip" data-question="Uzaktan çalışma politikamız nedir?">
-          Uzaktan çalışma politikası
+        <button
+          type="button"
+          class="chip"
+          data-question="200 satırlık örnek ticket verisi üret (departman, cozum_saati), departmana göre ortalama çözüm süresini hesapla, hem ham tabloyu hem özeti sakla."
+        >
+          1 · Veri üret ve sakla
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="Az önce sakladığın özette en yüksek ortalamaya sahip departman hangisi? Veriyi YENİDEN ÜRETME, sakladığından oku."
+        >
+          2 · Yeniden üretmeden oku
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="Sakladığın özetten bir çubuk grafik çiz ve tek sayfalık bir PDF rapora dök."
+        >
+          3 · PDF rapor üret
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="/output ve /artifacts altında neler var? Listele ve her birinin ne olduğunu kısaca söyle."
+        >
+          Depoda ne var?
+        </button>
+        <button
+          type="button"
+          class="chip"
+          data-question="/output altına çok dosyalı bir model dizini bırak: model.v1/weights.json, model.v1/schema.json ve model.v1/alt/notlar.txt."
+        >
+          Çok dosyalı dizin çıktısı
         </button>
         <button type="button" class="chip" data-question="Şu an açık kritik ticket sayısı kaç?">
-          Açık ticket sayısı
-        </button>
-        <button
-          type="button"
-          class="chip"
-          data-question="4 kaynaktaki tüm dokümanları tara, VPN konusunu geçen kaç tanesi var?"
-        >
-          VPN'i tüm kaynaklarda ara (PTC)
-        </button>
-        <button
-          type="button"
-          class="chip"
-          data-question="fetch_url tool'unu kullanarak https://example.com adresine bir HTTP GET isteği at ve sonucu bana raporla."
-        >
-          example.com'a istek at (egress testi)
-        </button>
-        <button
-          type="button"
-          class="chip"
-          data-question="resolve_dns tool'unu kullanarak example.com'un DNS'ini çöz (bağlanmadan, sadece isim çözümü) ve sonucu raporla."
-        >
-          example.com'un DNS'ini çöz (sadece isim)
-        </button>
-        <button
-          type="button"
-          class="chip"
-          data-question="check_connectivity tool'unu kullanarak example.com:443'e ham bir TCP bağlantısı dene ve hangi aşamada ne olduğunu raporla."
-        >
-          example.com:443'e ham TCP dene
+          Basit tool çağrısı
         </button>
       </div>
-
-      <button type="button" id="demo-escape-button" class="demo-escape-button">
-        🔓 Demo: Yasak Hedefe Erişim Dene (evil.com)
-      </button>
 
       <div id="chat" class="chat"></div>
     </main>

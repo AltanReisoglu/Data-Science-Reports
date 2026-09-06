@@ -40,7 +40,6 @@ const buttonLabel = submitButton.querySelector(".button-label");
 const spinner = submitButton.querySelector(".spinner");
 const connectionDot = document.getElementById("connection-dot");
 const exampleChips = document.getElementById("example-chips");
-const demoEscapeButton = document.getElementById("demo-escape-button");
 const ptcPanel = document.getElementById("ptc-panel");
 const ptcPanelHeader = document.getElementById("ptc-panel-header");
 const ptcPanelToggle = document.getElementById("ptc-panel-toggle");
@@ -250,8 +249,11 @@ ws.addEventListener("open", () => setConnectionStatus("connected"));
 ws.addEventListener("close", () => setConnectionStatus("disconnected"));
 ws.addEventListener("error", () => setConnectionStatus("disconnected"));
 
+// Kaçış demosu bu projede UI'dan KALDIRILDI (2026-09-06): egress-policy
+// PoC'undan (ptc_sec) kalmaydı; buranın konusu artifact kalıcılığı. Sunucu
+// tarafındaki `demo_escape` mesajı duruyor — zararsız, ama tetikleyen bir
+// düğme yok. Sonuç yine de gelirse panele yazılıyor.
 function handleDemoResult(msg) {
-  demoEscapeButton.disabled = false;
   const ok = msg.denied_count > 0;
   appendPtcLine(
     ok
@@ -289,16 +291,6 @@ form.addEventListener("submit", (event) => {
 // Örnek soru çipleri — tıklanınca doğrudan gönderilir (boş durumda hızlı deneme).
 exampleChips.querySelectorAll(".chip").forEach((chip) => {
   chip.addEventListener("click", () => submitQuestion(chip.dataset.question));
-});
-
-// Demo: LLM'i atlayıp doğrudan sandbox'ta bir kaçış denemesi tetikler —
-// sunumda "engelleme" senaryosunu LLM'in o an ne yazacağına bağlı olmadan,
-// her seferinde aynı şekilde göstermek için (bkz. web/app.py'deki not).
-demoEscapeButton.addEventListener("click", () => {
-  demoEscapeButton.disabled = true;
-  sawPtcEventForCurrentQuestion = true; // panel bu demoda da "(kullanılmadı)" yazmasın
-  appendPtcLine("▶ Demo tetiklendi: evil.com'a doğrudan bağlanma denemesi (LLM devrede değil)", "info");
-  ws.send(JSON.stringify({ type: "demo_escape" }));
 });
 
 // PTC panelini daraltma/genişletme (macOS pencere davranışı gibi).

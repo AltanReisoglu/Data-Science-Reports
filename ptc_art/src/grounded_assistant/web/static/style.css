@@ -188,30 +188,8 @@ body {
   transform: translateY(-1px);
 }
 
-.demo-escape-button {
-  display: block;
-  margin: 0.75rem auto 0;
-  border: 1px solid rgba(211, 47, 47, 0.4);
-  background: rgba(211, 47, 47, 0.08);
-  color: #d32f2f;
-  padding: 0.45rem 1rem;
-  border-radius: 980px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
+/* .demo-escape-button — 2026-09-06'da kaldırıldı (egress PoC'undan kalmaydı) */
 
-.demo-escape-button:hover:not(:disabled) {
-  background: rgba(211, 47, 47, 0.16);
-  transform: translateY(-1px);
-}
-
-.demo-escape-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
 
 @keyframes fade-in {
   from {

@@ -311,6 +311,14 @@ def artifact_icerigi(workflow_id: str, artifact_id: str, jeton_uret) -> dict:
     except Exception as exc:  # noqa: BLE001
         return {"hata": f"İçerik alınamadı: {exc}"}
 
+    # İKİLİ İÇERİK ÖNCE (2026-09-05): PDF/PNG `deserialize`'dan ham `bytes`
+    # olarak çıkıyor ve panelde "İkili içerik, N bayt — önizlenemiyor" oluyordu.
+    # Oysa tarayıcı ikisini de gösterebilir; eksik olan bizim onları
+    # gömülebilir bir biçime çevirmemizdi.
+    ikili = _ikili_onizleme(ham, content_type)
+    if ikili is not None:
+        return ikili
+
     try:
         deger = serialize.deserialize(ham, content_type)
     except Exception as exc:  # noqa: BLE001
@@ -318,6 +326,71 @@ def artifact_icerigi(workflow_id: str, artifact_id: str, jeton_uret) -> dict:
         return {"hata": f"Çözülemedi: {exc}"}
 
     return _onizleme(deger)
+
+
+#: Gömülü (base64) önizleme sınırı. `ONIZLEME_SINIRI`den DAHA DAR, çünkü
+#: base64 içeriği ~%33 şişiriyor ve bu JSON gövdesinde tarayıcıya gidiyor.
+#: Aşan dosya için künye gösteriliyor — panel bir belge görüntüleyici değil.
+GOMME_SINIRI = 1024 * 1024
+
+
+def _ikili_onizleme(ham: bytes, content_type: str) -> dict | None:
+    """PDF ve görselleri tarayıcının gösterebileceği hâle getirir.
+
+    İlgilenmediğimiz bir tip için None döner — çağıran normal yola devam eder.
+    """
+    tur = (content_type or "").split(";")[0].strip().lower()
+    if tur != "application/pdf" and not tur.startswith("image/"):
+        return None
+    if len(ham) > GOMME_SINIRI:
+        return {"bilgi": f"{len(ham)} bayt {tur} — gömme sınırı {GOMME_SINIRI} bayt. "
+                         "Dosya depoda duruyor; içeriğini sandbox içinde okuyun."}
+
+    import base64  # noqa: PLC0415
+
+    veri = f"data:{tur};base64," + base64.b64encode(ham).decode("ascii")
+    if tur == "application/pdf":
+        # Sayfa sayısı: PDF nesne sözlüklerindeki `/Type /Page` sayımı. Kesin
+        # bir ayrıştırma DEĞİL (sıkıştırılmış nesne akışlarını göremez), o
+        # yüzden bulunamazsa hiç göstermiyoruz — yanlış sayı, sayı yokluğundan
+        # kötüdür.
+        import re  # noqa: PLC0415
+
+        sayfa = len(re.findall(rb"/Type\s*/Page[^s]", ham))
+        return {"pdf": veri, "sayfa": sayfa or None, "bayt": len(ham)}
+    return {"gorsel": veri, "bayt": len(ham)}
+
+
+def soy_agaci(workflow_id: str, artifact_id: str, jeton_uret) -> dict:
+    """Bir artifact'in soy ağacı — Artifact Service'ten olduğu gibi geçirilir.
+
+    Panel neden aracı: tarayıcının kapsam jetonu yok ve OLMAMALI. Jeton
+    imzalama anahtarı sunucu tarafında; UI, kimliği doğrulanmış oturumu
+    gönderiyor, jetonu biz üretiyoruz. Artifact önizlemesinde olan düzenin
+    aynısı.
+    """
+    import requests  # noqa: PLC0415
+
+    from grounded_assistant.agent import artifact_context  # noqa: PLC0415
+
+    adres = artifact_context.servis_adresi()
+    if not adres:
+        return {"hata": "ARTIFACT_SERVICE_URL tanımlı değil"}
+    jeton = jeton_uret(workflow_id)
+    if not jeton:
+        return {"hata": "Kapsam jetonu üretilemedi"}
+    try:
+        yanit = requests.get(
+            f"{adres}/artifacts/{artifact_id}/lineage",
+            headers={"X-Scope-Token": jeton}, timeout=(3, 10),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {"hata": f"Soy ağacı alınamadı: {exc}"}
+    if yanit.status_code == 404:
+        return {"hata": "Artifact bulunamadı"}
+    if yanit.status_code != 200:
+        return {"hata": f"Servis {yanit.status_code} döndü"}
+    return yanit.json()
 
 
 def _onizleme(deger) -> dict:
