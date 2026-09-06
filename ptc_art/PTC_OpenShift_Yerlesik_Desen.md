@@ -191,7 +191,10 @@ content_type'a düşüyor. Ortak kural `serialize.py`'de — o dosya sandbox ima
 aynen kopyalandığı için iki taraf ayrışamıyor.
 
 **(c) `.metadata` torbası.** KFP'de her artifact serbest anahtar-değer
-taşıyabiliyor. Eklendi: `put_artifact(df, name=..., metadata={"r2": 0.91})`.
+taşıyabiliyor. Kayıt defterinde `user_metadata` sütunu var; `X-Artifact-Metadata`
+başlığıyla doldurulur. (2026-09-06'da LLM'e sunulan `put_artifact` kalktığı için
+sandbox bunu artık kendisi geçiremiyor — süpürme yolunda metadata boş kalıyor.
+Açık olarak §11.10'a eklenmeli.)
 Bozuk JSON sessizce yok sayılıyor (aynı gerekçe: etiket, kontrol değil).
 
 **Doğrulandı** (canlı, 2026-09-04): tek bir çalıştırmada üç artifact —

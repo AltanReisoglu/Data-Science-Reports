@@ -50,16 +50,22 @@ PTC her şeyi tek script'e ittiği için pratikte en çok **A** işe yarıyor.
 
 ```
 ┌── Sandbox Pod ── her çalıştırmada YENİ, sonunda silinir ──────────┐
-│  /sandbox  configMap  → LLM'in kodu (salt okunur)                 │
-│  /scratch  emptyDir   → geçici (pod ile ölür, ölmesi İSTENİR)     │
-│  /output   emptyDir   → süpürülür + tembel doldurulur             │
-│  kalıcı disk YOK                                                  │
+│  ┌─ artifact-sidecar (initContainer, restartPolicy: Always) ──┐  │
+│  │  kapsam jetonu BURADA · 127.0.0.1:8099 okuma proxy'si       │  │
+│  │  SIGTERM'de /output'u süpürüp yükler (Argo `wait` deseni)   │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│  ┌─ sandbox ───────────────────────────────────────────────────┐  │
+│  │  /sandbox    configMap → LLM'in kodu (salt okunur)          │  │
+│  │  /scratch    emptyDir  → geçici (ölmesi İSTENİR)            │  │
+│  │  /output     emptyDir  → BU koşu; sidecar süpürür           │  │
+│  │  /artifacts  emptyDir  → BAŞKA koşular: <wf>/<ad>, okuma    │  │
+│  │  jeton YOK · S3 anahtarı YOK · yazma uç noktası YOK         │  │
+│  └─────────────────────────────────────────────────────────────┘  │
 │                                                                   │
-│  put_artifact(df, name="tickets")   ← Parquet'e çevirir, ham bayt │
-│  get_artifact(name="tickets")                                     │
-│  list_artifacts(node_id=...)                                      │
-│  cached("tickets", pahali_fn)                                     │
-│  df.to_csv("/output/x.csv")   ← API'yi hiç bilmeden de olur       │
+│  df.to_parquet("/output/tickets.parquet")   ← düz Python, API YOK │
+│  pd.read_parquet("/output/tickets.parquet")  ← yoksa iner         │
+│  os.listdir("/output")        ← depoda ne varsa                   │
+│  os.path.exists("/output/x")  ← depodakini de sayar               │
 └──────────┬─────────────────────────────────┬──────────────────────┘
            │ MCP/HTTP                        │ akışlı HTTP
            │ (yalnızca tool'lar)             │ (yalnızca artifact)
@@ -128,8 +134,9 @@ kalsın, sandbox ile servis aynı kurallara uysun diye.
 
 Artifact baytlarının tek geçtiği yer. §27'nin REST API'sini sunar
 (`POST /artifacts`, `GET /artifacts/{id}`, `GET /artifacts/by-name/{ad}`,
-`GET /artifacts/{id}/metadata`, `GET /workflows/{id}/artifacts`,
-`DELETE /artifacts/{id}`) ve dört kontrol uygular:
+`GET /artifacts/{id}/metadata`, `GET /artifacts/{id}/lineage`,
+`GET /artifacts`, `GET /workflows/{id}/artifacts`,
+`DELETE /artifacts/{id}`) ve beş kontrol uygular:
 
 | Kontrol | Neden |
 |---|---|
@@ -137,8 +144,9 @@ Artifact baytlarının tek geçtiği yer. §27'nin REST API'sini sunar
 | **İsim** — yol geçişi yok | `artifact_save("/etc/shadow")` sınıfı |
 | **Boyut** — üst sınır | Veriyi sandbox içinde süzmeye zorlar |
 | **Format** — pickle reddi | Deserialization kod çalıştırır (CWE-502); baytları LLM'in kodu yazdı |
+| **Depo kökü** — `X-Artifact-Root` doğrulanır | 2026-09-06'ya kadar doğrulanmıyordu; sandbox ham POST ile kökü kendisi seçebiliyordu |
 
-Dördü de **akış sırasında** uygulanır, sonunda değil: pickle kararı ilk parçada
+Beşi de **akış sırasında** uygulanır, sonunda değil: pickle kararı ilk parçada
 verilir (imza ilk iki bayttadır) ve reddedilen yükleme depoya tek bayt bile
 yazmaz; boyut sayılarak kesilir; sha256 akış boyunca birikir. Gövde 8 MiB'ı
 aşınca diske taşar, yani süreç belleği yükleme boyutundan bağımsız kalır.
@@ -258,21 +266,27 @@ Koruduğu şey workflow'lar arası sınırdır.
 
 ## 7. Sandbox'ın gördüğü yüzey
 
+**Hiçbir API yok** (2026-09-06). Yalnızca bir dizin:
+
 ```python
-h  = put_artifact(df, name="extract.tickets")     # → "art_8c3cc05d0d6b"
-df = get_artifact(name="extract.tickets")         # en yeni sürüm
-df = get_artifact(artifact_id="art_8c3cc...")     # belirli sürüm
-ls = list_artifacts(node_id="extract")            # keşif
-df = cached("tarama", pahali_fn)                  # varsa oku, yoksa üret+sakla
+df.to_parquet("/output/extract.tickets.parquet")     # saklanır
+df = pd.read_parquet("/output/extract.tickets.parquet")  # yoksa iner, sonra okunur
+os.listdir("/output")                                 # depoda ne varsa
+os.path.exists("/output/x.parquet")                   # depodakini de sayar
 ```
 
-Beş fonksiyon. Bucket adı, anahtar düzeni ve S3 kimlik bilgisi **hiç görünmez** —
-elde yalnızca opak `artifact_id` vardır.
+Bucket adı, anahtar düzeni ve S3 kimlik bilgisi **hiç görünmez**.
 
-### 7.1 İkinci tetikleyici: `/output` süpürmesi
+Eskiden burada beş fonksiyon vardı (`put_artifact`, `get_artifact`,
+`list_artifacts`, `artifact_metadata`, `cached`). Kaldırıldılar: piyasada
+emsalleri yoktu ve canlı kullanımda çıkan ciddi hataların hepsi o yüzeydeydi.
+Yerine **KFP launcher deseni** geçti — kod yalnızca yerel yola dokunur,
+aktarımı launcher yapar. Gerekçenin tamamı:
+[PTC_Piyasa_Mentaliteleri.md §11.11](PTC_Piyasa_Mentaliteleri.md).
 
-Beş fonksiyon LLM'in bu API'yi **bilmesini ve kullanmasını** gerektirir. Model
-bunu bilmese ya da unutsa ürettiği dosyalar pod ile birlikte kaybolurdu — bu
+### 7.1 Tek tetikleyici: `/output` süpürmesi
+
+Eskiden süpürme, API'yi bilmeyen modeller için bir **emniyet ağıydı**. Artık
 riski araştırdık: **hiçbir SOTA kod-çalıştırma sistemi bu riski açık bir tool'a
 bağlı bırakmıyor.**
 
@@ -308,15 +322,23 @@ etkilenmez. Bu olay `ArtifactEvent`'e **çevrilmez**: hiç depolanmamış bir
 dosyanın `artifact_id`'si olamaz, model bunu zorunlu tutuyor. Yalnızca canlı
 panel için görünürlük.
 
-**İki tetikleyici, tek güvenlik sınırı:**
+**Süpürme = KFP launcher'ının yükleme adımı.** Karşılıklar:
 
-| | Açık API (`put_artifact`) | Süpürme (`/output`) |
-|---|---|---|
-| LLM'in bilmesi gerekir mi | Evet | **Hayır** |
-| Tip korunumu | Evet (Parquet/Arrow) | Yalnızca uzantıdan tahmin |
-| Erken sorgu (`cached`) | Evet | Hayır — ancak çalışma bitince görünür |
-| pickle/boyut/isim denetimi | Evet | Evet — aynı servis kapısından geçer |
-| İsim | LLM'in verdiği | Dosya adından (Türkçe/boşluk → tire) |
+| KFP | Bizde |
+|---|---|
+| Bileşen `.path`'e yazar | LLM `/output/<ad>`'a yazar |
+| Launcher `.path` → `.uri` kopyalar | Süpürme `/output` → depo akıtır |
+| Launcher doğrudan S3'e (anahtar pod'da) | Süpürme **Artifact Service'e**, S3'e servis yazar |
+
+Yani "süpürme" fiilen bucket'a kopyalamadır; tek fark, arada bir kapı olması:
+
+```
+/output/x.parquet ──HTTP akış──> Artifact Service ──S3 PUT──> bucket
+```
+
+Tip **dosya uzantısından** çıkarılıyor (`.parquet` → `system.Dataset`), isim
+dosya adından (ASCII olmayan → tire). pickle/boyut/isim denetimi aynı servis
+kapısından geçiyor.
 
 İkisi rakip değil: açık API script-içi erken sorguyu ve tip korunumunu çözüyor,
 süpürme LLM'in API'yi hiç kullanmadığı durumda emniyet ağı oluyor.
@@ -401,7 +423,7 @@ Senaryo: 12 tool çağrılık pahalı blok, sonra son satırda `NameError`.
 | | 1. deneme | 2. deneme (düzeltme) | Toplam |
 |---|---|---|---|
 | Kalıcılıksız | 12 | **12** | 24 |
-| `cached()` ile | 14 | **1** | 15 |
+| `/output` kalıcılığıyla | 14 | **1** | 15 |
 
 **Süre kasten raporlanmıyor**: mock tool'lar anında dönüyor, toplam süreyi 4 pod
 başlatması belirliyor. Anlamlı sinyal çağrı sayısı; zaman kazancı gerçek kaynak
@@ -438,7 +460,7 @@ src/grounded_assistant/artifacts/     925 satır
   metadata.py    kayıt defteri (SQLite/Postgres), immutability, TTL
   store.py       S3 erişimi, OBC sözleşmesi
   serialize.py   Parquet/Arrow, pickle savunması
-  service.py     beş operasyon + dört kontrol + dedup
+  service.py     beş operasyon + beş kontrol + dedup
   scope.py       HMAC kapsam jetonu
 
 mock_services/tool_gateway/server.py  dört MCP tool'u
@@ -462,10 +484,11 @@ scripts/              measure_sandbox.py · demo_artifact_persistence.py ·
 
 | Sınır | Not |
 |---|---|
-| Gateway tek replika | SQLite ReadWriteOnce PVC'de; Postgres'e geçince kalkar |
+| Artifact Service tek replika | SQLite ReadWriteOnce PVC'de; Postgres'e geçince kalkar. (Artifact işi 2026-09-04'te Tool Gateway'den ayrı bir servise taşındı) |
 | Kata denenmedi | `runtimeClassName` tek alan, ama yerelde nested virt gerekiyor |
 | Gerçek OBC denenmedi | Şekli taklit edildi; ekibin cluster'ında doğrulanacak |
 | Warm pool yok | Tavanı ölçüldü: 3,14 sn'nin en fazla 1,62'si |
-| TTL/GC uygulanmıyor | Şema ve `expired()` hazır, temizleyici görev yazılmadı |
+| ~~TTL/GC uygulanmıyor~~ | **Kapandı** (2026-09-04): saat başı çalışan CronJob — `k8s/artifact-service/reaper-cronjob.yaml` |
 | Versiyon ağacı yok | Immutable id yeterli görüldü |
+| Soy ağacı ajana açık değil | Otomatik dolduruluyor ve panelde görünüyor (2026-09-05), ama ajanın "X'i üreten veriyi bul" diye sorabileceği bir tool yok |
 | Süpürmede Türkçe/özel karakter isim çirkinleşiyor | `_gecerli_artifact_adi` ASCII olmayanı tireye çeviriyor (`Şubat.csv` → `-ubat.csv`); veri kaybı yok, yalnızca ad okunaksız. Bilerek düzeltilmedi — süpürme birincil yol değil, emniyet ağı |

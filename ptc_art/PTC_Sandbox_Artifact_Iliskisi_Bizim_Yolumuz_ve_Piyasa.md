@@ -111,7 +111,7 @@ LangGraph ajanı `run_ptc_code(code)` tool'unu çağırır. Bu, veriye erişmeni
 
 İlk kontrol bütçe: bir turda en fazla **2** sandbox çalıştırması. Birincisi
 hata verirse ikincisi düzeltmedir. Bu sınır, artifact persistence'ın değerini
-belirleyen şey — `cached()` olmadan o düzeltme pahalı işi de baştan yapar.
+belirleyen şey — `/output`'ta çıktı yoksa o düzeltme pahalı işi de baştan yapar.
 
 ## 1.3 Adım 2 — Kapsam jetonu imzalanır
 
@@ -156,7 +156,7 @@ artifact indiriliyordu. Maliyet var olan her şeyle ölçekleniyordu — workflo
 LLM'in çıktıyı kalıcılaştırmasının **iki** yolu var ve ikisi de aynı kapıdan
 geçiyor:
 
-**A — Açık çağrı.** LLM `put_artifact(df, name="satislar")` yazar. DataFrame
+**A — ~~Açık çağrı~~ (2026-09-06'da KALDIRILDI).** LLM `put_artifact(df, name="satislar")` yazardı. DataFrame
 Parquet'e çevrilir (tipler korunur), ham bayt olarak servise akar.
 
 **B — Süpürme (emniyet ağı).** LLM sıradan kod yazar:
@@ -263,7 +263,7 @@ kalıcılığı tek çağrıda geri alırdı.
 ┌── Sandbox Pod (her çalıştırmada YENİ) ────────────────────┐
 │  /sandbox (kod)  /scratch (geçici)  /output (süpürülür)   │
 │                                                            │
-│  put_artifact(df, name=...)      ← açık yol               │
+│  df.to_parquet("/output/x.parquet")  ← tek yol           │
 │  df.to_csv("/output/x.csv")      ← emniyet ağı            │
 │  pd.read_csv("/output/x.csv")    ← tembel doldurma        │
 └──────────┬──────────────────────────────┬─────────────────┘

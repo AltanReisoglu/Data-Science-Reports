@@ -134,9 +134,9 @@ biri sonradan eklenen bir konfor değil.
 │  runtimeClassName: kata            ← kullanılabilirse         │
 │  /scratch  (emptyDir, sizeLimit, grup 0 yazılabilir)          │
 │                                                                │
-│  h  = put_artifact(df, name="tickets")   ← B/C: isimle        │
-│  df = get_artifact(h)                                          │
-│  df = cached("tickets", lambda: pahali())← A: içerik hash'iyle │
+│  df.to_parquet("/output/tickets.parquet")   ← B/C: isimle      │
+│  pd.read_parquet("/output/tickets.parquet")                    │
+│  os.path.exists("/output/tickets.parquet") ← A: retry atlar    │
 └───────────────────────────┬───────────────────────────────────┘
                             │ MCP — NetworkPolicy'nin izin verdiği tek hedef
                 ┌───────────▼────────────┐
@@ -193,10 +193,11 @@ da kalmayız.
 ### 4.4 İki arayüz, tek depo
 
 ```python
-h  = put_artifact(df, name="acik_ticketlar")   # B/C — süreç sınırını aşar
-df = get_artifact(h)
+df.to_parquet("/output/acik_ticketlar.parquet")   # B/C — süreç sınırını aşar
+df = pd.read_parquet("/output/acik_ticketlar.parquet")
 
-df = cached("acik_ticketlar_v1", lambda: pahali_tool_dongusu())   # A — retry atlar
+if not os.path.exists("/output/acik_ticketlar.parquet"):          # A — retry atlar
+    pahali_tool_dongusu().to_parquet("/output/acik_ticketlar.parquet")
 ```
 
 `cached`, Metaflow'un content-addressing'ini Anthropic'in efemer-runtime

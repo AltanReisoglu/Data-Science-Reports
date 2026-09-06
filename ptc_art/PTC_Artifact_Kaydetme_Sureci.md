@@ -11,11 +11,21 @@ Mimarinin bütünü: [PTC_Mimari.md](PTC_Mimari.md)
 
 ---
 
-## 0. Kim tetikliyor — iki yol var (2026-09-03 eklendi)
+## 0. Kim tetikliyor — TEK yol var (2026-09-06'da sadeleşti)
 
-Aşağıdaki 12 adım, LLM'in **açıkça** `put_artifact(...)` yazdığı yolu anlatıyor.
-Ama bu, LLM'in o API'yi **bilmesini** gerektiriyor. Bilmezse — model bunu
-unutursa ya da hiç öğretilmemişse — ne olur?
+> **Bu bölüm 2026-09-06'da yeniden yazıldı.** Önceden iki tetikleyici vardı:
+> LLM'in açıkça çağırdığı `put_artifact(...)` ve emniyet ağı olarak `/output`
+> süpürmesi. **Açık API kaldırıldı** — piyasada emsali yoktu ve canlı
+> kullanımda çıkan ciddi hataların hepsi o yüzeydeydi. Geriye tek yol kaldı:
+> süpürme. Gerekçenin tamamı:
+> [PTC_Piyasa_Mentaliteleri.md §11.11](PTC_Piyasa_Mentaliteleri.md).
+>
+> Aşağıdaki 12 adımın **9-12'si değişmedi** — servisten sonrası (denetim,
+> dedup, iki depoya yazma, iz kaydı) birebir aynı. Değişen yalnızca 8. adım:
+> "LLM `put_artifact` çağırır" yerine "süpürme dosyayı bulur".
+
+Eskiden LLM'in API'yi **bilmesi** gerekiyordu. Bilmezse — model bunu unutursa
+ya da hiç öğretilmemişse — ne olurdu?
 
 Bunu SOTA'da araştırdık: **hiçbir kod-çalıştırma sistemi bu riski açık bir
 tool'a bağlı bırakmıyor.** Anthropic'in `$OUTPUT_DIR`'ı, OpenAI Code
@@ -24,35 +34,35 @@ kullanıyor: **LLM sıradan kod yazar, çalışma bitince bir dizin süpürülü
 (Tek istisna Cloudflare Code Mode — ama onun sandbox'ında dosya sistemi hiç
 yok, süpürecek bir şey de yok.)
 
-Bizde de iki tetikleyici var, ikisi de aynı **Artifact Service**'e, aynı
-güvenlik kontrollerine çıkıyor:
+Cevabı zaten biliyoruz: **API'yi hiç sunmamak.** Artık bizde de tek tetikleyici
+var ve o da onların kullandığı:
 
-| | Tetikleyen | Ne zaman | Tip korunumu |
+| | Tetikleyen | Ne zaman | Tip nereden |
 |---|---|---|---|
-| **A — Açık çağrı** | LLM, `put_artifact(df, name=...)` yazar | Kod içinde istediği an | Evet (Parquet/Arrow) |
-| **B — Süpürme** | `entrypoint.py`'nin `main()`'i, `exec()` bittikten hemen sonra | Çalışma sonunda, **başarı ya da hata fark etmeksizin** | Yalnızca dosya uzantısından tahmin |
+| **Süpürme** | `entrypoint.py`'nin `main()`'i, `exec()` bittikten hemen sonra | Çalışma sonunda, **başarı ya da hata fark etmeksizin** | Dosya uzantısından (`.parquet` → `system.Dataset`) |
+
+Bu, KFP launcher'ının yükleme adımının aynısı — orada da bileşen `.path`'e
+yazar, launcher `.uri`'ye kopyalar.
 
 ```python
 # main() — sandbox_image/entrypoint.py
 try:
     exec(code, sandbox_globals)
 except Exception as exc:
-    _ciktilari_supur(artifact_internal, inenler)   # ← B: hata olsa bile
+    _ciktilari_supur(launcher, inenler)            # ← hata olsa bile
     print(json.dumps({"status": "error", ...}))
     sys.exit(0)
 
-_ciktilari_supur(artifact_internal, inenler)       # ← B: başarı yolunda
+_ciktilari_supur(launcher, inenler)                # ← başarı yolunda
 print(json.dumps({"status": "success", ...}))
 ```
 
-**B'nin taradığı yer `/output`** (emptyDir, `/scratch`ten AYRI). LLM
-`df.to_csv("/output/rapor.csv")` yazsa, `put_artifact`'i hiç çağırmasa bile
-dosya kaybolmaz — süpürme onu alıp aynı servisten, aynı pickle/boyut/isim
-denetimlerinden geçirip artifact'e çevirir.
+**Taranan yer `/output`** (emptyDir, `/scratch`ten AYRI). LLM
+`df.to_parquet("/output/rapor.parquet")` yazar, gerisi olur — süpürme dosyayı
+alıp servisten, aynı pickle/boyut/isim denetimlerinden geçirip artifact'e
+çevirir. Üst düzey **dizinler** de alınır (tek tar olarak).
 
-Aşağıdaki 12 adım A yolunu anlatıyor; B yolu §2'nin **8. adımının** yerine
-`_ciktilari_supur()`'un devreye girmesiyle aynı 9-12 adımlara bağlanır —
-servisten sonrası (denetim, dedup, iki depoya yazma, iz kaydı) **birebir
+Aşağıdaki 12 adımın 8'incisi artık `_ciktilari_supur()`; 9-12 **birebir
 aynı**. Fark yalnızca baytları kimin ürettiğinde: LLM'in kodu mu
 (`serialize.serialize`), yoksa süpürme mi (dosyayı diskten akıtıp uzantıdan tip
 tahmin ederek).
@@ -101,9 +111,9 @@ Gerekçe ve güvenlik sonuçları: `PTC_Mimari.md` §3.
   │      └─6─ Job'u yarat (kod + jeton + gateway IP enjekte)
   │
   ├─7─► POD DOĞAR                                 entrypoint.py
-  │      └─ exec(code) · put_artifact global olarak hazır
+  │      └─ exec(code) · SADECE set_result + tool'lar global
   │
-  ├─8─► put_artifact(df, name="...")
+  ├─8─► _ciktilari_supur() — /output taranır
   │      ├─ serialize()  → DataFrame ise Parquet, metin ise text/plain
   │      └─ ham bayt → POST /artifacts → Artifact Service
   │
@@ -134,8 +144,15 @@ if trace.sandbox_run_count() >= MAX_SANDBOX_RUNS_PER_TURN:   # = 2
 ```
 
 **İncelik:** bu sınır, artifact persistence'ın değerini belirleyen şey. Bir turda
-iki atış hakkınız var; birincisi hata verirse ikincisi düzeltmedir. `cached()`
-olmadan o düzeltme, pahalı işi de baştan yapmak zorunda kalır.
+iki atış hakkınız var; birincisi hata verirse ikincisi düzeltmedir. Pahalı
+bloğun çıktısı `/output`'ta duruyorsa düzeltme onu **yeniden üretmez**:
+
+```python
+if os.path.exists("/output/tarama.parquet"):
+    df = pd.read_parquet("/output/tarama.parquet")
+else:
+    df = pahali_tarama(); df.to_parquet("/output/tarama.parquet")
+```
 
 ### Adım 3-6 — Çalıştırma hazırlanır
 
@@ -182,19 +199,39 @@ birlikte ölür**: `/scratch` (geçici, süpürülmez) ve `/output` (süpürül�
 içindekiler artifact'e döner). Kalması gereken her şey artifact deposuna gitmek
 zorunda; `/output`'a yazmak bunun kısa yolu.
 
-### Adım 8 — `put_artifact` çağrılır
+### Adım 8 — Süpürme dosyayı bulur ve akıtır
 
-Burası CSV'nin üç yola ayrıldığı yer, §3'te ayrıntısı var. Kabaca:
+`exec()` bittiği anda (hata almış olsa bile) `/output`'un üst düzeyi taranır:
 
 ```python
-data, content_type = serialize.serialize(value)      # sandbox İÇİNDE
-sonuc = istemci.put_bytes(data, content_type, name, parents, ttl_seconds)
-# → POST /artifacts, gövde HAM BAYT, kapsam X-Scope-Token başlığında
+for ad in sorted(_GERCEK_LISTDIR(OUTPUT_DIR)):
+    yol = os.path.join(OUTPUT_DIR, ad)
+    if os.path.isdir(yol):
+        _dizini_supur(...)                # dizin → tek tar
+        continue
+    api["_put_file"](yol,
+                     serialize.content_type_for_filename(ad),   # uzantıdan tip
+                     _gecerli_artifact_adi(ad))
+# → POST /artifacts, gövde AKIŞLI dosya, kapsam X-Scope-Token başlığında
 ```
 
-**İncelik — serileştirme neden sandbox'ta:** bir DataFrame ağdan nesne olarak
-geçemez. Ama asıl sebep bu değil: serviste `pandas` **yok**. Servis hazır
-baytları alır ve onları hiç ayrıştırmaz. Bu, "LLM'in ürettiği veriyi çözmesi
+Yani "süpürme" fiilen **bucket'a kopyalamadır**, arada tek bir kapı vardır:
+
+```
+/output/rapor.parquet ──HTTP akış──> Artifact Service ──S3 PUT──> bucket
+```
+
+KFP'nin launcher'ı bu kopyalamayı doğrudan S3'e yapıyor (anahtar pod'da);
+bizde servis yapıyor, sandbox'ta S3 anahtarı hiç yok.
+
+**İncelik — tip nereden geliyor:** artık `serialize()` değil
+`content_type_for_filename()` — yani **dosya uzantısı**. `.parquet` →
+`system.Dataset`, `.png` → `system.Artifact`. Uzantısız ad verilirse tip
+`application/octet-stream`'e düşer; sistem promptu bu yüzden "uzantısız ad
+verme" diyor.
+
+**İncelik — serviste `pandas` YOK.** Servis hazır baytları alır ve onları hiç
+ayrıştırmaz. Bu, "LLM'in ürettiği veriyi çözmesi
 gerekmeyen katman" olduğunu yapısal olarak garanti eder. (Pickle reddi bayt
 imzasına bakar, ayrıştırmaya değil.)
 
@@ -266,10 +303,14 @@ Aynı CSV içeriği (`ticket,departman,acik` + 3 satır) üç şekilde saklandı
 csv_metni = "ticket,departman,acik\nT-1,BT,3\nT-2,IK,1\nT-3,BT,5\n"
 
 df = pd.read_csv(io.StringIO(csv_metni))
-put_artifact(df,                name="csv.dataframe")   # A
-put_artifact(csv_metni,         name="csv.metin")       # B
-put_artifact(csv_metni.encode(),name="csv.bayt")        # C
+df.to_parquet("/output/csv.dataframe.parquet")          # A
+open("/output/csv.metin.txt", "w").write(csv_metni)     # B
+df.to_csv("/output/csv.tablo.csv", index=False)         # C
 ```
+
+*(Ölçüm 2026-09-04'te `put_artifact` ile yapılmıştı; API kalktı, ama içerik
+ve boyutlar aynı — değişen yalnızca çağrının biçimi. Tip artık uzantıdan
+geliyor: `.parquet` → Dataset, `.txt` → Artifact, `.csv` → Dataset.)*
 
 **Yazma sonucu:**
 
@@ -314,13 +355,13 @@ Bazen amaç dataframe değil, **dosyanın kendisidir** (rapor eki, ham kaynak,
 denetim kopyası). O zaman C yolu doğru:
 
 ```python
-ham = open("/scratch/rapor.csv", "rb").read()
-put_artifact(ham, name="rapor.ham")        # application/octet-stream
+import shutil
+shutil.copy("/scratch/rapor.csv", "/output/rapor.ham.csv")
 ```
 
-Bu durumda kural şu: **artifact'i tüketen taraf tipi bilmek zorundadır.**
-`content_type` metadata'da duruyor ve `artifact_metadata(artifact_id)` ile
-baytları indirmeden okunabilir.
+Kural: **uzantı tipi belirler.** `.csv` verirsen `text/csv` + `system.Dataset`
+olur ve geri okunduğunda doğru açılır; uzantısız bırakırsan
+`application/octet-stream`'e düşer ve tüketen taraf tipi bilmek zorunda kalır.
 
 ---
 

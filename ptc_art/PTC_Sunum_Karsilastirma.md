@@ -141,18 +141,25 @@ geçirilmesi ikisini birden vermiyor.
 | `$OUTPUT_DIR` süpürme | Anthropic | **Hayır** |
 | `/mnt/data` | OpenAI | **Hayır** |
 | Workspace dizini | OpenHands | **Hayır** |
-| `/output` süpürme + açık API | **BİZ** | **Hayır** (ikisi de var) |
+| `.path` → launcher kopyalar | KFP / OpenShift AI | **Hayır** |
+| `/output` süpürme | **BİZ** | **Hayır** |
 | Açık RPC zorunlu | Cloudflare Code Mode *(dosya sistemi yok)* | Evet |
 
-**Hiçbir SOTA sistem bu riski açık bir tool'a bağlı bırakmıyor.**
+**Dokuz sistemin dokuzu da bir DOSYA YOLU.** Hiçbiri sandbox'taki koda
+artifact fonksiyonu sunmuyor.
 
-**Bizde iki tetikleyici, tek kapı:**
+**2026-09-06: bizdeki açık API kaldırıldı.** `put_artifact`/`get_artifact`/
+`cached` piyasada emsalsizdi ve canlı hataların hepsi o yüzeydeydi.
 
-| | Açık çağrı | Süpürme |
+| | Önce | Şimdi |
 |---|---|---|
-| Nasıl | `put_artifact(df, name=...)` | `df.to_csv("/output/x.csv")` |
-| Ne zaman | İstediği an | Çalışma sonunda, **hata olsa bile** |
-| Tip korunumu | Evet (Parquet) | Uzantıdan tahmin |
+| Yazma | `put_artifact(df, name=...)` | `df.to_parquet("/output/x.parquet")` |
+| Okuma | `get_artifact("x")` | `pd.read_parquet("/output/x.parquet")` |
+| Keşif | `list_artifacts()` | `os.listdir("/output")` |
+| Retry atlama | `cached(...)` | `if os.path.exists(...)` |
+
+**Süpürme = bucket'a kopyalama:**
+`/output/x.parquet` → HTTP akış → Artifact Service → S3 PUT → bucket
 
 ---
 
@@ -166,6 +173,7 @@ geçirilmesi ikisini birden vermiyor.
 | 2 | Referans otomatik context'te | `file_id` tool sonucunda döner | Anthropic |
 | 3 | Dosya sistemi + `ls` | Sandbox yaşıyorsa model bakar | Anthropic, Google, OpenHands |
 | 4 | **İsimler prompt'a enjekte** | İsimler talimatlarda, içerik talep üzerine | **Google ADK**, **BİZ** |
+| 3+4 | **İkisi birden** | Manifest promptta **ve** `os.listdir("/output")` çalışıyor | **BİZ** (2026-09-06) |
 | 5 | Semantik arama | Vektör deposunda `file_search` | Llama Stack (RAG) |
 | — | **Keşif YOK** | DAG statik, girdi bağlanmış | KFP, Argo, Airflow, Tekton |
 
@@ -183,7 +191,7 @@ geçirilmesi ikisini birden vermiyor.
 | DAG | İnsan önceden yazar | LLM o an icat eder |
 | 5. adımın girdisi | **Bağlanmış** | **Keşfedilmeli** |
 | Kim çözer | Driver, adım başlamadan | Modelin kendisi |
-| Örnek | `adim5(girdi=adim1.ciktilar["features"])` | `list_artifacts()` |
+| Örnek | `adim5(girdi=adim1.ciktilar["features"])` | `os.listdir("/output")` |
 | Kim | Airflow, Argo, KFP, Tekton | Anthropic, Google ADK, biz |
 
 **Tek cümle:** Klasik pipeline'da 5. adım bir şey *anlamaz* — kendisine söylenir.
@@ -246,7 +254,8 @@ keşif için Google ADK'yı.
 | Kayıt defteri + tipler + kök | **Red Hat / KFP (MLMD)** |
 | Keşif (isimler prompt'ta) | **Google ADK** |
 | Sandbox ömrü (efemer) | Microsoft |
-| **Kapsam granülaritesi** | **Kimse — bizimki daha dar** |
+| **LLM yüzeyi (dosya, API yok)** | **hepsi** — KFP, Anthropic, OpenAI, MS |
+| **Kapsam (tenant)** | **Red Hat / KFP** — `pipeline_root` paylaşımlı |
 | **İzolasyon** | **Kimse — bizimki daha zayıf** |
 | **Şeffaf okuma** | **Kimse — emsalsiz** |
 
@@ -255,12 +264,13 @@ keşif için Google ADK'yı.
    platform desenini Red Hat'ten aldık.
 2. İzolasyonda herkesin gerisindeyiz (düz container). Warm pool yok ama
    kazancını ölçtük: ≤1.6 sn.
-3. Kapsam granülaritesinde herkesin ilerisindeyiz (çalıştırma başına imzalı
-   jeton; KFP namespace düzeyinde).
+3. 2026-09-06'da **emsalsiz olan iki şeyi bıraktık** (LLM'e artifact API'si,
+   çalıştırma başına kapsam) — çünkü hataların hepsi orada çıkıyordu.
+   Geriye emsalsiz tek şey şeffaf tembel okuma kaldı.
 
 ---
 
-## Sayfa 14 — Bugün ne değişti (2026-09-04)
+## Sayfa 14 — Ne değişti (2026-09-04 → 09-06)
 
 | Değişiklik | Öncesi | Sonrası |
 |---|---|---|
@@ -274,7 +284,19 @@ keşif için Google ADK'yı.
 | Depo kökü | Sabit kod | `PTC_ARTIFACT_ROOT` |
 | **Keşif** | Yumuşak garanti | **İsimler prompt'ta** (ADK deseni) |
 
-**Test sayısı:** 108 · **Canlı doğrulanan:** hepsi
+**2026-09-06 — büyük sadeleşme:**
+
+| Değişiklik | Öncesi | Sonrası |
+|---|---|---|
+| **LLM artifact API'si** | 5 fonksiyon | **YOK** — düz Python + `/output` |
+| Keşif | `list_artifacts()` | `os.listdir` / `os.path.exists` / `glob` |
+| Kapsam | Çalıştırma başına mühürlü | **Tenant** (KFP gibi) |
+| Dizin çıktısı | Sessizce kayboluyordu | Tek tar, tembel açılıyor |
+| Soy ağacı | Kaydediliyor, okunmuyordu | Otomatik + panelde mermaid grafiği |
+| PDF/PNG | `.bin` olarak duruyordu | Gerçek tip + panelde önizleme |
+| **Çalıştırma izolasyonu** | `/output` düz — başkasınınki sızıyordu | **İki kök:** `/output` + `/artifacts/<wf>/` |
+
+**Test sayısı:** 179 · **Canlı doğrulanan:** hepsi
 
 ---
 
@@ -287,9 +309,11 @@ keşif için Google ADK'yı.
 | **Workflow state** | Postgres yolu **test edilmedi** | Cluster'da Postgres yok |
 | **Auth** | Yok | Uuid'yi bilen okur |
 | **Büyük dosya** | 100 MiB / 512Mi | 5 GB çalışmaz |
-| **Soy ağacı** | Kaydediliyor, keşifte kullanılmıyor | Eksik yetenek |
-| **İsim çakışması** | "En yeni" kazanır, sessiz | Veri kaybı riski |
-| **Şeffaf okuma** | 5 pandas okuyucusu + `open` | `pyarrow`, `csv`, `PIL` yakalanmıyor |
+| **İsim çakışması** | "En yeni" kazanır, sessiz | Tenant genelinde daha olası |
+| **Şeffaf okuma** | 5 pandas okuyucusu + `open` + `listdir`/`exists`/`glob` | `pyarrow`, `PIL` doğrudan açarsa yakalanmıyor |
+| **`user_metadata`** | Süpürme yolunda doldurulamıyor | `put_artifact` kalkınca kapandı |
+| **Tip** | Yalnızca dosya uzantısından | Metrik/Dataset ayrımı kayboldu |
+| **Soy imzasız** | Kayıt defterine yazabilen değiştirebilir | Tekton Chains bunu çözüyor |
 | **Gerçek OBC/ODF** | Test edilmedi | ODF kapsam dışı |
 
 ---

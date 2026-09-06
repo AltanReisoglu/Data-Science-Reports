@@ -89,8 +89,8 @@ workflow konumu    → state store
 
 ```
 ┌── Sandbox Pod (efemer) ────────────────────────────┐
-│  put_artifact / get_artifact / list_artifacts      │
-│  cached(key, fn)                                   │
+│  /output/ — düz dosya (API YOK, 2026-09-06)        │
+│  to_parquet · read_parquet · os.listdir · exists   │
 │  /scratch (emptyDir)                               │
 └──────────────────┬─────────────────────────────────┘
                    │ MCP — tek izinli hedef
@@ -238,10 +238,11 @@ eşik üstü için gateway **kısa ömürlü, tek kullanımlık, workflow'a bağ
 `entrypoint.py`'de mevcut `_make_sync_tool` deseni aynen kullanılabilir:
 
 ```python
-h  = put_artifact(df, name="acik_ticketlar")      # B/C
-df = get_artifact(h)
-ls = list_artifacts(workflow="wf_42")             # C — keşif
-df = cached("acik_ticketlar_v1", lambda: ...)     # A — retry atlar
+df.to_parquet("/output/acik_ticketlar.parquet")   # B/C
+df = pd.read_parquet("/output/acik_ticketlar.parquet")
+ls = os.listdir("/output")                        # C — keşif
+if os.path.exists("/output/acik_ticketlar.parquet"):  # A — retry atlar
+    ...
 ```
 
 - Serileştirme **sandbox tarafında** (Parquet varsayılan, Arrow IPC opsiyon)
@@ -265,13 +266,13 @@ Tur 1  "Açık ticketları çek ve özetle"
        → PTC#1 → 40 tool çağrısı → art_001 (parquet)          [C'nin kurulumu]
 
 Tur 2  "Departmana göre grupla"
-       → PTC#2 → get_artifact(art_001)  ← 40 çağrı TEKRAR YAPILMIYOR
+       → PTC#2 → pd.read_parquet("/output/x.parquet") ← 40 çağrı TEKRAR YAPILMIYOR
        → ilk deneme KeyError                                   [B: self-repair]
        → PTC#3 düzeltilmiş → art_001 hâlâ elde → art_002
        → MAX_SANDBOX_RUNS bütçesi korunmuş oldu
 
 Tur 3  "Rapor üret"
-       → PTC#4 → list_artifacts() → art_002 → rapor            [C: keşif]
+       → PTC#4 → os.listdir("/output") → rapor                 [C: keşif]
 ```
 
 `cached()` ise A için ayrı ölçülür: aynı script iki kez, ikincisinde pahalı blok atlanır.
