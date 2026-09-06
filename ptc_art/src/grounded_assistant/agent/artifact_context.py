@@ -43,6 +43,7 @@ olurdu.
 from __future__ import annotations
 
 import os
+import sys
 
 import requests
 from langchain.agents.middleware import AgentMiddleware
@@ -57,18 +58,41 @@ _AZAMI_SATIR = 40
 _ZAMAN_ASIMI = (2, 5)  # (bağlantı, okuma) — ajanın turunu bekletmemeli
 
 
+#: Adres yokluğu bir kez uyarılır — her model çağrısında değil.
+_ADRES_UYARILDI = False
+
+
 def servis_adresi() -> str:
-    return os.environ.get("ARTIFACT_SERVICE_URL", "").rstrip("/")
+    """`ARTIFACT_SERVICE_URL` — yoksa manifest devre dışı, ama SESSİZ değil.
+
+    2026-09-06: bu değişken CLI'da hiç tanımlı değildi, `kunyeleri_getir` None
+    dönüyordu ve manifest enjeksiyonu **hiç çalışmıyordu** — ajan artifact'leri
+    yalnızca sandbox içindeki dosya sisteminden görüyordu. Hiçbir yerde hata
+    yoktu; özelliğin çalışmadığı ancak davranıştan anlaşıldı.
+    """
+    global _ADRES_UYARILDI
+    adres = os.environ.get("ARTIFACT_SERVICE_URL", "").rstrip("/")
+    if not adres and not _ADRES_UYARILDI:
+        _ADRES_UYARILDI = True
+        print("[uyarı] ARTIFACT_SERVICE_URL tanımlı değil — artifact manifesti "
+              "modele enjekte EDİLMEYECEK.", file=sys.stderr)
+    return adres
 
 
 def kunyeleri_getir(workflow_id: str, scope_token: str) -> list[dict] | None:
-    """Bu workflow'un artifact künyelerini çeker. Ulaşılamazsa None."""
+    """Tenant'taki artifact künyelerini çeker. Ulaşılamazsa None.
+
+    Kapsam workflow değil TENANT (2026-09-06): başka bir çalıştırmanın çıktısı
+    da listeleniyor, çünkü sandbox onu okuyabiliyor. Manifest, sandbox'ın
+    gördüğü dosya sisteminin aynısını göstermek zorunda — aksi hâlde model
+    promptta olmayan ama `/output`'ta duran bir dosyayı hiç aramazdı.
+    """
     adres = servis_adresi()
     if not adres or not workflow_id or not scope_token:
         return None
     try:
         yanit = requests.get(
-            f"{adres}/workflows/{workflow_id}/artifacts",
+            f"{adres}/artifacts",
             headers={"X-Scope-Token": scope_token},
             timeout=_ZAMAN_ASIMI,
         )
@@ -79,38 +103,68 @@ def kunyeleri_getir(workflow_id: str, scope_token: str) -> list[dict] | None:
         return None
 
 
-def manifest_metni(kunyeler: list[dict]) -> str | None:
+def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str | None:
     """Künyeleri modele gösterilecek metne çevirir.
 
-    BAYT YOK, yalnızca isim/tip/boyut. Modelin "ne var" sorusunu cevaplamaya
-    yeter; "içinde ne var" sorusu için kodun `get_artifact`/`read_csv`
-    çağırması gerekiyor — ADK'nın "isim ucuz, içerik pahalı" ayrımı.
+    BAYT YOK, yalnızca isim/tip/boyut — ADK'nın "isim ucuz, içerik pahalı"
+    ayrımı.
+
+    ## Neden İKİ GRUP (2026-09-06, canlı kullanımda bulunan arıza)
+
+    Keşif kapsamı tenant'a genişleyince manifest DÜZ bir liste oldu ve model
+    "kendi ürettiği" ile "başka bir çalıştırmanın ürettiği"ni ayırt edemedi.
+    Gerçekte olan şey:
+
+        1. tur: ajan bir analiz yapıp `ticket_analiz_raporu.pdf` üretti (HR=60,0)
+        2. tur: "az önce ürettiğin analizde HR kaçtı?" diye soruldu
+        -> ajan manifestte `departman.ozet.parquet` gördü, okudu, "7,46" dedi
+           — oysa o dosya BAŞKA bir workflow'un çıktısıydı.
+
+    Cevap sessizce yanlıştı; hiçbir yerde hata yoktu. Bu yüzden liste artık
+    ikiye ayrılıyor ve modele hangisinin kendi işi olduğu açıkça söyleniyor.
     """
     if not kunyeler:
         return None
 
-    satirlar = []
-    for k in kunyeler[:_AZAMI_SATIR]:
+    # Aynı ad birden çok çalıştırmada olabilir; ilk görülen (en yeni) kalır.
+    benim, digerleri, gorulen = [], [], set()
+    for k in kunyeler:
+        ad = k.get("name")
+        if not ad or ad in gorulen:
+            continue
+        gorulen.add(ad)
         tip = (k.get("type") or "system.Artifact").removeprefix("system.")
-        boyut = k.get("size_bytes") or 0
-        parca = f"  - {k.get('name')}  ({tip}, {boyut} bayt)"
+        satir = f"  /output/{ad}  ({tip}, {k.get('size_bytes') or 0} bayt)"
         ek = k.get("metadata") or {}
         if ek:
-            parca += f"  {ek}"
-        satirlar.append(parca)
+            satir += f"  {ek}"
+        (benim if workflow_id and k.get("workflow_id") == workflow_id
+         else digerleri).append(satir)
 
-    fazla = len(kunyeler) - len(satirlar)
-    if fazla > 0:
-        satirlar.append(f"  … ve {fazla} tane daha (list_artifacts() ile tamamı)")
+    if not benim and not digerleri:
+        return None
+
+    bolumler = []
+    if benim:
+        bolumler.append("BU OTURUMDA ÜRETİLENLER — \"az önce\", \"demin\", "
+                        "\"senin ürettiğin\" dendiğinde YALNIZCA bunları kullan:\n"
+                        + "\n".join(benim[:_AZAMI_SATIR]))
+    if digerleri:
+        kirpik = digerleri[:_AZAMI_SATIR - min(len(benim), _AZAMI_SATIR // 2)]
+        bolumler.append(
+            "BAŞKA ÇALIŞTIRMALARDAN (aynı tenant) — okunabilir, ama BU OTURUMUN "
+            "işi DEĞİL. Kullanıcı açıkça istemedikçe bunlara dayanma:\n"
+            + "\n".join(kirpik)
+            + (f"\n  … ve {len(digerleri) - len(kirpik)} tane daha "
+               "(os.listdir(\"/output\") ile tamamı)" if len(digerleri) > len(kirpik) else ""))
 
     return (
-        "BU KONUŞMADA ŞU ANDA SAKLI OLAN ARTIFACT'LER:\n"
-        + "\n".join(satirlar)
-        + "\n\nBunlar önceki adımlarda üretildi ve HÂLÂ ERİŞİLEBİLİR. Kullanıcı "
-        "bunlardan birine atıf yapıyorsa (\"az önceki tablo\", \"onu grupla\") "
-        "veriyi YENİDEN ÜRETME — run_ptc_code içinde "
-        "get_artifact(name=\"...\") ile oku, ya da doğrudan "
-        "pd.read_csv(\"/output/<ad>\") yaz; dosya otomatik iner."
+        "\n\n".join(bolumler)
+        + "\n\nHepsi pod'da fiziksel olarak durmasa bile okunmak istendiklerinde "
+        "otomatik iniyor. Veriyi YENİDEN ÜRETME; run_ptc_code içinde doğrudan "
+        "yolundan oku (ör. pd.read_parquet(\"/output/<ad>\")). "
+        "Aradığın dosya BU OTURUMDA yoksa, başka bir çalıştırmanınkini kendi "
+        "çıktın gibi sunma — üretmen gerektiğini söyle ya da üret."
     )
 
 
@@ -162,4 +216,4 @@ class ArtifactContextMiddleware(AgentMiddleware):
         if not jeton:
             return None
         kunyeler = kunyeleri_getir(self._workflow_id, jeton)
-        return manifest_metni(kunyeler) if kunyeler else None
+        return manifest_metni(kunyeler, self._workflow_id) if kunyeler else None

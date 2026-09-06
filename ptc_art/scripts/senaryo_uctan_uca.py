@@ -3,7 +3,7 @@
 Beş sahne, tek anlatı. Her sahne mimarinin bir iddiasını canlı gösterir:
 
   1. Pahalı tarama + hata            → iş boşa gitmez, artifact'e yazıldı
-  2. Self-repair                     → cached() pahalı bloğu ATLAR        (A)
+  2. Self-repair                     → /output'taki çıktı pahalı bloğu ATLATIR (A)
   3. Sonraki tur, YENİ pod           → artifact'ten okur, tool çağırmaz   (B/C)
   4. Başka workflow okumaya çalışır  → REDDEDİLİR
   5. Kod pickle saklamaya çalışır    → REDDEDİLİR
@@ -71,7 +71,12 @@ def main() -> None:
     kosu(
         "1 · İLK DENEME — tarama biter, sonra NameError",
         TARAMA
-        + 'df = cached("rapor.tarama", ticket_taramasi)\n'
+        + 'import os, pandas as pd\n'
+        'if os.path.exists("/output/rapor.tarama.parquet"):\n'
+        '    df = pd.read_parquet("/output/rapor.tarama.parquet")\n'
+        'else:\n'
+        '    df = ticket_taramasi()\n'
+        '    df.to_parquet("/output/rapor.tarama.parquet")\n'
         + 'set_result(df.groupby("departman")["acik"].sum().to_dict() + toplam)\n',
         node="extract",
     )
@@ -80,10 +85,14 @@ def main() -> None:
     kosu(
         "2 · SELF-REPAIR — aynı tur, düzeltilmiş kod",
         TARAMA
-        + 'kaynak_id = get_artifact(name="rapor.tarama") is not None\n'
-        + 'df = cached("rapor.tarama", ticket_taramasi)\n'
+        + 'import os, pandas as pd\n'
+        'if os.path.exists("/output/rapor.tarama.parquet"):\n'
+        '    df = pd.read_parquet("/output/rapor.tarama.parquet")\n'
+        'else:\n'
+        '    df = ticket_taramasi()\n'
+        '    df.to_parquet("/output/rapor.tarama.parquet")\n'
         + 'ozet = df.groupby("departman")["acik"].sum().reset_index()\n'
-        + 'put_artifact(ozet, name="rapor.ozet")\n'
+        + 'ozet.to_parquet("/output/rapor.ozet.parquet")\n'
         + 'set_result(ozet.to_dict("records"))\n',
         node="extract",
     )
@@ -91,17 +100,21 @@ def main() -> None:
     # 3 — Sonraki tur: yeni pod, hiç tool çağırmadan artifact'ten okur.
     kosu(
         "3 · SONRAKİ TUR — yeni pod, kaynak sisteme HİÇ gitmez",
-        'ozet = get_artifact(name="rapor.ozet")\n'
+        'import pandas as pd\n'
+        'ozet = pd.read_parquet("/output/rapor.ozet.parquet")\n'
         'bt = ozet[ozet["departman"] == "BT"]["acik"].iloc[0]\n'
         'set_result(f"BT departmanı: {bt} açık ticket")\n',
         node="report",
     )
 
-    # 4 — Sınır: başka bir workflow aynı adı okumaya çalışır.
+    # 4 — 2026-09-06: sınır workflow'dan TENANT'a taşındı. Başka bir workflow
+    #     ARTIK OKUYABİLİR — KFP'de de öyle (`pipeline_root` paylaşımlı).
     kosu(
-        "4 · SINIR — başka workflow aynı artifact'i istiyor",
-        'v = get_artifact(name="rapor.ozet")\n'
-        'set_result("SIZDI: " + str(v) if v is not None else "reddedildi (None döndü)")\n',
+        "4 · ÇALIŞTIRMALAR ARASI — başka workflow aynı artifact'i okuyor",
+        'import os, pandas as pd\n'
+        'var = os.path.exists("/output/rapor.ozet.parquet")\n'
+        'v = pd.read_parquet("/output/rapor.ozet.parquet") if var else None\n'
+        'set_result("okundu: " + str(v.to_dict("records")) if var else "bulunamadi")\n',
         workflow=BASKA_WF,
     )
 
@@ -109,12 +122,8 @@ def main() -> None:
     kosu(
         "5 · SINIR — kod pickle saklamaya çalışıyor",
         "import pickle\n"
-        'zehir = pickle.dumps({"kotu": "yuk"})\n'
-        "try:\n"
-        '    put_artifact(zehir, name="zararsiz.gorunen")\n'
-        '    set_result("SIZDI: pickle depoya girdi")\n'
-        "except Exception as e:\n"
-        '    set_result(f"reddedildi: {str(e)[:120]}")\n',
+        'open("/output/zararsiz.gorunen.txt","wb").write(pickle.dumps({"kotu":"yuk"}))\n'
+        'set_result("dosya yazildi — supurmede reddedilmeli")\n',
     )
 
 

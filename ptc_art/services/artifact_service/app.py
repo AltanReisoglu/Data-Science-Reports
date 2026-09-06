@@ -119,6 +119,10 @@ def _ozet(meta) -> dict:
     return {
         "artifact_id": meta.artifact_id,
         "name": meta.name,
+        # 2026-09-06: listeleme tenant genelinde olduğu için "kim üretti"
+        # künyeye girdi. Olmasaydı manifest, başka bir çalıştırmanın
+        # çıktısını kendi çıktısıymış gibi gösterirdi.
+        "workflow_id": meta.workflow_id,
         "type": meta.artifact_type,
         "metadata": meta.user_metadata,
         "node_id": meta.node_id,
@@ -258,6 +262,7 @@ def _akit(meta) -> StreamingResponse:
 @app.get("/artifacts/by-name/{name}")
 async def get_artifact_by_name(
     name: str = Path(...),
+    workflow: str | None = Query(default=None),
     x_scope_token: str | None = Header(default=None),
 ) -> StreamingResponse:
     """O isimdeki EN YENİ sürümün baytları.
@@ -266,7 +271,16 @@ async def get_artifact_by_name(
     değil, ismi yeterli.
     """
     kapsam = _kapsam(x_scope_token)
-    meta = _service().resolve(workflow_id=kapsam.workflow_id, name=name)
+    # `workflow` verilirse O ÇALIŞTIRMAYA bağlı çözülür (tenant'a düşmez).
+    # `/output/<ad>` bunu kullanıyor: bir run'ın kendi dizini yalnızca kendi
+    # çıktılarını göstermeli — 2026-09-06'da ajan başka bir run'ın aynı adlı
+    # çıktısını kendi işi sanıp yanlış sayı verdi.
+    meta = _service().resolve(
+        owner=kapsam.owner,
+        workflow_id=workflow or kapsam.workflow_id,
+        name=name,
+        strict=workflow is not None,
+    )
     if meta is None:
         raise HTTPException(404, f"'{name}' adında artifact yok.")
     return _akit(meta)
@@ -279,7 +293,25 @@ async def get_metadata(
 ) -> dict:
     """Künye — baytlar indirilmeden."""
     kapsam = _kapsam(x_scope_token)
-    return _ozet(_service().metadata_of(artifact_id, workflow_id=kapsam.workflow_id))
+    return _ozet(_service().metadata_of(artifact_id, owner=kapsam.owner))
+
+
+@app.get("/artifacts/{artifact_id}/lineage")
+async def get_lineage(
+    artifact_id: str = Path(...),
+    limit: int = Query(default=1000, le=5000),
+    x_scope_token: str | None = Header(default=None),
+) -> dict:
+    """Soy ağacı: bu artifact'in ATALARI ve ÜRÜNLERİ.
+
+    Kayıt defterinde `parents` baştan beri vardı ama okuyan bir uç nokta
+    yoktu — "kaydediliyor, keşifte kullanılmıyor" açığı (§11.10) tam olarak
+    buydu. Grafik yalnızca jetondaki workflow'la sınırlı.
+    """
+    kapsam = _kapsam(x_scope_token)
+    return _service().lineage(
+        artifact_id, owner=kapsam.owner, limit=limit
+    )
 
 
 @app.get("/artifacts/{artifact_id}")
@@ -289,30 +321,46 @@ async def get_artifact(
 ) -> StreamingResponse:
     """Kimlikle baytlar."""
     kapsam = _kapsam(x_scope_token)
-    meta = _service().resolve(workflow_id=kapsam.workflow_id, artifact_id=artifact_id)
+    meta = _service().resolve(owner=kapsam.owner, artifact_id=artifact_id)
     if meta is None:
         raise HTTPException(404, f"{artifact_id} bulunamadı.")
     return _akit(meta)
+
+
+@app.get("/artifacts")
+async def list_artifacts(
+    limit: int = Query(default=200, le=1000),
+    x_scope_token: str | None = Header(default=None),
+) -> list[dict]:
+    """Bu tenant'ta ne var — **çalıştırmalar arası**, künyeler, baytlar değil.
+
+    Sandbox'ın manifestinin kaynağı. Kapsam workflow değil tenant (2026-09-06):
+    KFP'de de bütün run'lar aynı `pipeline_root` altına yazar ve birbirinin
+    çıktısını görebilir. Her kayıt kendi `workflow_id`'sini taşıyor, yani
+    "kimin ürettiği" bilgisi kaybolmuyor — yalnızca görünürlük açılıyor.
+    """
+    kapsam = _kapsam(x_scope_token)
+    return [_ozet(m) for m in _service().list(owner=kapsam.owner, limit=limit)]
 
 
 @app.get("/workflows/{workflow_id}/artifacts")
 async def list_workflow_artifacts(
     workflow_id: str = Path(...),
     node_id: str | None = Query(default=None),
-    limit: int = Query(default=100, le=1000),
+    limit: int = Query(default=200, le=1000),
     x_scope_token: str | None = Header(default=None),
 ) -> list[dict]:
-    """Bu workflow'da şu ana kadar ne üretilmiş — künyeler, baytlar değil.
+    """Tek bir çalıştırmanın ürettikleri — tenant listesinin süzülmüş hâli.
 
-    Yoldaki `workflow_id` jetondakiyle eşleşmek ZORUNDA. Yol parametresi
-    yetkilendirme değil, okunabilirlik içindir; yetki jetondan gelir.
+    Panel bunu kullanıyor ("bu oturumda ne üretildi"). Artık BAŞKA bir
+    workflow'un kimliği de sorulabilir: okuma sınırı tenant, ve panelin
+    "şu çalıştırmaya bak" bağlantısının işe yaraması için gerekli.
     """
     kapsam = _kapsam(x_scope_token)
-    if workflow_id != kapsam.workflow_id:
-        raise HTTPException(404, "Bu workflow bulunamadı.")
     return [
         _ozet(m)
-        for m in _service().list(workflow_id=kapsam.workflow_id, node_id=node_id, limit=limit)
+        for m in _service().list(owner=kapsam.owner, limit=limit)
+        if m.workflow_id == workflow_id and (node_id is None or m.node_id == node_id)
     ]
 
 
@@ -377,7 +425,7 @@ async def reap(
     silinen, hatali = 0, []
     for m in suresi_dolan:
         try:
-            if servis.delete(m.artifact_id, workflow_id=m.workflow_id):
+            if servis.delete(m.artifact_id, owner=m.owner):
                 silinen += 1
         except Exception as exc:  # noqa: BLE001
             # Bir kayıt silinemezse (depo erişilemez, yarış) diğerleri sürsün:
@@ -403,5 +451,5 @@ async def delete_artifact(
     çalışması olacak (TODO: Faz 6).
     """
     kapsam = _kapsam(x_scope_token)
-    silindi = _service().delete(artifact_id, workflow_id=kapsam.workflow_id)
+    silindi = _service().delete(artifact_id, owner=kapsam.owner)
     return {"artifact_id": artifact_id, "deleted": silindi}

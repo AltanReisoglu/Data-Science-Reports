@@ -41,9 +41,11 @@ BINARY = "application/octet-stream"
 #: yazıp `df.to_csv("/output/rapor.csv")` dediğinde, dosyanın ne olduğunu
 #: uzantısından anlamak zorundayız — elimizde başka ipucu yok.
 #:
-#: `.csv` bilerek TEXT'e eşleniyor (`text/csv` değil): böylece geri okunduğunda
-#: `str` olarak gelir ve çağıran doğrudan parse edebilir. Tanımadığımız her şey
-#: BINARY — PDF, PNG, zip hepsi olduğu gibi saklanır, çözülmeye çalışılmaz.
+#: Tanımadığımız her şey BINARY: olduğu gibi saklanır, çözülmeye çalışılmaz.
+#: Aşağıdaki ikili biçimler (PDF, PNG, xlsx, zip) bu yüzden listede — BINARY'ye
+#: düşseler de saklanırlardı, ama o zaman künyede `application/octet-stream`
+#: görünürlerdi; panelin "bu bir PDF" diyebilmesi ve tarayıcının doğru
+#: açabilmesi için gerçek tip lazım.
 _UZANTI_TIPLERI = {
     ".parquet": "application/vnd.apache.parquet",
     ".arrow": "application/vnd.apache.arrow.file",
@@ -52,7 +54,38 @@ _UZANTI_TIPLERI = {
     ".txt": "text/plain",
     ".md": "text/markdown",
     ".html": "text/html",
+    # -- ikili çıktılar (2026-09-05): rapor/grafik üreten iş akışları --
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".svg": "image/svg+xml",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".zip": "application/zip",
+    # Dizin artifact'lerinin taşıyıcısı (2026-09-06). Sandbox `/output` altında
+    # bir DİZİN bırakırsa tek bir tar'a paketlenip öyle saklanıyor; KFP
+    # launcher'ının dizin desteğinin bizdeki karşılığı.
+    ".tar": "application/x-tar",
 }
+
+
+#: content_type -> kanonik uzantı. `_UZANTI_TIPLERI`'nin TERSİ, elle değil
+#: TÜRETİLEREK — çünkü ikisini ayrı ayrı tutmak 2026-09-06'da gerçekten
+#: ayrıştı: `.pdf`/`.png` buraya eklenince depo anahtarı hâlâ `.bin` yazıyordu
+#: (nesne deposuna bakan biri PDF'i tanıyamıyordu). Tek yön tanımlanır,
+#: diğeri çıkar.
+#:
+#: Aynı tipe birden çok uzantı düşüyorsa (`.jpg`/`.jpeg` -> `image/jpeg`)
+#: İLK tanımlanan kazanır — sözlük sırası kanonik sırayı belirliyor.
+_TIP_UZANTILARI: dict[str, str] = {}
+for _uzanti, _tip in _UZANTI_TIPLERI.items():
+    _TIP_UZANTILARI.setdefault(_tip, _uzanti)
+_TIP_UZANTILARI.setdefault(BINARY, ".bin")
+
+
+def uzanti_icin(content_type: str) -> str:
+    """content_type'ın depo anahtarında kullanılacak uzantısı; bilinmiyorsa `.bin`."""
+    return _TIP_UZANTILARI.get(content_type, ".bin")
 
 
 def content_type_for_filename(filename: str) -> str:
@@ -208,6 +241,13 @@ _TIP_ESLEME = {
     "text/csv": "system.Dataset",
     "text/html": "system.HTML",
     "text/markdown": "system.Markdown",
+    # KFP'nin standart sözlüğünde PDF/görsel için ayrı bir tip YOK; taban tip
+    # `system.Artifact` doğru cevap. Uydurma bir `system.PDF` icat etmiyoruz —
+    # hizalamanın anlamı, onların sözlüğünü kullanmak.
+    "application/pdf": "system.Artifact",
+    "image/png": "system.Artifact",
+    "image/jpeg": "system.Artifact",
+    "image/svg+xml": "system.Artifact",
 }
 
 

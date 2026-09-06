@@ -189,24 +189,54 @@ def test_bozuk_jeton_401(client):
     assert yanit.status_code == 401
 
 
-def test_baska_workflow_artifacti_gorunmez(client):
-    """Var-ama-yetkisiz ile hiç-yok ayrımı YAPILMAMALI — 404, 403 değil.
+def test_baska_workflow_artifacti_GORUNUR(client):
+    """2026-09-06: sınır workflow'dan TENANT'a taşındı.
 
-    Aksi halde çağıran, başka workflow'larda hangi id'lerin var olduğunu
-    deneyerek öğrenebilirdi.
+    KFP'de izolasyon namespace düzeyinde — bütün run'lar aynı `pipeline_root`
+    altına yazar ve biri diğerinin çıktısını okuyabilir. Çalıştırma başına
+    mühürlemek bizim eklediğimiz bir şeydi; ürün "başka workflow'un
+    artifact'ini gözlemleyip kullanabilsin" istediği için kalktı.
     """
-    yaz = client.post("/artifacts", content=b"gizli", headers=bas(workflow_id="wf_gizli"))
+    yaz = client.post("/artifacts", content=b"veri", headers=bas(workflow_id="wf_ureten"))
     kimlik = yaz.json()["artifact_id"]
 
-    baskasi = {"X-Scope-Token": jeton(workflow_id="wf_baska")}
+    okuyan = {"X-Scope-Token": jeton(workflow_id="wf_okuyan")}
+    assert client.get(f"/artifacts/{kimlik}", headers=okuyan).status_code == 200
+    assert client.get("/artifacts/by-name/rapor.csv", headers=okuyan).content == b"veri"
+
+
+def test_baska_TENANT_artifacti_gorunmez(client):
+    """Sınır kalkmadı, TAŞINDI. Var-ama-yetkisiz ile hiç-yok yine ayrılmıyor."""
+    yaz = client.post("/artifacts", content=b"gizli", headers=bas())
+    kimlik = yaz.json()["artifact_id"]
+
+    yabanci = issue_token(
+        ANAHTAR, Scope(workflow_id=WF, run_id="run_1", owner="baska-tenant")
+    )
+    baskasi = {"X-Scope-Token": yabanci}
     assert client.get(f"/artifacts/{kimlik}", headers=baskasi).status_code == 404
     assert client.get("/artifacts/by-name/rapor.csv", headers=baskasi).status_code == 404
 
 
-def test_workflow_yolu_jetonla_eslesmezse_404(client):
-    """Yoldaki workflow_id yetkilendirme DEĞİL; yetki jetondan gelir."""
-    yanit = client.get("/workflows/wf_baskasinin/artifacts", headers={"X-Scope-Token": jeton()})
-    assert yanit.status_code == 404
+def test_tenant_listelemesi_workflowlari_kapsiyor(client):
+    """`/artifacts` — sandbox manifestinin kaynağı, çalıştırmalar arası."""
+    client.post("/artifacts", content=b"a", headers=bas(workflow_id="wf_a", ad="a.txt"))
+    client.post("/artifacts", content=b"b", headers=bas(workflow_id="wf_b", ad="b.txt"))
+
+    kayit = client.get("/artifacts", headers={"X-Scope-Token": jeton()}).json()
+    assert {k["name"] for k in kayit} == {"a.txt", "b.txt"}
+    assert {k["workflow_id"] for k in kayit} == {"wf_a", "wf_b"}
+
+
+def test_workflow_yolu_suzuyor(client):
+    """Yol parametresi artık yetki değil FİLTRE — panelin "şu çalıştırmaya bak"
+    bağlantısı başka bir workflow'u da gösterebilmeli."""
+    client.post("/artifacts", content=b"a", headers=bas(workflow_id="wf_a", ad="a.txt"))
+    client.post("/artifacts", content=b"b", headers=bas(workflow_id="wf_b", ad="b.txt"))
+
+    h = {"X-Scope-Token": jeton(workflow_id="wf_a")}
+    kayit = client.get("/workflows/wf_b/artifacts", headers=h).json()
+    assert [k["name"] for k in kayit] == ["b.txt"]
 
 
 # -- listeleme (manifest yolu) ---------------------------------------------

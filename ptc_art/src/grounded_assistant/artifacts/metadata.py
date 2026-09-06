@@ -78,6 +78,9 @@ _INDEXES = (
     "CREATE INDEX IF NOT EXISTS ix_artifacts_wf_name ON artifacts(workflow_id, name)",
     "CREATE INDEX IF NOT EXISTS ix_artifacts_wf_hash ON artifacts(workflow_id, content_hash)",
     "CREATE INDEX IF NOT EXISTS ix_artifacts_created ON artifacts(created_at)",
+    # owner+name: workflow'lar arası isimle çözme (2026-09-06). Keşif sınırı
+    # workflow'dan tenant'a genişleyince bu sorgu sıcak yola girdi.
+    "CREATE INDEX IF NOT EXISTS ix_artifacts_owner_name ON artifacts(owner, name)",
 )
 
 _COLUMNS = (
@@ -193,6 +196,66 @@ class MetadataStore:
             (artifact_id,),
         )
         return next(rows, None)
+
+    def latest_in_workflow(self, owner: str, workflow_id: str, name: str):
+        """O ÇALIŞTIRMADAKİ en yeni — tenant'a düşmez.
+
+        `/output/<ad>` bunun üzerinden çözülüyor: bir çalıştırmanın kendi
+        dizini yalnızca kendi çıktılarını göstermeli. Başka bir run'ın çıktısı
+        adını taşıyan ayrı bir yoldan (`/artifacts/<wf>/<ad>`) okunuyor —
+        KFP'de de `pipeline_root/<run-id>/...` böyle.
+        """
+        rows = self._query(
+            "SELECT * FROM artifacts "
+            f"WHERE owner = {self.placeholder} AND workflow_id = {self.placeholder} "
+            f"AND name = {self.placeholder} "
+            "ORDER BY created_at DESC, artifact_id DESC",
+            (owner, workflow_id, name),
+        )
+        return next(rows, None)
+
+    def latest_by_name_for_owner(
+        self, owner: str, name: str, prefer_workflow: str | None = None
+    ) -> ArtifactMeta | None:
+        """Tenant genelinde o isimdeki EN YENİ artifact.
+
+        NEDEN TENANT (2026-09-06): KFP'de izolasyon sınırı **namespace**, run
+        değil — bütün çalıştırmalar aynı `pipeline_root` altına yazar ve bir
+        bileşen başka bir run'ın çıktısını URI'siyle okuyabilir. Bizde de
+        yerleştirme çalıştırma başına (anahtar yolu), ama **keşif ve okuma**
+        tenant genelinde.
+
+        `prefer_workflow`: aynı isim iki workflow'da varsa çağıranınki kazanır.
+        Kendi çıktını başkasının aynı adlı çıktısının gölgelemesi, en az
+        beklenen davranış olurdu.
+        """
+        if prefer_workflow:
+            kendi = self._query(
+                "SELECT * FROM artifacts "
+                f"WHERE owner = {self.placeholder} AND name = {self.placeholder} "
+                f"AND workflow_id = {self.placeholder} "
+                "ORDER BY created_at DESC, artifact_id DESC",
+                (owner, name, prefer_workflow),
+            )
+            bulunan = next(kendi, None)
+            if bulunan is not None:
+                return bulunan
+        rows = self._query(
+            "SELECT * FROM artifacts "
+            f"WHERE owner = {self.placeholder} AND name = {self.placeholder} "
+            "ORDER BY created_at DESC, artifact_id DESC",
+            (owner, name),
+        )
+        return next(rows, None)
+
+    def list_for_owner(self, owner: str, limit: int = 200) -> list[ArtifactMeta]:
+        """Tenant'ta ne var — manifestin kaynağı, workflow'lar arası."""
+        return list(self._query(
+            "SELECT * FROM artifacts "
+            f"WHERE owner = {self.placeholder} "
+            f"ORDER BY created_at DESC LIMIT {self.placeholder}",
+            (owner, limit),
+        ))
 
     def latest_by_name(self, workflow_id: str, name: str) -> ArtifactMeta | None:
         """Bir workflow içinde o isimle üretilmiş EN YENİ artifact.

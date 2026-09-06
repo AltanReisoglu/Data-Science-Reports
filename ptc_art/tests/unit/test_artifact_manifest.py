@@ -39,9 +39,19 @@ def test_baytlar_ASLA_gorunmuyor():
 
 
 def test_model_yeniden_uretmemeye_yonlendiriliyor():
+    """Manifest, modele YOLU göstermeli — artık bir fonksiyon adını değil.
+
+    2026-09-06: `get_artifact` kaldırıldı, keşif dosya sistemi üzerinden.
+    Manifest sandbox'ın gördüğü `/output` görünümünün aynısını anlatmak
+    zorunda; farklı bir dil kullanırsa model olmayan bir API arar.
+    """
     metin = manifest_metni(KUNYE)
     assert "YENİDEN ÜRETME" in metin
-    assert "get_artifact" in metin and "read_csv" in metin
+    assert "/output/" in metin
+    assert "read_parquet" in metin
+    # kaldırılan yüzey geri sızmamalı
+    for yok in ("get_artifact", "put_artifact", "list_artifacts", "cached("):
+        assert yok not in metin
 
 
 def test_bos_liste_mesaj_uretmiyor():
@@ -49,11 +59,19 @@ def test_bos_liste_mesaj_uretmiyor():
     assert manifest_metni([]) is None
 
 
+def test_ayni_isim_tek_satir(): 
+    """Aynı ad birden çok çalıştırmada olabilir; okuma en yeniyi çözüyor,
+    manifest de tek satır göstermeli — yoksa liste tekrarla dolardı."""
+    cok = [{"name": "rapor.csv", "type": "system.Dataset", "size_bytes": i}
+           for i in range(5)]
+    assert manifest_metni(cok).count("/output/rapor.csv") == 1
+
+
 def test_uzun_liste_kirpiliyor():
     cok = [{"name": f"a{i}", "type": "system.Artifact", "size_bytes": 1} for i in range(120)]
     metin = manifest_metni(cok)
     assert "ve 80 tane daha" in metin
-    assert metin.count("\n  - ") == 40
+    assert metin.count("\n  /output/") == 40
 
 
 def test_servis_tanimsizsa_ag_istegi_yok(monkeypatch):
@@ -90,3 +108,53 @@ def test_middleware_mesaji_sistem_mesaji_olarak_ekliyor(monkeypatch):
     sonuc = mw.before_model(None, None)
     assert isinstance(sonuc["messages"][0], SystemMessage)
     assert "satislar.csv" in sonuc["messages"][0].content
+
+
+# -- iki grup: bu oturum vs başka çalıştırmalar (2026-09-06) ----------------
+
+
+KARISIK = [
+    {"name": "benim.parquet", "type": "system.Dataset", "size_bytes": 10,
+     "workflow_id": "wf_ben"},
+    {"name": "baskasinin.parquet", "type": "system.Dataset", "size_bytes": 20,
+     "workflow_id": "wf_baska"},
+]
+
+
+def test_kendi_ciktisi_ayri_bolumde():
+    """ASIL REGRESYON (2026-09-06, canlı kullanımda bulundu).
+
+    Keşif kapsamı tenant'a genişleyince manifest düz bir liste oldu. Ajan
+    1. turda `ticket_analiz_raporu.pdf` üretti (HR = 60,0); 2. turda
+    "az önce ürettiğin analizde HR kaçtı?" sorulunca manifestte gördüğü
+    BAŞKA bir workflow'un `departman.ozet.parquet`'ini okudu ve "7,46" dedi.
+
+    Cevap sessizce yanlıştı — hiçbir yerde hata yoktu. Model'in "benim işim"
+    ile "başkasınınki"ni ayırt edebilmesi için liste ikiye bölündü.
+    """
+    metin = manifest_metni(KARISIK, "wf_ben")
+
+    assert "BU OTURUMDA ÜRETİLENLER" in metin
+    assert "BAŞKA ÇALIŞTIRMALARDAN" in metin
+    # kendi çıktısı ilk bölümde, diğeri ikincide
+    ilk, ikinci = metin.split("BAŞKA ÇALIŞTIRMALARDAN")
+    assert "benim.parquet" in ilk and "baskasinin.parquet" not in ilk
+    assert "baskasinin.parquet" in ikinci
+
+
+def test_baskasinin_ciktisini_kendi_gibi_sunma_uyarisi():
+    metin = manifest_metni(KARISIK, "wf_ben")
+    assert "kendi çıktın gibi sunma" in metin
+
+
+def test_workflow_verilmezse_hepsi_diger_grupta():
+    """Kapsam bilinmiyorsa hiçbir şey "benim" sayılmamalı — güvenli taraf."""
+    metin = manifest_metni(KARISIK, None)
+    assert "BU OTURUMDA ÜRETİLENLER" not in metin
+    assert "BAŞKA ÇALIŞTIRMALARDAN" in metin
+
+
+def test_yalnizca_kendi_ciktisi_varsa_ikinci_bolum_yok():
+    metin = manifest_metni([KARISIK[0]], "wf_ben")
+    assert "BU OTURUMDA ÜRETİLENLER" in metin
+    assert "BAŞKA ÇALIŞTIRMALARDAN" not in metin

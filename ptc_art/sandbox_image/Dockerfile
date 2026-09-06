@@ -16,7 +16,16 @@ FROM python:3.11-slim
 # Bu paketler imaja GÖMÜLÜ olmak zorunda: sandbox'ın çalışma anında ağ erişimi
 # yok, `pip install` yapamaz. (Anthropic'in code execution container'ı da aynı
 # kısıtla çalışıyor: "no internet access, only pre-installed libraries".)
-RUN pip install --no-cache-dir fastmcp requests pandas pyarrow
+# matplotlib / reportlab / openpyxl (2026-09-05): artifact'lerin "ciddi"
+# olabilmesi için. Buraya kadar üretebildiğimiz her şey tablo ya da metindi;
+# gerçek bir iş akışının çıktısı PDF raporu, PNG grafiği, Excel dosyası olur.
+#
+# Hiçbiri entrypoint'te import EDİLMİYOR — yalnızca LLM'in kodu isterse
+# yükleniyor. Yani sıradan bir çalıştırmanın ~3 sn'lik süresi değişmiyor;
+# maliyet imaj boyutunda, çalışma zamanında değil.
+RUN pip install --no-cache-dir \
+        fastmcp requests pandas pyarrow \
+        matplotlib reportlab openpyxl
 
 # serialize.py, ana kaynak ağacındaki dosyanın TA KENDİSİ — çoğaltılmıyor,
 # kopyalanıyor. Böylece Parquet/Arrow biçimi ve pickle yasağı tek yerde
@@ -26,5 +35,10 @@ COPY src/grounded_assistant/artifacts/serialize.py /serialize.py
 # fastmcp'ye bağlı DEĞİL — artifact yolu MCP'den çıkarıldı, yalnızca `requests`.
 COPY sandbox_image/artifact_client.py /artifact_client.py
 COPY sandbox_image/entrypoint.py /entrypoint.py
+# sidecar.py (2026-09-06): Argo'nun `wait` container'ının karşılığı. AYNI imajda
+# çünkü aynı iki modüle (artifact_client, serialize) ihtiyaç duyuyor; ama AYRI
+# bir container olarak, AYRI bir ortamla çalışıyor — kapsam jetonu yalnızca
+# onun ortamında. `command` ile seçiliyor (bkz. k8s/sandbox/job-template.yaml).
+COPY sandbox_image/sidecar.py /sidecar.py
 
 ENTRYPOINT ["python", "/entrypoint.py"]

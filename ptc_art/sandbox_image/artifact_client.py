@@ -61,10 +61,17 @@ class ArtifactClient:
         content_type: str,
         name: str,
         ttl_seconds: int | None = None,
+        parents: list[str] | None = None,
     ) -> dict:
-        """Dosyayı belleğe almadan yükler — `requests` dosya nesnesini akıtır."""
+        """Dosyayı belleğe almadan yükler — `requests` dosya nesnesini akıtır.
+
+        `parents` (2026-09-05): süpürme yolu da soy ağacı taşıyor. Önceden
+        sabit `None` geçiliyordu — yani `df.to_csv("/output/x.csv")` ile
+        üretilen her şey kayıt defterine ÖKSÜZ giriyordu, oysa aynı
+        çalıştırmada okunan girdiler belliydi.
+        """
         with open(path, "rb") as f:
-            return self._post(f, content_type, name, None, ttl_seconds, None, None)
+            return self._post(f, content_type, name, parents, ttl_seconds, None, None)
 
     def _post(self, govde, content_type, name, parents, ttl_seconds,
               artifact_type=None, metadata=None) -> dict:
@@ -98,25 +105,29 @@ class ArtifactClient:
         with yanit:
             return yanit.content, self._kunye(yanit)
 
-    def fetch_to_file(self, name: str, hedef: str) -> dict | None:
+    def fetch_to_file(self, name: str, hedef: str, workflow_id: str | None = None) -> dict | None:
         """Artifact'i doğrudan diske yazar — hiçbir noktada tamamı bellekte olmaz.
 
         `/output` altındaki tembel okuma bunu kullanır: `pd.read_csv` çağrılınca
         dosya yoksa buraya düşülür, dosya yerine konur, sonra pandas normal
         şekilde okur.
         """
-        yanit = self._ham_getir(None, name)
+        yanit = self._ham_getir(None, name, workflow_id)
         if yanit is None:
             return None
         with yanit, open(hedef, "wb") as f:
             shutil.copyfileobj(yanit.raw, f, _PARCA)
         return self._kunye(yanit)
 
-    def _ham_getir(self, artifact_id: str | None, name: str | None):
+    def _ham_getir(self, artifact_id: str | None, name: str | None,
+                   workflow_id: str | None = None):
+        """`workflow_id` verilirse isim O ÇALIŞTIRMADA aranır, tenant'a düşmez."""
         if artifact_id is not None:
             url = f"{self.endpoint}/artifacts/{artifact_id}"
         elif name is not None:
             url = f"{self.endpoint}/artifacts/by-name/{name}"
+            if workflow_id:
+                url += f"?workflow={workflow_id}"
         else:
             raise ValueError("artifact_id ya da name verilmeli")
         yanit = self._oturum.get(url, stream=True, timeout=_ZAMAN_ASIMI)
@@ -128,6 +139,17 @@ class ArtifactClient:
         # ham gövde gelir. Servis sıkıştırma yapmıyor ama açıkça garanti edelim.
         yanit.raw.decode_content = True
         return yanit
+
+    def list_all(self) -> list[dict]:
+        """Bu tenant'ta ne var — **çalıştırmalar arası** (2026-09-06).
+
+        Manifestin kaynağı. Eskiden yalnızca kendi workflow'unu listeliyorduk;
+        KFP'de bütün run'lar aynı `pipeline_root` altına yazıyor ve birbirinin
+        çıktısını görebiliyor — istenen davranış o.
+        """
+        yanit = self._oturum.get(f"{self.endpoint}/artifacts", timeout=_ZAMAN_ASIMI)
+        self._dogrula(yanit)
+        return yanit.json()
 
     def list(self, workflow_id: str, node_id: str | None = None) -> list[dict]:
         yanit = self._oturum.get(
@@ -169,3 +191,41 @@ class ArtifactClient:
             except ValueError:
                 gerekce = yanit.text
             raise ArtifactServiceError(f"[{yanit.status_code}] {gerekce}")
+
+
+class ProxyClient:
+    """Sandbox'ın istemcisi — 127.0.0.1'deki sidecar'a konuşur.
+
+    Jeton BU TARAFTA YOK. Sidecar onu ekliyor. Ve bilerek YALNIZCA OKUMA var:
+    yükleme kararı sidecar'ın, `/output`'a bakarak verdiği bir karar
+    (Argo'nun `wait` container'ı gibi). LLM'in kodu buradan bir şey
+    yükleyemez — yükleme uç noktası hiç yok.
+    """
+
+    def __init__(self, taban: str):
+        self.taban = taban.rstrip("/")
+        self._oturum = requests.Session()
+
+    def list_all(self) -> list[dict]:
+        yanit = self._oturum.get(f"{self.taban}/manifest", timeout=_ZAMAN_ASIMI)
+        yanit.raise_for_status()
+        return yanit.json()
+
+    def fetch_to_file(self, name: str, hedef: str,
+                      workflow_id: str | None = None) -> dict | None:
+        params = {"name": name}
+        if workflow_id:
+            params["workflow"] = workflow_id
+        yanit = self._oturum.get(f"{self.taban}/fetch", params=params,
+                                 timeout=_ZAMAN_ASIMI, stream=True)
+        if yanit.status_code == 404:
+            return None
+        yanit.raise_for_status()
+        with yanit, open(hedef, "wb") as f:
+            shutil.copyfileobj(yanit.raw, f, _PARCA)
+        return {
+            "artifact_id": yanit.headers.get("X-Artifact-Id"),
+            "name": name,
+            "content_type": yanit.headers.get("Content-Type"),
+            "size_bytes": int(yanit.headers.get("Content-Length") or 0),
+        }

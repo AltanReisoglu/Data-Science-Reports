@@ -46,6 +46,7 @@ from grounded_assistant.artifacts.serialize import (
     guvenlik_kontrolu,
     serialize,
     tip_cikar,
+    uzanti_icin,
 )
 from grounded_assistant.artifacts.store import ObjectStore
 
@@ -53,15 +54,6 @@ from grounded_assistant.artifacts.store import ObjectStore
 #: Nokta serbest çünkü node'lar arası konvansiyon böyle: "extract.tickets".
 _GECERLI_ISIM = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
-_UZANTI = {
-    "application/vnd.apache.parquet": ".parquet",
-    "application/vnd.apache.arrow.file": ".arrow",
-    "application/json": ".json",
-    "text/plain": ".txt",
-    "text/csv": ".csv",
-    "text/markdown": ".md",
-    "text/html": ".html",
-}
 
 VARSAYILAN_BOYUT_SINIRI = 100 * 1024 * 1024  # 100 MiB
 
@@ -162,7 +154,7 @@ class ArtifactService:
         else:
             key = self._anahtar(
                 owner, workflow_id, node_id, run_id, artifact_id, content_type,
-                VARSAYILAN_KOK if root is None else root.strip("/"),
+                VARSAYILAN_KOK if root is None else _kok_dogrula(root.strip("/")),
             )
             storage_uri = self.objects.put(key, data, content_type)
 
@@ -186,7 +178,7 @@ class ArtifactService:
             )
         )
 
-    def delete(self, artifact_id: str, *, workflow_id: str) -> bool:
+    def delete(self, artifact_id: str, *, owner: str) -> bool:
         """ÖNCE bayt, SONRA metadata.
 
         Ters sıra (MLflow'un sorunu) görünmez ama ücreti işleyen yetim blob
@@ -196,10 +188,10 @@ class ArtifactService:
         Dedup nedeniyle aynı baytı birden çok kayıt gösteriyor olabilir; o
         durumda bayt SİLİNMEZ, yalnızca bu kaydın referansı düşer.
         """
-        meta = self._yetkili_meta(artifact_id, workflow_id)
+        meta = self._yetkili_meta(artifact_id, owner)
         paylasan = [
             m
-            for m in self.metadata.list(workflow_id, limit=10_000)
+            for m in self.metadata.list_for_owner(owner, limit=10_000)
             if m.storage_uri == meta.storage_uri and m.artifact_id != artifact_id
         ]
         if not paylasan:
@@ -208,17 +200,19 @@ class ArtifactService:
 
     # -- okuma ------------------------------------------------------------
 
-    def get(self, artifact_id: str, *, workflow_id: str) -> Any:
-        meta = self._yetkili_meta(artifact_id, workflow_id)
+    def get(self, artifact_id: str, *, owner: str) -> Any:
+        meta = self._yetkili_meta(artifact_id, owner)
         return self._yukle(meta)
 
-    def get_by_name(self, name: str, *, workflow_id: str) -> Any | None:
-        """İsimle en yeni sürüm — node'lar arası devrin ana yolu."""
-        meta = self.metadata.latest_by_name(workflow_id, name)
+    def get_by_name(self, name: str, *, owner: str,
+                    workflow_id: str | None = None) -> Any | None:
+        """İsimle en yeni sürüm — çalıştırmalar arası devrin ana yolu."""
+        meta = self.metadata.latest_by_name_for_owner(owner, name, workflow_id)
         return None if meta is None else self._yukle(meta)
 
     def get_bytes(
-        self, *, workflow_id: str, artifact_id: str | None = None, name: str | None = None
+        self, *, owner: str, workflow_id: str | None = None,
+        artifact_id: str | None = None, name: str | None = None,
     ) -> tuple[bytes, ArtifactMeta] | None:
         """Ham baytlar + metadata — **gateway'in kullandığı yol**.
 
@@ -227,9 +221,9 @@ class ArtifactService:
         olduğu gibi geçirir.
         """
         if artifact_id is not None:
-            meta = self._yetkili_meta(artifact_id, workflow_id)
+            meta = self._yetkili_meta(artifact_id, owner)
         elif name is not None:
-            meta = self.metadata.latest_by_name(workflow_id, name)
+            meta = self.metadata.latest_by_name_for_owner(owner, name, workflow_id)
             if meta is None:
                 return None
         else:
@@ -237,7 +231,9 @@ class ArtifactService:
         return self.objects.get(_anahtar_ayikla(meta.storage_uri)), meta
 
     def resolve(
-        self, *, workflow_id: str, artifact_id: str | None = None, name: str | None = None
+        self, *, owner: str, workflow_id: str | None = None,
+        artifact_id: str | None = None, name: str | None = None,
+        strict: bool = False,
     ) -> ArtifactMeta | None:
         """Kimlik ya da isimden metadata çözer — baytlara DOKUNMADAN.
 
@@ -245,9 +241,13 @@ class ArtifactService:
         okumadan üretebilmek için.
         """
         if artifact_id is not None:
-            return self._yetkili_meta(artifact_id, workflow_id)
+            return self._yetkili_meta(artifact_id, owner)
         if name is not None:
-            return self.metadata.latest_by_name(workflow_id, name)
+            if strict:
+                if not workflow_id:
+                    return None
+                return self.metadata.latest_in_workflow(owner, workflow_id, name)
+            return self.metadata.latest_by_name_for_owner(owner, name, workflow_id)
         raise ValueError("artifact_id ya da name verilmeli")
 
     def iter_bytes(self, meta: ArtifactMeta, chunk_size: int = 1024 * 1024):
@@ -299,7 +299,7 @@ class ArtifactService:
         else:
             key = self._anahtar(
                 owner, workflow_id, node_id, run_id, artifact_id, content_type,
-                VARSAYILAN_KOK if root is None else root.strip("/"),
+                VARSAYILAN_KOK if root is None else _kok_dogrula(root.strip("/")),
             )
             storage_uri = self.objects.put_stream(key, fileobj, length, content_type)
 
@@ -323,24 +323,95 @@ class ArtifactService:
             )
         )
 
-    def metadata_of(self, artifact_id: str, *, workflow_id: str) -> ArtifactMeta:
-        return self._yetkili_meta(artifact_id, workflow_id)
+    def metadata_of(self, artifact_id: str, *, owner: str) -> ArtifactMeta:
+        return self._yetkili_meta(artifact_id, owner)
 
-    def list(
-        self, *, workflow_id: str, node_id: str | None = None, limit: int = 100
-    ) -> list[ArtifactMeta]:
-        return self.metadata.list(workflow_id, node_id=node_id, limit=limit)
+    def list(self, *, owner: str, limit: int = 200) -> list[ArtifactMeta]:
+        """Tenant'ta ne var — manifestin kaynağı, workflow'lar arası."""
+        return self.metadata.list_for_owner(owner, limit=limit)
+
+    def lineage(self, artifact_id: str, *, owner: str, limit: int = 1000) -> dict:
+        """Bir artifact'in soy ağacı: yukarı ATALAR, aşağı ÜRÜNLER.
+
+        NEDEN BELLEKTE: `parents` bir JSON metin sütunu, yani "beni ebeveyn
+        gösterenler" sorgusu SQL'de `LIKE '%id%'` olurdu — indekssiz, ve
+        `art_abc` ile `art_abcdef` gibi önek çakışmalarına açık. Bir
+        workflow'un artifact sayısı üç haneli bile değil; grafiği tek
+        listeden kurmak hem doğru hem yeterince hızlı. Postgres'e geçince
+        kenarları ayrı tabloya alma seçeneği açık kalıyor.
+
+        Kapsam: YALNIZCA bu workflow. `_yetkili_meta` kökü zaten doğruluyor;
+        kenarlar da aynı listeden kurulduğu için başka bir workflow'a sızma
+        yolu yok.
+        """
+        kok = self._yetkili_meta(artifact_id, owner)
+        hepsi = {m.artifact_id: m for m in
+                 self.metadata.list_for_owner(owner, limit=limit)}
+        hepsi.setdefault(kok.artifact_id, kok)
+
+        # Kenarlar: yalnızca İKİ UCU DA bu workflow'da olanlar. Süresi dolup
+        # silinmiş bir ebeveyne işaret eden kenar çizilmez — düğümsüz kenar
+        # grafikte kopuk bir ok olurdu.
+        cocuklar: dict[str, list[str]] = {}
+        ebeveynler: dict[str, list[str]] = {}
+        for m in hepsi.values():
+            for ebeveyn in m.parents:
+                if ebeveyn in hepsi:
+                    cocuklar.setdefault(ebeveyn, []).append(m.artifact_id)
+                    ebeveynler.setdefault(m.artifact_id, []).append(ebeveyn)
+
+        def gez(baslangic: str, komsuluk: dict[str, list[str]]) -> dict[str, int]:
+            """BFS — derinlik döner. Döngü olsa bile `gorulen` sonsuza sokmaz."""
+            gorulen: dict[str, int] = {}
+            sira = [(baslangic, 0)]
+            while sira:
+                dugum, d = sira.pop(0)
+                for komsu in komsuluk.get(dugum, ()):
+                    if komsu not in gorulen and komsu != baslangic:
+                        gorulen[komsu] = d + 1
+                        sira.append((komsu, d + 1))
+            return gorulen
+
+        atalar = gez(kok.artifact_id, ebeveynler)
+        urunler = gez(kok.artifact_id, cocuklar)
+
+        dugumler = [_soy_dugumu(kok, 0, "kok")]
+        for kimlik, d in sorted(atalar.items(), key=lambda kv: kv[1]):
+            dugumler.append(_soy_dugumu(hepsi[kimlik], -d, "ata"))
+        for kimlik, d in sorted(urunler.items(), key=lambda kv: kv[1]):
+            dugumler.append(_soy_dugumu(hepsi[kimlik], d, "urun"))
+
+        ilgili = {d["artifact_id"] for d in dugumler}
+        kenarlar = [
+            {"from": e, "to": c}
+            for e, cs in sorted(cocuklar.items())
+            for c in sorted(cs)
+            if e in ilgili and c in ilgili
+        ]
+        return {"root": kok.artifact_id, "nodes": dugumler, "edges": kenarlar}
 
     # -- iç ---------------------------------------------------------------
 
-    def _yetkili_meta(self, artifact_id: str, workflow_id: str) -> ArtifactMeta:
+    def _yetkili_meta(self, artifact_id: str, owner: str) -> ArtifactMeta:
+        """Yetki sınırı **tenant** (2026-09-06'da workflow'dan genişletildi).
+
+        KFP'de izolasyon sınırı namespace: bütün çalıştırmalar aynı
+        `pipeline_root` altına yazar ve bir bileşen başka bir run'ın çıktısını
+        okuyabilir. Çalıştırma başına mühürlemek bizim eklediğimiz bir şeydi;
+        istenen davranış "başka workflow artifact'ini görebilsin ve
+        kullanabilsin" olduğu için sınır oraya taşındı.
+
+        Yerleştirme hâlâ çalıştırma başına: anahtar yolu
+        `{owner}/{workflow}/{node}/{run}/...` — yani kim ne zaman üretti bilgisi
+        kaybolmuyor, yalnızca okuma kapısı açılıyor.
+        """
         meta = self.metadata.get(artifact_id)
-        if meta is None or meta.workflow_id != workflow_id:
+        if meta is None or meta.owner != owner:
             # Var-ama-yetkisiz ile hiç-yok ayrımı BİLEREK yapılmıyor: aksi halde
             # çağıran, başka workflow'larda hangi id'lerin var olduğunu
             # deneyerek öğrenebilirdi.
             raise ScopeViolation(
-                f"{artifact_id} bu workflow'da bulunamadı ({workflow_id})."
+                f"{artifact_id} bu tenant'ta bulunamadı ({owner})."
             )
         return meta
 
@@ -366,7 +437,7 @@ class ArtifactService:
         """
         govde = (
             f"{owner}/{workflow_id}/{node_id or '_'}/{run_id}/"
-            f"{artifact_id}{_UZANTI.get(content_type, '.bin')}"
+            f"{artifact_id}{uzanti_icin(content_type)}"
         )
         return f"{kok}/{govde}" if kok else govde
 
@@ -378,6 +449,41 @@ def _tip_dogrula(tip: str) -> str:
     yüzünden kullanıcının çıktısını kaybetmek orantısız olurdu.
     """
     return tip if tip in TIPLER else VARSAYILAN_TIP
+
+
+#: Depo kökü: `/` ile ayrılmış, harf/rakamla başlayan segmentler. `..` ve mutlak
+#: yol yok. `_GECERLI_ISIM`'in çok segmentli hâli.
+_GECERLI_KOK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0,4}$")
+
+
+def _kok_dogrula(kok: str) -> str:
+    """Depo kökünü doğrular — boşsa boş döner.
+
+    NEDEN (2026-09-06'da fark edildi): `X-Artifact-Root` başlığı sandbox'a
+    açık uçtan noktada hiç doğrulanmadan kabul ediliyordu. Sandbox'ın kendi
+    istemcisi bu başlığı GÖNDERMİYOR, ama imajda `requests` var — LLM'in
+    yazdığı kod ham bir POST atıp kökü kendisi seçebilirdi.
+
+    Bu, mimarinin ana iddiasını deliyordu: "baytın NEREYE yazılacağını servis
+    belirler, çağıran değil". Anahtarın geri kalanı (`owner/workflow/node/run`)
+    zaten jetondan geliyordu; kök tek boşluktu.
+
+    Sızma sınırlıydı — başka bir workflow'un artifact'i OKUNAMAZ (kayıt defteri
+    `workflow_id` kontrol ediyor) ve var olan bir nesne EZİLEMEZ (`artifact_id`
+    sunucuda üretiliyor). Ama paylaşılan bir bucket'ta (ODF/OpenShift AI'da
+    olağan durum) başka bir prefix'e nesne serpmek mümkündü.
+
+    KFP'de `pipeline_root` da pipeline'ı TANIMLAYAN kişinin ayarı, adımın
+    kodunun değil. Doğru hizalama bu.
+    """
+    if not kok:
+        return ""
+    if not _GECERLI_KOK.match(kok):
+        raise InvalidArtifactName(
+            f"Geçersiz depo kökü: {kok!r}. İzin verilen: harf/rakam ile başlayan, "
+            "'/' ile ayrılmış en fazla 5 segment; '..' ve mutlak yol yok."
+        )
+    return kok
 
 
 def _isim_dogrula(name: str) -> None:
@@ -392,3 +498,19 @@ def _isim_dogrula(name: str) -> None:
 def _anahtar_ayikla(storage_uri: str) -> str:
     """`s3://bucket/a/b/c` → `a/b/c`"""
     return storage_uri.split("/", 3)[3]
+
+
+def _soy_dugumu(m: ArtifactMeta, derinlik: int, yon: str) -> dict:
+    """Soy grafiği düğümü. `depth` işaretli: negatif = ata, pozitif = ürün."""
+    return {
+        "artifact_id": m.artifact_id,
+        "name": m.name,
+        "artifact_type": m.artifact_type,
+        "content_type": m.content_type,
+        "size_bytes": m.size_bytes,
+        "created_at": m.created_at.isoformat(),
+        "node_id": m.node_id,
+        "run_id": m.run_id,
+        "depth": derinlik,
+        "yon": yon,
+    }

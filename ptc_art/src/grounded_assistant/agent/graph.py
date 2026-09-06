@@ -104,32 +104,74 @@ def _make_ptc_tool(
         programatik olarak (döngü/koşul ile) sıralamak istediğinde de bunu
         kullan.
 
-        ARTIFACT DEPOSU — çalıştırmalar arasında veri saklamanın tek yolu.
-        Sandbox pod'u her çalıştırmada SIFIRDAN doğar; değişkenler bir sonraki
-        çağrıya TAŞINMAZ. Kalması gerekeni açıkça saklaman gerekir. Şu beş
-        fonksiyon da global olarak hazırdır (import YOK):
+        KALICI VERİ — `/output/` dizini. Sandbox pod'u her çalıştırmada
+        SIFIRDAN doğar; değişkenler bir sonraki çağrıya TAŞINMAZ. Kalması
+        gereken her şeyi `/output/` altına DOSYA olarak yaz.
 
-        - cached(ad, fonksiyon): PAHALI bir bloğu bir kez çalıştırır, sonucu
-          saklar; sonraki çağrılarda depodan okur ve bloğu HİÇ çalıştırmaz.
-          ÇOK ÖNEMLİ: 5'ten fazla tool çağrısı içeren ya da döngüyle veri
-          toplayan her bloğu bununla sar — ör.
-          `df = cached("acik_ticketlar", ticket_taramasi)`. Kodun hata verip
-          düzeltilmiş hâliyle yeniden çalıştırılması sık olur; cached kullanırsan
-          o pahalı iş tekrarlanmaz.
-        - put_artifact(deger, name="ad"): bir DataFrame/sözlük/liste/metni
-          KALICI olarak saklar, artifact_id döndürür. DataFrame'ler tipleri
-          korunarak saklanır. Kullanıcının sonradan üzerine soru sorabileceği
-          her ara sonucu sakla.
-        - get_artifact(name="ad"): daha önce saklananı geri okur (o addaki en
-          yeni sürüm). Yoksa None döner.
-        - list_artifacts(): bu konuşmada şimdiye kadar NE saklandığını listeler.
-          Kullanıcı önceki bir sonuca atıf yapıyorsa ("az önceki tabloyu",
-          "onu departmana göre grupla") ÖNCE bunu çağır — veriyi yeniden
-          üretmek yerine oradan oku.
-        - artifact_metadata(artifact_id): baytları indirmeden künyesini verir.
+        Özel bir API YOK. Düpedüz Python yaz:
 
-        Küçük skaler sonuçlar (tek sayı, kısa metin) için artifact KULLANMA —
-        onları doğrudan set_result ile döndür."""
+            df.to_parquet("/output/satislar.parquet")   # saklanır
+            df = pd.read_parquet("/output/satislar.parquet")  # geri okunur
+            json.dump(ozet, open("/output/ozet.json", "w"))
+            plt.savefig("/output/dagilim.png")
+
+        Çalışma bitince `/output/` üst düzeyindeki her dosya (ve her dizin)
+        otomatik olarak kalıcı depoya konur. Hata alsan bile o ana kadar
+        yazdıkların kurtarılır.
+
+        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — dosya sistemi deponun görünümüdür.
+        `/output/` altındaki bir dosyayı okumak istediğinde, o dosya bu pod'da
+        fiziksel olarak olmasa bile depodan otomatik iner. Yani:
+
+            os.listdir("/output")              # depoda ne varsa listeler
+            os.path.exists("/output/x.parquet")  # depodakini de sayar
+            pd.read_parquet("/output/x.parquet") # yoksa indirir, sonra okur
+
+        Kullanıcı önceki bir sonuca atıf yapıyorsa ("az önceki tabloyu", "onu
+        departmana göre grupla") veriyi YENİDEN ÜRETME — önce `/output`'a bak,
+        oradan oku.
+
+        İKİ AYRI KÖK var, karıştırma:
+        - `/output/` — YALNIZCA BU OTURUMUN çıktıları. "Az önce", "demin",
+          "senin ürettiğin" dendiğinde burası.
+        - `/artifacts/<workflow_id>/` — BAŞKA çalıştırmaların çıktıları.
+          `os.listdir("/artifacts")` hangi çalıştırmalar var onu listeler.
+          Bunlar bu oturumun işi DEĞİL; kullanıcı açıkça istemedikçe
+          kullanma, ve asla kendi çıktın gibi sunma.
+
+        Aradığın dosya `/output`'ta yoksa üretmen gerekiyor demektir —
+        `/artifacts` altındaki benzer adlı bir dosyayı onun yerine koyma.
+
+        PAHALI İŞİ TEKRARLAMA: 5'ten fazla tool çağrısı içeren ya da döngüyle
+        veri toplayan bir bloktan önce çıktısı var mı diye bak:
+
+            if os.path.exists("/output/acik_ticketlar.parquet"):
+                df = pd.read_parquet("/output/acik_ticketlar.parquet")
+            else:
+                df = ticket_taramasi()
+                df.to_parquet("/output/acik_ticketlar.parquet")
+
+        Kodun hata verip düzeltilmiş hâliyle yeniden çalıştırılması sık olur;
+        bu kalıbı kullanırsan o pahalı iş tekrarlanmaz.
+
+        DOSYA ADI ÖNEMLİ: uzantı içeriğin tipini belirliyor (`.parquet`, `.csv`,
+        `.json`, `.png`, `.pdf`, `.xlsx`, `.md`). Uzantısız ad verme.
+
+        Küçük skaler sonuçlar (tek sayı, kısa metin) için dosya yazma —
+        onları doğrudan set_result ile döndür.
+
+        BELGE ÜRETİMİ — kullanıcı rapor/grafik isterse gerçekten üret:
+        - matplotlib kurulu (backend Agg): `plt.savefig("/output/dagilim.png")`
+          ya da çok sayfalı PDF için `PdfPages("/output/rapor.pdf")`
+        - reportlab kurulu: metin+tablo içeren düzgün PDF raporlar için
+        - openpyxl kurulu: `df.to_excel("/output/ozet.xlsx")`
+
+        `/output/` altına bir DİZİN de bırakabilirsin (çok dosyalı model,
+        varlıklarıyla birlikte HTML rapor). Tek bir artifact olarak saklanır ve
+        sonraki çalıştırmada `/output/<dizin>/<dosya>` yolunu okuyunca
+        kendiliğinden geri açılır.
+        Panelde PNG ve PDF önizlemesi var, yani ürettiğin belge gerçekten
+        görüntülenebilir."""
         if trace.sandbox_run_count() >= MAX_SANDBOX_RUNS_PER_TURN:
             # Altan'ın kararı (2026-09-01): agent, engellenen bir hedefi farklı
             # bir URL/şema ile tekrar tekrar deneyip her seferinde yeni bir
