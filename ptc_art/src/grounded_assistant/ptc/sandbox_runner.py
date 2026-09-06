@@ -73,6 +73,12 @@ _POLL_INTERVAL_SECONDS = 0.15
 # Failed/DeadlineExceeded'e çevirmesi için makul bir tampon (research.md §6).
 _WAIT_TIMEOUT_SECONDS = 45.0
 
+#: Sandbox'ın terminal satırından sonra sidecar'ın süpürmesini beklediğimiz
+#: tavan. Süpürme ana container bittikten SONRA çalışıyor (Argo `wait` deseni);
+#: burada dönseydik `produced` olaylarını hiç göremezdik. Pod terminal faza
+#: geçerse zaten daha erken dönüyoruz — bu yalnızca güvenlik ağı.
+_SIDECAR_BEKLEME_SANIYE = 20.0
+
 
 def _resolve_tool_gateway_endpoint(core_v1: client.CoreV1Api) -> str:
     """research.md §4.1: sandbox'ın DNS'e hiç ihtiyaç duymaması için Tool
@@ -221,17 +227,31 @@ def _wait_and_stream(
     tool_calls: list[LiveToolCall] = []
     artifacts: list[ArtifactEvent] = []
     status, result_text, error_message = SandboxRunStatus.ERROR, None, None
-    seen_lines = 0
+    # Container başına ayrı sayaç: artifact olayları artık SIDECAR'ın log'unda
+    # (2026-09-06, süpürme oraya taşındı), sonuç/tool_call'lar sandbox'ta.
+    seen_lines: dict[str, int] = {"sandbox": 0, "artifact-sidecar": 0}
     terminal_seen = False
+    sidecar_bitti = False
+    #: Sandbox bitti ama sidecar henüz süpürmedi — bu kadar daha bekleriz.
+    sidecar_deadline: float | None = None
 
     pod_running_emitted = False
     while time.monotonic() < deadline:
-        log_text, pod_phase = _read_pod_log(core_v1, job_name)
+        log_text, pod_phase = _read_pod_log(core_v1, job_name, "sandbox")
         if pod_phase == "Running" and not pod_running_emitted:
             pod_running_emitted = True
             _emit(on_event, {"stage": "pod_running", "job_name": job_name})
-        lines = log_text.strip().splitlines() if log_text and log_text.strip() else []
-        for line in lines[seen_lines:]:
+
+        yan_log, _ = _read_pod_log(core_v1, job_name, "artifact-sidecar")
+        yan = yan_log.strip().splitlines() if yan_log and yan_log.strip() else []
+        lines = (log_text.strip().splitlines() if log_text and log_text.strip() else [])
+
+        # Sidecar satırları ÖNCE işleniyor; sandbox'ın terminal satırı geldiği
+        # anda dönmemek için `terminal_seen` aşağıda ayrıca bekletiliyor.
+        birlesik = [("artifact-sidecar", l) for l in yan[seen_lines["artifact-sidecar"]:]]
+        birlesik += [("sandbox", l) for l in lines[seen_lines["sandbox"]:]]
+        seen_lines["artifact-sidecar"] = len(yan)
+        for _kaynak, line in birlesik:
             parsed = _parse_line(line)
             if parsed is None:
                 continue  # entrypoint.py'nin kendi hata çıktısı olabilir, yok say
@@ -247,6 +267,10 @@ def _wait_and_stream(
                 )
                 artifacts.append(olay)
                 _emit(on_event, {"stage": "artifact", **parsed})
+            elif parsed.get("type") == "supurme_bitti":
+                # Sidecar süpürmeyi bitirdi — pod'un terminal faza geçmesini
+                # beklemeye gerek yok (ölçümde ~3 sn).
+                sidecar_bitti = True
             elif parsed.get("type") == "artifact_skipped":
                 # /output süpürmesinde reddedilen bir dosya (pickle, boyut,
                 # okunamayan dosya). ArtifactEvent'e ÇEVRİLMEZ — hiç
@@ -285,15 +309,24 @@ def _wait_and_stream(
                 # başarısız koşuda hep None kalmalı) DEĞİL, ayrı error_message.
                 status, error_message = SandboxRunStatus.ERROR, parsed.get("message")
                 terminal_seen = True
-        seen_lines = len(lines)
+        seen_lines["sandbox"] = len(lines)
 
-        # 2026-09-03: entrypoint sözleşmesinin SON satırı geldiyse sandbox işini
-        # bitirmiştir — Kubernetes'in Job.status'ü güncellemesini beklemeye gerek
-        # yok. Ölçümde bu bekleme medyan ~2.7 sn tutuyordu (ilk tool_call → final).
-        # Job status kontrolü aşağıda kalıyor: timeout ve "hiç satır yazmadan
-        # öldü" durumlarının tek sinyali o.
+        # 2026-09-03'te burada erken dönüyorduk: sandbox'ın terminal satırı
+        # gelince Job.status'ü beklemeden çıkıyorduk (~2.7 sn kazanç).
+        #
+        # 2026-09-06: SÜPÜRME SIDECAR'A TAŞINDI ve o, ana container bittikten
+        # SONRA çalışıyor. Terminal satırda dönseydik `produced` olaylarının
+        # HİÇBİRİNİ görmezdik. O yüzden terminal satırdan sonra sidecar'ın
+        # bitmesini bekliyoruz — ama sınırlı süre: pod terminal faza geçerse
+        # ya da tavan dolarsa dönüyoruz.
         if terminal_seen:
-            return status, result_text, error_message, tool_calls, artifacts
+            if sidecar_deadline is None:
+                sidecar_deadline = time.monotonic() + _SIDECAR_BEKLEME_SANIYE
+            if (sidecar_bitti or pod_phase in ("Succeeded", "Failed")
+                    or time.monotonic() > sidecar_deadline):
+                return status, result_text, error_message, tool_calls, artifacts
+            time.sleep(_POLL_INTERVAL_SECONDS)
+            continue
 
         job = batch_v1.read_namespaced_job(name=job_name, namespace=NAMESPACE)
         for condition in job.status.conditions or []:
@@ -306,7 +339,9 @@ def _wait_and_stream(
     return SandboxRunStatus.TIMEOUT, None, None, tool_calls, artifacts  # kendi güvenlik ağımız
 
 
-def _read_pod_log(core_v1: client.CoreV1Api, job_name: str) -> tuple[str | None, str | None]:
+def _read_pod_log(
+    core_v1: client.CoreV1Api, job_name: str, container: str = "sandbox"
+) -> tuple[str | None, str | None]:
     """(log metni, pod phase) döner. Phase, pod'un ne zaman Running'e geçtiğini
     ölçebilmek için eklendi (2026-09-03): toplam gecikmenin ne kadarı pod
     kurulumu, ne kadarı Python/fastmcp açılışı — warm pool kararı buna bağlı.
@@ -322,8 +357,11 @@ def _read_pod_log(core_v1: client.CoreV1Api, job_name: str) -> tuple[str | None,
         # tırnak işaretlerini bozup contracts/sandbox_job_contract.md'nin
         # JSON kontratını geçersiz kılıyor (deneyle doğrulandı, 2026-08-28).
         # Ham yanıtı kendimiz decode ederek bunu atlıyoruz.
+        # `container` ZORUNLU oldu (2026-09-06): pod artık iki container
+        # taşıyor (sandbox + artifact-sidecar). Belirtilmezse API 400 döner.
         raw = core_v1.read_namespaced_pod_log(
-            name=pod_name, namespace=NAMESPACE, _preload_content=False
+            name=pod_name, namespace=NAMESPACE, container=container,
+            _preload_content=False,
         )
         return raw.data.decode("utf-8"), phase
     except client.ApiException:
