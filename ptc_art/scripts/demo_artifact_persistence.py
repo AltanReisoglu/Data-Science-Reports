@@ -30,26 +30,24 @@ df = pd.DataFrame([
     for i in range(sayim["open_count"])
 ])
 
-art_id = put_artifact(df, name="extract.tickets")
-set_result(f"{len(df)} satir uretildi -> {art_id}")
+df.to_parquet("/output/extract.tickets.parquet")
+set_result(f"{len(df)} satir uretildi")
 """
 
 # --- PTC #2 — "transform" node'u: AYRI bir pod, veriyi geri okur -------------
 # Dikkat: count_open_tickets() BURADA HİÇ ÇAĞRILMIYOR.
 PTC_2 = """
-df = get_artifact(name="extract.tickets")
-if df is None:
-    set_result("HATA: artifact bulunamadi")
-else:
-    ozet = df.groupby("departman").size().reset_index(name="adet")
-    put_artifact(ozet, name="transform.ozet")
-    set_result(ozet.to_dict("records"))
+import pandas as pd
+df = pd.read_parquet("/output/extract.tickets.parquet")
+ozet = df.groupby("departman").size().reset_index(name="adet")
+ozet.to_parquet("/output/transform.ozet.parquet")
+set_result(ozet.to_dict("records"))
 """
 
 # --- PTC #3 — keşif: kendisinden önce ne üretildiğini bilmiyor ---------------
 PTC_3 = """
-kunye = list_artifacts()
-set_result([(k["name"], k["size_bytes"]) for k in kunye])
+import os
+set_result(sorted(os.listdir("/output")))
 """
 
 

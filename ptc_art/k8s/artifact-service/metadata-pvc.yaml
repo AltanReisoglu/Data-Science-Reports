@@ -1,0 +1,33 @@
+# Artifact metadata veritabanının kalıcı yeri.
+#
+# 2026-09-04'te `tool-gateway-metadata`'dan buraya taşındı — kayıt defteri artık
+# Artifact Service'in sorumluluğunda. Var olan bir kurulumu göç ettirirken
+# DB dosyası kopyalanmalı, yoksa eski kayıtlar görünmez olur ve MinIO'daki
+# baytlar yetim kalır (aşağıdaki kusurun aynısı, bu kez göçten doğan hâli).
+#
+# NEDEN GEREKLİ — ölçülmüş bir tutarsızlık (2026-09-02):
+#   Metadata SQLite'ı gateway pod'unun /tmp'inde duruyordu. Sonuç:
+#     baytlar  → MinIO → PVC  → pod ölse de KALIR
+#     metadata → pod /tmp     → pod ölünce GİDER
+#   Bir yeniden başlatmadan sonra sayıldı: bucket'ta 9 nesne, metadata'da 7
+#   kayıt. Aradaki 2 nesne YETİM — baytları duruyor ama onları gösteren hiçbir
+#   kayıt yok, yani erişilemez ve görünmez maliyet.
+#
+#   Bu, metadata.py'nin başlığında "MLflow'un sorunu" diye yazdığımız şeyin ta
+#   kendisi, ters yönden gelmiş hâli: silme sırasını doğru tasarladık ama
+#   DAĞITIM yetim üretiyordu.
+#
+# ÜRETİMDE: bunun yerine PostgreSQL (`open_postgres`). Red Hat'in Model
+# Registry için çizdiği çizgi de bu — SQLite yalnızca geliştirme/test, üretimde
+# PostgreSQL. Tek replika sınırı da o zaman kalkar: SQLite dosyası
+# ReadWriteOnce bir PVC'de olduğu için servis şu an >1 replikaya çıkamaz.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: artifact-service-metadata
+  labels: {app: artifact-service}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi

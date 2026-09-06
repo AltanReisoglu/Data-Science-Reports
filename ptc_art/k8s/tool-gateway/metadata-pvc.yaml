@@ -1,0 +1,41 @@
+# ARTIK KULLANILMIYOR (2026-09-04) — ama BİLEREK SİLİNMEDİ.
+#
+# Artifact işi Tool Gateway'den `artifact-service`'e taşınınca kayıt defteri de
+# `artifact-service-metadata` PVC'sine göç etti (66 kayıt kopyalandı, doğrulandı).
+# Gateway deployment'ı bu volume'u artık mount ETMİYOR.
+#
+# NEDEN DURUYOR: içinde göçten önceki kayıt defterinin kopyası var. Yeni PVC'de
+# bir sorun çıkarsa geri dönülecek tek yer burası. Göçün doğruluğundan emin
+# olunduktan sonra `kubectl delete pvc tool-gateway-metadata` ile silinebilir —
+# ama bu, veri silen bir işlem olduğu için bilinçli bir karar olmalı, sessizce
+# temizlenmemeli.
+#
+# Yeni hâli: k8s/artifact-service/metadata-pvc.yaml
+# Artifact metadata veritabanının kalıcı yeri (2026-09-03).
+#
+# NEDEN GEREKLİ — ölçülmüş bir tutarsızlık:
+#   Metadata SQLite'ı gateway pod'unun /tmp'inde duruyordu. Sonuç:
+#     baytlar  → MinIO → PVC   → pod ölse de KALIR
+#     metadata → gateway /tmp  → pod ölünce GİDER
+#   Gateway bir kez yeniden başladıktan sonra sayıldı: bucket'ta 9 nesne,
+#   metadata'da 7 kayıt. Aradaki 2 nesne YETİM — baytları duruyor ama onları
+#   gösteren hiçbir kayıt yok, yani erişilemez ve görünmez maliyet.
+#
+#   Bu, metadata.py'nin başlığında "MLflow'un sorunu" diye yazdığımız şeyin
+#   ta kendisi, ters yönden gelmiş hâli: silme sırasını doğru tasarladık ama
+#   DAĞITIM yetim üretiyordu.
+#
+# ÜRETİMDE: bunun yerine PostgreSQL (`open_postgres`). Red Hat'in Model
+# Registry için çizdiği çizgi de bu — SQLite yalnızca geliştirme/test,
+# üretimde PostgreSQL. Tek replika sınırı da o zaman kalkar: SQLite dosyası
+# ReadWriteOnce bir PVC'de olduğu için gateway şu an >1 replikaya çıkamaz.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tool-gateway-metadata
+  labels: {app: tool-gateway}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi

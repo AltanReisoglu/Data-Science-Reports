@@ -47,7 +47,15 @@ set_result(int(df["acik"].sum()))
 """
 
 KALICILIKSIZ = "df = pahali_tarama()\n"
-KALICILIKLA = 'df = cached("tarama.sonucu", pahali_tarama)\n'
+# `cached()` 2026-09-06'da kaldırıldı — düz Python karşılığı bu.
+KALICILIKLA = (
+    'import os, pandas as pd\n'
+    'if os.path.exists("/output/tarama.sonucu.parquet"):\n'
+    '    df = pd.read_parquet("/output/tarama.sonucu.parquet")\n'
+    'else:\n'
+    '    df = pahali_tarama()\n'
+    '    df.to_parquet("/output/tarama.sonucu.parquet")\n'
+)
 
 
 def kosu(kod: str, workflow: str) -> tuple[int, float, str]:
@@ -85,7 +93,7 @@ def main() -> None:
         f"wf_kalicisiz_{damga}",
     )
     b_cagri, b_sure = senaryo(
-        "KALICILIKLA — cached() ilk denemede saklıyor, düzeltmede okuyor",
+        "KALICILIKLA — ilk deneme /output'a yazıyor, düzeltme oradan okuyor",
         KALICILIKLA,
         f"wf_kalicili_{damga}",
     )

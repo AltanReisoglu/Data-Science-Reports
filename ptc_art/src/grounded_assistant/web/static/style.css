@@ -1,0 +1,558 @@
+/* Faz 4 — düz CSS, build aracı yok, harici hiçbir kaynak yok (Principle V).
+   Apple-esque tasarım: pill-shaped soru kutusu, yumuşak gölgeli kartlar,
+   macOS-tarzı daraltılabilir panel. Bilerek TEK tema (her zaman açık/beyaz) —
+   sistem karanlık modunda olsa bile demo sırasında tutarlı görünsün diye
+   otomatik karanlık mod desteği kaldırıldı (Altan'ın kararı, 2026-08-30). */
+
+:root {
+  --bg: #f5f5f7;
+  --card-bg: #ffffff;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --border: rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --success-bg: #e8f8ee;
+  --success-text: #1e7e42;
+  --danger-bg: #fdecec;
+  --danger-text: #c0392b;
+  --panel-bg: rgba(255, 255, 255, 0.97);
+  --panel-header-bg: #f0f0f2;
+  --panel-text: #1d1d1f;
+  --panel-border: rgba(0, 0, 0, 0.1);
+  --chip-bg: rgba(0, 113, 227, 0.08);
+  --chip-text: var(--accent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.app {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 38rem 1.5rem; /* alt boşluk: sabit, büyütülmüş PTC paneline yer aç */
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.header-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-header h1 {
+  font-size: 2.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.connection-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #a1a1a6;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.connection-dot.connected {
+  background: #28c840;
+  box-shadow: 0 0 0 3px rgba(40, 200, 64, 0.18);
+}
+
+.connection-dot.disconnected {
+  background: #ff5f57;
+  box-shadow: 0 0 0 3px rgba(255, 95, 87, 0.18);
+}
+
+.app-header .subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin: 0.4rem 0 0 0;
+}
+
+.question-form {
+  display: flex;
+  gap: 0.6rem;
+  background: var(--card-bg);
+  padding: 0.4rem;
+  border-radius: 980px; /* pill */
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.question-form:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+}
+
+#question-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0.7rem 1.1rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+#question-input::placeholder {
+  color: #a1a1a6;
+}
+
+#submit-button {
+  border: none;
+  background: var(--accent);
+  color: white;
+  padding: 0.7rem 1.4rem;
+  border-radius: 980px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#submit-button:hover {
+  background: var(--accent-hover);
+}
+
+#submit-button:active {
+  transform: scale(0.97);
+}
+
+#submit-button:disabled {
+  background: #a1a1a6;
+  cursor: default;
+}
+
+.spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.chip {
+  border: none;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  padding: 0.45rem 0.9rem;
+  border-radius: 980px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  font-family: inherit;
+}
+
+.chip:hover {
+  background: rgba(0, 113, 227, 0.16);
+  transform: translateY(-1px);
+}
+
+/* .demo-escape-button — 2026-09-06'da kaldırıldı (egress PoC'undan kalmaydı) */
+
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Sohbet akışı — her soru/yanıt kalıcı bir balon olarak eklenir, önceki
+   silinmez (önceki tasarımın "tek yanıt alanı" sınırının yerine). */
+.chat {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.msg-user {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--accent);
+  color: white;
+  padding: 0.65rem 1.1rem;
+  border-radius: 18px 18px 4px 18px;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  animation: fade-in 0.25s ease;
+}
+
+.msg-assistant {
+  align-self: flex-start;
+  width: 100%;
+  background: var(--card-bg);
+  border-radius: 4px 18px 18px 18px;
+  padding: 1.5rem 1.75rem;
+  box-shadow: var(--shadow-md);
+  animation: fade-in 0.3s ease;
+}
+
+/* "Düşünüyor" balonu — yanıt gelene kadar, gerçek yanıtla yerinde değişir. */
+.msg-assistant.thinking {
+  padding: 1rem 1.5rem;
+  display: inline-flex;
+  width: auto;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 0.32rem;
+  align-items: center;
+}
+
+.thinking-dots span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  animation: bounce 1.1s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.msg-header {
+  margin-bottom: 0.75rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 980px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge.grounded {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.badge.not-grounded {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.msg-text {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 1.25rem 0;
+}
+
+/* marked.js'in ürettiği markdown içeriği için tipografi. */
+.msg-text p {
+  margin: 0 0 0.75rem 0;
+}
+
+.msg-text p:last-child {
+  margin-bottom: 0;
+}
+
+.msg-text ul,
+.msg-text ol {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.4rem;
+}
+
+.msg-text li {
+  margin: 0.25rem 0;
+}
+
+.msg-text strong {
+  font-weight: 600;
+}
+
+.msg-text code {
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  background: rgba(0, 113, 227, 0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.msg-text pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.msg-meta {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.meta-row {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.meta-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.meta-value {
+  color: var(--text-primary);
+}
+
+.meta-row.warning .meta-value {
+  color: var(--danger-text);
+}
+
+/* Sol-alt, terminal benzeri, sabit, daraltılabilir PTC yaşam döngüsü paneli (US2). */
+.ptc-panel {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  width: 56rem;
+  max-width: calc(100vw - 2.5rem);
+  /* Yükseklik ekrana göre (2026-09-04 düzeltmesi): sabit 34rem iken, 900px
+     yüksekliğindeki bir laptopta panel son örnek çip satırını örtüyordu —
+     çip tıklanabiliyor ama okunamıyordu. `min()` ile büyük ekranda eski
+     boyut korunuyor, kısa ekranda panel kısalıp içeriği serbest bırakıyor. */
+  height: min(34rem, 50vh);
+  max-height: calc(100vh - 2.5rem);
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--panel-text);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--panel-border);
+  transition: height 0.25s ease;
+}
+
+.ptc-panel.collapsed {
+  height: auto;
+}
+
+.ptc-panel.collapsed .ptc-panel-log {
+  display: none;
+}
+
+.ptc-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--panel-header-bg);
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ptc-panel.collapsed .ptc-panel-header {
+  border-bottom: none;
+}
+
+.traffic-lights {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.traffic-lights .dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+}
+
+.traffic-lights .dot.red {
+  background: #ff5f57;
+}
+
+.traffic-lights .dot.yellow {
+  background: #febc2e;
+}
+
+.traffic-lights .dot.green {
+  background: #28c840;
+}
+
+.ptc-panel-title {
+  flex: 1;
+}
+
+.ptc-panel-toggle {
+  color: #8e8e93;
+  font-size: 0.9rem;
+}
+
+.ptc-panel-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.9rem;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.ptc-panel-log .line {
+  margin: 0.15rem 0;
+  animation: line-in 0.2s ease;
+}
+
+/* highlight.js'in Python kod bloğu (job_created olayındaki kod) */
+.ptc-panel-log pre {
+  margin: 0.3rem 0 0.5rem 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  animation: line-in 0.2s ease;
+}
+
+.ptc-panel-log pre code.hljs {
+  padding: 0;
+  background: transparent;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ptc-panel-log .line.denied {
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.ptc-panel-log .line.denied-raw {
+  color: #8a8a8e;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ptc-panel-log .line.final-success {
+  color: #1e7e42;
+  font-weight: 600;
+}
+
+.ptc-panel-log .line.final-error {
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.ptc-panel-log .line.info {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.ptc-panel-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ptc-panel-log::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+@media (max-width: 40rem) {
+  .ptc-panel {
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    width: auto;
+    max-width: none;
+    height: 14rem;
+  }
+
+  .app {
+    padding-bottom: 18rem;
+  }
+}
+
+
+/* Durum paneline bağlantı (2026-09-04) — sohbet ekranından gözlemlenebilirlik
+   sayfasına geçiş. Başlık satırının sağında, bağlantı noktasının yanında. */
+.durum-link {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.durum-link:hover { text-decoration: underline; }

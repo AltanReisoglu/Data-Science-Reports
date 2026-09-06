@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PTC — Sistem Durumu</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/durum.css" />
+</head>
+<body>
+  <div class="durum-app">
+    <header class="durum-header">
+      <div>
+        <h1>Artifact Deposu</h1>
+        <p class="subtitle">Ne saklandı, neyden türedi, hangi çalıştırma üretti — ve altyapının o an ne yaptığı</p>
+      </div>
+      <div class="durum-header-sag">
+        <span class="yenileme" id="yenileme">—</span>
+        <a class="baglanti" href="/">← Sohbete dön</a>
+      </div>
+    </header>
+
+    <div class="durum-govde">
+    <div class="durum-sol">
+
+    <!-- ARTIFACT DEPOSU -->
+    <section class="kart">
+      <div class="kart-baslik">
+        <h2>Saklananlar</h2>
+        <span class="kart-not" id="artifact-kapsam"></span>
+      </div>
+      <p class="kart-not artifact-aciklama">
+        Sandbox <code>/output</code>'a yazar, çalışma bitince süpürülüp depoya
+        kopyalanır. Satıra tıkla → içeriği; <strong>⑂</strong> → neyden türediği.
+      </p>
+      <div id="artifactler"><p class="bos">Yükleniyor…</p></div>
+      <!-- Önizleme tablonun DIŞINDA: `ciz_artifactler` her 5 sn'de bir
+           `#artifactler`i innerHTML ile yeniden çiziyor. İçeride olsaydı açık
+           önizleme her yenilemede silinirdi (bulunan gerçek kusur). -->
+      <div id="onizleme"></div>
+    </section>
+    <!-- VERİ AKIŞI (soy ağacı) -->
+    <section class="kart">
+      <div class="kart-baslik">
+        <h2>Veri akışı</h2>
+        <span class="kart-not" id="soy-mod"></span>
+      </div>
+      <p class="kart-not soy-aciklama">
+        Topoloji "hangi <strong>servis</strong> hangi servisle konuşabilir" der.
+        Burası bir kat aşağısı: "hangi <strong>veri</strong> hangi veriden türedi".
+        Oklar kayıt defterindeki <code>parents</code> alanından geliyor.
+      </p>
+      <div class="soy-sarmal"><div id="soy-diyagram"><p class="bos">Yükleniyor…</p></div></div>
+      <p class="kart-not soy-alt" id="soy-alt"></p>
+    </section>
+
+    <div class="ikili">
+      <!-- SANDBOX'LAR -->
+      <section class="kart">
+        <div class="kart-baslik">
+          <h2>Sandbox pod'ları</h2>
+          <span class="kart-not">Efemer — boş olması normaldir</span>
+        </div>
+        <div id="sandboxlar"><p class="bos">Yükleniyor…</p></div>
+      </section>
+
+      <!-- İZİNLİ AKIŞLAR -->
+      <section class="kart">
+        <div class="kart-baslik">
+          <h2>İzin verilmiş akışlar</h2>
+          <span class="kart-not" id="politika-sayisi"></span>
+        </div>
+        <div id="akislar"><p class="bos">Yükleniyor…</p></div>
+      </section>
+    </div>
+
+    <!-- TOPOLOJİ -->
+    <section class="kart">
+      <div class="kart-baslik">
+        <h2>Altyapı — kim kiminle konuşabiliyor</h2>
+        <span class="kart-not">Destekleyici kanıt: sandbox'ta depo anahtarı YOK, rota da yok</span>
+      </div>
+      <div class="harita-sarmal">
+        <svg id="harita" viewBox="55 75 810 325" preserveAspectRatio="xMidYMid meet"
+             role="img" aria-label="Servis haritası">
+          <defs>
+            <marker id="ucu" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#c7c7cc"/>
+            </marker>
+          </defs>
+          <g id="kenarlar"></g>
+          <g id="parcaciklar"></g>
+          <g id="dugumler"></g>
+        </svg>
+      </div>
+      <p class="kart-not harita-alt" id="harita-alt">Yükleniyor…</p>
+    </section>
+
+    </div><!-- /sol -->
+
+    <!-- CANLI AKIŞ (Hubble) -->
+    <aside class="durum-sag">
+      <section class="kart kart-akis">
+        <div class="kart-baslik">
+          <h2>Canlı akış</h2>
+          <span class="akis-durum" id="akis-durum">bağlanıyor…</span>
+        </div>
+        <p class="kart-not akis-aciklama">
+          Cilium/eBPF'in <strong>gerçekten gördüğü</strong> paketler — Hubble'dan.
+          Artifact yazılırken <code>sandbox → artifact-service → minio</code>
+          zinciri burada canlanır.
+        </p>
+        <div class="akis-listesi" id="akis-listesi">
+          <p class="bos" id="akis-bos">
+            Şu an pod'lar arası trafik yok — <strong>bu normal</strong>.
+            Bir soru sorduğunda sandbox doğar, <code>/output</code>'u süpürür
+            ve akış burada canlanır.
+            <br><br>
+            <span class="akis-not-kucuk">Panelin kendi yenileme istekleri
+            (host&nbsp;→&nbsp;artifact-service) bilerek süzülüyor; yoksa gerçek
+            trafiği bastırırlardı.</span>
+          </p>
+        </div>
+      </section>
+    </aside>
+    </div><!-- /govde -->
+  </div>
+
+  <script src="/static/vendor/mermaid.min.js"></script>
+  <script src="/static/soy.js"></script>
+  <script src="/static/durum.js"></script>
+</body>
+</html>

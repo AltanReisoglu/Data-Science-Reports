@@ -1,0 +1,149 @@
+# Faz 2 sandbox Job şablonu — sandbox_runner.py bunu metin olarak okuyup
+# {run_id} ve {tool_gateway_endpoint} yer tutucularını doldurur, sonra
+# yaml.safe_load ile kubernetes client'a verir (research.md §1, §5, §6).
+#
+# activeDeadlineSeconds/resources.limits: research.md §6.
+# ttlSecondsAfterFinished: research.md §5 (otomatik temizlik, Principle V).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ptc-sandbox-{run_id}
+  labels:
+    app: ptc-sandbox
+    ptc-run-id: "{run_id}"
+spec:
+  # 30 -> 90 (2026-09-05): matplotlib/reportlab ile GERÇEK çıktı üreten iş
+  # akışları için. matplotlib'in ilk importu tek başına 2-4 sn; 30 sn'lik
+  # tavan, bir PDF raporu üreten koda pratikte yer bırakmıyordu. Sıradan bir
+  # çalıştırma hâlâ ~3 sn sürüyor — bu bir TAVAN, maliyet değil.
+  activeDeadlineSeconds: 90
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: ptc-sandbox
+        ptc-run-id: "{run_id}"
+    spec:
+      restartPolicy: Never
+      # ── SIDECAR: artifact aktarımı ───────────────────────────────────────
+      #
+      # Argo Workflows'un `wait` container'ının karşılığı. Argo bu problemi
+      # dört farklı yerleşimle (docker/kubelet/k8sapi/pns) denedikten sonra
+      # v3.4'te hepsini kaldırıp bu modelde karar kıldı.
+      #
+      # `restartPolicy: Always` bir initContainer'ı YERLEŞİK SIDECAR yapıyor
+      # (Kubernetes 1.29+). Semantiği tam olarak ihtiyacımız olan şey:
+      #   "Upon Pod termination, the kubelet postpones terminating sidecar
+      #    containers until the main application container has fully stopped."
+      # Yani sandbox bitince sidecar hâlâ ayakta; süpürmeyi o anda yapıyor.
+      #
+      # KRİTİK: `PTC_SCOPE_TOKEN` YALNIZCA BURADA. Container'lar ortam
+      # değişkenlerini PAYLAŞMIYOR, dolayısıyla LLM'in kodu jetonu okuyamıyor.
+      # Ve proxy'de yükleme uç noktası yok — neyin yükleneceğine sidecar
+      # `/output`'a bakarak karar veriyor.
+      initContainers:
+        - name: artifact-sidecar
+          image: ptc-sandbox:local
+          imagePullPolicy: Never
+          restartPolicy: Always
+          command: ["python", "/sidecar.py"]
+          env:
+            - name: ARTIFACT_SERVICE_ENDPOINT
+              value: "{artifact_service_endpoint}"
+            - name: PTC_SCOPE_TOKEN
+              value: "{scope_token}"
+            - name: PTC_WORKFLOW_ID
+              value: "{workflow_id}"
+            - name: TOOL_GATEWAY_ENDPOINT
+              value: "{tool_gateway_endpoint}"
+          volumeMounts:
+            - name: scratch
+              mountPath: /scratch
+            - name: output
+              mountPath: /output
+            - name: artifacts
+              mountPath: /artifacts
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      containers:
+        - name: sandbox
+          image: ptc-sandbox:local
+          imagePullPolicy: Never  # kind load docker-image ile yerelden yüklendi
+          env:
+            - name: TOOL_GATEWAY_ENDPOINT
+              value: "{tool_gateway_endpoint}"
+            # Artifact Service (2026-09-04): artifact baytları ARTIK BURADAN
+            # gidip geliyor, gateway'den değil. Gateway yalnızca tool proxy'si.
+            - name: ARTIFACT_SERVICE_ENDPOINT
+              value: "{artifact_service_endpoint}"
+            # Kapsam jetonu BURADA YOK (2026-09-06). Sidecar taşıyor; bu
+            # container yalnızca 127.0.0.1'deki proxy'yi görüyor. Container'lar
+            # ortam değişkenlerini paylaşmadığı için LLM'in kodu jetona
+            # ulaşamıyor — kimlik izolasyonu artık politika değil, YAPISAL.
+            - name: PTC_ARTIFACT_PROXY
+              value: "http://127.0.0.1:8099"
+            # Yalnızca `/workflows/{{id}}/artifacts` yolunu kurmak için. Yetki
+            # bundan DEĞİL jetondan geliyor: servis yoldaki değeri jetondakiyle
+            # karşılaştırır, uymazsa 404 döner.
+            - name: PTC_WORKFLOW_ID
+              value: "{workflow_id}"
+            # matplotlib (2026-09-05): ekran yok, backend Agg olmalı; ve
+            # config/font önbelleği için YAZILABİLİR bir dizin gerekiyor —
+            # kök dosya sistemi salt-okunur, varsayılan `~/.config/matplotlib`
+            # ilk import'ta sessizce uyarı basıp yavaşlıyordu.
+            - name: MPLBACKEND
+              value: "Agg"
+            - name: MPLCONFIGDIR
+              value: "/scratch/.mpl"
+          volumeMounts:
+            - name: code
+              mountPath: /sandbox
+            # Yazılabilir scratch: kök dosya sistemi salt-okunur, kodun geçici
+            # dosya yazacak bir yeri olmalı (Parquet ara dosyaları vb.).
+            # `sizeLimit` aşılırsa pod tahliye edilir — kota bedavaya geliyor.
+            - name: scratch
+              mountPath: /scratch
+            # Çıktı süpürmesi (2026-09-03): LLM'in put_artifact() API'sini
+            # HİÇ bilmeden yazdığı sıradan kod (`df.to_csv("/output/x.csv")`)
+            # için emniyet ağı. `entrypoint.py`'nin `_ciktilari_supur`'u,
+            # script bitince (başarı ya da hata fark etmeksizin) bu dizinin
+            # ÜST DÜZEYİNİ artifact'e çevirir. `/scratch`ten AYRI: scratch
+            # süpürülmez, her geçici dosya artifact'e dönerdi.
+            #
+            # Endüstri emsali: Anthropic'in `$OUTPUT_DIR`'ı, OpenAI Code
+            # Interpreter'ın `/mnt/data`'sı — ikisi de aynı deseni kullanıyor.
+            - name: output
+              mountPath: /output
+            # BAŞKA çalıştırmaların çıktıları buraya iniyor:
+            # /artifacts/<workflow_id>/<ad>. Süpürülmez — bu çalıştırmanın
+            # ürettiği bir şey değil, yalnızca okuma yüzeyi.
+            - name: artifacts
+              mountPath: /artifacts
+          resources:
+            limits:
+              cpu: "1"
+              # 256Mi -> 1Gi (2026-09-05). 256Mi, pandas + pyarrow için bile
+              # dardı; matplotlib'in import'u tek başına ~120 MiB RSS ekliyor
+              # ve OOMKilled, LLM'e "kodun hatalı" gibi görünen bir çöküş
+              # veriyordu (asıl sebep görünmüyor).
+              #
+              # Servisin 100 MiB'lık artifact sınırıyla tutarlı: bir dosyayı
+              # ÜRETMEK için içeriğinden birkaç kat fazla bellek gerekir.
+              memory: "1Gi"
+      volumes:
+        - name: code
+          configMap:
+            name: ptc-code-{run_id}
+        - name: scratch
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: output
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: artifacts
+          emptyDir:
+            sizeLimit: 512Mi
+
