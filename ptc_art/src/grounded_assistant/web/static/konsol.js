@@ -373,56 +373,90 @@ async function ciz_soy() {
   if (g.error || g.hata) { alan.innerHTML = `<div class="card">${uyari(g.error || g.hata)}</div>`; return; }
 
   const dugum = g.nodes || [], kenar = g.edges || [];
-  const merkez = dugum.find(n => n.artifact_id === S.soyId) || dugum[0];
-  const ata = new Set(), urun = new Set();
-  kenar.forEach(e => { if (e.to === S.soyId) ata.add(e.from); if (e.from === S.soyId) urun.add(e.to); });
+  const merkez = dugum.find(n => n.artifact_id === g.root) || dugum[0];
 
-  const kat = [
-    dugum.filter(n => ata.has(n.artifact_id)),
-    dugum.filter(n => n.artifact_id === S.soyId),
-    dugum.filter(n => urun.has(n.artifact_id)),
-  ];
-  const W = 900, Y = [80, 210, 340], yer = {};
-  kat.forEach((satir, si) => satir.forEach((n, i) =>
-    (yer[n.artifact_id] = { x: W / (satir.length + 1) * (i + 1), y: Y[si] })));
+  // ZİNCİRİN TAMAMI çiziliyor. Servis her düğümün `depth`ini veriyor
+  // (negatif = ata, 0 = bu artifact, pozitif = ürün); önceden yalnızca ±1
+  // komşular çizildiği için 5 düğümlük bir zincirin 3'ü kayboluyordu — ve
+  // kaybolanlar tam da workflow sınırını geçenlerdi.
+  const seviyeler = [...new Set(dugum.map(n => n.depth))].sort((a, b) => a - b);
+  const W = 900, satirH = 108, ustBosluk = 54;
+  const yuk = ustBosluk + seviyeler.length * satirH + 26;
+  const yer = {};
+  seviyeler.forEach((d, si) => {
+    const satir = dugum.filter(n => n.depth === d);
+    satir.forEach((n, i) => (yer[n.artifact_id] = {
+      x: W / (satir.length + 1) * (i + 1) + 60,
+      y: ustBosluk + si * satirH,
+    }));
+  });
 
-  const kutular = kat.flatMap((satir, si) => satir.map(n => {
+  const wfRenk = {};
+  [...new Set(dugum.map(n => n.workflow_id))].forEach((w, i) => (wfRenk[w] = i));
+
+  const satirEtiket = seviyeler.map((d, si) => {
+    const y = ustBosluk + si * satirH;
+    const ad = d === 0 ? "BU ARTIFACT" : d < 0 ? `GİRDİ · ${-d} adım geride` : `TÜREV · ${d} adım ileride`;
+    return `<text x="8" y="${y - 26}" class="bant">${ad}</text>`;
+  }).join("");
+
+  const kutular = dugum.map(n => {
     const { x, y } = yer[n.artifact_id];
-    const capraz = merkez && n.workflow_id && n.workflow_id !== merkez.workflow_id;
+    const capraz = merkez && n.workflow_id !== merkez.workflow_id;
     return `<g data-art="${esc(n.artifact_id)}" style="cursor:pointer">
-      <rect x="${x - 95}" y="${y - 20}" width="190" height="40" rx="9" class="kutu ${si === 1 ? "merkez" : ""}"/>
-      <text x="${x}" y="${y - 2}" text-anchor="middle" class="ad">${esc(n.name)}</text>
-      <text x="${x}" y="${y + 12}" text-anchor="middle" class="alt">${kb(n.size_bytes)}${capraz ? " · başka çalıştırma" : ""}</text>
+      <rect x="${x - 105}" y="${y - 21}" width="210" height="42" rx="9"
+            class="kutu ${n.depth === 0 ? "merkez" : ""}"/>
+      <text x="${x}" y="${y - 3}" text-anchor="middle" class="ad">${esc(n.name)}</text>
+      <text x="${x}" y="${y + 12}" text-anchor="middle" class="alt">${kb(n.size_bytes)} · ${esc(kisa(n.workflow_id))}${capraz ? " ⟂" : ""}</text>
     </g>`;
-  })).join("");
+  }).join("");
 
   const cizgi = kenar.filter(e => yer[e.from] && yer[e.to]).map(e => {
     const a = yer[e.from], b = yer[e.to];
     const na = dugum.find(n => n.artifact_id === e.from), nb = dugum.find(n => n.artifact_id === e.to);
     const capraz = na && nb && na.workflow_id !== nb.workflow_id;
-    return `<path class="kenar ${capraz ? "capraz" : ""}" d="M${a.x} ${a.y + 20} C${a.x} ${a.y + 60} ${b.x} ${b.y - 60} ${b.x} ${b.y - 20}"/>`;
+    return `<path class="kenar ${capraz ? "capraz" : ""}"
+      d="M${a.x} ${a.y + 21} C${a.x} ${a.y + 60} ${b.x} ${b.y - 60} ${b.x} ${b.y - 21}"/>`;
   }).join("");
+
+  const wfSayi = new Set(dugum.map(n => n.workflow_id)).size;
 
   alan.innerHTML = `
     <div class="card">
       <div class="card-h">
         <h2 class="mono" style="font-size:.92rem">${esc(merkez?.name || S.soyId)}</h2>
         <span class="badge">${dugum.length} düğüm · ${kenar.length} kenar</span>
+        ${wfSayi > 1 ? `<span class="badge live">${wfSayi} farklı çalıştırma</span>` : ""}
       </div>
-      <svg class="soy-svg" viewBox="0 0 ${W} 400" role="img" aria-label="Soy ağacı">
-        <text x="8" y="24" class="bant">ATALAR — beyan edilen girdiler</text>
-        <text x="8" y="160" class="bant">BU ARTIFACT</text>
-        <text x="8" y="292" class="bant">ÜRÜNLER — bunu girdi alanlar</text>
-        ${cizgi}${kutular}
-        ${!kat[0].length ? `<text x="${W / 2}" y="80" text-anchor="middle" class="alt">kök — girdisi yok</text>` : ""}
-        ${!kat[2].length ? `<text x="${W / 2}" y="340" text-anchor="middle" class="alt">henüz kimse tüketmedi</text>` : ""}
-      </svg>
-      <p class="muted" style="margin:.6rem 0 0">Kesikli mavi kenar, iki farklı çalıştırma arasında geçen bağı gösterir.</p>
+
+      <div class="not" style="margin-bottom:.9rem">
+        <b>Nasıl okunur.</b> Yukarıdan aşağı veri akıyor: en üstteki kutu en eski girdi,
+        ortadaki (mavi çerçeveli) seçtiğiniz artifact, altındakiler ondan türeyenler.
+        Her kutunun altında boyutu ve <b>hangi çalıştırmadan geldiği</b> yazıyor.
+        ${wfSayi > 1 ? `<b>Kesikli mavi çizgi</b>, bağın iki farklı çalıştırma arasında
+        kurulduğunu gösterir — <span class="mono">⟂</span> işaretli kutular seçtiğinizden
+        başka bir hatta üretilmiş.` : `Bu zincirin tamamı tek bir çalıştırmada üretilmiş.`}
+      </div>
+
+      <div style="overflow-x:auto">
+        <svg class="soy-svg" viewBox="0 0 ${W + 120} ${yuk}" style="min-width:36rem"
+             role="img" aria-label="Soy ağacı">
+          ${satirEtiket}${cizgi}${kutular}
+        </svg>
+      </div>
+
+      <p class="muted" style="margin:.7rem 0 0">
+        Kenarlar kayıt defterindeki <span class="mono">parents</span> alanından geliyor;
+        o alanı da her adımın <span class="mono">inputs=[…]</span> beyanı dolduruyor.
+        Bir kutuya basınca grafiğin merkezi oraya kayar.
+      </p>
     </div>
+
     <div class="card">
-      <div class="card-h"><h2>Soyu olan diğer artifact'ler</h2></div>
-      <div class="suzgec">${S.kayitlar.filter(a => a.parents?.length).slice(0, 14)
-        .map(a => `<button data-soy="${esc(a.artifact_id)}" class="${a.artifact_id === S.soyId ? "on" : ""}">${esc(a.name)}</button>`).join("")}</div>
+      <div class="card-h"><h2>Başka bir artifact'in soyuna bak</h2></div>
+      <div class="suzgec">${S.kayitlar.filter(a => a.parents?.length).slice(0, 16)
+        .map(a => `<button data-soy="${esc(a.artifact_id)}" class="${a.artifact_id === S.soyId ? "on" : ""}">
+          ${esc(a.name)} <span class="mono" style="opacity:.55">${esc(kisa(a.workflow_id))}</span></button>`).join("")}</div>
     </div>`;
 
   $$("#soyAlan [data-art]").forEach(g2 => g2.onclick = () => { S.soyId = g2.dataset.art; ciz_soy(); });
