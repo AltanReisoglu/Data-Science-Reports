@@ -2689,8 +2689,8 @@ veriliyor, isimle değil. `PTC_S3_ENDPOINT` dışarıdan verilmişse ona dokunul
 ### Doğrulama
 
 ```
-proxy   51/51 canlı kabul kontrolü   ·  sandbox → minio  TimeoutError
-direct  52/52 canlı kabul kontrolü   ·  sandbox → minio  ULASTI (beklenen)
+proxy   52/52 canlı kabul kontrolü   ·  sandbox → minio  TimeoutError
+direct  53/53 canlı kabul kontrolü   ·  sandbox → minio  ULASILDI (beklenen)
         baytlar MinIO'da: ptc/<wf>/_/<run>/art_….txt
 212 birim/entegrasyon testi
 ```
@@ -2786,7 +2786,7 @@ alındı. Testler olmasa çalıştırmalar sessizce çıktısız dönerdi.
 ### Doğrulama
 
 ```
-209 birim/entegrasyon testi  ·  52/52 canlı kabul kontrolü
+209 birim/entegrasyon testi  ·  52/52 (proxy) + 53/53 (direct) canlı kabul kontrolü
 çapraz workflow: /artifacts/<wf>/ozet.json + /artifacts/<wf>/model.v1/w.json
                  turev.json parents=[iki girdi de]
 PL-A 5 artifact · PL-B çapraz sınır, beyanla

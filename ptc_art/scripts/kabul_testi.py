@@ -2,7 +2,8 @@
 
 `pytest` birim/entegrasyon testleri kodu sınıyor; bu script ÜRÜNÜ sınıyor:
 gerçek pod'lar doğuyor, gerçek MinIO'ya yazılıyor, gerçek ağ politikası
-deneniyor. 38 kontrol, hepsi ölçülüyor — hiçbiri varsayılmıyor.
+deneniyor. 52 kontrol (`direct` kipinde 53), hepsi ölçülüyor — hiçbiri
+varsayılmıyor.
 
 ## Ön koşullar
 
@@ -73,7 +74,7 @@ kontrol("3 artifact saklandı (dosya+json+dizin)",
         uretilen == {"ham.tickets.parquet", "kunye.json", "model.v1.tar"}, sorted(uretilen))
 
 # ══ 2. Çalıştırmalar arası keşif + kullanım ══════════════════════════════
-basla("2 · BAŞKA WORKFLOW — /output izole, load_artifact ile açık erişim")
+basla("2 · BAŞKA WORKFLOW — /output izole, çapraz girdi BEYANLA")
 r = kos(f"""
 import os, pandas as pd, json
 # KENDİ /output'u BOŞ olmalı — başka run'ın çıktısı buraya sızmamalı.
@@ -155,6 +156,12 @@ kontrol("soy grafiği ürünleri buluyor",
 
 # ══ 5. Güvenlik sınırları ════════════════════════════════════════════════
 basla("5 · GÜVENLİK SINIRLARI")
+# MinIO'nun IP'sini DIŞARIDAN veriyoruz. Eskiden sonda bunu
+# `MINIO_PORT_9000_TCP_ADDR`'den okuyordu; `enableServiceLinks: false`
+# konunca o değişken kalktı ve sonda IP'yi bulamayıp KeyError veriyordu —
+# yani "rota kapalı" DEĞİL, "adres bilinmiyor" ölçülüyordu. İkisi ayrı şey:
+# adresi bilmemek bir engel değil, rota testinin de sorusu bu değil.
+_MINIO_IP = os.popen("kubectl get svc minio -o jsonpath='{.spec.clusterIP}'").read().strip()
 r = kos("""
 import os, socket, requests
 s = {}
@@ -162,7 +169,7 @@ s["s3_kimlik"] = [k for k in os.environ if k.startswith(("AWS_ACCESS","AWS_SECRE
 try: import boto3; s["boto3"]="VAR"
 except ImportError: s["boto3"]="yok"
 try:
-    socket.create_connection((os.environ["MINIO_PORT_9000_TCP_ADDR"],9000),timeout=6).close()
+    socket.create_connection(("__MINIO_IP__",9000),timeout=6).close()
     s["minio_ip"]="ULASILDI"
 except Exception as e: s["minio_ip"]=type(e).__name__
 try:
@@ -184,7 +191,7 @@ try:
 except Exception as e:
     s["proxy_yazma"] = type(e).__name__
 set_result(s)
-""", str(uuid.uuid4()), "guvenlik")
+""".replace("__MINIO_IP__", _MINIO_IP), str(uuid.uuid4()), "guvenlik")
 kontrol("güvenlik sondası çalıştı", r.status.value == "success", r.error_message or "")
 if r.status.value == "success":
     s = eval(r.result_text)

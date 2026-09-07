@@ -75,7 +75,7 @@ Sidecar'a depo rotası açmak sandbox'a da açmaktır.
 
 | | `proxy` | `direct` |
 |---|---|---|
-| `sandbox → minio` | **gaierror** | **ULASTI** |
+| `sandbox → minio` (IP ile) | **TimeoutError** | **ULASILDI** |
 | sandbox'ta S3 anahtarı | yok | yok |
 
 **Hangisi ne zaman:** < ~50 MB `proxy` (kontroller tek yerde) · > ~50 MB
@@ -209,7 +209,7 @@ parçadan çıkmadı.**
 | `SIGKILL` | OOM/deadline'da süpürme çalışmaz (Argo'da da aynı) |
 | Soy imzasız | Tekton Chains bunu çözüyor, bizde yok |
 
-**209 test · 51/51 (`proxy`) + 52/52 (`direct`) canlı kabul kontrolü · bütün ölçümler cluster'dan.**
+**209 test · 52/52 (`proxy`) + 53/53 (`direct`) canlı kabul kontrolü · bütün ölçümler cluster'dan.**
 
 ---
 
