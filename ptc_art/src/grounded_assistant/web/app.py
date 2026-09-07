@@ -70,16 +70,20 @@ async def index() -> FileResponse:
 _DAMGALANAN = ("style.css", "konsol.css", "app.js", "konsol.js")
 
 
-def _damgala(html: str) -> str:
+def _damgala(html: str) -> tuple[str, str]:
+    """Statik bağlantılara içerik damgası basar; sürümü de döndürür."""
     import hashlib  # noqa: PLC0415
 
+    damgalar = []
     for ad in _DAMGALANAN:
         yol = _STATIC_DIR / ad
         if not yol.exists():
             continue
         damga = hashlib.sha256(yol.read_bytes()).hexdigest()[:8]
+        damgalar.append(damga)
         html = html.replace(f"/static/{ad}", f"/static/{ad}?v={damga}")
-    return html
+    surum = hashlib.sha256("".join(damgalar).encode()).hexdigest()[:8]
+    return html.replace("__SURUM__", surum), surum
 
 
 @app.get("/konsol")
@@ -90,7 +94,12 @@ async def konsol_sayfasi() -> HTMLResponse:
     burası artifact yaşam döngüsünün uçtan uca gösterimi. İkisi de aynı
     uçlardan besleniyor.
     """
-    return HTMLResponse(_damgala((_STATIC_DIR / "konsol.html").read_text(encoding="utf-8")))
+    html, _ = _damgala((_STATIC_DIR / "konsol.html").read_text(encoding="utf-8"))
+    # HTML'in KENDİSİ önbelleğe girerse damgalar da onunla birlikte donuyor ve
+    # sayfa eski JS'i istemeye devam ediyor — 2026-09-07'de tam bunu yaşadık:
+    # dosya güncellenmişti, sunucu yenisini veriyordu, tarayıcı eski sayfayı
+    # açık tutuyordu. Damga yalnızca TAZE bir HTML ile işe yarıyor.
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, must-revalidate"})
 
 
 @app.get("/api/pipelines")
