@@ -17,7 +17,7 @@ import queue
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -106,6 +106,31 @@ async def konsol_sayfasi() -> HTMLResponse:
 async def api_pipelines() -> dict:
     """Tanımlı hatlar ve adımları — kodları dahil, panelde gösteriliyor."""
     return {"pipelines": konsol_modulu.pipelines()}
+
+
+@app.post("/api/pipelines", status_code=201)
+async def api_pipeline_kaydet(hat: dict = Body(...)) -> dict:  # noqa: B008
+    """Konsoldan kurulmuş bir hattı kaydeder (aynı `key` varsa günceller).
+
+    Kod alanı serbest bırakılıyor: sandbox'ta zaten güvenilmeyen kod
+    çalışıyor ve kısıtlama oraya ait (izolasyon, ağ politikası, süpürme).
+    Burada denetlenen şey tanımın BİÇİMİ.
+    """
+    try:
+        return await asyncio.to_thread(konsol_modulu.hat_kaydet, hat)
+    except konsol_modulu.HatGecersiz as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/pipelines/{key}")
+async def api_pipeline_sil(key: str) -> dict:
+    try:
+        silindi = await asyncio.to_thread(konsol_modulu.hat_sil, key)
+    except konsol_modulu.HatGecersiz as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not silindi:
+        raise HTTPException(404, f"'{key}' diye bir hat yok.")
+    return {"silindi": key}
 
 
 @app.get("/api/depo")

@@ -458,3 +458,166 @@ pre.kod {
 /* Terminal her zaman içeriğin üstünde kalsın. `style.css`te z-index yok;
    sohbet ekranında sorun değildi çünkü orada üst üste binen katman yok. */
 body.konsol .ptc-panel { z-index: 50; }
+
+/* ── hat kurucu ───────────────────────────────────────────────────── */
+
+.hat-ust {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  justify-content: space-between;
+}
+.hat-ust .lead { flex: 1; }
+.hat-ust .k-btn { flex: none; white-space: nowrap; }
+
+.hat { position: relative; }
+
+.hat-araclar {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.8rem;
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.hat:hover .hat-araclar, .hat:focus-within .hat-araclar { opacity: 1; }
+
+.hat-araclar button {
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.hat-araclar button:hover { background: var(--bg); color: var(--text-primary); }
+.hat-araclar .hat-sil:hover { color: var(--danger-text); border-color: var(--danger-text); }
+
+.badge.kul { background: var(--chip-bg); color: var(--accent); border-color: transparent; }
+
+.kurucu {
+  margin-top: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+.kurucu-bas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.kurucu-bas h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.kurucu-bas .k-actions { display: flex; gap: 0.5rem; }
+
+.kurucu-hata {
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 9px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 0.83rem;
+}
+
+.kurucu label,
+.node-kart label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+}
+.kurucu label.tam { margin-bottom: 0.9rem; }
+.kurucu small, .node-kart small { font-size: 0.7rem; color: var(--text-secondary); }
+
+.kurucu input,
+.kurucu select,
+.kurucu textarea {
+  font: inherit;
+  font-size: 0.84rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  width: 100%;
+  min-width: 0;
+}
+.kurucu input:focus,
+.kurucu select:focus,
+.kurucu textarea:focus {
+  outline: 2px solid rgba(0, 113, 227, 0.35);
+  border-color: var(--accent);
+}
+.kurucu input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.kurucu textarea {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  resize: vertical;
+  margin-bottom: 0.7rem;
+}
+
+.alan-satir {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.node-liste { display: flex; flex-direction: column; gap: 0.8rem; margin: 1.1rem 0 0.9rem; }
+
+.node-kart {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg);
+  padding: 0.85rem 0.95rem 0.2rem;
+}
+
+.node-bas {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.node-bas .baloncuk { flex: none; }
+.node-bas .n-ad { flex: 2; }
+.node-bas .n-tur { flex: 1; max-width: 15rem; }
+
+.node-bas button {
+  flex: none;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.node-bas button:hover:not(:disabled) { background: var(--bg); color: var(--text-primary); }
+.node-bas button:disabled { opacity: 0.3; cursor: not-allowed; }
+.node-bas .node-sil:hover:not(:disabled) { color: var(--danger-text); border-color: var(--danger-text); }
+
+.node-kart .n-aciklama { margin-bottom: 0.7rem; }
+
+@media (max-width: 720px) {
+  .hat-ust { flex-direction: column; }
+  .alan-satir { flex-direction: column; gap: 0.7rem; }
+  .node-bas { flex-wrap: wrap; }
+  .node-bas .n-tur { max-width: none; }
+}

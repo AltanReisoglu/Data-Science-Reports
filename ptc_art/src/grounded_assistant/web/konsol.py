@@ -15,28 +15,41 @@ Burada tanımlı iki pipeline **gerçek** çalışıyor: her sandbox adımı ger
 Kubernetes Job açıyor, gerçek log basıyor, çıktısı gerçekten MinIO'ya iniyor
 ve kayıt defterine satır düşüyor. Simülasyon yok.
 
-## İki node TÜRÜ var ve fark gerçek
+## ÜÇ node TÜRÜ var ve fark gerçek
 
     sandbox : gerçek PTC pod'u — kimlik bilgisi yok, ağı kapalı, süpürülüyor
     query   : host tarafında kayıt defteri sorgusu — pod açılmıyor
+    alias   : host tarafında sürüm sabitleme — pod açılmıyor
 
-Bu ayrım uydurma değil, mimarinin kendisi: **keşif sandbox'ta olmuyor.**
-Sandbox'ın listeleme yolu hiç yok; hangi artifact'in var olduğunu host
-tarafındaki kayıt defteri sorgusu söylüyor (§11.14 süzgeç). Panelde bu iki tür
-farklı çiziliyor ki izleyici nerede pod açıldığını görsün.
+Bu ayrım uydurma değil, mimarinin kendisi: **keşif de sabitleme de sandbox'ta
+olmuyor.** Sandbox'ın listeleme yolu hiç yok; hangi artifact'in var olduğunu
+host tarafındaki kayıt defteri sorgusu söylüyor (§11.14 süzgeç). Alias'ı da
+insan/CI atıyor — MLflow'da da öyle. Panelde üç tür farklı çiziliyor ki
+izleyici nerede pod açıldığını görsün.
 
 ## Çapraz workflow
 
-B pipeline'ı A'nın çıktısını `load_artifact(<A'nın workflow_id'si>, ...)` ile
-okuyor. A'nın kimliğini B'ye veren şey node 1'in kayıt defteri sorgusu — yani
-tam olarak ürünün kendi keşif yolu, elle gömülmüş bir kimlik değil.
+B pipeline'ı A'nın çıktısını `inputs=["<A'nın workflow_id'si>/…"]` BEYANIYLA
+okuyor — kod bir çağrı yapmıyor, dosya kod başlamadan yerinde. A'nın kimliğini
+B'ye veren şey node 1'in kayıt defteri sorgusu; elle gömülmüş bir kimlik değil.
+
+## Hatlar nereden geliyor (2026-09-07)
+
+Dört hat koda gömülü (`_YERLESIK`), kullanıcının konsoldan kurdukları ise
+`var/konsol-hatlari.json`'da duruyor. İkisi aynı sözleşmeyi konuşuyor:
+`pipeline_calistir` hangisinden geldiğine bakmıyor. Yerleşikler silinemiyor —
+gösterimin zemini onlar.
 """
 
 from __future__ import annotations
 
+import json
 import os
+import re
+import tempfile
 import time
 import uuid
+from pathlib import Path
 
 import requests
 
@@ -203,7 +216,7 @@ import json
 yol = "/artifacts/{kaynak_wf}/processed-result.json"
 veri = json.load(open(yol))
 json.dump(veri, open("/output/analysis-input.json", "w"))
-set_result({{"kaynak_yol": yol, "alanlar": list(veri)}})
+set_result({"kaynak_yol": yol, "alanlar": list(veri)})
 '''
 
 _KOD_ANALIZ = '''
@@ -223,6 +236,58 @@ json.dump({"denge_skoru": skor, "en_yuklu": v["en_yuklu"],
                     else "Dagilim kabul edilebilir"},
           open("/output/analysis-result.json", "w"))
 set_result({"denge_skoru": skor})
+'''
+
+
+_KOD_SABIT_OKU = '''
+import json
+# Beyan `processed-result.json@konsol-sabit` idi; alias'la gelen dosya
+# `/artifacts/_alias/` altına konuyor. Kod yine hiçbir çağrı yapmıyor.
+yol = "/artifacts/_alias/processed-result.json"
+v = json.load(open(yol))
+json.dump({"kaynak": yol, "veri": v}, open("/output/sabit-surum.json", "w"))
+set_result({"okunan": yol, "alanlar": list(v)})
+'''
+
+_KOD_SABIT_RAPOR = '''
+import json
+v = json.load(open("/output/sabit-surum.json"))["veri"]
+json.dump({"en_yuklu": v["en_yuklu"], "yuk_orani": v["yuk_orani"],
+           "not": "alias ile sabitlenmis surumden okundu"},
+          open("/output/sabit-rapor.json", "w"))
+set_result({"en_yuklu": v["en_yuklu"], "yuk_orani": v["yuk_orani"]})
+'''
+
+_KOD_DIZIN_URET = '''
+import json, os
+os.makedirs("/output/model.v1", exist_ok=True)
+for i, ad in enumerate(["agirliklar.json", "olcumler.json", "NOTLAR.md"]):
+    yol = "/output/model.v1/" + ad
+    if ad.endswith(".json"):
+        json.dump({"katman": i, "deger": round(0.1 * (i + 1), 3)}, open(yol, "w"))
+    else:
+        open(yol, "w").write("# model v1\\nkonsoldan uretildi\\n")
+set_result({"dizin": "model.v1", "dosya": sorted(os.listdir("/output/model.v1"))})
+'''
+
+_KOD_DIZIN_OKU = '''
+import json, os
+# Beyan `model.v1` idi. Depoda `model.v1.tar` duruyor ama sidecar açıp
+# gerçek bir DİZİN bırakıyor — kodun tar diye bir şeyden haberi yok.
+kok = "/output/model.v1"
+dosyalar = sorted(os.listdir(kok))
+toplam = sum(os.path.getsize(os.path.join(kok, d)) for d in dosyalar)
+json.dump({"dosya": dosyalar, "bayt": toplam}, open("/output/dizin-ozeti.json", "w"))
+set_result({"gorulen_dosya": dosyalar, "toplam_bayt": toplam})
+'''
+
+_KOD_DEDUP = '''
+import hashlib, json
+icerik = json.dumps({"olcum": [1, 2, 3], "kaynak": "konsol"}, sort_keys=True)
+for ad in ["olcum.a.json", "olcum.b.json"]:
+    open("/output/" + ad, "w").write(icerik)
+set_result({"iki_ad": ["olcum.a.json", "olcum.b.json"],
+            "sha256": hashlib.sha256(icerik.encode()).hexdigest()[:16]})
 '''
 
 
@@ -264,9 +329,10 @@ def pipeline_b() -> dict:
         "nodes": [
             {"n": 1, "ad": "Artifact Keşfet", "tur": "query", "ikon": "i-search",
              "aciklama": "Kayıt defterine ada göre sorgu atar. Bu adım POD AÇMAZ — "
-                         "keşif sandbox'ta değil, host tarafında olur. Aynı ad "
-                         "onlarca çalıştırmada varsa: bir sürüm alias ile "
-                         "sabitlenmişse o, değilse en yeni seçilir.",
+                         "keşif sandbox'ta değil, host tarafında olur. Bu hat "
+                         "belirli bir alias İSTEMİYOR, dolayısıyla EN YENİ "
+                         "kazanıyor; sabitlenmiş sürüm varsa log bunu söylüyor. "
+                         "Sabitlemenin kendisi PL-C'de.",
              "sorgu": {"name": "processed-result.json"}, "inputs": [],
              "bekleniyor": []},
             {"n": 2, "ad": "Artifact Yükle", "tur": "sandbox", "ikon": "i-down",
@@ -287,8 +353,267 @@ def pipeline_b() -> dict:
     }
 
 
+def pipeline_c() -> dict:
+    return {
+        "key": "c", "kod": "PL-C", "ad": "Sürüm Sabitleme Hattı",
+        "aciklama": "Aynı ad depoda onlarca sürümle duruyor. Bu hat EN ESKİ "
+                    "sürümü alias'la sabitliyor ve sonra o alias'ı BEYAN edip "
+                    "okuyor — 'en yeni kazanır' kuralını bilerek deviriyor.",
+        "nodes": [
+            {"n": 1, "ad": "Adayları Say", "tur": "query", "ikon": "i-search",
+             "aciklama": "Kayıt defterine sorar: bu adda kaç sürüm var? Pod "
+                         "AÇMAZ. Sayı büyüdükçe 'hangisini alıyorum' sorusu "
+                         "keskinleşiyor — hattın derdi bu.",
+             "sorgu": {"name": "processed-result.json"}, "inputs": [],
+             "bekleniyor": []},
+            {"n": 2, "ad": "En Eskiyi Sabitle", "tur": "alias", "ikon": "i-pin",
+             "aciklama": "EN ESKİ adaya `@konsol-sabit` alias'ı atar. Pod "
+                         "AÇMAZ — alias'ı insan/CI koyar, MLflow'da da öyle. "
+                         "En eskiyi seçmesi kasıtlı: 'en yeni' kuralı geçerli "
+                         "olsaydı bu sürüm asla seçilmezdi.",
+             "sorgu": {"name": "processed-result.json"},
+             "alias": "konsol-sabit", "sec": "en_eski",
+             "inputs": [], "bekleniyor": []},
+            {"n": 3, "ad": "Sabit Sürümü Oku", "tur": "sandbox", "ikon": "i-down",
+             "aciklama": "Beyanın üçüncü biçimi: `ad@alias`. Dosya "
+                         "/artifacts/_alias/ altında hazır geliyor; kod yine "
+                         "hiçbir çağrı yapmıyor.",
+             "kod": _KOD_SABIT_OKU,
+             "inputs": ["processed-result.json@konsol-sabit"],
+             "bekleniyor": ["sabit-surum.json"]},
+            {"n": 4, "ad": "Sabit Rapor", "tur": "sandbox", "ikon": "i-pkg",
+             "aciklama": "Sabitlenmiş sürümden okunanı ayrı bir künyeye yazar.",
+             "kod": _KOD_SABIT_RAPOR, "inputs": ["sabit-surum.json"],
+             "bekleniyor": ["sabit-rapor.json"]},
+        ],
+    }
+
+
+def pipeline_d() -> dict:
+    return {
+        "key": "d", "kod": "PL-D", "ad": "Dizin ve Dedup Hattı",
+        "aciklama": "Artifact her zaman tek dosya değil: bir DİZİN üretip "
+                    "beyanla geri alıyor. Son adım aynı içeriği iki ada "
+                    "yazarak içerik-hash dedup'ını görünür kılıyor.",
+        "nodes": [
+            {"n": 1, "ad": "Dizin Üret", "tur": "sandbox", "ikon": "i-fileplus",
+             "aciklama": "/output/model.v1/ altına üç dosya yazar. Süpürme "
+                         "dizini yeniden-üretilebilir bir tar'a paketliyor "
+                         "(mtime/uid/gid/mode sıfırlanmış) — depoda "
+                         "`model.v1.tar` olarak duruyor.",
+             "kod": _KOD_DIZIN_URET, "inputs": [],
+             "bekleniyor": ["model.v1.tar"]},
+            {"n": 2, "ad": "Dizini Geri Al", "tur": "sandbox", "ikon": "i-down",
+             "aciklama": "`model.v1` beyan edilir. Sidecar tar'ı indirip AÇAR "
+                         "ve tar'ı siler; kod gerçek bir dizin görür. Süpürme "
+                         "aynı hash'i bulup 'bunu ben verdim' der, tekrar "
+                         "yüklemez.",
+             "kod": _KOD_DIZIN_OKU, "inputs": ["model.v1"],
+             "bekleniyor": ["dizin-ozeti.json"]},
+            {"n": 3, "ad": "Aynı İçerik İki Ad", "tur": "sandbox", "ikon": "i-copy",
+             "aciklama": "Birebir aynı baytı iki ayrı adla yazar. Kayıt "
+                         "defterinde İKİ künye oluşur, MinIO'da TEK nesne — "
+                         "içerik-hash dedup'ı. Depo sekmesinde iki satırın "
+                         "content_hash'i aynı görünür.",
+             "kod": _KOD_DEDUP, "inputs": [],
+             "bekleniyor": ["olcum.a.json", "olcum.b.json"]},
+        ],
+    }
+
+
+#: Koda gömülü hatlar — silinemez, düzenlenemez. Gösterimin zemini bunlar.
+_YERLESIK = (pipeline_a, pipeline_b, pipeline_c, pipeline_d)
+_YERLESIK_ANAHTAR = frozenset({"a", "b", "c", "d"})
+
+
+# ── kullanıcının kurduğu hatlar ───────────────────────────────────────────
+#
+# Konsoldan node ekleyerek kurulan hatlar burada. Yerleşiklerle AYNI
+# sözleşmeyi konuşuyorlar; `pipeline_calistir` ikisini ayırt etmiyor.
+
+_HATLAR_DOSYASI = Path(
+    os.environ.get("PTC_KONSOL_HATLARI")
+    or Path(__file__).resolve().parents[3] / "var" / "konsol-hatlari.json")
+
+_ANAHTAR_BICIMI = re.compile(r"^[a-z0-9][a-z0-9-]{0,23}$")
+#: Görünen adlar TÜRKÇE — `[A-Za-z0-9]` "Üret"i reddediyordu. `[^\W_]`
+#: unicode-duyarlı bir harf/rakam sınıfı (alt çizgi hariç).
+_AD_BICIMI = re.compile(r"^[^\W_][\w .,'\-()/]{0,59}$", re.UNICODE)
+#: Beyan biçimleri: `ad`, `<wf>/ad`, `ad@alias` — sidecar'ın `_beyani_coz`'ü.
+#: `{kaynak_wf}` de geçerli bir workflow segmenti: keşif adımının bulduğu
+#: kimlik çalışma anında yerine konuyor (PL-B'nin yaptığı iş). Kurucudan
+#: kurulan hatlar da çapraz-workflow okuyabilsin diye açık.
+_BEYAN_BICIMI = re.compile(
+    r"^(\{kaynak_wf\}|[\w.\-]+)?/?[\w.\-]+(@[A-Za-z0-9][\w.\-]{0,63})?$")
+#: Servisin `_ALIAS_BICIMI`'yle aynı — alias adı orada da böyle denetleniyor.
+_TAKMA_BICIMI = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+#: Çalışma anında keşif adımının bulduğu workflow kimliğiyle DEĞİŞTİRİLİYOR.
+#: Bir zamanlar `str.format` ile yapılıyordu; kullanıcının yazdığı kodda dict
+#: ya da f-string süslü parantezi olunca `.format` onları biçim alanı sanıp
+#: patlıyordu. Düz metin ikamesi hem güvenli hem de kaçış gerektirmiyor.
+_YER_TUTUCU = "{kaynak_wf}"
+_AZAMI_NODE = 8
+_AZAMI_KOD = 20_000
+
+
+class HatGecersiz(ValueError):
+    """Kullanıcının gönderdiği hat tanımı sözleşmeye uymuyor."""
+
+
+def _kullanici_hatlari() -> list[dict]:
+    try:
+        veri = json.loads(_HATLAR_DOSYASI.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError):
+        # Bozuk dosya konsolu kapatmasın: yerleşikler yine çalışsın.
+        return []
+    return veri if isinstance(veri, list) else []
+
+
+def _kullanici_hatlarini_yaz(hatlar: list[dict]) -> None:
+    """Atomik yazma — yarıda kesilen bir yazma dosyayı bozmasın."""
+    _HATLAR_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=_HATLAR_DOSYASI.parent,
+            prefix=".hatlar-", suffix=".tmp", delete=False) as f:
+        json.dump(hatlar, f, ensure_ascii=False, indent=2)
+        gecici = f.name
+    os.replace(gecici, _HATLAR_DOSYASI)
+
+
+def _liste(deger, alan: str) -> list[str]:
+    if deger in (None, ""):
+        return []
+    if not isinstance(deger, list):
+        raise HatGecersiz(f"{alan} bir liste olmalı.")
+    return [str(x).strip() for x in deger if str(x).strip()]
+
+
+def hat_dogrula(ham: dict) -> dict:
+    """Kullanıcının gönderdiği tanımı sözleşmeye oturtur — ya da reddeder.
+
+    Kod ALANI serbest: sandbox'ta zaten güvenilmeyen kod çalışıyor, kısıtlama
+    oraya ait (izolasyon, ağ politikası, süpürme). Burada denetlenen şey
+    tanımın BİÇİMİ — panelin ve çalıştırıcının varsaydığı alanlar.
+    """
+    if not isinstance(ham, dict):
+        raise HatGecersiz("Hat tanımı bir nesne olmalı.")
+
+    key = str(ham.get("key") or "").strip().lower()
+    if not _ANAHTAR_BICIMI.match(key):
+        raise HatGecersiz("key biçimi: küçük harf/rakam/tire, en çok 24 karakter.")
+    if key in _YERLESIK_ANAHTAR:
+        raise HatGecersiz(f"'{key}' yerleşik bir hat — üzerine yazılamaz.")
+
+    ad = str(ham.get("ad") or "").strip()
+    if not _AD_BICIMI.match(ad):
+        raise HatGecersiz("ad: 1-60 karakter, harfle/rakamla başlamalı.")
+
+    ham_nodes = ham.get("nodes")
+    if not isinstance(ham_nodes, list) or not ham_nodes:
+        raise HatGecersiz("En az bir adım gerekli.")
+    if len(ham_nodes) > _AZAMI_NODE:
+        raise HatGecersiz(f"En çok {_AZAMI_NODE} adım.")
+
+    nodes = []
+    for i, hn in enumerate(ham_nodes, start=1):
+        if not isinstance(hn, dict):
+            raise HatGecersiz(f"{i}. adım bir nesne olmalı.")
+        n_ad = str(hn.get("ad") or "").strip()
+        if not _AD_BICIMI.match(n_ad):
+            raise HatGecersiz(f"{i}. adımın adı geçersiz.")
+        tur = str(hn.get("tur") or "sandbox").strip()
+        if tur not in {"sandbox", "query", "alias"}:
+            raise HatGecersiz(f"{i}. adımın türü: sandbox | query | alias.")
+
+        nd = {"n": i, "ad": n_ad, "tur": tur,
+              "ikon": {"sandbox": "i-cpu", "query": "i-search",
+                       "alias": "i-pin"}[tur],
+              "aciklama": str(hn.get("aciklama") or "").strip()[:400],
+              "inputs": _liste(hn.get("inputs"), f"{i}. adımın inputs"),
+              "bekleniyor": _liste(hn.get("bekleniyor"), f"{i}. adımın bekleniyor")}
+
+        for beyan in nd["inputs"]:
+            if not _BEYAN_BICIMI.match(beyan):
+                raise HatGecersiz(
+                    f"{i}. adımda geçersiz beyan: '{beyan}'. "
+                    "Biçimler: ad · <workflow_id>/ad · ad@alias")
+
+        if tur == "sandbox":
+            kod = str(hn.get("kod") or "").strip()
+            if not kod:
+                raise HatGecersiz(f"{i}. adımın kodu boş olamaz.")
+            if len(kod) > _AZAMI_KOD:
+                raise HatGecersiz(f"{i}. adımın kodu {_AZAMI_KOD} karakteri aşıyor.")
+            nd["kod"] = kod
+        else:
+            # İki biçim de kabul: formun düz `sorgu_ad`'ı ve `pipelines()`in
+            # döndürdüğü normalleşmiş `sorgu: {"name": …}`. UI kaydedilmiş bir
+            # hattı düzenlemek için GET'ten geleni geri POST'luyor — yalnızca
+            # `sorgu_ad` kabul edilseydi kendi çıktımızı reddederdik.
+            mevcut = hn.get("sorgu") if isinstance(hn.get("sorgu"), dict) else {}
+            sorgu_ad = str(hn.get("sorgu_ad") or mevcut.get("name") or "").strip()
+            if not sorgu_ad:
+                raise HatGecersiz(f"{i}. adım ({tur}) için aranacak ad gerekli.")
+            nd["sorgu"] = {"name": sorgu_ad}
+            if tur == "query":
+                # İSTEĞE BAĞLI: belirli bir alias'ı ADIYLA çözmek
+                # (MLflow `models:/<ad>@<alias>`). Boşsa en yeni kazanır.
+                # "Sabitlenmiş olanı ver" diye bir seçenek YOK — iki alias
+                # varsa o kural tanımsız kalıyordu, bkz. `pipeline_calistir`.
+                tercih = str(hn.get("tercih_alias")
+                             or mevcut.get("alias") or "").strip()
+                if tercih:
+                    if not _TAKMA_BICIMI.match(tercih):
+                        raise HatGecersiz(
+                            f"{i}. adımın istediği alias biçimi geçersiz.")
+                    nd["sorgu"]["alias"] = tercih
+            if tur == "alias":
+                takma = str(hn.get("alias") or "").strip()
+                if not _TAKMA_BICIMI.match(takma):
+                    raise HatGecersiz(f"{i}. adımın alias biçimi geçersiz.")
+                nd["alias"] = takma
+                sec = str(hn.get("sec") or "en_yeni").strip()
+                if sec not in {"en_yeni", "en_eski"}:
+                    raise HatGecersiz(f"{i}. adımın seçimi: en_yeni | en_eski.")
+                nd["sec"] = sec
+        nodes.append(nd)
+
+    return {"key": key, "kod": f"PL-{key.upper()[:6]}", "ad": ad,
+            "aciklama": str(ham.get("aciklama") or "").strip()[:300]
+                        or "Konsoldan kurulmuş hat.",
+            "kullanici": True, "nodes": nodes}
+
+
+def hat_kaydet(ham: dict) -> dict:
+    """Doğrular ve diske yazar; aynı `key` varsa üzerine yazar."""
+    hat = hat_dogrula(ham)
+    hatlar = [h for h in _kullanici_hatlari() if h.get("key") != hat["key"]]
+    hatlar.append(hat)
+    _kullanici_hatlarini_yaz(hatlar)
+    return hat
+
+
+def hat_sil(key: str) -> bool:
+    if key in _YERLESIK_ANAHTAR:
+        raise HatGecersiz(f"'{key}' yerleşik bir hat — silinemez.")
+    hatlar = _kullanici_hatlari()
+    kalan = [h for h in hatlar if h.get("key") != key]
+    if len(kalan) == len(hatlar):
+        return False
+    _kullanici_hatlarini_yaz(kalan)
+    return True
+
+
 def pipelines() -> list[dict]:
-    return [pipeline_a(), pipeline_b()]
+    """Yerleşikler + kullanıcının kurdukları. Panel bunu çiziyor."""
+    return [f() for f in _YERLESIK] + _kullanici_hatlari()
+
+
+def hat_bul(key: str) -> dict | None:
+    return next((h for h in pipelines() if h["key"] == key), None)
 
 
 # ── çalıştırma ────────────────────────────────────────────────────────────
@@ -308,7 +633,12 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
     """
     from grounded_assistant.ptc.sandbox_runner import run_sandbox  # noqa: PLC0415
 
-    hat = pipeline_a() if key == "a" else pipeline_b()
+    hat = hat_bul(key)
+    if hat is None:
+        yay({"type": "log", "n": 0, "ts": _damga(),
+             "msg": f"'{key}' diye bir hat yok.", "cls": "fail"})
+        yay({"type": "pipeline_done", "status": "error"})
+        return {"workflow_id": None, "status": "error"}
     workflow_id = str(uuid.uuid4())
     yay({"type": "pipeline_start", "key": key, "workflow_id": workflow_id,
          "ad": hat["ad"], "kod": hat["kod"], "nodes": len(hat["nodes"])})
@@ -351,21 +681,48 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
             # SÜRÜM SEÇİMİ — vakanın asıl gösterdiği şey burası.
             #
             # Aynı ad depoda onlarca kez var (her PL-A çalıştırması bir tane
-            # daha ekliyor). "En yeni kazanır" kuralı SESSİZ; tüketen taraf
-            # hangi sürümü aldığını bilmiyor. MLflow'un cevabı alias:
-            # bir sürüm İSİMLE sabitlenmişse o kazanır (§11.14).
-            sabit = next((k for k in kayitlar if k.get("alias")), None)
-            secilen = sabit or kayitlar[0]
-            cozulen_wf = secilen["workflow_id"]
-
-            if sabit:
+            # daha ekliyor) ve "en yeni kazanır" kuralı SESSİZ.
+            #
+            # 2026-09-07: burada bir zamanlar `next(k for k in kayitlar if
+            # k.get("alias"))` vardı — yani "hangisi sabitlenmişse onu ver".
+            # Aynı ada İKİ farklı alias konunca (PL-C bunu yapıyor) o kural
+            # tanımsız hâle geldi: liste yeniden-eskiye sıralı olduğu için
+            # sessizce ilk rastlanan kazanıyordu. Çözmeye çalıştığımız sessiz
+            # seçim, bir üst katta aynen tekrarlanıyordu.
+            #
+            # MLflow'da alias ADIYLA istenir (`models:/<ad>@<alias>`);
+            # "sabitlenmiş olanı ver" diye bir çağrı yok. Biz de öyle:
+            # `sorgu["alias"]` varsa TAM O alias, yoksa en yeni.
+            istenen_alias = nd["sorgu"].get("alias")
+            if istenen_alias:
+                secilen = next((k for k in kayitlar
+                                if k.get("alias") == istenen_alias), None)
+                if secilen is None:
+                    mesaj = f"@{istenen_alias} alias'ı bu adda atanmamış."
+                    yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                         "msg": mesaj, "cls": "fail"})
+                    yay({"type": "node_done", "n": nd["n"], "status": "error",
+                         "dur": f"{time.monotonic()-t0:.1f}s", "sonuc": mesaj})
+                    yay({"type": "pipeline_done", "workflow_id": workflow_id,
+                         "status": "error"})
+                    return {"workflow_id": workflow_id, "status": "error"}
                 yay({"type": "log", "n": nd["n"], "ts": _damga(),
-                     "msg": f"@{sabit['alias']} ile SABİTLENMİŞ sürüm seçildi "
+                     "msg": f"@{istenen_alias} ADIYLA istendi "
                             f"({len(kayitlar)} aday arasından)", "cls": "hi"})
             else:
+                secilen = kayitlar[0]
+                sabitler = [k["alias"] for k in kayitlar if k.get("alias")]
                 yay({"type": "log", "n": nd["n"], "ts": _damga(),
-                     "msg": f"alias yok → en yeni seçildi "
+                     "msg": f"alias istenmedi → en yeni seçildi "
                             f"({len(kayitlar)} aday)", "cls": ""})
+                if sabitler:
+                    # Sessizce geçmiyoruz: sabitlenmiş sürümler VAR ama bu
+                    # adım onları istemedi. İzleyici farkı görsün.
+                    yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                         "msg": f"not: bu adda sabitlenmiş sürüm(ler) var "
+                                f"({', '.join('@' + a for a in sabitler)}) — "
+                                f"bu adım hiçbirini istemedi", "cls": ""})
+            cozulen_wf = secilen["workflow_id"]
             yay({"type": "log", "n": nd["n"], "ts": _damga(),
                  "msg": f"çözüldü {secilen['artifact_id']} "
                         f"({secilen['size_bytes']} bayt)", "cls": "art"})
@@ -375,7 +732,54 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
                  "dur": f"{time.monotonic()-t0:.1f}s",
                  "sonuc": {"artifact_id": secilen["artifact_id"],
                            "workflow_id": cozulen_wf,
-                           "secim": f"@{sabit['alias']}" if sabit else "en yeni",
+                           "secim": f"@{istenen_alias}" if istenen_alias
+                                    else "en yeni",
+                           "aday": len(kayitlar)}})
+            continue
+
+        # ── alias adımı: pod YOK, sürüm sabitleme (MLflow deseni) ────────
+        if nd["tur"] == "alias":
+            yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                 "msg": f"GET /artifacts?name={nd['sorgu']['name']}", "cls": ""})
+            sonuc = depo(jeton_uret, **nd["sorgu"])
+            kayitlar = sonuc.get("kayitlar") or []
+            if sonuc.get("error") or not kayitlar:
+                mesaj = sonuc.get("error") or (
+                    f"{nd['sorgu']['name']} bulunamadı — önce üreten hattı "
+                    "çalıştırın.")
+                yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                     "msg": mesaj, "cls": "fail"})
+                yay({"type": "node_done", "n": nd["n"], "status": "error",
+                     "dur": f"{time.monotonic()-t0:.1f}s", "sonuc": mesaj})
+                yay({"type": "pipeline_done", "workflow_id": workflow_id,
+                     "status": "error"})
+                return {"workflow_id": workflow_id, "status": "error"}
+
+            # Servis yeniden-eskiye sıralı döndürüyor.
+            hedef = kayitlar[-1] if nd.get("sec") == "en_eski" else kayitlar[0]
+            yanit = alias_ata(jeton_uret, hedef["artifact_id"], nd["alias"])
+            if yanit.get("error"):
+                yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                     "msg": yanit["error"], "cls": "fail"})
+                yay({"type": "node_done", "n": nd["n"], "status": "error",
+                     "dur": f"{time.monotonic()-t0:.1f}s", "sonuc": yanit["error"]})
+                yay({"type": "pipeline_done", "workflow_id": workflow_id,
+                     "status": "error"})
+                return {"workflow_id": workflow_id, "status": "error"}
+
+            yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                 "msg": f"{len(kayitlar)} aday · {nd.get('sec','en_yeni')} seçildi",
+                 "cls": ""})
+            yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                 "msg": f"@{nd['alias']} → {hedef['artifact_id']} "
+                        f"(üreten {hedef['workflow_id'][:8]})", "cls": "hi"})
+            cozulen_wf = hedef["workflow_id"]
+            yay({"type": "node_done", "n": nd["n"], "status": "success",
+                 "dur": f"{time.monotonic()-t0:.1f}s",
+                 "sonuc": {"alias": nd["alias"],
+                           "artifact_id": hedef["artifact_id"],
+                           "workflow_id": cozulen_wf,
+                           "secim": nd.get("sec", "en_yeni"),
                            "aday": len(kayitlar)}})
             continue
 
@@ -383,17 +787,16 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
         kod = nd["kod"]
         # Beyan da çalışma anında dolduruluyor: keşif adımı kimliği buluyor,
         # yerleştirme onu kullanıyor. Kimlik hiçbir yere gömülü değil.
-        girdiler = [g.format(kaynak_wf=cozulen_wf) if "{kaynak_wf}" in g else g
-                    for g in nd["inputs"]] if cozulen_wf else [
-            g for g in nd["inputs"] if "{kaynak_wf}" not in g]
-        if "{kaynak_wf}" in kod:
+        girdiler = [g.replace(_YER_TUTUCU, cozulen_wf) for g in nd["inputs"]] \
+            if cozulen_wf else [g for g in nd["inputs"] if _YER_TUTUCU not in g]
+        if _YER_TUTUCU in kod:
             if not cozulen_wf:
                 yay({"type": "log", "n": nd["n"], "ts": _damga(),
                      "msg": "Kaynak çalıştırma bilinmiyor", "cls": "fail"})
                 yay({"type": "pipeline_done", "workflow_id": workflow_id,
                      "status": "error"})
                 return {"workflow_id": workflow_id, "status": "error"}
-            kod = kod.format(kaynak_wf=cozulen_wf)
+            kod = kod.replace(_YER_TUTUCU, cozulen_wf)
 
         olaylar: list[dict] = []
 

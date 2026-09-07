@@ -249,6 +249,58 @@ $PY -m uvicorn grounded_assistant.web.app:app --port 8123
 Beş sekme: **Sohbet · Hatlar · Çalıştırma · Depo · Soy**. Depo ve Soy sekmeleri
 yukarıdaki uçların aynısını çağırıyor; sahte veri yok.
 
+### Hatlar
+
+Dört yerleşik hat var, hepsi gerçek pod açıyor:
+
+| | Ne gösteriyor |
+|---|---|
+| **PL-A** Ticket İşleme | dört adımlık üretim zinciri |
+| **PL-B** Artifact Analiz | çapraz workflow: A'nın çıktısını defterden bulup BEYAN eder |
+| **PL-C** Sürüm Sabitleme | en eskiyi `@konsol-sabit` ile sabitler, sonra `ad@alias` beyanıyla okur |
+| **PL-D** Dizin ve Dedup | dizin artifact'i (tar) + aynı içerik iki ad → tek nesne |
+
+Üç adım TÜRÜ var; ikisi pod açmıyor:
+
+```
+sandbox  gerçek PTC pod'u
+query    kayıt defteri sorgusu        — pod YOK
+alias    sürüm sabitleme (PUT alias)  — pod YOK
+```
+
+**Kendi hattınızı kurmak:** Hatlar sekmesinde *＋ Yeni hat kur*. Adım ekleyip
+türünü seçiyorsunuz; `sandbox` adımına Python, `query`/`alias` adımına
+aranacak ad giriyorsunuz. Kaydedilenler `var/konsol-hatlari.json`'da duruyor
+(gitignore'da — çalışma zamanı durumu). Yerleşik dördü silinemez.
+
+Terminalden de kurulabiliyor:
+
+```bash
+curl -s -X POST http://127.0.0.1:8123/api/pipelines \
+  -H "Content-Type: application/json" -d '{
+  "key":"ornek","ad":"Örnek Hat","aciklama":"Konsoldan kuruldu.",
+  "nodes":[
+    {"ad":"Adıyla İste","tur":"query","sorgu_ad":"processed-result.json",
+     "tercih_alias":"konsol-sabit"},
+    {"ad":"Oku","tur":"sandbox",
+     "kod":"import json\nv=json.load(open(\"/artifacts/{kaynak_wf}/processed-result.json\"))\nset_result(v)",
+     "inputs":["{kaynak_wf}/processed-result.json"]}]}'
+
+curl -s http://127.0.0.1:8123/api/pipelines | $PY -c "
+import json,sys
+for h in json.load(sys.stdin)['pipelines']:
+    print(h['kod'], h['ad'], len(h['nodes']), 'adım', '(konsoldan)' if h.get('kullanici') else '')"
+
+curl -s -X DELETE http://127.0.0.1:8123/api/pipelines/ornek
+```
+
+`{kaynak_wf}` bir yer tutucu: `query`/`alias` adımının bulduğu workflow
+kimliği çalışma anında yerine konur. Hem beyanda hem kod içinde geçerli.
+
+**Alias ADIYLA isteniyor** (`tercih_alias`), "sabitlenmiş olanı ver" diye bir
+seçenek yok — aynı ada iki alias konabildiği için o kural tanımsız kalıyordu.
+Boş bırakılırsa en yeni kazanır ve log, istenmemiş sabit sürümleri söyler.
+
 ---
 
 ## 6 · Ürünü baştan sona sınamak

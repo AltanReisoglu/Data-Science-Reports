@@ -63,9 +63,41 @@
 
     <!-- ══ HATLAR ══════════════════════════════════════════════════ -->
     <section class="k-view" id="k-hatlar">
-      <p class="lead">İki tanımlı hat. Her sandbox adımı ayrı bir Kubernetes Job'u açar;
-        ikinci hat, birincinin çıktısını kayıt defterinden bulup okur.</p>
+      <div class="hat-ust">
+        <p class="lead">Dört yerleşik hat, üstüne kendi kurduklarınız. Her sandbox adımı
+          ayrı bir Kubernetes Job'u açar; <code>query</code> ve <code>alias</code> adımları
+          pod AÇMAZ — keşif ve sürüm sabitleme host tarafında olur.</p>
+        <button class="k-btn" id="btnYeniHat">＋ Yeni hat kur</button>
+      </div>
       <div class="grid2" id="hatGrid"></div>
+
+      <!-- ══ KURUCU ══════════════════════════════════════════════ -->
+      <div class="kurucu" id="kurucu" hidden>
+        <div class="kurucu-bas">
+          <h3 id="kurucuBaslik">Yeni hat</h3>
+          <div class="k-actions">
+            <button class="k-btn ikincil" id="btnKurucuKapat">Vazgeç</button>
+            <button class="k-btn" id="btnKurucuKaydet">Kaydet</button>
+          </div>
+        </div>
+        <div class="kurucu-hata" id="kurucuHata" hidden></div>
+
+        <div class="alan-satir">
+          <label>Anahtar
+            <input id="kAnahtar" placeholder="ornek-hat" maxlength="24" />
+            <small>küçük harf, rakam, tire — URL'de ve çalıştırmada kullanılır</small>
+          </label>
+          <label>Ad
+            <input id="kAd" placeholder="Örnek Hattı" maxlength="60" />
+          </label>
+        </div>
+        <label class="tam">Açıklama
+          <input id="kAciklama" placeholder="Bu hat ne gösteriyor?" maxlength="300" />
+        </label>
+
+        <div class="node-liste" id="kNodeListe"></div>
+        <button class="k-btn ikincil" id="btnNodeEkle">＋ Adım ekle</button>
+      </div>
     </section>
 
     <!-- ══ ÇALIŞTIRMA ══════════════════════════════════════════════ -->
