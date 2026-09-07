@@ -529,6 +529,10 @@ def _soy_dugumu(m: ArtifactMeta, derinlik: int, yon: str) -> dict:
     return {
         "artifact_id": m.artifact_id,
         "name": m.name,
+        # 2026-09-07: grafik bir workflow SINIRINI geçtiğinde bunu göstermenin
+        # tek yolu düğümün kendi çalıştırmasını bilmek. Alan yokken panel
+        # çapraz kenarı sıradan bir kenar gibi çiziyordu.
+        "workflow_id": m.workflow_id,
         "artifact_type": m.artifact_type,
         "content_type": m.content_type,
         "size_bytes": m.size_bytes,

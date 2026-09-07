@@ -28,6 +28,7 @@ from grounded_assistant.cli import _build_answer
 from grounded_assistant.ptc.sandbox_runner import run_sandbox
 from grounded_assistant.session import oturum_kimligi
 from grounded_assistant.web import durum as durum_modulu
+from grounded_assistant.web import konsol as konsol_modulu
 from grounded_assistant.trace import Trace
 
 load_dotenv()
@@ -57,6 +58,94 @@ app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
+
+
+@app.get("/konsol")
+async def konsol_sayfasi() -> FileResponse:
+    """Dört sekmeli tek panel — workflow'lar, çalıştırma, depo, soy.
+
+    `durum.html`'in yerine geçmiyor: orası pod/akış odaklı bir denetim ekranı,
+    burası artifact yaşam döngüsünün uçtan uca gösterimi. İkisi de aynı
+    uçlardan besleniyor.
+    """
+    return FileResponse(_STATIC_DIR / "konsol.html")
+
+
+@app.get("/api/pipelines")
+async def api_pipelines() -> dict:
+    """Tanımlı hatlar ve adımları — kodları dahil, panelde gösteriliyor."""
+    return {"pipelines": konsol_modulu.pipelines()}
+
+
+@app.get("/api/depo")
+async def api_depo(name: str | None = None, type: str | None = None,  # noqa: A002
+                   workflow: str | None = None, q: str | None = None,
+                   limit: int = 200) -> dict:
+    """Kayıt defteri, süzgeçleriyle (§11.14 — MLMD `filter_query` karşılığı)."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(
+        konsol_modulu.depo, _kapsam_jetonu,
+        name=name, type=type, workflow=workflow, q=q, limit=limit)
+
+
+@app.get("/api/depo/{artifact_id}/soy")
+async def api_depo_soy(artifact_id: str) -> dict:
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(konsol_modulu.soy, _kapsam_jetonu, artifact_id)
+
+
+@app.put("/api/depo/{artifact_id}/alias")
+async def api_depo_alias(artifact_id: str, alias: str | None = None) -> dict:
+    """Sürümü isimle sabitler — MLflow'un alias'ı. İnsan/CI tarafı."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(
+        konsol_modulu.alias_ata, _kapsam_jetonu, artifact_id, alias)
+
+
+@app.websocket("/ws/pipeline")
+async def pipeline_socket(websocket: WebSocket) -> None:
+    """Gerçek bir pipeline çalıştırır ve HER adımı akıtır.
+
+    `run_sandbox` bloklayıcı olduğu için ayrı bir thread'de dönüyor; olaylar
+    thread-safe bir kuyruğa yazılıp buradan WebSocket'e boşaltılıyor —
+    `/ws`'deki `_drain_ptc_events` ile aynı desen.
+    """
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    await websocket.accept()
+    try:
+        while True:
+            mesaj = await websocket.receive_json()
+            if mesaj.get("type") != "run":
+                continue
+            kuyruk: queue.Queue = queue.Queue()
+
+            async def _bosalt() -> None:
+                loop = asyncio.get_running_loop()
+                while True:
+                    olay = await loop.run_in_executor(None, kuyruk.get)
+                    if olay is _QUEUE_SENTINEL:
+                        return
+                    await websocket.send_json(olay)
+
+            bosaltici = asyncio.create_task(_bosalt())
+            try:
+                await asyncio.to_thread(
+                    konsol_modulu.pipeline_calistir,
+                    mesaj.get("key", "a"), mesaj.get("kaynak_wf"),
+                    _kapsam_jetonu, kuyruk.put)
+            except Exception as exc:  # noqa: BLE001 — panel kapanmasın
+                kuyruk.put({"type": "log", "n": 0, "ts": "", "cls": "fail",
+                            "msg": f"{type(exc).__name__}: {exc}"})
+                kuyruk.put({"type": "pipeline_done", "status": "error"})
+            finally:
+                kuyruk.put(_QUEUE_SENTINEL)
+                await bosaltici
+    except WebSocketDisconnect:
+        return
 
 
 @app.get("/durum")
