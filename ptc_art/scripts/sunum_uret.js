@@ -67,6 +67,10 @@ function bloklaraAyir(satirlar) {
 
     if (!s.trim() || s.trim() === "---") { i++; continue; }
 
+    // <!-- diyagram: ad --> → docs/diyagram/ad.png
+    const dg = s.match(/^\s*<!--\s*diyagram:\s*([\w-]+)\s*-->\s*$/);
+    if (dg) { bloklar.push({ tur: "diyagram", ad: dg[1] }); i++; continue; }
+
     // kod bloğu
     if (s.trim().startsWith("```")) {
       const govde = [];
@@ -143,6 +147,24 @@ function hucreRengi(ham) {
   return T.metin;
 }
 
+/* Diyagramın slayttaki yeri. PNG'nin gerçek oranı korunuyor — esnetilmiş
+   bir çizim, elle çizilmiş görünümü ilk bozan şey. */
+function diyagramOlcu(ad) {
+  const yol = path.join(KOK, "docs", "diyagram", `${ad}.png`);
+  if (!fs.existsSync(yol)) return null;
+  const boyut = require("image-size").imageSize
+    ? require("image-size").imageSize(fs.readFileSync(yol))
+    : require("image-size")(yol);
+  const enBoy = boyut.width / boyut.height;
+  // Azami yükseklik, ALTINDAKİ CÜMLEYE yer bırakacak kadar. 4.6 iken
+  // diyagram slaydı doldurup açıklamayı devam slaydına atıyordu — diyagram
+  // ile onu okutan cümlenin ayrı sayfalara düşmesi en kötü sonuçtu.
+  const azamiG = ICERIK_G, azamiY = 3.95;
+  let w = azamiG, h = w / enBoy;
+  if (h > azamiY) { h = azamiY; w = h * enBoy; }
+  return { yol, w, h, x: KENAR + (ICERIK_G - w) / 2 };
+}
+
 /* ── slayt çizimi ──────────────────────────────────────────────── */
 
 function kunye(slayt, no, toplam) {
@@ -187,10 +209,10 @@ function tabloCiz(slayt, hucreler, y, genislik) {
   const satirlar = [
     basliklar.map(h => ({
       text: h.replace(/[*`]/g, ""),
-      options: { bold: true, color: T.metin, fill: { color: T.basliksatiri }, fontSize: 11 },
+      options: { bold: true, color: T.metin, fill: { color: T.basliksatiri }, fontSize: 11.5 },
     })),
     ...govde.map((r, ri) => r.map(c => ({
-      text: parcala(c, { fontSize: 10.5, color: hucreRengi(c) }),
+      text: parcala(c, { fontSize: 11.5, color: hucreRengi(c) }),
       options: { fill: { color: ri % 2 ? T.panel : T.zemin } },
     }))),
   ];
@@ -203,11 +225,11 @@ function tabloCiz(slayt, hucreler, y, genislik) {
     x: KENAR, y, w: genislik,
     colW: [ilk, ...Array(sut - 1).fill(digerG)],
     border: { type: "solid", pt: 0.5, color: T.cizgi },
-    fontFace: T.sans, fontSize: 10.5, color: T.metin,
-    valign: "middle", margin: [4, 7, 4, 7], autoPage: false,
+    fontFace: T.sans, fontSize: 11.5, color: T.metin,
+    valign: "middle", margin: [6, 9, 6, 9], autoPage: false,
   });
   // yaklaşık yükseklik: başlık + satırlar
-  return 0.34 + govde.length * 0.31;
+  return 0.36 + govde.length * 0.34;
 }
 
 function slaytBasligi(s, sayfa, devam) {
@@ -217,7 +239,7 @@ function slaytBasligi(s, sayfa, devam) {
     fontFace: T.sans, charSpacing: 1.6,
   });
   s.addText(sayfa.baslik, {
-    x: KENAR, y: 0.52, w: ICERIK_G, h: 0.52, fontSize: 24, bold: true, color: T.metin,
+    x: KENAR, y: 0.52, w: ICERIK_G, h: 0.56, fontSize: 27, bold: true, color: T.metin,
     fontFace: T.sans, charSpacing: -0.4,
   });
   s.addShape("rect", { x: KENAR, y: 1.10, w: 1.5, h: 0.028, fill: { color: T.vurgu } });
@@ -226,7 +248,8 @@ function slaytBasligi(s, sayfa, devam) {
 /* Bloğun kaplayacağı yükseklik + altındaki boşluk. Çizim matematiğiyle
    AYNI formüller; ikisi ayrışırsa ya taşma ya boş slayt olur. */
 function blokYuksekligi(b) {
-  if (b.tur === "tablo") return 0.34 + (b.satirlar.length - 1) * 0.31 + 0.26;
+  if (b.tur === "diyagram") return diyagramOlcu(b.ad).h + 0.3;
+  if (b.tur === "tablo") return 0.36 + (b.satirlar.length - 1) * 0.34 + 0.28;
   if (b.tur === "kod") return b.satirlar.length * 0.215 + 0.26 + 0.22;
   if (b.tur === "alinti") {
     return Math.max(0.5, Math.ceil(b.metin.length / 118) * 0.26 + 0.24) + 0.22;
@@ -261,7 +284,14 @@ function icerikSlaydi(pres, sayfa, toplam, uretilen) {
       y = 1.34;
     }
 
-    if (b.tur === "tablo") {
+    if (b.tur === "diyagram") {
+      const o = diyagramOlcu(b.ad);
+      if (!o) { console.warn(`  ! diyagram yok: ${b.ad}`); continue; }
+      s.addImage({ path: o.yol, x: o.x, y, w: o.w, h: o.h });
+      y += o.h + 0.3;
+    }
+
+    else if (b.tur === "tablo") {
       const h = tabloCiz(s, b.satirlar, y, ICERIK_G);
       y += h + 0.26;
     }
@@ -270,7 +300,7 @@ function icerikSlaydi(pres, sayfa, toplam, uretilen) {
       const satirSayisi = Math.ceil(b.metin.length / 118);
       const h = Math.max(0.5, satirSayisi * 0.26 + 0.24);
       s.addShape("rect", { x: KENAR, y, w: 0.045, h, fill: { color: T.vurgu } });
-      s.addText(parcala(b.metin, { fontSize: 12, color: T.metin, italic: true }), {
+      s.addText(parcala(b.metin, { fontSize: 13, color: T.metin, italic: true }), {
         x: KENAR + 0.22, y, w: ICERIK_G - 0.3, h, fontFace: T.sans, valign: "middle",
       });
       y += h + 0.22;
@@ -295,12 +325,12 @@ function icerikSlaydi(pres, sayfa, toplam, uretilen) {
       if (vurgulu) {
         s.addShape("rect", { x: KENAR, y, w: ICERIK_G, h: h + 0.14,
                              fill: { color: T.vurguYumusak } });
-        s.addText(parcala(b.metin, { fontSize: 12, color: T.metin }), {
+        s.addText(parcala(b.metin, { fontSize: 13, color: T.metin }), {
           x: KENAR + 0.16, y: y + 0.06, w: ICERIK_G - 0.32, h, fontFace: T.sans, valign: "middle",
         });
         y += h + 0.32;
       } else {
-        s.addText(parcala(b.metin, { fontSize: 12, color: T.soluk }), {
+        s.addText(parcala(b.metin, { fontSize: 13, color: T.soluk }), {
           x: KENAR, y, w: ICERIK_G, h, fontFace: T.sans, valign: "top",
         });
         y += h + 0.16;
