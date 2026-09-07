@@ -260,7 +260,9 @@ def pipeline_b() -> dict:
         "nodes": [
             {"n": 1, "ad": "Artifact Keşfet", "tur": "query", "ikon": "i-search",
              "aciklama": "Kayıt defterine ada göre sorgu atar. Bu adım POD AÇMAZ — "
-                         "keşif sandbox'ta değil, host tarafında olur.",
+                         "keşif sandbox'ta değil, host tarafında olur. Aynı ad "
+                         "onlarca çalıştırmada varsa: bir sürüm alias ile "
+                         "sabitlenmişse o, değilse en yeni seçilir.",
              "sorgu": {"name": "processed-result.json"}, "inputs": [],
              "bekleniyor": []},
             {"n": 2, "ad": "Artifact Yükle", "tur": "sandbox", "ikon": "i-down",
@@ -341,18 +343,35 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
                      "status": "error"})
                 return {"workflow_id": workflow_id, "status": "error"}
 
-            en_yeni = kayitlar[0]
-            cozulen_wf = en_yeni["workflow_id"]
+            # SÜRÜM SEÇİMİ — vakanın asıl gösterdiği şey burası.
+            #
+            # Aynı ad depoda onlarca kez var (her PL-A çalıştırması bir tane
+            # daha ekliyor). "En yeni kazanır" kuralı SESSİZ; tüketen taraf
+            # hangi sürümü aldığını bilmiyor. MLflow'un cevabı alias:
+            # bir sürüm İSİMLE sabitlenmişse o kazanır (§11.14).
+            sabit = next((k for k in kayitlar if k.get("alias")), None)
+            secilen = sabit or kayitlar[0]
+            cozulen_wf = secilen["workflow_id"]
+
+            if sabit:
+                yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                     "msg": f"@{sabit['alias']} ile SABİTLENMİŞ sürüm seçildi "
+                            f"({len(kayitlar)} aday arasından)", "cls": "hi"})
+            else:
+                yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                     "msg": f"alias yok → en yeni seçildi "
+                            f"({len(kayitlar)} aday)", "cls": ""})
             yay({"type": "log", "n": nd["n"], "ts": _damga(),
-                 "msg": f"çözüldü {en_yeni['artifact_id']} "
-                        f"({en_yeni['size_bytes']} bayt)", "cls": "art"})
+                 "msg": f"çözüldü {secilen['artifact_id']} "
+                        f"({secilen['size_bytes']} bayt)", "cls": "art"})
             yay({"type": "log", "n": nd["n"], "ts": _damga(),
                  "msg": f"üreten çalıştırma {cozulen_wf}", "cls": "hi"})
             yay({"type": "node_done", "n": nd["n"], "status": "success",
                  "dur": f"{time.monotonic()-t0:.1f}s",
-                 "sonuc": {"artifact_id": en_yeni["artifact_id"],
+                 "sonuc": {"artifact_id": secilen["artifact_id"],
                            "workflow_id": cozulen_wf,
-                           "eslesme": len(kayitlar)}})
+                           "secim": f"@{sabit['alias']}" if sabit else "en yeni",
+                           "aday": len(kayitlar)}})
             continue
 
         # ── sandbox adımı: GERÇEK pod ────────────────────────────────────

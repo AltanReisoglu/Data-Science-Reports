@@ -407,6 +407,11 @@ async function ciz_artDetay() {
     </div>
 
     <div style="margin-bottom:1rem">
+      <div class="muted" style="margin-bottom:.35rem">Kullananlar</div>
+      <div id="kullananlar"><p class="bos">Yükleniyor…</p></div>
+    </div>
+
+    <div style="margin-bottom:1rem">
       <div class="muted" style="margin-bottom:.35rem">Sürümü sabitle</div>
       <div style="display:flex;gap:.5rem">
         <input id="aliasIn" class="k-input" value="${esc(a.alias || "")}" placeholder="ör. onaylanmis" />
@@ -434,6 +439,40 @@ async function ciz_artDetay() {
       if (!r.error) ciz_depo();
     } catch (e) { out.innerHTML = uyari(e.message); }
   };
+
+  // TERS SOY — "bu artifact'i kim kullandı".
+  //
+  // Ebeveynler künyede hazır geliyordu ama ÜRÜNLER gelmiyordu; artifact'e
+  // bakan biri onu başka bir workflow'un tükettiğini göremiyordu. Vakanın
+  // tamamı da tam bu yön: A üretir, B tüketir.
+  (async () => {
+    const el0 = $("#kullananlar"); if (!el0) return;
+    try {
+      const g = await getJSON(`/api/depo/${a.artifact_id}/soy`);
+      const urun = (g.nodes || []).filter(n => n.depth > 0);
+      const el = $("#kullananlar"); if (!el) return;
+      if (g.error || g.hata) { el.innerHTML = `<p class="bos">${esc(g.error || g.hata)}</p>`; return; }
+      if (!urun.length) { el.innerHTML = `<p class="bos">Henüz kimse tüketmedi.</p>`; return; }
+
+      const capraz = urun.filter(n => n.workflow_id !== a.workflow_id);
+      el.innerHTML = urun.map(n => {
+        const disari = n.workflow_id !== a.workflow_id;
+        return `<button class="plaka" data-art="${esc(n.artifact_id)}" style="width:100%;margin-bottom:.35rem">
+          <span class="ad">${esc(n.name)}</span>
+          <span class="alt">
+            ${disari ? `<span class="badge live">başka çalıştırma</span>` : `<span class="badge">aynı çalıştırma</span>`}
+            <span class="mono">${esc(kisa(n.workflow_id))}</span> · ${n.depth} adım ileride
+          </span></button>`;
+      }).join("") + (capraz.length ? `<div class="not" style="margin-top:.5rem">
+        <b>Sınır geçildi.</b> Bu artifact'i ${capraz.length} farklı çalıştırma tüketti.
+        Onlar bunu üreten çalıştırmayı bilmiyordu — kayıt defterine ada göre sorup buldular.
+      </div>` : "");
+
+      $$("#kullananlar [data-art]").forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); });
+    } catch (e) {
+      const el = $("#kullananlar"); if (el) el.innerHTML = `<p class="bos">Soy alınamadı.</p>`;
+    }
+  })();
 
   try {
     const o = await getJSON(`/api/artifact/${a.artifact_id}?session=${encodeURIComponent(a.workflow_id)}`);
