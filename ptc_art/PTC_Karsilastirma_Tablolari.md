@@ -518,15 +518,22 @@ Pod-adım kavramı yok; **container** ve **konuşma** var.
 
 | # | Nerede | Ne oluyor |
 |---|---|---|
-| 1 | Pod-1 `artifact-sidecar` | `yerlestir()` — bu çalıştırmanın çıktılarını `/output`'a indirir |
-| 2 | Pod-1 `sandbox` | proxy `/healthz` cevap verince başlar (= girdiler hazır) |
-| 3 | Pod-1 `sandbox` | `df.to_parquet("/output/x.parquet")` — düz dosya |
-| 4 | Pod-1 `sandbox` | biter |
-| 5 | Pod-1 `artifact-sidecar` | SIGTERM → `supur()`: `/output`'a **bakar**, beyan istemez |
-| 6 | — | MinIO'ya bayt, SQLite'a künye; pod silinir |
-| 7 | Pod-2 `artifact-sidecar` | `yerlestir()` yine çalışır → `/output/x.parquet` **gerçekten orada** |
-| 8 | Pod-2 `sandbox` | `pd.read_parquet("/output/x.parquet")` — sıradan dosya okuması |
-| 9 | Pod-2 `sandbox` | başka çalıştırma gerekiyorsa `load_artifact(wf, ad)` — **açık çağrı** |
+| 1 | Pod-1 `artifact-sidecar` | `yerlestir()` — BEYAN edilen girdileri diske koyar |
+| 2 | Pod-1 `artifact-sidecar` | `/output/.ptc-girdiler-hazir` dosyasını yazar |
+| 3 | Pod-1 `sandbox` | o dosyayı görünce başlar (= girdiler hazır) |
+| 4 | Pod-1 `sandbox` | `df.to_parquet("/output/x.parquet")` — düz dosya |
+| 5 | Pod-1 `sandbox` | biter |
+| 6 | Pod-1 `artifact-sidecar` | SIGTERM → `supur()`: `/output`'a **bakar**, beyan istemez |
+| 7 | — | MinIO'ya bayt, SQLite'a künye; pod silinir |
+| 8 | Pod-2 `artifact-sidecar` | `yerlestir()` — beyan `x.parquet` ise onu koyar |
+| 9 | Pod-2 `sandbox` | `pd.read_parquet("/output/x.parquet")` — sıradan dosya okuması |
+| 10 | Pod-2 `sandbox` | başka çalıştırma gerekiyorsa o da BEYAN: `inputs=["<wf>/ad"]` |
+
+2026-09-07 (ikinci tur): 2. adımda bir zamanlar sidecar'ın 127.0.0.1'de
+açtığı bir HTTP sunucusu vardı ve sandbox `/healthz`'e sorarak bekliyordu;
+9. adım da `load_artifact(wf, ad)` diye bir ÇAĞRIYDI. İkisi de kalktı —
+sandbox artık hiçbir ağ çağrısı yapmıyor, el sıkışma paylaşılan volume'de
+bir dosya (Argo da 1.29 öncesinde böyle yapıyordu).
 
 ### 18.5 — Dört sütunda özet
 
