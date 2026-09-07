@@ -120,9 +120,19 @@
 
     <!-- ══ DEPO ════════════════════════════════════════════════════ -->
     <section class="k-view" id="k-depo">
-      <p class="lead">Baytlar üreten pod'da değil burada. Süzgeçler doğrudan servise gider.</p>
+      <p class="lead">Baytlar üreten pod'da değil burada. Süzgeçler doğrudan servise gider —
+        <code>?q=</code> sunucu tarafında arıyor, MLMD'nin <code>filter_query</code>'si gibi.</p>
       <div class="split">
         <div>
+          <div class="ara-satir">
+            <input id="depoAra" class="k-input" placeholder="ada göre ara — rapor, .pdf, ozet…"
+                   autocomplete="off" />
+            <select id="depoSirala" class="k-input" style="flex:0 0 12rem">
+              <option value="yeni">En yeni önce</option>
+              <option value="adet">Artifact sayısı</option>
+            </select>
+            <button class="k-btn ikincil" id="depoYenile" title="Listeyi tazele">↻</button>
+          </div>
           <div class="suzgec" id="depoSuzgec"></div>
           <div id="depoCekmece"></div>
         </div>

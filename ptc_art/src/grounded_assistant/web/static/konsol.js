@@ -18,8 +18,26 @@ const kisa = s => String(s || "").slice(0, 8);
 const S = {
   hatlar: [], hat: "a", adim: null, icTab: "genel", durum: {}, calisiyor: false,
   wfSon: {}, kayitlar: [], filtre: "hepsi", acik: {}, art: null, soyId: null,
-  kurucu: null,
+  kurucu: null, ara: "", sirala: "yeni",
 };
+
+/* Sohbet sekmesinin oturum kimliği = onun `workflow_id`'si.
+ *
+ * `app.js` bunu `_oturum` diye bir global'de tutuyor ve WebSocket'e
+ * `?session=` olarak veriyor; sunucu da aynı değeri sandbox'ın `workflow_id`'si
+ * yapıyor. Depo sekmesi bunu bilmediği için "Bu oturum" YALNIZCA hat
+ * çalıştırmalarını sayıyordu — sohbette üretilen dosyalar 40 küsur çekmece
+ * arasında kayboluyordu (2026-09-07'de bulundu). */
+// try/catch: `_oturum` bir global `const`. `app.js` ona ULAŞMADAN patlarsa
+// değişken TDZ'de kalır ve `typeof` bile ReferenceError atar — o durumda
+// Depo sekmesinin komple ölmesindense sohbet rozetinden vazgeçiyoruz.
+function sohbetWf() {
+  try { return (typeof _oturum !== "undefined" && _oturum) || null; }
+  catch { return null; }
+}
+
+const benimWf = () => new Set([...Object.values(S.wfSon).filter(Boolean),
+                               sohbetWf()].filter(Boolean));
 
 async function getJSON(url, opts) {
   const r = await fetch(url, opts);
@@ -532,31 +550,55 @@ function calistir() {
 async function ciz_depo() {
   const cek = $("#depoCekmece"), suz = $("#depoSuzgec");
   let d;
-  try { d = await getJSON("/api/depo?limit=1000"); }
+  // Arama SUNUCUDA: `?q=` servisin kendi süzgeci (§11.14). İstemcide filtrelemek
+  // yalnızca çekilen 1000 satırı süzerdi; sunucu bütün defteri süzüyor.
+  const q = S.ara.trim();
+  try { d = await getJSON(`/api/depo?limit=1000${q ? `&q=${encodeURIComponent(q)}` : ""}`); }
   catch (e) { cek.innerHTML = uyari(e.message); suz.innerHTML = ""; return; }
   if (d.error) { cek.innerHTML = uyari(d.error); suz.innerHTML = ""; return; }
 
   S.kayitlar = d.kayitlar;
   const arts = d.kayitlar;
   const tipler = [...new Set(arts.map(a => a.type))];
+  const benim = benimWf();
+  const sohbet = sohbetWf();
 
   suz.innerHTML =
     `<button class="${S.filtre === "hepsi" ? "on" : ""}" data-f="hepsi">Hepsi · ${arts.length}</button>` +
     tipler.map(t => `<button class="${S.filtre === "t:" + t ? "on" : ""}" data-f="t:${esc(t)}">${esc(t.replace("system.", ""))} · ${arts.filter(a => a.type === t).length}</button>`).join("") +
-    (Object.values(S.wfSon).filter(Boolean).length
-      ? `<button class="${S.filtre === "benim" ? "on" : ""}" data-f="benim">Bu oturum</button>` : "");
+    (benim.size
+      ? `<button class="${S.filtre === "benim" ? "on" : ""}" data-f="benim">Bu oturum · ${
+          arts.filter(a => benim.has(a.workflow_id)).length}</button>` : "") +
+    (sohbet && arts.some(a => a.workflow_id === sohbet)
+      ? `<button class="${S.filtre === "sohbet" ? "on" : ""}" data-f="sohbet">Sohbet · ${
+          arts.filter(a => a.workflow_id === sohbet).length}</button>` : "") +
+    (arts.some(a => a.alias)
+      ? `<button class="${S.filtre === "alias" ? "on" : ""}" data-f="alias">Sabitlenmiş · ${
+          arts.filter(a => a.alias).length}</button>` : "");
 
   let gosterilen = arts;
   if (S.filtre.startsWith("t:")) gosterilen = arts.filter(a => a.type === S.filtre.slice(2));
-  if (S.filtre === "benim") gosterilen = arts.filter(a => Object.values(S.wfSon).includes(a.workflow_id));
+  if (S.filtre === "benim") gosterilen = arts.filter(a => benim.has(a.workflow_id));
+  if (S.filtre === "sohbet") gosterilen = arts.filter(a => a.workflow_id === sohbet);
+  if (S.filtre === "alias") gosterilen = arts.filter(a => a.alias);
 
   const grup = {};
   gosterilen.forEach(a => (grup[a.workflow_id] = grup[a.workflow_id] || []).push(a));
-  const sirali = Object.entries(grup).sort((x, y) => y[1].length - x[1].length);
+  // Varsayılan sıra ARTIK ADET DEĞİL, TAZELİK. Sohbetin 3 dosyalık çalıştırması
+  // 60 dosyalık hat çalıştırmalarının altına gömülüyordu ve "az önce ürettiğim
+  // nerede" sorusu cevapsız kalıyordu.
+  const enYeni = l => l.reduce((m, a) => a.created_at > m ? a.created_at : m, "");
+  const sirali = Object.entries(grup).sort((x, y) =>
+    S.sirala === "adet" ? y[1].length - x[1].length
+                        : enYeni(y[1]).localeCompare(enYeni(x[1])));
 
   cek.innerHTML = sirali.length ? sirali.map(([wf, list]) => {
-    const acik = S.acik[wf] !== false;
-    const benim = Object.values(S.wfSon).includes(wf);
+    list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    // 40+ çalıştırma varken hepsi açık gelmesin: yalnızca ilk üçü ve bu
+    // oturumunkiler açık. Arama varken hepsi açık — aradığını görmek istersin.
+    const kendi = benim.has(wf);
+    const acik = S.acik[wf] !== undefined ? S.acik[wf]
+               : (q ? true : kendi || sirali.findIndex(([k]) => k === wf) < 3);
     return `<div class="cekmece ${acik ? "acik" : ""}" data-wf="${esc(wf)}">
       <button class="cekmece-yuz">
         <span class="cekmece-ok">▸</span>
@@ -564,16 +606,21 @@ async function ciz_depo() {
           <span class="mono" style="font-size:.82rem">${esc(wf)}</span>
           <span class="muted" style="display:block;font-size:.74rem">${list.length} artifact · ${kb(list.reduce((s, a) => s + (a.size_bytes || 0), 0))}</span>
         </span>
-        ${benim ? `<span class="badge live">bu oturum</span>` : ""}
+        ${wf === sohbet ? `<span class="badge live">sohbet</span>`
+          : kendi ? `<span class="badge live">bu oturum</span>` : ""}
       </button>
       <div class="raf">${list.map(plaka).join("")}</div>
     </div>`;
-  }).join("") : `<p class="bos">Bu süzgeçle eşleşen artifact yok.</p>`;
+  }).join("") : `<p class="bos">${q ? `"${esc(q)}" ile eşleşen artifact yok.`
+                                     : "Bu süzgeçle eşleşen artifact yok."}</p>`;
 
   $$("#depoSuzgec button").forEach(b => b.onclick = () => { S.filtre = b.dataset.f; ciz_depo(); });
   $$("#depoCekmece .cekmece-yuz").forEach(b => b.onclick = () => {
     const wf = b.closest(".cekmece").dataset.wf;
-    S.acik[wf] = S.acik[wf] === false; ciz_depo();
+    // Açık/kapalı artık üç değerli (undefined = varsayılan kural). Tıklama
+    // varsayılanı KESİN bir değere çeviriyor.
+    const suanAcik = b.closest(".cekmece").classList.contains("acik");
+    S.acik[wf] = !suanAcik; ciz_depo();
   });
   $$("#depoCekmece .plaka").forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); ciz_artDetay(); });
   ciz_artDetay();
@@ -824,6 +871,16 @@ $("#btnKurucuKapat").onclick = kurucuKapat;
 $("#btnKurucuKaydet").onclick = kurucuKaydet;
 $("#btnNodeEkle").onclick = () => { S.kurucu.nodes.push(BOS_NODE()); kurucuYaz(); };
 $("#btnRun").onclick = calistir;
+
+/* Arama: her tuşta sunucuya gitmesin diye 250 ms bekletiliyor. */
+let _araGecikme;
+$("#depoAra").oninput = e => {
+  S.ara = e.target.value;
+  clearTimeout(_araGecikme);
+  _araGecikme = setTimeout(() => { S.acik = {}; ciz_depo(); }, 250);
+};
+$("#depoSirala").onchange = e => { S.sirala = e.target.value; S.acik = {}; ciz_depo(); };
+$("#depoYenile").onclick = () => { S.acik = {}; ciz_depo(); yenileSayac(); };
 $("#btnTemizle").onclick = () => { if (!S.calisiyor) { S.durum = {}; S.adim = null; ciz_calistir(); } };
 
 (async () => {

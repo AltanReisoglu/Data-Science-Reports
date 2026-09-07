@@ -621,3 +621,19 @@ body.konsol .ptc-panel { z-index: 50; }
   .node-bas { flex-wrap: wrap; }
   .node-bas .n-tur { max-width: none; }
 }
+
+/* ── depo arama satırı ────────────────────────────────────────────── */
+
+.ara-satir {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+.ara-satir .k-input { flex: 1; }
+.ara-satir .k-btn { flex: none; padding: 0.4rem 0.8rem; }
+.ara-satir select.k-input { font-family: inherit; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .ara-satir { flex-wrap: wrap; }
+  .ara-satir select.k-input { flex: 1 1 auto !important; }
+}
