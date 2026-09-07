@@ -1499,7 +1499,7 @@ Artı: bir **CronJob** (TTL reaper) saat başı çalışıyor.
 ┌── Sandbox Pod (her çalıştırmada YENİ, ~3.14 sn) ──────────┐
 │  /sandbox    configMap → LLM'in kodu (salt okunur)        │
 │  /scratch    emptyDir  → geçici (ölmesi İSTENİR)          │
-│  /output     emptyDir  → BU koşu: süpürülür + tembel iner │
+│  /output     emptyDir  → BU koşu: yerleştirilir+süpürülür │
 │  /artifacts  emptyDir  → BAŞKA koşular: <wf>/<ad>, salt   │
 │                          okuma, süpürülmez                │
 │  kalıcı disk YOK · S3 anahtarı YOK · DNS YOK · API YOK    │
@@ -1592,40 +1592,40 @@ Gelen liste **ikiye** ayrılıyor:
 | Bu çalıştırmanın kendi çıktıları | `/output/<ad>` |
 | Başka çalıştırmaların çıktıları | `/artifacts/<workflow_id>/<ad>` |
 
-**Neden sadece isimler:** önceki tasarımda pod doğarken depodaki **her**
-artifact indiriliyordu. Maliyet var olan her şeyle ölçekleniyordu — 6 tane
-100 MiB'lik artifact biriktiğinde, hiçbirine dokunmayan bir script bile
-512Mi'lık `/output`'u patlatıyordu. Şimdi maliyet **kullanılan kadar**.
+**Neden çalıştırmaya kapsanmış:** ilk tasarımda pod doğarken **tenant'ın
+tamamı** iniyordu; maliyet var olan her şeyle ölçekleniyor ve 512Mi'lık
+`/output`'u zorluyordu. Kapsam bu çalıştırmaya daraltılınca sorun kalmadı —
+ölçüm: workflow başına medyan 3 dosya / 13,7 KiB, azami 35,3 KiB (§11.13).
 
-### Adım 6 — Kod çalışır
+### Adım 6 — Sidecar girdileri yerleştirir, SONRA kod çalışır
 
-`main()` şu sırayla ilerliyor:
-
-```python
-istemci  = ArtifactClient(...) if SCOPE_TOKEN and ENDPOINT else None
-launcher = _launcher_api(istemci, okunanlar) if istemci else {}
-#          ^^^^^^^^^^^^ LLM'e GÖRÜNMEZ; içinde yalnızca `_put_file` var
-
-inenler = {}
-if istemci:
-    tembel_globals = _tembel_okumayi_kur(istemci, _manifest(istemci),
-                                         inenler, okunanlar)
-
-sandbox_globals = {"set_result": set_result, **tool'lar, **tembel_globals}
-#                  ^ artifact fonksiyonu YOK — 2026-09-06'da kaldırıldı (§11.11)
-
-try:
-    exec(kod, sandbox_globals)
-except Exception as exc:
-    _ciktilari_supur(launcher, inenler)   # ← hata olsa BİLE önce süpür
-    print(hata); exit(0)
-
-_ciktilari_supur(launcher, inenler)       # ← başarıda da
-print(sonuc)
+```
+sidecar                                sandbox
+───────                                ───────
+signal handler kur
+yerlestir()                            (bekliyor: /healthz)
+  · list_all() → bu wf'in çıktıları
+  · her birini /output'a indir
+  · dizin artifact'ini aç, tar'ı sil
+  · sunduğu sha256 + artifact_id'yi
+    kendi defterine yaz
+sunucuyu aç  ──────────────────────►   _proxy_bekle() döner
+                                       exec(kod, sandbox_globals)
+                                         · /output'ta GERÇEK dosyalar
+                                         · yama YOK
+                                         · load_artifact(wf, ad) tek fonksiyon
+                                       print(sonuc); exit 0
+SIGTERM ◄──────────────────────────    (container bitti)
+supur()
+  · /output'u tara
+  · sunduğum sha256 ile aynıysa ATLA
+  · değilse yükle, parents = sunduklarım
+supurme_bitti
 ```
 
 Dikkat: süpürme **hata yolunda da** çalışıyor. Script son satırda patlasa bile
-o ana kadar üretilen dosyalar kurtarılıyor — asıl değeri de burada.
+o ana kadar üretilen dosyalar kurtarılıyor — çünkü süpürmeyi yapan container
+sandbox değil, sidecar. Asıl değeri de burada.
 
 ### Adım 7 — Artifact Service kontrolleri akış sırasında yapar
 
@@ -1727,35 +1727,39 @@ değil. **Üçü de düz Python** — çağrılacak bir API yok:
 1. **Manifest promptta** — isimler model talimatlarına enjekte ediliyor, iki
    grup hâlinde: *bu oturumda üretilenler* ve *başka çalıştırmalardan*
    (ADK'nın `LoadArtifactsTool` deseni)
-2. **Dosya sistemi** — `os.listdir("/output")`, `os.path.exists(...)`,
-   `glob` manifestle birleştirilmiş; `/artifacts` başka çalıştırmaları listeler
+2. **Dosya sistemi** — `os.listdir("/output")` bu çalıştırmanın
+   yerleştirilmiş çıktılarını gösterir (yama yok, gerçek dosyalar)
 3. **Konuşma hafızası** — checkpointer kalıcı olduğu için LLM kendi verdiği
    dosya adını hatırlıyor
 
-### Nasıl çalışıyor (tembel doldurma)
+### Nasıl çalışıyor (yerleştirme — 2026-09-07'den beri)
 
-`pd.read_csv` / `read_parquet` / `read_json` / `read_excel` / `read_feather`
-sarmalanmış, ayrıca sandbox'ın globals'ına tembel bir `open` konmuş. Dosya
-yoksa **ve** adı manifestte geçiyorsa, o an indiriliyor; sonra pandas normal
-şekilde okuyor.
+Sandbox açılmadan **önce** sidecar bu çalıştırmanın çıktılarını `/output`'a
+indiriyor (`yerlestir()`), sonra localhost sunucusunu açıyor. Sandbox
+`/healthz` cevap verene kadar bekliyor — yani kod başladığında `/output`'taki
+dosyalar **gerçek**. Argo'da `init` container, KFP'de `kfp-driver` +
+`kfp-launcher` ne yapıyorsa aynısı.
 
-İki yol biçimi tanınıyor — `/output/<ad>` (bu çalıştırma, **katı**: tenant'a
-düşmez) ve `/artifacts/<wf>/<ad>` (adı verilen çalıştırma). Bu ayrımın neden
-zorunlu olduğu §11.11'de: düz bir isim uzayında ajan başkasının dosyasını
-kendi işi sanıyordu.
+Yolun iki biçimi var:
 
-`os.listdir` ve `os.path.exists` de yamalı — API kalkınca keşfin tek yolu
-dosya sistemi kaldığı için `/output`'un boş görünmesi modeli doğrudan
-yanıltıyordu. Launcher kendi işini yamalanmamış orijinallerle yapıyor.
+| Yol | Ne | Nasıl geliyor |
+|---|---|---|
+| `/output/<ad>` | BU çalıştırma | pod açılışında **yerleştirilmiş** |
+| `/artifacts/<wf>/<ad>` | adı verilen çalıştırma | `load_artifact(wf, ad)` ile **açıkça** |
 
-`builtins` **değiştirilmiyor** — sadece LLM'in doğrudan çağrısı yakalanıyor,
-kütüphanelerin iç dosya işlemleri hiç etkilenmiyor. Yama alanını dar tutmanın
-en temiz yolu bu.
+Bu ayrımın neden zorunlu olduğu §11.11'de: düz bir isim uzayında ajan
+başkasının dosyasını kendi işi sanıyordu.
 
-**İnce nokta:** indirilen dosyanın (değişim zamanı, boyut) çifti kaydediliyor;
+**Öncesi (2026-09-04 → 09-07): tembel doldurma.** Beş pandas okuyucusu, `open`,
+`os.listdir`, `os.path.exists` ve `glob` yamalıydı; bayt okuma çağrısının
+ortasında iniyordu. Maliyeti O(kullanılan) yapıyordu ama `/output` yalan
+söylüyordu ve piyasada emsali yoktu — kaldırıldı (§11.13). Bugün sandbox'ta
+**hiçbir yama yok**; `os.scandir` ile `os.listdir` aynı şeyi görüyor.
+
+**İnce nokta:** sidecar sunduğu her baytın sha256'sını kendi defterine yazıyor;
 süpürme dokunulmamış olanı **atlıyor**. Yoksa sadece *okuyan* bir çalıştırma
 bile dosyayı "üretilmiş" sayıp geri yüklerdi. (Prefetch döneminde gerçekten
-yaşanmış bir kusur.)
+yaşanmış bir kusur.) Defter sandbox'ta değil — LLM'in kodu etkileyemiyor.
 
 ## §11.5 — İki değişmez kural
 
@@ -1855,7 +1859,7 @@ Diğer ayarlar:
 | **Tip yalnızca uzantıdan** | Eskiden `put_artifact(df, ...)` nesneye bakıp `system.Metrics` çıkarabiliyordu; artık `.json` her zaman `system.Artifact`. Sayısal sözlük/metrik ayrımı kayboldu |
 | **Manifest host değişkenine bağlı** | `ARTIFACT_SERVICE_URL` tanımsızsa manifest enjeksiyonu SESSİZCE devre dışıydı; 2026-09-06'da bir kez uyarı basılıyor ve `.env`'e eklendi. Ama hâlâ "çalışmazsa çalışmaz" bir bağımlılık |
 | **Soy imzasız** | `parents` doğru ama kriptografik olarak korumasız — kayıt defterine yazabilen değiştirebilir. Tekton Chains'in çözdüğü problem (§8.6); bizde karşılığı yok |
-| **Şeffaf okuma** | 5 pandas okuyucusu + `open` + `os.listdir`/`os.path.exists`/`glob`. `pyarrow`, `csv`, `PIL`, `matplotlib` doğrudan açarsa yakalanmıyor |
+| ~~**Şeffaf okuma**~~ | **KAPANDI 2026-09-07 (§11.13).** Yamalar kalktı; `/output` pod açılışında yerleştiriliyor, dosyalar gerçek. Hangi kütüphanenin açtığı artık önemsiz |
 | **Warm pool** | Yok (kazancı ölçüldü: ≤1.6 sn) |
 | **Gerçek OBC/ODF** | Test edilmedi (ODF kapsam dışı) |
 
@@ -1901,8 +1905,8 @@ LLM'in yazdığı kod artık şu:
 ```python
 df.to_parquet("/output/satislar.parquet")          # saklanır
 df = pd.read_parquet("/output/satislar.parquet")   # geri okunur
-os.listdir("/output")                              # depoda ne varsa
-os.path.exists("/output/x.parquet")                # depodakini de sayar
+os.listdir("/output")                              # bu koşunun çıktıları
+load_artifact("<wf>", "rapor.pdf")                 # BAŞKA koşu, açık çağrı
 ```
 
 `cached()`'in karşılığı düz Python:
@@ -2105,12 +2109,123 @@ kısalttık — o olmadan 6,1 sn'ydi.
 [URET ] sizan_jeton: []            ← sandbox'ta PTC_SCOPE_TOKEN YOK
         produced ilk.parquet
         produced not.txt
-[TURET] consumed ilk.parquet       ← tembel okuma proxy üzerinden
+[TURET] consumed ilk.parquet       ← okuma proxy üzerinden (o günkü hâli)
         produced turev.txt  parents=['art_6c99f21f0b6a']   ← sidecar kaydetti
 ```
 
 Kabul testinde ayrıca: jetonsuz doğrudan yazma **401**, proxy'ye POST **501**
 (yazma uç noktası yok), pickle süpürme yolundan da **reddediliyor**.
+
+---
+
+## §11.13 — 2026-09-07: girdiler kod BAŞLAMADAN yerleşiyor (KFP/Argo modeli)
+
+§11.12 aktarımı sidecar'a taşımıştı. Geriye **tek gerçek icadımız** kalmıştı:
+okuma yolu.
+
+### Neyi icat etmiştik
+
+`/output` sahte bir görünümdü. Sandbox'ta şunlar yamalıydı:
+
+```
+os.listdir · os.path.exists · glob.glob/iglob · open
+pd.read_csv/read_parquet/read_json/read_excel/read_feather
+```
+
+Manifestten gelen isimler `os.listdir("/output")`'a **eklenıyordu**; bayt ise
+`pd.read_parquet("/output/x.parquet")` çağrısının **ortasında** iniyordu.
+
+Bunun piyasada emsali yoktu. Yaptığı iş "uzak nesneyi yerel dosya gibi göster,
+okununca indir" — bunun adı **FUSE**'dur ve Databricks, E2B, Vercel onu
+kullanıyor. Biz kullanamıyoruz (`/dev/fuse` + `CAP_SYS_ADMIN`, OpenShift
+`restricted-v2` vermiyor), o yüzden kullanıcı alanında taklit etmiştik.
+
+Üç ölçülebilir sorunu vardı:
+
+| Sorun | Kanıt |
+|---|---|
+| Yama **delinebiliyordu** | `os.scandir("/output")` → `[]` (yamasız), `os.listdir` → `['x.parquet']` |
+| Kapsam **eksikti** | `pyarrow.parquet.read_table` ya da `PIL.Image.open` doğrudan açarsa yakalanmıyordu |
+| **Tanıdık değildi** | Kodu okuyan hiç kimse `/output`'un yalan söylediğini bilmiyordu |
+
+### Piyasanın cevabı: indirme kod başlamadan biter
+
+| Ürün | Nerede | Ne zaman |
+|---|---|---|
+| **Argo** | `init` container | main başlamadan |
+| **KFP / OpenShift AI** | `kfp-driver` (init) + `kfp-launcher` | kullanıcı kodu başlamadan |
+| **Anthropic** | platform container'a koyar | model isteyince |
+
+İlk ikisinde dosya, container doğduğunda `.path`'te **zaten durur**. Bizde de
+artık öyle.
+
+### Yapılan
+
+```
+sidecar.yerlestir()   → açılışta: bu çalıştırmanın çıktılarını /output'a indirir
+                        (dizin artifact'i açılır; tar silinir)
+                        sunucuyu AÇMADAN ÖNCE biter — /healthz "hazır" demektir
+entrypoint            → yama YOK. /output'taki dosyalar GERÇEK.
+load_artifact(wf, ad) → BAŞKA bir çalıştırma için, salt okuma, AÇIK çağrı
+sidecar.supur()       → değişmedi (Argo `wait`)
+```
+
+`load_artifact` yeni bir API yüzeyi değil, **ADK'nın `load_artifact`'ının
+aynısı** ve yalnızca okuma tarafında. Kaldırdığımız `put_artifact` yazma
+yüzeyiydi; ADK'da da yazma tarafı modele sunulmuyor.
+
+### Ölçüm
+
+| | Öncesi | Sonrası |
+|---|---|---|
+| `entrypoint.py` | 651 satır | **357 satır** |
+| Yama satırı | ~120 | **0** |
+| `os.scandir("/output")` kod başlarken | `[]` | **`['x.parquet']`** |
+| Okuyan çalıştırma (medyan, n=5) | 4,11 sn | **3,13 sn** |
+| Birim/entegrasyon testi | 178 | **185** |
+| Canlı kabul kontrolü | 40/40 | **38/38** |
+
+Süre **düştü**: yerleştirme sidecar'da, sandbox imajı ve Python açılırken
+paralel ilerliyor; eskiden manifest isteği ve her `fetch` çalıştırmanın
+ortasında **seri** duruyordu.
+
+### Prefetch'i öldüren şey kapsamdı, prefetch değil
+
+Yamaların gerekçesi, öncesindeki prefetch'in `/output`'un 512Mi sınırını
+zorlamasıydı. Ama o prefetch **tenant'ın tamamını** indiriyordu. Ölçüm
+(2026-09-07, canlı depo):
+
+```
+tenant toplamı        : 163 artifact, 498 KiB     ← eski prefetch bunu indiriyordu
+workflow başına adet  : medyan 3, azami 7
+workflow başına boyut : medyan 13,7 KiB, azami 35,3 KiB
+512Mi sınırına oran   : azami workflow = %0,007
+```
+
+Çalıştırmaya kapsanmış yerleştirme sınırın **on binde yedisini** kullanıyor —
+ve bu tam olarak KFP'nin `pipeline_root/<run-id>/` kapsamı.
+
+### Canlı doğrulama
+
+```
+ADIM 1  W yazıyor        → produced ozet.parquet, model.v1.tar
+ADIM 2  W'nin devamı     → scandir_kod_baslarken: ['model.v1','ozet.parquet']
+                           dizin_acilmis_mi: ['agirlik.json']   toplam: 25
+                           (yalnızca consumed — kopya yüklenmedi)
+ADIM 3  Z (başka wf)     → Z_output: []            /output izole
+                           Z_output_ozet: FileNotFoundError
+                           load_artifact → /artifacts/wf-URETICI-…/ozet.parquet  = 25
+ADIM 4  başka tenant     → FileNotFoundError
+```
+
+Ajan uçtan uca: 1. tur `produced:butce.parquet`, 2. tur `consumed:butce.parquet`
+→ "İK departmanının harcaması 45".
+
+### Kalan tek şey
+
+`os.scandir` artık yamayı **delmiyor** çünkü yama yok — ama `/output` da bir
+güvenlik sınırı değil, hiç olmadı. Gerçek sınır ağda (sandbox MinIO'ya da
+artifact-service'e de çıkamıyor) ve jetonda (yalnızca sidecar'da).
 
 ---
 
@@ -2124,7 +2239,7 @@ Tek bir şirketle örtüşmüyoruz; boyut boyut farklı şirketlerle örtüşüy
 | Ağ | İnternet yok, DNS yok, 2 iç hedef | **Anthropic**, GKE, Red Hat |
 | Depoya erişim | SDK, servis içinde; mount yok | **Red Hat**, Anthropic, OpenAI |
 | Çıktı yakalama | `/output` süpürme | **Anthropic** (`$OUTPUT_DIR`), OpenAI (`/mnt/data`) |
-| `.uri` ↔ `.path` kopyalama | Süpürme + tembel doldurma | **KFP launcher** |
+| `.uri` ↔ `.path` kopyalama | Sidecar yerleştirme + süpürme | **KFP driver+launcher** |
 | Kayıt defteri | `artifact_id`, tip, soy, TTL, hash | **Anthropic**, **KFP/MLMD** |
 | Artifact tipleri | `system.*` (aynı sözlük) | **KFP/MLMD** |
 | Yapılandırılabilir kök | `PTC_ARTIFACT_ROOT` | **KFP `pipeline_root`** |
@@ -2134,8 +2249,8 @@ Tek bir şirketle örtüşmüyoruz; boyut boyut farklı şirketlerle örtüşüy
 | İzolasyon | Normal container | **Kimse** — herkes daha güçlü |
 | Warm pool | Yok | Microsoft/Google'da var |
 | LLM yüzeyi | **Yok** — düz Python + `/output` (2026-09-06) | **KFP** (`.path`), Anthropic (`$OUTPUT_DIR`), OpenAI (`/mnt/data`) |
-| Şeffaf okuma (`read_csv` → tembel indirme) | Var | **Kimse** — KFP girdileri peşin indirir |
-| Dizin artifact'i | Tek tar, tembel açılıyor | **KFP** (o özyinelemeli yüklüyor) |
+| Girdi yerleştirme (kod başlamadan) | Sidecar `yerlestir()` | **KFP** driver+launcher, **Argo** `init` |
+| Dizin artifact'i | Tek tar, açılmış yerleşiyor | **KFP** (o özyinelemeli yüklüyor) |
 | Çalıştırma izolasyonu | `/output` bu koşu, `/artifacts/<wf>/` adı verilen koşu | **KFP** — `pipeline_root/<run-id>/` |
 | Aracının yeri | Ayrı pod, kodun erişemeyeceği yerde | **Anthropic/OpenAI** (§9.6 C ailesi) |
 | Aktarımı başlatan | **Sidecar** (`wait` deseni), jeton onda | **Argo Workflows** — init + wait |
@@ -2228,11 +2343,11 @@ artifact cevabı yok (§8.7). KFP'nin veri modeli + Agent Sandbox'ın izolasyonu
    Red Hat'ten alıyoruz.** Omurga tartışmasız SOTA.
 2. **İki yerde kimsenin gerisindeyiz:** izolasyon (düz container) ve warm pool.
    Birincisi gerçek bir eksik, ikincisinin kazancını ölçtük — en fazla 1.6 sn.
-3. ~~İki yerde kimsenin ilerisindeyiz~~ — **2026-09-06'da bu iddia geri
-   çekildi.** Çalıştırma başına kapsam kaldırıldı (KFP gibi tenant), LLM'e
-   sunulan artifact API'si kaldırıldı (KFP gibi düz dosya). Geriye emsalsiz
-   tek şey şeffaf tembel okuma kaldı — o da bir kolaylık, üstünlük değil.
-   Gerekçe §11.11'de: emsalsiz olan her yüzeyden hata çıktı, kopyaladığımız
+3. ~~İki yerde kimsenin ilerisindeyiz~~ — **iddia tamamen geri çekildi.**
+   Çalıştırma başına kapsam kaldırıldı (KFP gibi tenant), LLM'e sunulan
+   artifact API'si kaldırıldı (2026-09-06), şeffaf tembel okuma da kaldırıldı
+   (2026-09-07, §11.13). **Artık emsalsiz hiçbir desenimiz yok.** Gerekçe
+   §11.11 ve §11.13'te: emsalsiz olan her yüzeyden hata çıktı, kopyaladığımız
    hiçbir parçadan çıkmadı.
 4. **OpenShift ekseninde:** veri akışı deseni birebir KFP'nin (§12.5); ayrıldığımız
    iki yerden biri kasıtlı (kimlik bilgisi vermemek), diğeri eksik (SQLite,

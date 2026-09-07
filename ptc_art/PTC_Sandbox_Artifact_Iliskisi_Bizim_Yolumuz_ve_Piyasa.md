@@ -178,23 +178,34 @@ gerektiriyor. Bilmezse ürettiği her şey pod'la birlikte kaybolurdu. B'nin as�
 değeri de hata durumunda: script son satırda patlasa bile o ana kadar üretilen
 dosyalar kurtarılır.
 
-## 1.7 Adım 6 — Kod çalışır: OKUMA yolu (tembel)
+## 1.7 Adım 6 — Kod çalışır: OKUMA yolu (yerleştirme)
 
-Tur 2'de LLM `pd.read_csv("/output/satislar.csv")` yazıyor. Ama bu **yepyeni
-bir pod**; o dosya orada yok.
+Tur 2'de LLM `pd.read_csv("/output/satislar.csv")` yazıyor. Bu **yepyeni bir
+pod** — ama dosya **zaten orada**.
 
-Devreye tembel doldurma giriyor: `pd.read_csv`/`read_parquet`/`read_json`/
-`read_excel` sarmalanmış, ayrıca sandbox'ın globals'ına tembel bir `open`
-konmuş. Dosya `/output`'ta yoksa **ve** adı manifestte geçiyorsa, o an
-indirilir; sonra pandas normal şekilde okur.
+Çünkü sandbox açılmadan önce sidecar `yerlestir()` çalıştırıyor: bu
+çalıştırmanın çıktılarını `/output`'a indiriyor, sonra localhost sunucusunu
+açıyor. Sandbox `/healthz` cevap verene kadar bekliyor, yani kod başladığında
+girdiler yerinde. Argo'da bunu `init` container, KFP'de `kfp-driver` +
+`kfp-launcher` yapıyor — ikisinde de indirme kod başlamadan biter.
 
-`builtins` **değiştirilmiyor** — sadece LLM'in doğrudan çağrısı yakalanıyor,
-kütüphanelerin iç dosya işlemleri hiç etkilenmiyor.
+Başka bir çalıştırmanın çıktısı `/output`'a **inmez**; gerekiyorsa açıkça
+isteniyor:
 
-**Bir incelik:** indirdiğimiz dosyanın (değişim zamanı, boyut) çifti
-kaydediliyor. Süpürme, dokunulmamış olanı atlıyor — yoksa sadece *okuyan* bir
+```python
+yol = load_artifact("<workflow_id>", "rapor.pdf")   # → /artifacts/<wf>/rapor.pdf
+```
+
+**Öncesi (2026-09-04 → 09-07): tembel doldurma.** Beş pandas okuyucusu, `open`,
+`os.listdir`, `os.path.exists` ve `glob` yamalıydı; bayt okuma çağrısının
+ortasında iniyordu. Piyasada emsali olmayan tek desenimizdi, kaldırıldı.
+Bugün sandbox'ta hiçbir yama yok.
+
+**Bir incelik:** sidecar sunduğu her baytın sha256'sını kendi defterine
+yazıyor. Süpürme, dokunulmamış olanı atlıyor — yoksa sadece *okuyan* bir
 çalıştırma bile dosyayı "üretilmiş" sayıp geri yüklerdi. (Bu, prefetch
-döneminde gerçekten yaşanmış bir kusurdu.)
+döneminde gerçekten yaşanmış bir kusurdu.) Defter sandbox'ta değil; LLM'in
+kodu etkileyemiyor.
 
 ## 1.8 Adım 7 — Artifact Service dört kontrol yapar
 
@@ -265,7 +276,7 @@ kalıcılığı tek çağrıda geri alırdı.
 │                                                            │
 │  df.to_parquet("/output/x.parquet")  ← tek yol           │
 │  df.to_csv("/output/x.csv")      ← emniyet ağı            │
-│  pd.read_csv("/output/x.csv")    ← tembel doldurma        │
+│  pd.read_csv("/output/x.csv")    ← dosya zaten orada      │
 └──────────┬──────────────────────────────┬─────────────────┘
            │ tool'lar                     │ artifact baytları
            │ (MCP)                        │ (akışlı HTTP)
@@ -500,27 +511,34 @@ tarafında ya mount var (dosya zaten orada) ya da açık çağrı var
 (`artifact.load("art_789")`). Paylaşılan mimari dokümanının §27'si de açık
 çağrıyı öneriyor.
 
-Bizde üçüncü bir şey var: mount yok, ama LLM `pd.read_csv("/output/x.csv")`
-yazınca dosya arka planda iniyor. LLM artifact ID diye bir kavramla hiç
-karşılaşmıyor.
+Bizde de mount yok, ama LLM `pd.read_csv("/output/x.csv")` yazınca dosya
+zaten oradadır — çünkü sidecar pod açılırken yerleştirmiş oluyor. LLM artifact
+ID diye bir kavramla hiç karşılaşmıyor.
 
 **Bunu neden yaptık:** LLM'in ID taşıması, tam da unutabileceği türden bir yük.
 Sıradan pandas kodu yazması hem daha doğal hem daha güvenilir.
 
-**Ama dürüst olalım — bunun anlamı şu:** bu deseni sahada kimse zorlamamış.
-Bilmediğimiz kenar durumları olabilir:
+**Ve bunun sahada karşılığı var.** Argo `init` container'la, KFP
+`kfp-driver` + `kfp-launcher` ile aynı şeyi yapıyor: girdi kod başlamadan
+`.path`'te durur, kullanıcı kodu yalnızca yerel bir dosya görür.
 
-- pandas dışındaki okuyucular (`pyarrow.parquet.read_table`, `csv` modülü,
-  `PIL.Image.open`) yakalanmıyor — sadece pandas ve doğrudan `open`
-- isim çakışması: iki farklı workflow adımı aynı dosya adını kullanırsa
-  "en yeni" kazanır, LLM bunun farkında olmayabilir
-- büyük N'de manifest maliyeti ölçülmedi
-- Türkçe/özel karakterli dosya adları süpürmede tireye çevriliyor, tembel
-  okuma aynı dönüşümü uyguluyor ama bu eşleşme kırılgan
+**Dürüst tarih:** 2026-09-04 → 09-07 arasında bunu **tembel** yapıyorduk —
+`os.listdir`, `glob`, beş pandas okuyucusu ve `open` yamalıydı, bayt okuma
+çağrısının ortasında iniyordu. Emsalsizdi ve bilinen kenar durumları vardı
+(`pyarrow.parquet.read_table`, `csv` modülü, `PIL.Image.open` yakalanmıyordu;
+`os.scandir` yamayı deliyordu). 2026-09-07'de bırakıldı.
 
-**Verdict: bu bizim özgün katkımız, ama "SOTA" değil — SOTA'nın ötesinde bir
-deneme.** Ekibe böyle sunulmalı: *"herkesin yaptığı şeyi yaptık, artı okuma
-tarafında bir iyileştirme denedik ve şu kenar durumları henüz bilmiyoruz."*
+Kalan bilinen sınırlar:
+
+- isim çakışması: iki farklı çalıştırma aynı dosya adını kullanırsa "en yeni"
+  kazanır, LLM bunun farkında olmayabilir
+- büyük N'de yerleştirme maliyeti ölçüldü ama küçük depoda (163 artifact);
+  binlerce artifact'lik bir tenant'ta workflow başına dağılım değişebilir
+- Türkçe/özel karakterli dosya adları süpürmede tireye çevriliyor,
+  `load_artifact` aynı dönüşümü uyguluyor ama bu eşleşme kırılgan
+
+**Verdict: artık özgün bir desenimiz yok — ve bu iyi.** Ekibe böyle sunulmalı:
+*"her parçasını sahadan aldık; icat ettiğimiz tek şeyi ölçüp bıraktık."*
 
 ## 3.5 Tek cümlelik cevap
 
@@ -534,8 +552,9 @@ tarafında bir iyileştirme denedik ve şu kenar durumları henüz bilmiyoruz."*
 > **Bazı yerlerde SOTA'nın gerisindeyiz (Kata yok, Postgres yok, tek replika,
 > auth yok) — bunlar PoC olmanın bedeli, gizlenmemeli.**
 >
-> **Bir yerde de SOTA'nın ötesinde bir şey denedik (şeffaf okuma) — o yüzden
-> orada emsal yok, kenar durumları da yok değil.**
+> **Emsalsiz olan tek desenimizi (şeffaf tembel okuma) 2026-09-07'de bıraktık.
+> Yerine Argo/KFP'nin "girdiyi kod başlamadan yerleştir" deseni geçti — artık
+> her parçasının sahada bir karşılığı var.**
 
 ---
 
@@ -547,9 +566,10 @@ Sandbox'ın ölmesi güvenlik için gerekli, ürettiğinin kalması iş için ge
 
 **Slayt 2 — Bizim yolumuz**
 Efemer pod → akışlı HTTP → Artifact Service (4 kontrol) → MinIO + kayıt defteri.
-Sandbox'ın deposu görmesi yok. Yazma iki yolla (açık API + `/output` süpürme),
-okuma şeffaf (tembel doldurma). Kapsam her çalıştırma için ayrı imzalı jeton.
+Sandbox'ın deposu görmesi yok. Sidecar açılışta `/output`'u **yerleştirir**
+(Argo `init` / KFP launcher), bitişte **süpürür** (Argo `wait`). Kapsam her
+çalıştırma için ayrı imzalı jeton — ve jeton yalnızca sidecar'da.
 
 **Slayt 3 — Nerede duruyoruz**
 Omurga SOTA ile aynı · Erişim modelinde Anthropic/OpenAI ile aynı safta ·
-Kata/Postgres/HA/auth eksik (PoC) · Şeffaf okuma özgün ve emsalsiz.
+Kata/Postgres/HA/auth eksik (PoC) · Her deseninin sahada bir karşılığı var.

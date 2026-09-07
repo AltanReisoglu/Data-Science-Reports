@@ -160,9 +160,10 @@ def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str 
 
     return (
         "\n\n".join(bolumler)
-        + "\n\nHepsi pod'da fiziksel olarak durmasa bile okunmak istendiklerinde "
-        "otomatik iniyor. Veriyi YENİDEN ÜRETME; run_ptc_code içinde doğrudan "
-        "yolundan oku (ör. pd.read_parquet(\"/output/<ad>\")). "
+        + "\n\nBU OTURUMUN çıktıları pod açılırken /output'a YERLEŞTİRİLMİŞ "
+        "oluyor — düz dosya okuması yeter (ör. pd.read_parquet(\"/output/<ad>\")). "
+        "Veriyi YENİDEN ÜRETME. Başka bir çalıştırmanınki /output'ta OLMAZ; "
+        "gerekiyorsa load_artifact(\"<workflow_id>\", \"<ad>\") ile açıkça iste. "
         "Aradığın dosya BU OTURUMDA yoksa, başka bir çalıştırmanınkini kendi "
         "çıktın gibi sunma — üretmen gerektiğini söyle ya da üret."
     )

@@ -257,16 +257,18 @@ keşif için Google ADK'yı.
 | **LLM yüzeyi (dosya, API yok)** | **hepsi** — KFP, Anthropic, OpenAI, MS |
 | **Kapsam (tenant)** | **Red Hat / KFP** — `pipeline_root` paylaşımlı |
 | **İzolasyon** | **Kimse — bizimki daha zayıf** |
-| **Şeffaf okuma** | **Kimse — emsalsiz** |
+| **Girdi yerleştirme (kod başlamadan)** | **Argo `init` / KFP `launcher`** |
+| Çapraz-çalıştırma erişimi (açık çağrı) | **KFP** (açık URI) · **Google ADK** (`load_artifact`) |
 
 **Üç cümle:**
 1. Omurga tartışmasız SOTA — tezi Cloudflare'den, veri modelini Anthropic'ten,
    platform desenini Red Hat'ten aldık.
 2. İzolasyonda herkesin gerisindeyiz (düz container). Warm pool yok ama
    kazancını ölçtük: ≤1.6 sn.
-3. 2026-09-06'da **emsalsiz olan iki şeyi bıraktık** (LLM'e artifact API'si,
-   çalıştırma başına kapsam) — çünkü hataların hepsi orada çıkıyordu.
-   Geriye emsalsiz tek şey şeffaf tembel okuma kaldı.
+3. Emsalsiz olan **üç şeyi de** bıraktık: LLM'e artifact API'si ve
+   çalıştırma başına kapsam (2026-09-06), sonra şeffaf tembel okuma
+   (2026-09-07) — yerine Argo/KFP'nin "girdiyi kod başlamadan yerleştir"
+   deseni geçti. Hataların hepsi bizim icat ettiğimiz yerlerde çıkıyordu.
 
 ---
 
@@ -275,7 +277,7 @@ keşif için Google ADK'yı.
 | Değişiklik | Öncesi | Sonrası |
 |---|---|---|
 | Artifact servisi ayrıldı | Tool Gateway'de, base64+MCP | Kendi pod'unda, akışlı HTTP |
-| Prefetch kaldırıldı | Her artifact iniyordu, O(hepsi) | Manifest + tembel doldurma, O(kullanılan) |
+| Prefetch kapsamı daraltıldı | Tenant'ın tamamı iniyordu, O(hepsi) | Çalıştırmaya kapsanmış yerleştirme, azami 35 KiB |
 | TTL reaper | Şema vardı, çalıştıran yoktu | Saat başı CronJob |
 | Oturum kimliği | Her bağlantıda yeni → artifact erişilemez | `localStorage` / `--session` |
 | Workflow state | `InMemorySaver` | `AsyncSqliteSaver` (Postgres'e hazır) |
@@ -289,9 +291,9 @@ keşif için Google ADK'yı.
 | Değişiklik | Öncesi | Sonrası |
 |---|---|---|
 | **LLM artifact API'si** | 5 fonksiyon | **YOK** — düz Python + `/output` |
-| Keşif | `list_artifacts()` | `os.listdir` / `os.path.exists` / `glob` |
+| Keşif | `list_artifacts()` | Manifest promptta + `/output` yerleştirilmiş |
 | Kapsam | Çalıştırma başına mühürlü | **Tenant** (KFP gibi) |
-| Dizin çıktısı | Sessizce kayboluyordu | Tek tar, tembel açılıyor |
+| Dizin çıktısı | Sessizce kayboluyordu | Tek tar, açılmış hâlde yerleşiyor |
 | Soy ağacı | Kaydediliyor, okunmuyordu | Otomatik + panelde mermaid grafiği |
 | PDF/PNG | `.bin` olarak duruyordu | Gerçek tip + panelde önizleme |
 | **Çalıştırma izolasyonu** | `/output` düz — başkasınınki sızıyordu | **İki kök:** `/output` + `/artifacts/<wf>/` |
@@ -310,7 +312,7 @@ keşif için Google ADK'yı.
 | **Auth** | Yok | Uuid'yi bilen okur |
 | **Büyük dosya** | 100 MiB / 512Mi | 5 GB çalışmaz |
 | **İsim çakışması** | "En yeni" kazanır, sessiz | Tenant genelinde daha olası |
-| **Şeffaf okuma** | 5 pandas okuyucusu + `open` + `listdir`/`exists`/`glob` | `pyarrow`, `PIL` doğrudan açarsa yakalanmıyor |
+| ~~**Şeffaf okuma**~~ | **KAPANDI (2026-09-07)** — yama yok, dosyalar gerçek | Emsalsiz olan son desenimizdi |
 | **`user_metadata`** | Süpürme yolunda doldurulamıyor | `put_artifact` kalkınca kapandı |
 | **Tip** | Yalnızca dosya uzantısından | Metrik/Dataset ayrımı kayboldu |
 | **Soy imzasız** | Kayıt defterine yazabilen değiştirebilir | Tekton Chains bunu çözüyor |

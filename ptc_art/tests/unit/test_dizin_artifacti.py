@@ -1,28 +1,23 @@
-"""Dizin çıktıları (2026-09-06) — KFP launcher'ının dizin desteğinin karşılığı.
+"""Dizin artifact'i — tar olarak saklanır, açılmış hâlde yerleştirilir.
 
-## Neden eklendi
+## Neden var
 
-Süpürme döngüsü `not os.path.isfile(yol): continue` diyordu; yani `/output`
-altındaki bir DİZİN sessizce atlanıyordu. Canlı doğrulandı: LLM
-`/output/model.v1/` altına üç dosya yazdı, hiçbiri saklanmadı, hiçbir yerde
-hata çıkmadı — modelin "kaydettim" sanmasına yetecek kadar sessiz.
+LLM `/output/model.v1/` altına birkaç dosya bırakabiliyor (çok dosyalı model,
+varlıklarıyla birlikte HTML rapor). Süpürme bunu tek bir `.tar` artifact'ine
+çeviriyor; yerleştirme ise geri AÇIYOR, yani sonraki çalıştırma gerçek bir
+dizin görüyor.
 
-KFP launcher'ı bu ayrımı yapıyor: *"the launcher determines artifact type
-(file vs directory), then uploads from local path to object storage URI."*
+## Kritik nokta: aç → yeniden paketle → aynı hash
 
-## Neden tek tar, KFP gibi çoklu nesne değil
-
-KFP bir dizini nesne deposuna özyinelemeli yüklüyor (1 artifact = N nesne).
-Bizde bu, künyenin dört değişmezini bozardı: `content_hash`, dedup,
-`size_bytes`, akışlı tek-nesne put/get. Tar'layınca dördü de duruyor.
-
-Bedeli: dizinden TEK dosya ayrı çekilemiyor. Sandbox efemer olduğu için
-pratikte dizin zaten bütün hâlinde isteniyor.
+Yerleştirmede tar açılıyor, süpürmede dizin YENİDEN paketleniyor. İkisi aynı
+baytı üretmezse "bunu ben verdim" kontrolü tutmaz ve her çalıştırma aynı
+içeriği bir kez daha yükler. Bu yüzden `_dizini_paketle` mtime/uid/gid/uname
+VE kip'i sabitliyor (2026-09-07: kip eklendi — açma sırasında umask'a göre
+değişiyordu).
 """
 
 from __future__ import annotations
 
-import hashlib
 import os
 import sys
 import tarfile
@@ -34,87 +29,108 @@ KOK = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(KOK / "sandbox_image"))
 sys.path.insert(0, str(KOK / "src" / "grounded_assistant" / "artifacts"))
 os.environ.setdefault("TOOL_GATEWAY_ENDPOINT", "http://yok/mcp")
+os.environ.setdefault("ARTIFACT_SERVICE_ENDPOINT", "http://yok")
 
 import entrypoint  # noqa: E402
+import sidecar  # noqa: E402
+
+WF = "wf-bu"
 
 
-class SahteIstemci:
-    def __init__(self, depo: dict[str, bytes] | None = None):
-        self.depo = depo or {}
-        self.yuklenenler: list[tuple[str, str, bytes]] = []
+def tar_uret(tmp_path: Path, icerik: dict[str, str]) -> bytes:
+    """Süpürmenin ürettiğiyle AYNI kuralla paketler."""
+    kaynak = tmp_path / "_kaynak"
+    kaynak.mkdir(exist_ok=True)
+    for ad, veri in icerik.items():
+        (kaynak / ad).write_text(veri)
+    hedef = tmp_path / "_paket.tar"
+    sidecar._dizini_paketle(str(kaynak), str(hedef))
+    return hedef.read_bytes()
 
-    def list(self, workflow_id, node_id=None):
-        return [{"name": ad, "artifact_id": f"art_{ad}",
-                 "workflow_id": entrypoint.WORKFLOW_ID} for ad in self.depo]
+
+class SahteUst:
+    def __init__(self, kayitlar: list[dict], icerik: dict[str, bytes]):
+        self.kayitlar = kayitlar
+        self.icerik = icerik
+        self.yuklenenler: list[tuple[str, list[str]]] = []
+
+    def list_all(self):
+        return self.kayitlar
 
     def fetch_to_file(self, name, hedef, workflow_id=None):
-        if name not in self.depo:
+        ham = self.icerik.get(f"{workflow_id}/{name}", self.icerik.get(name))
+        if ham is None:
             return None
-        Path(hedef).write_bytes(self.depo[name])
+        Path(hedef).write_bytes(ham)
         return {"artifact_id": f"art_{name}", "name": name,
-                "content_type": "application/x-tar", "size_bytes": len(self.depo[name])}
+                "content_type": "application/x-tar", "size_bytes": len(ham)}
 
     def put_file(self, path, content_type, name, ttl_seconds=None, parents=None):
-        self.yuklenenler.append((name, content_type, Path(path).read_bytes()))
-        return {"artifact_id": f"art_{name}", "name": name, "content_type": content_type,
-                "size_bytes": 0, "parents": list(parents or [])}
+        self.yuklenenler.append((name, list(parents or [])))
+        return {"artifact_id": f"art_{name}", "name": name, "size_bytes": 0,
+                "content_type": content_type, "parents": list(parents or [])}
 
 
 @pytest.fixture
 def ortam(tmp_path, monkeypatch):
-    cikti = tmp_path / "output"
+    cikti, scratch = tmp_path / "output", tmp_path / "scratch"
     cikti.mkdir()
-    scratch = tmp_path / "scratch"
     scratch.mkdir()
-    monkeypatch.setattr(entrypoint, "OUTPUT_DIR", str(cikti))
-    monkeypatch.setattr(entrypoint, "SCRATCH_DIR", str(scratch))
+    monkeypatch.setattr(sidecar, "OUTPUT_DIR", str(cikti))
+    monkeypatch.setattr(sidecar, "SCRATCH_DIR", str(scratch))
+    monkeypatch.setattr(sidecar, "WORKFLOW_ID", WF)
+    monkeypatch.setattr(sidecar, "_sunulan_ozet", {})
+    monkeypatch.setattr(sidecar, "_sunulan_kimlik", set())
     return cikti
 
 
-def dizin_kur(kok: Path, icerik: dict[str, str]) -> Path:
-    for gorece, veri in icerik.items():
-        hedef = kok / gorece
-        hedef.parent.mkdir(parents=True, exist_ok=True)
-        hedef.write_text(veri)
-    return kok
+def test_dizin_acilmis_halde_yerlesir(ortam, tmp_path, monkeypatch):
+    ust = SahteUst(
+        [{"name": "model.v1.tar", "workflow_id": WF, "artifact_id": "art_m"}],
+        {"model.v1.tar": tar_uret(tmp_path, {"agirlik.json": "{}", "kunye.txt": "v1"})},
+    )
+    monkeypatch.setattr(sidecar, "istemci", ust)
+
+    sidecar.yerlestir()
+
+    assert (ortam / "model.v1" / "agirlik.json").read_text() == "{}"
+    assert (ortam / "model.v1" / "kunye.txt").read_text() == "v1"
+    # Tar'ın kendisi kalmamalı: kalsaydı `os.listdir("/output")` LLM'e hem
+    # dizini hem arşivi gösterirdi.
+    assert not (ortam / "model.v1.tar").exists()
 
 
+def test_dokunulmayan_dizin_yeniden_yuklenmez(ortam, tmp_path, monkeypatch):
+    """Aç → yeniden paketle → aynı hash. Tutmazsa depo her turda şişer."""
+    ust = SahteUst(
+        [{"name": "model.v1.tar", "workflow_id": WF, "artifact_id": "art_m"}],
+        {"model.v1.tar": tar_uret(tmp_path, {"a.json": "1", "b.json": "2"})},
+    )
+    monkeypatch.setattr(sidecar, "istemci", ust)
 
-def tar_uret(tmp_path, icerik: dict[str, str]) -> bytes:
-    """Paketleme SIDECAR'da (süpürme oraya taşındı); test onu kullanıyor."""
-    import sidecar  # noqa: PLC0415
+    sidecar.yerlestir()
+    sidecar.supur()
 
-    kaynak = dizin_kur(tmp_path / "kaynak", icerik)
-    sidecar._dizini_paketle(str(kaynak), str(tmp_path / "k.tar"))
-    return (tmp_path / "k.tar").read_bytes()
-
-
-def test_derin_yol_istenince_dizin_iniyor(ortam, tmp_path):
-    """`/output/model.v1/weights.json` okunmak isteniyor, dizin daha inmemiş."""
-    istemci = SahteIstemci({"model.v1.tar": tar_uret(tmp_path, {
-        "weights.json": '{"w":1}', "alt/n.txt": "derin"})})
-    entrypoint._tembel_oku(str(ortam / "model.v1" / "weights.json"), istemci,
-                           entrypoint.Depo({"model.v1.tar"}))
-
-    assert (ortam / "model.v1" / "weights.json").read_text() == '{"w":1}'
-    assert (ortam / "model.v1" / "alt" / "n.txt").read_text() == "derin"
-    # Soy ağacı ARTIK BURADA izlenmiyor — sidecar sunduğu artifact'leri kendi
-    # kaydediyor (bkz. test_sidecar.py::test_soy_sidecarin_SUNDUKLARINDAN_geliyor).
+    assert ust.yuklenenler == []
 
 
-def test_manifestte_olmayan_dizin_icin_aga_cikilmaz(ortam, tmp_path):
-    istemci = SahteIstemci({"baska.tar": tar_uret(tmp_path, {"a": "b"})})
-    entrypoint._tembel_oku(str(ortam / "yok" / "dosya.txt"), istemci,
-                           entrypoint.Depo({"baska.tar"}))
-    assert not (ortam / "yok").exists()
+def test_degistirilen_dizin_yeniden_yuklenir(ortam, tmp_path, monkeypatch):
+    ust = SahteUst(
+        [{"name": "model.v1.tar", "workflow_id": WF, "artifact_id": "art_m"}],
+        {"model.v1.tar": tar_uret(tmp_path, {"a.json": "1"})},
+    )
+    monkeypatch.setattr(sidecar, "istemci", ust)
+
+    sidecar.yerlestir()
+    (ortam / "model.v1" / "c.json").write_text("3")   # LLM ekledi
+    sidecar.supur()
+
+    assert [ad for ad, _ in ust.yuklenenler] == ["model.v1.tar"]
 
 
 def test_yol_gecisli_tar_disari_yazmiyor(ortam, tmp_path):
-    """Depoya süpürme yoluyla kötü niyetli bir tar girmiş olabilir.
-
-    Arşivi biz üretmiş olsak da açan taraf kaynağına güvenmemeli (CWE-22 /
-    CVE-2007-4559). `filter="data"` bunu reddediyor.
-    """
+    """Depoya kötü niyetli bir tar girmiş olabilir; açan taraf kaynağına
+    güvenmemeli (CWE-22 / CVE-2007-4559). `filter="data"` reddediyor."""
     kotu = tmp_path / "kotu.tar"
     with tarfile.open(kotu, "w") as t:
         veri = tmp_path / "yuk"
@@ -123,48 +139,24 @@ def test_yol_gecisli_tar_disari_yazmiyor(ortam, tmp_path):
 
     hedef = ortam / "acilan"
     hedef.mkdir()
-    try:
-        entrypoint._tari_ac(str(kotu), str(hedef))
-    except Exception:
-        pass  # reddetmek de geçerli bir sonuç
-
-    assert not (tmp_path / "kacis.txt").exists()
-    assert not (ortam.parent / "kacis.txt").exists()
-
-
-# -- iki kök: /output kendi, /artifacts/<wf>/ başkaları (2026-09-06) --------
+    for ac in (sidecar._tari_ac, entrypoint._tari_ac):
+        try:
+            ac(str(kotu), str(hedef))
+        except Exception:  # noqa: BLE001 — reddetmek de geçerli bir sonuç
+            pass
+        assert not (tmp_path / "kacis.txt").exists()
+        assert not (ortam.parent / "kacis.txt").exists()
 
 
-def test_baska_calistirmanin_dizini_kimlikle_aciliyor(ortam, tmp_path, monkeypatch):
-    """`/artifacts/<wf>/<dizin>/<dosya>` de açılabilmeli.
+def test_baska_calistirmanin_dizini_load_artifact_ile_aciliyor(tmp_path, monkeypatch):
+    """`/output`'a inmez; açıkça istenince `/artifacts/<wf>/<dizin>/` olur."""
+    d = tmp_path / "artifacts"
+    d.mkdir()
+    monkeypatch.setattr(entrypoint, "ARTIFACTS_DIR", str(d))
 
-    Dizin açma yolu önce yalnızca `/output`'u biliyordu; kabul testinde
-    `/artifacts/<wf>/model.v1/alt/derin.txt` FileNotFoundError veriyordu.
-    """
-    art = tmp_path / "artifacts"
-    art.mkdir()
-    monkeypatch.setattr(entrypoint, "ARTIFACTS_DIR", str(art))
-    monkeypatch.setattr(entrypoint, "WORKFLOW_ID", "wf_ben")
+    ust = SahteUst([], {"wf-baska/model.v1.tar": tar_uret(tmp_path, {"a.json": "1"})})
+    yol = entrypoint._load_artifact_uret(ust)("wf-baska", "model.v1.tar")
 
-    istemci = SahteIstemci({"model.tar": tar_uret(tmp_path, {
-        "w.json": '{"w":1}', "alt/derin.txt": "derin"})})
-    depo = entrypoint.Depo(kendi=set(), digerleri={"wf_baska": {"model.tar"}})
-
-    entrypoint._tembel_oku(str(art / "wf_baska" / "model" / "alt" / "derin.txt"),
-                           istemci, depo)
-
-    assert (art / "wf_baska" / "model" / "alt" / "derin.txt").read_text() == "derin"
-
-
-def test_baskasinin_dizini_output_a_SIZMIYOR(ortam, tmp_path, monkeypatch):
-    """İzolasyonun dizin tarafı: başka run'ın dizini kendi /output'una inmemeli."""
-    art = tmp_path / "artifacts"
-    art.mkdir()
-    monkeypatch.setattr(entrypoint, "ARTIFACTS_DIR", str(art))
-    istemci = SahteIstemci({"model.tar": tar_uret(tmp_path, {"w.json": "1"})})
-    depo = entrypoint.Depo(kendi=set(), digerleri={"wf_baska": {"model.tar"}})
-
-    entrypoint._tembel_oku(str(ortam / "model" / "w.json"), istemci, depo)
-
-    assert not (ortam / "model").exists(), "/output'a sızdı"
-
+    assert Path(yol) == d / "wf-baska" / "model.v1"
+    assert (Path(yol) / "a.json").read_text() == "1"
+    assert not (d / "wf-baska" / "model.v1.tar").exists()

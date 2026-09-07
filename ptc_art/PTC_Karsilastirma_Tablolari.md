@@ -29,6 +29,7 @@ yazılı; gerekçeler ve alıntılar orada.
 | [15](#15--biz-neredeyiz) | Biz neredeyiz | Boyut boyut |
 | [16](#16--bilinen-açıklar) | Açıklar | Saklamıyoruz |
 | [17](#17--openshift-uyumluluğu) | **OpenShift uyumluluğu** | **Bizimki orada çalışır mı** |
+| [18](#18--aynı-akış-adım-adım-üç-üründe) | **Aynı akış, adım adım** | **Bir dosya nasıl yolculuk ediyor** |
 
 ---
 
@@ -219,7 +220,7 @@ hepsini kaldırdı — `docker` için gerekçe *"breaks security completely"*.
 | 2 | Referans otomatik context'te | `file_id` tool sonucunda döner | Anthropic |
 | 3 | Dosya sistemi + `ls` | Sandbox yaşıyorsa model bakar | Anthropic, Google, OpenHands |
 | 4 | **İsimler prompt'a enjekte** | İsimler talimatlarda, içerik talep üzerine | **Google ADK** |
-| 3+4 | **İkisi birden** | Manifest promptta **ve** `os.listdir` çalışıyor | **BİZ** |
+| 3+4 | **İkisi birden** | Manifest promptta; `/output` kod başlamadan **yerleştirilmiş**, `os.listdir` gerçek dosyaları gösteriyor | **BİZ** |
 | 5 | Semantik arama | Vektör deposunda `file_search` | Llama Stack (RAG) |
 | — | **Keşif YOK** | DAG statik, girdi bağlanmış | KFP, Argo, Airflow, Tekton |
 
@@ -304,8 +305,9 @@ code"* diyor. *(§9.7)*
 | Kapsam (tenant) | **Red Hat / KFP** — `pipeline_root` paylaşımlı |
 | Çalıştırma izolasyonu (`/output` + `/artifacts/<wf>`) | **KFP** — `pipeline_root/<run-id>/` |
 | **Aktarımı başlatan (sidecar)** | **Argo Workflows** — init + wait |
+| **Girdi yerleştirme (kod başlamadan)** | **Argo `init` / KFP `driver`+`launcher`** |
+| Çapraz-çalıştırma erişimi (açık çağrı) | **KFP** (açık URI) · **Google ADK** (`load_artifact`) |
 | İzolasyon | **Kimse — bizimki daha zayıf** |
-| Şeffaf okuma | **Kimse — emsalsiz** |
 
 *(§12)*
 
@@ -321,7 +323,7 @@ code"* diyor. *(§9.7)*
 | **Auth** | Yok | Jetonu üretebilen tenant'ın tümünü okur |
 | Büyük dosya | 100 MiB servis / 1 Gi pod | 5 GB çalışmaz |
 | İsim çakışması | Aynı workflow'da "en yeni" kazanır, sessiz | Veri kaybı riski |
-| Şeffaf okuma | 5 pandas okuyucusu + `open` + `listdir`/`exists`/`glob` | `pyarrow`, `PIL` doğrudan açarsa yakalanmıyor |
+| ~~Şeffaf okuma~~ | **KAPANDI (2026-09-07)** — yamalar kalktı, `/output` gerçek dosya | Emsalsiz olan tek desenimizdi |
 | `user_metadata` | Süpürme yolunda doldurulamıyor | API kalkınca kapandı |
 | Tip | Yalnızca dosya uzantısından | Metrik/Dataset ayrımı kayboldu |
 | Soy imzasız | Kayıt defterine yazabilen değiştirebilir | Tekton Chains bunu çözüyor |
@@ -349,7 +351,7 @@ code"* diyor. *(§9.7)*
 | matplotlib (`MPLCONFIGDIR=/scratch/.mpl`) | ✅ `HOME=/` olmasına rağmen |
 | Parquet + PNG üretimi | ✅ |
 | Sidecar süpürmesi + yükleme | ✅ `produced scc.parquet`, `produced scc.png` |
-| Sabit UID 1001 ile (kind) | ✅ üretim + tembel okuma + soy |
+| Sabit UID 1001 ile (kind) | ✅ üretim + yerleştirme + soy |
 | Rastgele UID 1000670000 ile (SCC ezmesi) | ✅ aynı sonuç |
 
 **Sonuç: iş yükü OpenShift uyumlu.** SCC'nin dayattığı hiçbir kısıt bizi
@@ -405,6 +407,131 @@ Sık değişen IP'ler ve joker adlar için `DNSNameResolver` var — ama o
 **Tek cümle:** Ürünün kendisi OpenShift varsayılanında çalışıyor; **kind'a
 özgü olan altyapı katmanı** (Cilium, Hubble, `kind load`), ve bunların
 OpenShift karşılıkları belli.
+
+---
+
+## 18 — Aynı akış, adım adım (üç üründe)
+
+Yukarıdaki tablolar *özellikleri* karşılaştırıyor. Bu bölüm tek bir senaryoyu
+uçtan uca izliyor, çünkü asıl fark orada görünüyor.
+
+> **Senaryo.** Adım A `x.parquet` üretiyor. Adım B onu okuyor. İkisi ayrı pod.
+
+### 18.1 — Argo Workflows (emissary; v3.4'ten beri tek executor)
+
+| # | Nerede | Ne oluyor |
+|---|---|---|
+| 1 | Pod-A `init` | YAML'da **beyan edilen** `inputs.artifacts[]` paylaşılan volume'e iner |
+| 2 | Pod-A `main` | kullanıcı kodu: `to_parquet("/tmp/out/x.parquet")` — düz dosya |
+| 3 | Pod-A `main` | biter |
+| 4 | Pod-A `wait` | `outputs.artifacts[].path`'e bakar — **adresi insan yazmış** |
+| 5 | Pod-A `wait` | dosyayı S3'e yükler |
+| 6 | — | pod silinir, disk gider |
+| 7 | Pod-B `init` | `from: "{{steps.A.outputs.artifacts.veri}}"` — **insan bağlamış** |
+| 8 | Pod-B `init` | S3'ten indirir, `/tmp/in/x.parquet`'e koyar |
+| 9 | Pod-B `main` | kod başlar; **dosya zaten oradadır** |
+
+> *"**After the main container completes**, the wait container collects output
+> artifacts from the main container's filesystem through volume mounts… and
+> uploads it to the configured artifact repository."*
+
+**Arama yok.** B, A'nın çıktısını bulmuyor — YAML'da eli tutulup getiriliyor.
+
+### 18.2 — KFP / OpenShift AI (driver + launcher)
+
+Bağlantıyı YAML yerine Python kuruyor: `adim_b(veri=adim_a.outputs["x"])`.
+
+| # | Nerede | Ne oluyor |
+|---|---|---|
+| 1 | Pod-A `kfp-driver` (init) | girdileri çözer, cache'e bakar, MLMD'ye yürütmeyi yazar |
+| 2 | Pod-A `kfp-launcher` | main'i sarar, girdileri `.path`'e indirir |
+| 3 | Pod-A kullanıcı kodu | `df.to_parquet(cikti.path)` — düz yerel dosya |
+| 4 | Pod-A `kfp-launcher` | `.path` → `.uri` (`pipeline_root/<run-id>/adim-a/x`) |
+| 5 | — | MLMD'ye künye düşer: ad, tip, `.uri` |
+| 6 | — | pod silinir |
+| 7 | Pod-B `kfp-driver` | MLMD'ye sorar: "A'nın `x`'inin `.uri`'si ne?" |
+| 8 | Pod-B `kfp-launcher` | o `.uri`'yi indirir, B'nin `.path`'ine koyar |
+| 9 | Pod-B kullanıcı kodu | başlar; **dosya zaten oradadır** |
+
+Argo'dan tek farkı: adres YAML'da sabit değil, **MLMD'ye sorularak** bulunuyor.
+Ortak yanı: **indirme kod başlamadan bitiyor.**
+
+### 18.3 — Anthropic / OpenAI code interpreter
+
+Pod-adım kavramı yok; **container** ve **konuşma** var.
+
+| # | Ne oluyor |
+|---|---|
+| 1 | kod `to_parquet("x.parquet")` — container diskine |
+| 2 | platform diske bakar, yeni dosyayı görür |
+| 3 | Files API'ye kaydeder, konuşmaya kimlik döner (`file_abc123`) |
+| 4 | container ölür; bayt Files API'de kalır (Anthropic: 30 gün) |
+| 5 | sonraki tur — model konuşmada `file_abc123`'ü **görür** |
+| 6 | model ister; platform dosyayı container'a **koyar** |
+| 7 | kod okur: `pd.read_parquet("x.parquet")` |
+
+**Seçimi model yapıyor** — YAML yok, DAG yok; konuşmadaki isimlerden seçiyor.
+
+### 18.4 — Biz (2026-09-07'den beri)
+
+| # | Nerede | Ne oluyor |
+|---|---|---|
+| 1 | Pod-1 `artifact-sidecar` | `yerlestir()` — bu çalıştırmanın çıktılarını `/output`'a indirir |
+| 2 | Pod-1 `sandbox` | proxy `/healthz` cevap verince başlar (= girdiler hazır) |
+| 3 | Pod-1 `sandbox` | `df.to_parquet("/output/x.parquet")` — düz dosya |
+| 4 | Pod-1 `sandbox` | biter |
+| 5 | Pod-1 `artifact-sidecar` | SIGTERM → `supur()`: `/output`'a **bakar**, beyan istemez |
+| 6 | — | MinIO'ya bayt, SQLite'a künye; pod silinir |
+| 7 | Pod-2 `artifact-sidecar` | `yerlestir()` yine çalışır → `/output/x.parquet` **gerçekten orada** |
+| 8 | Pod-2 `sandbox` | `pd.read_parquet("/output/x.parquet")` — sıradan dosya okuması |
+| 9 | Pod-2 `sandbox` | başka çalıştırma gerekiyorsa `load_artifact(wf, ad)` — **açık çağrı** |
+
+### 18.5 — Dört sütunda özet
+
+| | Ne yükleneceğini kim söyler | Ne indirileceğini kim söyler | İndirme ne zaman |
+|---|---|---|---|
+| **Argo** | YAML (insan) | YAML (insan) | kod **başlamadan** |
+| **KFP** | Python DSL (insan) | MLMD sorgusu | kod **başlamadan** |
+| **Anthropic** | platform (dizine bakar) | model seçer | model isteyince |
+| **BİZ** | sidecar (dizine bakar) | model seçer | kod **başlamadan** |
+
+Yükleme tarafımız Anthropic'in deseni (dizine bak, beyan isteme); seçim
+tarafımız ADK/Anthropic'in deseni (model seçer); **indirme zamanlaması**
+Argo/KFP'nin deseni.
+
+### 18.6 — Tek icadımız ve nasıl kapatıldı
+
+2026-09-07'ye kadar son sütunda **yalnız** duruyorduk: indirme "kod okurken"
+oluyordu. `/output` sahte bir görünümdü — `os.listdir`, `os.path.exists`,
+`glob`, beş pandas okuyucusu ve `open` yamalıydı; bayt `pd.read_parquet(...)`
+çağrısının **ortasında** iniyordu.
+
+| | Öncesi | Sonrası |
+|---|---|---|
+| `/output` içeriği | manifestten uydurulmuş isimler | **gerçek dosyalar** |
+| İndirme anı | okuma çağrısının ortasında | pod açılışında, sidecar'da |
+| `os.scandir("/output")` (yamasız) | `[]` — yamayı deliyordu | `['x.parquet']` |
+| Yama satırı | ~120 | **0** |
+| `entrypoint.py` | 651 satır | **357 satır** |
+| Çapraz-çalıştırma | `/artifacts/<wf>/<ad>` sessizce | `load_artifact(wf, ad)` açıkça |
+| Okuyan çalıştırma (medyan) | 4,11 sn | **3,13 sn** |
+
+Bu yamaların gerekçesi vardı: öncesinde bir **prefetch** vardı ve `/output`'un
+512Mi sınırını zorluyordu. Ama o prefetch **tenant'ın tamamını** indiriyordu.
+Ölçüm (2026-09-07, 163 artifact'lik depo):
+
+| | Değer |
+|---|---|
+| Tenant toplamı | 163 artifact, 498 KiB |
+| Workflow başına adet | medyan **3**, azami **7** |
+| Workflow başına boyut | medyan **13,7 KiB**, azami **35,3 KiB** |
+| 512Mi sınırına oran | azami workflow = **%0,007** |
+
+**Hatalı olan prefetch değil, kapsamıydı.** Çalıştırmaya kapsanmış bir
+yerleştirme sınırın on binde yedisini kullanıyor — ve bu tam olarak KFP'nin
+`pipeline_root/<run-id>/` kapsamı.
+
+*(§11.13)*
 
 ---
 

@@ -72,37 +72,39 @@ kontrol("3 artifact saklandı (dosya+json+dizin)",
         uretilen == {"ham.tickets.parquet", "kunye.json", "model.v1.tar"}, sorted(uretilen))
 
 # ══ 2. Çalıştırmalar arası keşif + kullanım ══════════════════════════════
-basla("2 · BAŞKA WORKFLOW — /output izole, /artifacts/<wf>/ okunabilir")
+basla("2 · BAŞKA WORKFLOW — /output izole, load_artifact ile açık erişim")
 r = kos(f"""
-import os, glob, pandas as pd, json
-set_result({{
-  # KENDİ /output'u BOŞ olmalı — başka run'ın çıktısı buraya sızmamalı.
-  # (2026-09-06: sızıyordu ve ajan başkasının dosyasını kendi işi sanıyordu.)
+import os, pandas as pd, json
+# KENDİ /output'u BOŞ olmalı — başka run'ın çıktısı buraya sızmamalı.
+# (2026-09-06: sızıyordu ve ajan başkasının dosyasını kendi işi sanıyordu.)
+sonuc = {{
   "kendi_output_bos": os.listdir("/output") == [],
   "output_sizinti":   os.path.exists("/output/ham.tickets.parquet"),
-  # Başkasınınki ancak KİMLİĞİ verilerek okunuyor (KFP'nin pipeline_root düzeni)
-  "kosu_gorunuyor":   "{WF_A}" in os.listdir("/artifacts"),
-  "gorunuyor": all(a in os.listdir("/artifacts/{WF_A}") for a in
-                   ["ham.tickets.parquet","kunye.json","model.v1.tar"]),
-  "exists":    os.path.exists("/artifacts/{WF_A}/ham.tickets.parquet"),
-  "glob":      len(glob.glob("/artifacts/{WF_A}/*.json")) > 0,
-  "satir":     len(pd.read_parquet("/artifacts/{WF_A}/ham.tickets.parquet")),
-  "kunye":     json.load(open("/artifacts/{WF_A}/kunye.json"))["kaynak"],
-  "dizin":     open("/artifacts/{WF_A}/model.v1/alt/derin.txt").read(),
-}})
+}}
+# Başkasınınki ancak KİMLİĞİ verilerek geliyor (KFP: başka bir run'a AÇIK adresle)
+p = load_artifact("{WF_A}", "ham.tickets.parquet")
+sonuc["satir"] = len(pd.read_parquet(p))
+sonuc["kunye"] = json.load(open(load_artifact("{WF_A}", "kunye.json")))["kaynak"]
+d = load_artifact("{WF_A}", "model.v1.tar")
+sonuc["dizin"] = open(os.path.join(d, "alt", "derin.txt")).read()
+sonuc["yol"] = p.startswith("/artifacts/{WF_A}/")
+try:
+    load_artifact("{WF_A}", "hic-olmayan.parquet"); sonuc["yok_hatasi"] = "SESSIZ(!)"
+except FileNotFoundError:
+    sonuc["yok_hatasi"] = "FileNotFoundError"
+set_result(sonuc)
 """, WF_B, "kesif")
 kontrol("başka workflow okuyabiliyor", r.status.value == "success", r.error_message or "")
 if r.status.value == "success":
     d = eval(r.result_text)
     kontrol("kendi /output'u İZOLE (başkasınınki sızmıyor)",
             d["kendi_output_bos"] and not d["output_sizinti"])
-    kontrol("/artifacts başka çalıştırmaları listeliyor", d["kosu_gorunuyor"])
-    kontrol("os.listdir depoyu gösteriyor", d["gorunuyor"])
-    kontrol("os.path.exists depodakini sayıyor", d["exists"])
-    kontrol("glob manifesti kapsıyor", d["glob"])
+    kontrol("load_artifact /artifacts/<wf>/ altına indiriyor", d["yol"])
     kontrol("parquet düz read_parquet ile okundu", d["satir"] == 150, d["satir"])
     kontrol("json düz open ile okundu", d["kunye"] == "crm")
     kontrol("dizin artifact'i açıldı", d["dizin"] == "derin dosya")
+    kontrol("olmayan artifact AÇIK hata veriyor", d["yok_hatasi"] == "FileNotFoundError",
+            d["yok_hatasi"])
 
 # ══ 3. Türetme + otomatik soy ════════════════════════════════════════════
 basla("3 · TÜRETME — soy ağacı kendiliğinden kuruluyor")
@@ -110,7 +112,7 @@ r = kos(f"""
 import pandas as pd, matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-df = pd.read_parquet("/artifacts/{WF_A}/ham.tickets.parquet")
+df = pd.read_parquet(load_artifact("{WF_A}", "ham.tickets.parquet"))
 ozet = df.groupby("departman")["gun"].mean().round(2)
 ozet.to_frame("ort").to_parquet("/output/departman.ozet.parquet")
 fig, ax = plt.subplots(figsize=(6,3)); ax.bar(list(ozet.index), list(ozet.values))

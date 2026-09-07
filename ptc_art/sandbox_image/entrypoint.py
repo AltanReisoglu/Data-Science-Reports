@@ -5,13 +5,29 @@ vb.) YOK — research.md §4.3'teki karar: enforcement Cilium'da (network
 seviyesinde), burada değil. Kod istediği kütüphaneyi import edebilir, ama
 Tool Gateway dışında hiçbir yere çıkamaz (Cilium bunu kernel'de engeller).
 
+## Artifact'ler burada YÖNETİLMİYOR (2026-09-07)
+
+Bu dosyada artık ne yükleme var ne indirme ne de yama. İş bölümü Argo/KFP'nin
+aynısı:
+
+    sidecar.yerlestir()  → kod BAŞLAMADAN `/output`'u doldurur
+    bu dosya             → kodu çalıştırır; `/output` GERÇEK dosyalar içerir
+    sidecar.supur()      → kod BİTİNCE `/output`'u toplar
+
+Yani `pd.read_parquet("/output/x.parquet")` sıradan bir dosya okumasıdır;
+`os.listdir("/output")` gerçeği söyler. Öncesinde bunların hepsi yamalıydı ve
+bayt okuma çağrısının ortasında iniyordu — piyasada karşılığı olmayan tek
+desenimizdi.
+
+Geriye tek fonksiyon kaldı: `load_artifact(workflow_id, ad)` — BAŞKA bir
+çalıştırmanın çıktısı için, ve salt okuma.
+
 Kontrat: contracts/sandbox_job_contract.md
 """
 
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import os
 import re
@@ -19,14 +35,10 @@ import sys
 import tarfile
 from datetime import UTC, datetime
 
-# `serialize.py`, ana kaynak ağacındaki
-# src/grounded_assistant/artifacts/serialize.py dosyasının AYNISIDIR — imaja
-# bağımsız bir modül olarak kopyalanır (bkz. sandbox_image/Dockerfile).
-# Kopyalanıyor çünkü sandbox imajına `grounded_assistant` paketinin tamamını
-# (langgraph, langchain…) kurmak istemiyoruz; ama tek kaynak korunsun diye
-# dosya çoğaltılmıyor, Dockerfile aynı dosyayı kopyalıyor.
+# `artifact_client.py` imaja bağımsız bir modül olarak kopyalanıyor
+# (bkz. sandbox_image/Dockerfile): sandbox imajına `grounded_assistant`
+# paketinin tamamını (langgraph, langchain…) kurmak istemiyoruz.
 import artifact_client
-import serialize
 from fastmcp import Client
 
 TOOL_GATEWAY_ENDPOINT = os.environ["TOOL_GATEWAY_ENDPOINT"]
@@ -172,6 +184,7 @@ SCRATCH_DIR = os.environ.get("PTC_SCRATCH_DIR", "/scratch")
 #: Dizin artifact'lerinin ad soneki. Paketleme ARTIK BURADA DEĞİL — süpürme
 #: sidecar'a taşındı (bkz. sidecar.py). Burada yalnızca AÇMA tarafı var.
 _DIZIN_SONEKI = ".tar"
+_DIZIN_TIPI = "application/x-tar"
 
 #: Sidecar'ın localhost proxy'si. Kapsam jetonu ONDA; bu container'da yok.
 PROXY_URL = os.environ.get("PTC_ARTIFACT_PROXY", "")
@@ -190,15 +203,6 @@ PROXY_URL = os.environ.get("PTC_ARTIFACT_PROXY", "")
 #: `/output` = bu çalıştırma, `/artifacts/<wf>/` = adı verilen çalıştırma.
 ARTIFACTS_DIR = os.environ.get("PTC_ARTIFACTS_DIR", "/artifacts")
 
-#: `os.listdir` / `os.path.exists` LLM'in kodu için YAMALANIYOR (manifestteki
-#: isimler de görünsün diye). Launcher'ın kendisi gerçeği görmek ZORUNDA:
-#: yamalı sürümü kullansaydı, henüz inmemiş bir ismi `/output`'ta var sanıp
-#: süpürmeye çalışırdı. Bu yüzden orijinaller import anında saklanıyor.
-_GERCEK_LISTDIR = os.listdir
-_GERCEK_EXISTS = os.path.exists
-
-#: Süpürmede yok sayılacak adlar — kullanıcı çıktısı değiller.
-_SUPURME_DISI = (".", "__")
 
 
 def _gecerli_artifact_adi(dosya_adi: str) -> str:
@@ -215,348 +219,6 @@ def _gecerli_artifact_adi(dosya_adi: str) -> str:
     return (temiz or "cikti")[:128]
 
 
-#: `art_` + 12 hex — `service.py`'deki `"art_" + uuid4().hex[:12]` ile birebir.
-_KIMLIK_BICIMI = re.compile(r"^art_[0-9a-f]{12}$")
-
-
-def _kimlik_mi(deger) -> bool:
-    return isinstance(deger, str) and bool(_KIMLIK_BICIMI.match(deger))
-
-
-class Depo:
-    """Sandbox'ın gördüğü depo görünümü — tek istekle kurulur.
-
-    `kendi`      : bu çalıştırmanın ürettiği adlar   -> /output/<ad>
-    `digerleri`  : workflow_id -> adlar              -> /artifacts/<wf>/<ad>
-
-    Baytlar İNMİYOR, yalnızca isimler. Maliyet artifact sayısından ve
-    boyutundan bağımsız.
-    """
-
-    __slots__ = ("kendi", "digerleri")
-
-    def __init__(self, kendi=None, digerleri=None):
-        self.kendi = kendi or set()
-        self.digerleri = digerleri or {}
-
-    def bos(self) -> bool:
-        return not self.kendi and not self.digerleri
-
-
-def _manifest(istemci) -> Depo:
-    """Depoda ne var — YALNIZCA isimler, tek istek.
-
-    Servise ulaşılamazsa boş görünüm döner: pod açılışı ASLA buna bağlı
-    olmamalı, yalnızca keşif ve tembel okuma sessizce devre dışı kalır.
-    """
-    try:
-        kayitlar = istemci.list_all()
-    except Exception:  # noqa: BLE001
-        return Depo()
-    kendi, digerleri = set(), {}
-    for k in kayitlar:
-        ad, wf = k.get("name"), k.get("workflow_id") or ""
-        if not ad:
-            continue
-        # `wf == WORKFLOW_ID` boş-boş eşleşmesini de kapsıyor: kapsamı
-        # bilinmeyen bir kurulumda her şeyi "kendi" saymak, hiçbirini
-        # göstermemekten iyi — ilk hâli künyeyi sessizce DÜŞÜRÜYORDU.
-        if wf == WORKFLOW_ID:
-            kendi.add(ad)
-        elif wf:
-            digerleri.setdefault(wf, set()).add(ad)
-    return Depo(kendi, digerleri)
-
-
-def _yolu_coz(yol) -> tuple[str, str, str] | None:
-    """Bir yolu (`tur`, `workflow_id`, `ad`) üçlüsüne çevirir; ilgisizse None.
-
-    tur: "cikti"    -> /output/<ad>            (bu çalıştırma)
-         "baska"    -> /artifacts/<wf>/<ad>    (adı verilen çalıştırma)
-    """
-    if not isinstance(yol, (str, bytes, os.PathLike)):
-        return None
-    try:
-        metin = os.fspath(yol)
-    except TypeError:
-        return None
-    if isinstance(metin, bytes):
-        metin = metin.decode("utf-8", "replace")
-    tam = os.path.abspath(metin)
-
-    cikti = os.path.abspath(OUTPUT_DIR)
-    if os.path.dirname(tam) == cikti:
-        return ("cikti", WORKFLOW_ID, os.path.basename(tam))
-
-    art = os.path.abspath(ARTIFACTS_DIR)
-    if tam.startswith(art + os.sep):
-        parcalar = os.path.relpath(tam, art).split(os.sep)
-        if len(parcalar) == 2:
-            return ("baska", parcalar[0], parcalar[1])
-    return None
-
-
-def _tembel_dizin_ac(tam: str, istemci, depo) -> None:
-    """`<kök>/<dizin>/...` istendi — `<dizin>.tar` varsa indir ve aç.
-
-    İKİ kökü de tanır (2026-09-06):
-        /output/<dizin>/...            -> bu çalıştırmanın dizin artifact'i
-        /artifacts/<wf>/<dizin>/...    -> adı verilen çalıştırmanınki
-
-    "Bunu ben indirdim, LLM üretmedi" defteri ARTIK BURADA TUTULMUYOR —
-    sidecar sunduğu her baytın sha256'sını kendisi kaydediyor ve süpürmede ona
-    bakıyor. Kayıt sandbox'ta olmadığı için kurcalanamıyor da.
-    """
-    cikti = os.path.abspath(OUTPUT_DIR)
-    art = os.path.abspath(ARTIFACTS_DIR)
-
-    if tam.startswith(cikti + os.sep):
-        gorece, wf, havuz, kok = os.path.relpath(tam, cikti), WORKFLOW_ID, depo.kendi, cikti
-    elif tam.startswith(art + os.sep):
-        parcalar = os.path.relpath(tam, art).split(os.sep)
-        if len(parcalar) < 3:
-            return                       # /artifacts/<wf>/<dizin>/<dosya> gerekiyor
-        wf = parcalar[0]
-        gorece = os.sep.join(parcalar[1:])
-        havuz = depo.digerleri.get(wf, set())
-        kok = os.path.join(art, wf)
-    else:
-        return
-
-    parcalar = gorece.split(os.sep)
-    if len(parcalar) < 2 or parcalar[0] in ("..", "."):
-        return
-    dizin_adi = parcalar[0]
-    hedef = os.path.join(kok, dizin_adi)
-    if _GERCEK_EXISTS(hedef):
-        return  # zaten inmiş; istenen dosya gerçekten yok
-    arsiv = _gecerli_artifact_adi(dizin_adi + _DIZIN_SONEKI)
-    if arsiv not in havuz:
-        return
-
-    paket = os.path.join(SCRATCH_DIR, f"_inen_{arsiv}")
-    try:
-        kunye = istemci.fetch_to_file(arsiv, paket, workflow_id=wf)
-        if not kunye:
-            return
-        os.makedirs(hedef, exist_ok=True)
-        _tari_ac(paket, hedef)
-    except Exception:  # noqa: BLE001 — inemezse dosya yok gibi davran
-        return
-    finally:
-        if _GERCEK_EXISTS(paket):
-            os.unlink(paket)
-
-
-def _tembel_oku(yol, istemci, depo) -> None:
-    """Bir yol istendi ama dosya yok — depoda varsa indir.
-
-    İki yol biçimi tanınıyor:
-      `/output/<ad>`          -> BU çalıştırmanın çıktısı
-      `/artifacts/<wf>/<ad>`  -> adı verilen çalıştırmanın çıktısı
-
-    Yalnızca manifestte adı geçen dosyalar indirilir; yani var olmayan bir
-    dosya için ağa çıkılmaz, `FileNotFoundError` normal şekilde yükselir.
-
-    "İndirdiğimiz dosyayı süpürme geri yüklemesin" kuralı ARTIK BURADA DEĞİL:
-    sidecar sunduğu her baytın sha256'sını tutuyor ve süpürmede ona bakıyor
-    (2026-09-06). Defter sandbox'ta olmadığı için kurcalanamıyor.
-    """
-    if not isinstance(yol, (str, bytes, os.PathLike)):
-        return  # dosya nesnesi, URL, tampon — bizim işimiz değil
-    metin = os.fspath(yol)
-    if isinstance(metin, bytes):
-        metin = metin.decode("utf-8", "replace")
-    if _GERCEK_EXISTS(metin):
-        return
-
-    coz = _yolu_coz(metin)
-    if coz is None:
-        # DİZİN ARTIFACT'İ: `/output/model.v1/weights.json` isteniyor ama
-        # `/output/model.v1` daha inmemiş olabilir.
-        _tembel_dizin_ac(os.path.abspath(metin), istemci, depo)
-        return
-
-    tur, wf, ham_ad = coz
-    ad = _gecerli_artifact_adi(ham_ad)
-    havuz = depo.kendi if tur == "cikti" else depo.digerleri.get(wf, set())
-    if ad not in havuz:
-        return
-
-    os.makedirs(os.path.dirname(os.path.abspath(metin)), exist_ok=True)
-    try:
-        kunye = istemci.fetch_to_file(ad, metin, workflow_id=wf)
-    except Exception:  # noqa: BLE001 — indirilemezse dosya yok gibi davran
-        return
-    # `consumed` olayını da sidecar yayınlıyor — baytı o sunuyor.
-
-
-def _tembel_okumayi_kur(istemci, depo) -> dict:
-    """pandas okuyucularını sarmalar, sandbox'a tembel bir `open` döndürür.
-
-    İki ayrı yer gerekiyor çünkü kapsamları farklı:
-
-      - **pandas** bir kütüphane; `read_csv` kendi C parser'ıyla dosyayı
-        açtığı için `open`'ı sarmak yetmez, modülün kendisi yamalanmalı.
-      - **`open`** ise `sandbox_globals`'a konuyor, `builtins` DEĞİŞTİRİLMİYOR.
-        Böylece LLM'in doğrudan `open("/output/x.json")` çağrısı yakalanıyor
-        ama kütüphanelerin iç dosya işlemleri hiç etkilenmiyor. Yama alanını
-        dar tutmanın en temiz yolu bu.
-    """
-    try:
-        import pandas as pd  # noqa: PLC0415
-    except ImportError:
-        pd = None
-
-    if pd is not None:
-        for fn_adi in ("read_csv", "read_parquet", "read_json", "read_excel", "read_feather"):
-            orijinal = getattr(pd, fn_adi, None)
-            if orijinal is None:
-                continue
-            setattr(
-                pd, fn_adi,
-                _okuyucu_sarmala(orijinal, istemci, depo),
-            )
-
-    # -- KEŞİF: `/output` artık yalan söylememeli -------------------------
-    #
-    # LLM'e sunulan artifact fonksiyonları kaldırıldığı için (2026-09-06)
-    # keşfin TEK yolu dosya sistemi kaldı. Ama `/output` pod açılışında
-    # fiziksel olarak BOŞ — baytlar ancak adıyla istenince iniyor.
-    #
-    # Bu, düz Python yazan bir modeli doğrudan yanıltıyordu:
-    #     os.listdir("/output")   -> []      (oysa depoda 5 artifact var)
-    #     os.path.exists("/output/satislar.parquet") -> False
-    # Model "hiçbir şey yok" sonucuna varıp veriyi yeniden üretiyordu.
-    #
-    # Üçü de manifestle BİRLEŞTİRİLİYOR: dosya sistemi artık deponun görünümü.
-    _yamala_kesif(depo)
-
-    gercek_open = open
-
-    def _tembel_open(dosya, kip="r", *args, **kwargs):
-        if "r" in kip and "+" not in kip:
-            _tembel_oku(dosya, istemci, depo)
-        return gercek_open(dosya, kip, *args, **kwargs)
-
-    return {"open": _tembel_open}
-
-
-def _yamala_kesif(depo) -> None:
-    """`os.listdir`, `os.path.exists` ve `glob` depoyu da görsün.
-
-    Yama MODÜL düzeyinde olmak zorunda: LLM'in kodu `import os` deyince
-    `sys.modules['os']`'u alıyor, bizim verdiğimiz bir kopyayı değil. Aynı
-    sebep pandas okuyucularının yamalanmasındakiyle bir.
-
-    İki kök ayrı gösteriliyor:
-        /output                -> bu çalıştırmanın çıktıları
-        /artifacts             -> başka çalıştırmaların kimlikleri
-        /artifacts/<wf>        -> o çalıştırmanın çıktıları
-
-    Launcher kendi işini `_GERCEK_LISTDIR` / `_GERCEK_EXISTS` ile yapıyor,
-    yani bu yamadan etkilenmiyor.
-    """
-    import glob as _glob  # noqa: PLC0415
-
-    def _sanal_liste(yol: str):
-        """Bu yol için depodan gelen adlar; ilgisizse None."""
-        tam = os.path.abspath(yol)
-        if tam == os.path.abspath(OUTPUT_DIR):
-            return depo.kendi
-        art = os.path.abspath(ARTIFACTS_DIR)
-        if tam == art:
-            return set(depo.digerleri)
-        if os.path.dirname(tam) == art:
-            return depo.digerleri.get(os.path.basename(tam), set())
-        return None
-
-    def listdir(path="."):
-        gercek = _GERCEK_LISTDIR(path) if _GERCEK_EXISTS(path) else []
-        sanal = _sanal_liste(os.fspath(path))
-        return sorted(set(gercek) | sanal) if sanal is not None else gercek
-
-    def exists(path):
-        if _GERCEK_EXISTS(path):
-            return True
-        if _sanal_liste(path) is not None:
-            return True          # dizinin kendisi (/output, /artifacts, /artifacts/<wf>)
-        coz = _yolu_coz(path)
-        if coz is None:
-            return False
-        tur, wf, ad = coz
-        havuz = depo.kendi if tur == "cikti" else depo.digerleri.get(wf, set())
-        return ad in havuz
-
-    def _genisle(sonuc, kalip):
-        dizin = os.path.dirname(os.path.abspath(os.fspath(kalip)))
-        sanal = _sanal_liste(dizin)
-        if sanal is None:
-            return sonuc
-        import fnmatch  # noqa: PLC0415
-
-        desen = os.path.basename(os.fspath(kalip))
-        ek = [os.path.join(dizin, ad) for ad in sanal if fnmatch.fnmatch(ad, desen)]
-        return sorted(set(sonuc) | set(ek))
-
-    gercek_glob, gercek_iglob = _glob.glob, _glob.iglob
-    _glob.glob = lambda kalip, *a, **kw: _genisle(gercek_glob(kalip, *a, **kw), kalip)
-    _glob.iglob = lambda kalip, *a, **kw: iter(
-        _genisle(list(gercek_iglob(kalip, *a, **kw)), kalip))
-
-    os.listdir = listdir
-    os.path.exists = exists
-
-
-#: Dosya başlangıcındaki imza → o biçimi okuyan pandas fonksiyonu.
-#: Parquet "PAR1", Arrow IPC "ARROW1" ile başlar.
-_BICIM_IMZALARI = ((b"PAR1", "read_parquet"), (b"ARROW1", "read_feather"))
-
-
-def _bicim_uyari(yol: str, cagrilan: str) -> str | None:
-    """Yanlış okuyucu kullanıldıysa açıklayıcı mesaj döner, yoksa None.
-
-    NEDEN (2026-09-04, canlı kullanımda bulundu): `put_artifact(df, ...)`
-    DataFrame'i Parquet'e çeviriyor, ama artifact ADI uzantı taşımıyor
-    ("ticket.durumlari"). Tembel doldurma o adı dosya olarak koyunca model
-    `pd.read_csv("/output/ticket.durumlari")` deniyor ve şu hatayı alıyor:
-
-        'utf-8' codec can't decode byte 0xe4 in position 106
-
-    Bu mesajdan ne olduğu anlaşılmıyor; model "artifact bozuk" sanıp vazgeçti.
-    Doğru çağrıyı söylemek, modelin kendini düzeltebilmesi için yeterli.
-    """
-    try:
-        with open(yol, "rb") as f:
-            bas = f.read(8)
-    except OSError:
-        return None
-    for imza, dogru in _BICIM_IMZALARI:
-        if bas.startswith(imza) and cagrilan != dogru:
-            return (
-                f"{yol} bir {imza.decode()} dosyası ama {cagrilan}() ile açılmaya "
-                f"çalışıldı. Bunun yerine {dogru}('{yol}') kullanın — ya da daha "
-                f"kolayı: get_artifact('{os.path.basename(yol)}') doğrudan "
-                "DataFrame döndürür."
-            )
-    return None
-
-
-def _okuyucu_sarmala(orijinal, istemci, depo):
-    ad = getattr(orijinal, "__name__", "")
-
-    def _oku(yol=None, *args, **kwargs):
-        if yol is not None:
-            _tembel_oku(yol, istemci, depo)
-            if isinstance(yol, str):
-                uyari = _bicim_uyari(yol, ad)
-                if uyari:
-                    raise ValueError(uyari)
-        return orijinal(yol, *args, **kwargs)
-
-    _oku.__name__ = getattr(orijinal, "__name__", "read")
-    _oku.__doc__ = getattr(orijinal, "__doc__", None)
-    return _oku
 
 
 def _tari_ac(tar_yolu: str, hedef_dizin: str) -> None:
@@ -594,6 +256,61 @@ def _proxy_bekle(taban: str, saniye: float = 10.0) -> bool:
     return False
 
 
+#: Sidecar'ın yerleştirmeyi bitirip sunucuyu açması için beklenecek süre.
+#: Yerleştirme ağdan indirme içerdiği için proxy'nin salt açılmasından uzun
+#: sürebilir; `activeDeadlineSeconds: 90` içinde rahat kalıyor.
+_SIDECAR_BEKLEME = 30.0
+
+#: `load_artifact`'e verilen çalıştırma kimliği — yol geçişine karşı.
+_GUVENLI_WF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _load_artifact_uret(istemci):
+    """BAŞKA bir çalıştırmanın çıktısını yerelleştiren tek fonksiyon.
+
+    Kendi çıktıların için GEREKMİYOR: onlar pod açılırken `/output`'a
+    yerleştirilmiş oluyor, düz `open`/`pd.read_*` yetiyor.
+
+    Bu ayrım KFP'den geliyor. Orada bir bileşen kendi girdilerini `.path`'te
+    HAZIR bulur (driver çözer, launcher indirir); başka bir çalıştırmanın
+    artifact'ine ise ancak onun kimliğini içeren AÇIK bir adresle ulaşır.
+    Burada da öyle: sık olan yol sessiz, nadir olan yol açık.
+
+    Salt okuma. Yükleme uç noktası proxy'de hiç yok — neyin artifact olacağına
+    sidecar `/output`'a bakarak karar veriyor (Argo'nun `wait` container'ı).
+    """
+
+    def load_artifact(workflow_id: str, name: str) -> str:
+        """`workflow_id` çalıştırmasının `name` çıktısını indirir, yolunu döner.
+
+        Dizin artifact'i ise açılır ve dizinin yolu döner.
+        """
+        if istemci is None:
+            raise RuntimeError("artifact servisi bu çalıştırmada kapalı")
+        wf = str(workflow_id)
+        if not _GUVENLI_WF.match(wf):
+            raise ValueError(f"geçersiz çalıştırma kimliği: {workflow_id!r}")
+        ad = _gecerli_artifact_adi(os.path.basename(str(name)))
+
+        hedef_dizin = os.path.join(ARTIFACTS_DIR, wf)
+        os.makedirs(hedef_dizin, exist_ok=True)
+        hedef = os.path.join(hedef_dizin, ad)
+
+        kunye = istemci.fetch_to_file(ad, hedef, workflow_id=wf)
+        if not kunye:
+            raise FileNotFoundError(f"{wf}/{ad} — böyle bir artifact yok")
+
+        if ad.endswith(_DIZIN_SONEKI) and kunye.get("content_type") == _DIZIN_TIPI:
+            dizin = hedef[: -len(_DIZIN_SONEKI)]
+            os.makedirs(dizin, exist_ok=True)
+            _tari_ac(hedef, dizin)
+            os.unlink(hedef)
+            return dizin
+        return hedef
+
+    return load_artifact
+
+
 def main() -> None:
     with open(CODE_PATH, encoding="utf-8") as f:
         code = f.read()
@@ -604,31 +321,32 @@ def main() -> None:
         """Sandbox kodu, nihai sonucunu bununla bildirir (research.md kontratı)."""
         result_holder["value"] = value
 
-    # OKUMA yolu: 127.0.0.1'deki sidecar'a. Kapsam jetonu BU CONTAINER'DA YOK
-    # (2026-09-06) — sidecar taşıyor. Proxy'de yükleme uç noktası da yok:
-    # neyin yükleneceğine sidecar `/output`'a bakarak karar veriyor, tıpkı
-    # Argo'nun `wait` container'ı gibi. LLM'in kodunun etkileyebileceği tek
-    # şey dosya yazmak — yani zaten kastedilen arayüz.
+    # GİRDİLER KOD BAŞLAMADAN YERLEŞTİRİLMİŞ OLMALI (2026-09-07, KFP deseni).
+    #
+    # Eskiden `/output` YALAN bir görünümdü: `os.listdir`, `glob`, pandas
+    # okuyucuları ve `open` yamalanıyor, bayt ancak `read_parquet` çağrısının
+    # ORTASINDA iniyordu. Hiçbir üründe böyle bir şey yok — Argo girdiyi
+    # `init` container'da, KFP launcher'da indiriyor; ikisi de kod BAŞLAMADAN.
+    # Artık biz de öyle: yerleştirmeyi sidecar üstlendi, burada yama kalmadı,
+    # `/output`'taki dosyalar GERÇEK.
+    #
+    # Sidecar yerleştirmeyi BİTİRDİKTEN SONRA localhost sunucusunu açıyor;
+    # yani `/healthz`'in cevap vermesi "`/output` hazır" demektir. Bu el
+    # sıkışma artık YÜK TAŞIYOR: cevap gelmezse `/output` yarım kalmış
+    # olabilir. Sessizce devam etmek, tam da kovaladığımız "sessizce yanlış"
+    # arızası olurdu — o yüzden çalıştırma açık hatayla bitiyor.
     istemci = artifact_client.ProxyClient(PROXY_URL) if PROXY_URL else None
-    if istemci and not _proxy_bekle(PROXY_URL):
-        # Sidecar HTTP sunucusunu henüz açmamış olabilir — main container onunla
-        # AYNI ANDA başlıyor. Beklemezsek `_manifest` boş dönüyor ve tembel
-        # okuma SESSİZCE devre dışı kalıyordu (yarış koşulu).
-        print(json.dumps({"type": "proxy_hazir_degil", "url": PROXY_URL}), flush=True)
-        istemci = None
-
-    # Tembel okuma: prefetch'in yerini aldı. Pod açılışında YALNIZCA isim
-    # listesi çekiliyor (tek istek, N'den bağımsız); baytlar ancak
-    # `pd.read_parquet("/output/...")` çağrıldığında iniyor — maliyet
-    # O(kullanılan), eskiden O(hepsi) idi ve 512Mi'lık /output'u patlatıyordu.
-    tembel_globals: dict = {}
-    if istemci:
-        tembel_globals = _tembel_okumayi_kur(istemci, _manifest(istemci))
+    if istemci and not _proxy_bekle(PROXY_URL, _SIDECAR_BEKLEME):
+        print(json.dumps({
+            "status": "error",
+            "message": "artifact sidecar hazır değil — girdiler yerleştirilemedi",
+        }))
+        sys.exit(0)
 
     sandbox_globals: dict = {
         "set_result": set_result,
         **{name: _make_sync_tool(name) for name in ALLOWED_TOOLS},
-        **tembel_globals,
+        "load_artifact": _load_artifact_uret(istemci),
     }
 
     # SÜPÜRME BURADA DEĞİL. `/output`'a yazılanları sidecar topluyor: ana

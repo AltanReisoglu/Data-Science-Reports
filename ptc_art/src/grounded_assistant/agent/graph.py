@@ -119,28 +119,28 @@ def _make_ptc_tool(
         otomatik olarak kalıcı depoya konur. Hata alsan bile o ana kadar
         yazdıkların kurtarılır.
 
-        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — dosya sistemi deponun görünümüdür.
-        `/output/` altındaki bir dosyayı okumak istediğinde, o dosya bu pod'da
-        fiziksel olarak olmasa bile depodan otomatik iner. Yani:
+        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — bu oturumun bütün çıktıları
+        `/output/` altında HAZIR duruyor. Pod açılırken oraya yerleştiriliyor,
+        yani sıradan dosyalar; özel bir çağrı yok:
 
-            os.listdir("/output")              # depoda ne varsa listeler
-            os.path.exists("/output/x.parquet")  # depodakini de sayar
-            pd.read_parquet("/output/x.parquet") # yoksa indirir, sonra okur
+            os.listdir("/output")                # bu oturumun çıktıları
+            pd.read_parquet("/output/x.parquet") # düz dosya okuması
 
         Kullanıcı önceki bir sonuca atıf yapıyorsa ("az önceki tabloyu", "onu
         departmana göre grupla") veriyi YENİDEN ÜRETME — önce `/output`'a bak,
         oradan oku.
 
-        İKİ AYRI KÖK var, karıştırma:
-        - `/output/` — YALNIZCA BU OTURUMUN çıktıları. "Az önce", "demin",
-          "senin ürettiğin" dendiğinde burası.
-        - `/artifacts/<workflow_id>/` — BAŞKA çalıştırmaların çıktıları.
-          `os.listdir("/artifacts")` hangi çalıştırmalar var onu listeler.
-          Bunlar bu oturumun işi DEĞİL; kullanıcı açıkça istemedikçe
-          kullanma, ve asla kendi çıktın gibi sunma.
+        BAŞKA BİR ÇALIŞTIRMANIN çıktısı `/output`'ta OLMAZ ve kendiliğinden
+        gelmez. Gerekiyorsa açıkça iste:
 
-        Aradığın dosya `/output`'ta yoksa üretmen gerekiyor demektir —
-        `/artifacts` altındaki benzer adlı bir dosyayı onun yerine koyma.
+            yol = load_artifact("<workflow_id>", "rapor.pdf")  # yolu döner
+
+        Bunlar bu oturumun işi DEĞİL. Kullanıcı açıkça istemedikçe kullanma ve
+        asla kendi çıktın gibi sunma. Hangi çalıştırmada ne olduğunu sistem
+        mesajındaki artifact listesinden görürsün.
+
+        Aradığın dosya `/output`'ta yoksa üretmen gerekiyor demektir — başka
+        bir çalıştırmadaki benzer adlı bir dosyayı onun yerine koyma.
 
         PAHALI İŞİ TEKRARLAMA: 5'ten fazla tool çağrısı içeren ya da döngüyle
         veri toplayan bir bloktan önce çıktısı var mı diye bak:
@@ -168,8 +168,7 @@ def _make_ptc_tool(
 
         `/output/` altına bir DİZİN de bırakabilirsin (çok dosyalı model,
         varlıklarıyla birlikte HTML rapor). Tek bir artifact olarak saklanır ve
-        sonraki çalıştırmada `/output/<dizin>/<dosya>` yolunu okuyunca
-        kendiliğinden geri açılır.
+        sonraki çalıştırmada `/output/<dizin>/` olarak açılmış hâlde gelir.
         Panelde PNG ve PDF önizlemesi var, yani ürettiğin belge gerçekten
         görüntülenebilir."""
         if trace.sandbox_run_count() >= MAX_SANDBOX_RUNS_PER_TURN:
