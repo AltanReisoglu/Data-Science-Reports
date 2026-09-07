@@ -41,4 +41,19 @@ COPY sandbox_image/entrypoint.py /entrypoint.py
 # onun ortamında. `command` ile seçiliyor (bkz. k8s/sandbox/job-template.yaml).
 COPY sandbox_image/sidecar.py /sidecar.py
 
+# SAYISAL, root olmayan kullanıcı (2026-09-07). İki sebep:
+#
+# 1. `runAsNonRoot: true` bir imajın root ÇALIŞTIRDIĞINI görürse pod
+#    CreateContainerConfigError veriyor — kubelet imajın USER'ına bakıyor.
+# 2. OpenShift'in `restricted-v2` SCC'si zaten namespace'e özgü rastgele bir UID
+#    atıyor ve buradaki değeri EZİYOR. Yani bu satır OpenShift'te bir şey
+#    değiştirmiyor; kind'ın OpenShift gibi davranmasını sağlıyor.
+#
+# Sayısal olmak ZORUNDA (`USER app` değil): `runAsNonRoot` kontrolü isim
+# çözemiyor, yalnızca UID'ye bakıyor.
+#
+# Yazılabilir yerler emptyDir (0777) — pip paketleri root'a ait ama herkese
+# okunabilir, o yüzden çalıştırma etkilenmiyor.
+USER 1001
+
 ENTRYPOINT ["python", "/entrypoint.py"]

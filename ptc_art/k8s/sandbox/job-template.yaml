@@ -26,6 +26,19 @@ spec:
         ptc-run-id: "{run_id}"
     spec:
       restartPolicy: Never
+      # OpenShift'in `restricted-v2` SCC'si bunları zaten DAYATIR; burada AÇIKÇA
+      # yazmamızın sebebi kind ile OpenShift'in aynı davranması. Yazmasaydık
+      # kind'da root olarak çalışıp OpenShift'te rastgele UID'ye düşerdi ve fark
+      # ancak orada görülürdü.
+      #
+      # `runAsUser` BİLEREK YOK: OpenShift namespace'e özgü bir UID atıyor; sabit
+      # bir değer yazmak SCC ile çakışırdı. İmaj rastgele UID'ye dayanmak zorunda
+      # — emptyDir 0777 geldiği için `/output` ve `/scratch` yazılabiliyor
+      # (2026-09-07'de SCC taklidiyle doğrulandı).
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       # ── SIDECAR: artifact aktarımı ───────────────────────────────────────
       #
       # Argo Workflows'un `wait` container'ının karşılığı. Argo bu problemi
@@ -48,6 +61,10 @@ spec:
           imagePullPolicy: Never
           restartPolicy: Always
           command: ["python", "/sidecar.py"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: ARTIFACT_SERVICE_ENDPOINT
               value: "{artifact_service_endpoint}"
@@ -72,6 +89,10 @@ spec:
         - name: sandbox
           image: ptc-sandbox:local
           imagePullPolicy: Never  # kind load docker-image ile yerelden yüklendi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: TOOL_GATEWAY_ENDPOINT
               value: "{tool_gateway_endpoint}"
