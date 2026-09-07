@@ -420,7 +420,43 @@ Sol altta PTC terminali: pod adı, çalıştırılan kod, süpürülen artifact 
 
 ---
 
-## Sayfa 20 — Açıklar (saklamıyoruz)
+## Sayfa 20 — Vaka: başka bir workflow'un artifact'ını kullanmak
+
+**PoC bunu üç ayrı yerden gösteriyor.**
+
+| Soru | Nerede görünüyor |
+|---|---|
+| Sınır geçildi mi? | **Soy ağacı** — kesikli mavi kenar, farklı `workflow_id` |
+| Kim geçti? | **Depo müfettişi → Kullananlar** — "başka çalıştırma" rozeti |
+| Hangi sürüm seçildi? | **Keşif adımının log'u** — alias mı, en yeni mi |
+
+**Ne yazılı, ne çalışma anında bulunuyor:**
+
+| | Nereden |
+|---|---|
+| Ne aranacak (`processed-result.json`) | **yazılı** — hat tanımında, Argo/KFP gibi |
+| Hangi çalıştırma üretmiş | çalışma anında, kayıt defteri sorgusundan |
+| Hangi sürüm (8 aday arasından) | çalışma anında, alias/en-yeni kuralıyla |
+
+```
+load_artifact("{kaynak_wf}", "processed-result.json")
+               ^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^
+               bulunuyor      yazılı
+```
+
+**Sürüm seçimi canlı doğrulandı:**
+
+| | Seçilen | Üreten çalıştırma |
+|---|---|---|
+| alias yokken | `art_dd422fd3e66b` — **en yeni** | 119d1f91 |
+| `@onaylanmis` sabitliyken | `art_cfa44f0298f5` — **en eski** | bfc62bbe |
+
+**Adı da modelin seçtiği yol Sohbet sekmesi:** orada hiçbir şey yazılı değil,
+manifest isimleri veriyor, neyi okuyacağına model karar veriyor.
+
+---
+
+## Sayfa 21 — Açıklar (saklamıyoruz)
 
 | Konu | Durum | Etki |
 |---|---|---|
@@ -438,7 +474,7 @@ Sol altta PTC terminali: pod adı, çalıştırılan kod, süpürülen artifact 
 
 ---
 
-## Sayfa 21 — Ekibe dört soru
+## Sayfa 22 — Ekibe dört soru
 
 | # | Soru | Neden önemli |
 |---|---|---|
