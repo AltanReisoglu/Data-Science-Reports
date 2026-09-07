@@ -119,10 +119,30 @@ TRANSFER = os.environ.get("PTC_ARTIFACT_TRANSFER", "proxy")
 S3_ENDPOINT = os.environ.get("PTC_S3_ENDPOINT", "")
 S3_BUCKET = os.environ.get("PTC_S3_BUCKET", "")
 
-#: Artifact adı — servisin kabul ettiğiyle birebir. Beyan bu süzgeçten
-#: geçiyor: ad ne virgül ne tırnak içerebiliyor, dolayısıyla virgülle
-#: ayrılmış tek bir ortam değişkenine güvenle sığıyor.
-_AD_BICIMI = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+#: Beyan edilebilecek girdi biçimleri (2026-09-07, ikinci tur):
+#:
+#:     ad                  bu çalıştırmanın çıktısı  → /output/<ad>
+#:     <workflow_id>/ad    başka çalıştırmanınki     → /artifacts/<wf>/<ad>
+#:     ad@alias            sabitlenmiş sürüm         → /artifacts/_alias/<ad>
+#:
+#: Üçü de KFP'de `.uri` beyanına denk geliyor: launcher hepsini `.path`'e
+#: indiriyor, kullanıcı kodu hiçbir çağrı yapmıyor. Çapraz-workflow okuma
+#: BEYANA taşınınca sandbox'ın son ağ çağrısı da kalktı.
+#:
+#: Ad/alias/workflow parçalarının hiçbiri virgül ya da tırnak içeremiyor,
+#: dolayısıyla virgülle ayrılmış tek bir ortam değişkenine güvenle sığıyorlar.
+_AD_BICIMI = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}"           # ad
+    r"(@[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$"        # @alias
+)
+_YOLLU_BICIMI = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}"           # workflow_id
+    r"/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"          # /ad
+)
+
+
+def _gecerli_beyan(a: str) -> bool:
+    return bool(_AD_BICIMI.match(a) or _YOLLU_BICIMI.match(a))
 
 #: Beyanda en fazla bu kadar ad. Sınır ortam değişkeni boyutu için değil,
 #: "beyan" kavramının anlamı için: yüzlerce girdi beyan etmek beyan etmemekle
@@ -144,7 +164,7 @@ def _beyani_bicimle(inputs) -> str:
     """
     if inputs is None:
         return "*"
-    temiz = [a for a in (str(x).strip() for x in inputs) if _AD_BICIMI.match(a)]
+    temiz = [a for a in (str(x).strip() for x in inputs) if _gecerli_beyan(a)]
     return ",".join(list(dict.fromkeys(temiz))[:_AZAMI_BEYAN])
 
 

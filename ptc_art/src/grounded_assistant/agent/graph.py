@@ -140,10 +140,16 @@ def _make_ptc_tool(
         departmana göre grupla") veriyi YENİDEN ÜRETME — önce `/output`'a bak,
         oradan oku.
 
-        BAŞKA BİR ÇALIŞTIRMANIN çıktısı `/output`'ta OLMAZ ve kendiliğinden
-        gelmez. Gerekiyorsa açıkça iste:
+        BAŞKA BİR ÇALIŞTIRMANIN çıktısı da BEYANLA gelir — kod içinde çağrı
+        yok, dosya hazır olur:
 
-            yol = load_artifact("<workflow_id>", "rapor.pdf")  # yolu döner
+            run_ptc_code(kod, inputs=["<workflow_id>/rapor.pdf"])
+            # kodun içinde:  open("/artifacts/<workflow_id>/rapor.pdf")
+
+        Sabitlenmiş bir sürüm istiyorsan:
+
+            run_ptc_code(kod, inputs=["rapor.pdf@onaylanmis"])
+            # kodun içinde:  open("/artifacts/_alias/rapor.pdf")
 
         Bunlar bu oturumun işi DEĞİL. Kullanıcı açıkça istemedikçe kullanma ve
         asla kendi çıktın gibi sunma. Hangi çalıştırmada ne olduğunu sistem

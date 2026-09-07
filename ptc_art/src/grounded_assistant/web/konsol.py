@@ -194,9 +194,13 @@ with PdfPages("/output/final-report.pdf") as pdf:
 set_result({"rapor": "final-report.pdf", "alanlar": list(t)})
 '''
 
+# Çapraz-workflow girdi artık BEYAN (2026-09-07): kod bir çağrı yapmıyor,
+# dosya zaten `/artifacts/<wf>/` altında hazır. Beyanı keşif adımının bulduğu
+# kimlikle runtime'da kuruyoruz — KFP'de driver'ın `.uri`yi çözüp launcher'a
+# vermesinin birebir karşılığı.
 _KOD_YUKLE = '''
-import json, shutil
-yol = load_artifact("{kaynak_wf}", "processed-result.json")
+import json
+yol = "/artifacts/{kaynak_wf}/processed-result.json"
 veri = json.load(open(yol))
 json.dump(veri, open("/output/analysis-input.json", "w"))
 set_result({{"kaynak_yol": yol, "alanlar": list(veri)}})
@@ -266,9 +270,10 @@ def pipeline_b() -> dict:
              "sorgu": {"name": "processed-result.json"}, "inputs": [],
              "bekleniyor": []},
             {"n": 2, "ad": "Artifact Yükle", "tur": "sandbox", "ikon": "i-down",
-             "aciklama": "Bulunan artifact'i `load_artifact` ile açıkça ister. "
-                         "Çapraz-workflow okuma tam burada oluyor.",
-             "kod": _KOD_YUKLE, "inputs": [], "bekleniyor": ["analysis-input.json"]},
+             "aciklama": "Bulunan artifact'i BEYAN ederek alır. Kod hiçbir çağrı "
+                         "yapmıyor — dosya /artifacts/<wf>/ altında hazır geliyor.",
+             "kod": _KOD_YUKLE, "inputs": ["{kaynak_wf}/processed-result.json"],
+             "bekleniyor": ["analysis-input.json"]},
             {"n": 3, "ad": "Analiz Et", "tur": "sandbox", "ikon": "i-chart",
              "aciklama": "Yerel kopyayı okur, denge skorunu hesaplar. Bu adım "
                          "artifact ÜRETMEZ — her adımın üretmesi gerekmiyor.",
@@ -376,6 +381,11 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
 
         # ── sandbox adımı: GERÇEK pod ────────────────────────────────────
         kod = nd["kod"]
+        # Beyan da çalışma anında dolduruluyor: keşif adımı kimliği buluyor,
+        # yerleştirme onu kullanıyor. Kimlik hiçbir yere gömülü değil.
+        girdiler = [g.format(kaynak_wf=cozulen_wf) if "{kaynak_wf}" in g else g
+                    for g in nd["inputs"]] if cozulen_wf else [
+            g for g in nd["inputs"] if "{kaynak_wf}" not in g]
         if "{kaynak_wf}" in kod:
             if not cozulen_wf:
                 yay({"type": "log", "n": nd["n"], "ts": _damga(),
@@ -407,12 +417,12 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
                      "cls": "fail"})
 
         yay({"type": "log", "n": nd["n"], "ts": _damga(),
-             "msg": f"beyan edilen girdiler: {nd['inputs'] or '—'}", "cls": ""})
+             "msg": f"beyan edilen girdiler: {girdiler or '—'}", "cls": ""})
         yay({"type": "code", "n": nd["n"], "kod": kod.strip()})
 
         run = run_sandbox(kod, on_event=_on_event, workflow_id=workflow_id,
                           owner="ptc", node_id=f"node-{nd['n']}",
-                          inputs=nd["inputs"])
+                          inputs=girdiler)
 
         for o in run.artifacts:
             if o.op.value == "produced":

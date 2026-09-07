@@ -194,14 +194,18 @@ def test_hicbir_sey_sunulmadiysa_oksuz(ortam):
 # -- yüzey: proxy'de YAZMA uç noktası yok ---------------------------------
 
 
-def test_proxyde_yazma_yolu_YOK():
-    """ASIL GÜVENLİK ÖZELLİĞİ: LLM proxy üzerinden bir şey yükleyemez.
+def test_SIDECARDA_HTTP_SUNUCUSU_YOK():
+    """2026-09-07 (ikinci tur): localhost proxy TAMAMEN kaldırıldı.
 
-    Jetonu sidecar'a taşımak tek başına yetmezdi — LLM localhost'a aynı çağrıyı
-    atabilirdi. Kazanç, yükleme uç noktasının HİÇ OLMAMASI: neyin yükleneceğine
-    sidecar `/output`'a bakarak karar veriyor.
+    Önce 127.0.0.1:8099'da `/healthz`, `/manifest`, `/fetch` vardı ve
+    `load_artifact` ona konuşuyordu. Çapraz-workflow okuma BEYANA taşınınca
+    sunucunun tek işi el sıkışma kaldı; onun için de paylaşılan volume'de bir
+    dosya yetiyor.
+
+    Bu test NEGATİF: sunucu geri gelirse sandbox'ın "hiçbir ağ çağrısı yok"
+    garantisi sessizce kaybolurdu.
     """
-    assert not hasattr(sidecar.Proxy, "do_POST")
-    assert not hasattr(sidecar.Proxy, "do_PUT")
-    assert not hasattr(sidecar.Proxy, "do_DELETE")
-    assert hasattr(sidecar.Proxy, "do_GET")
+    for gitmis in ("Proxy", "PROXY_PORT", "ThreadingHTTPServer",
+                   "BaseHTTPRequestHandler"):
+        assert not hasattr(sidecar, gitmis), f"{gitmis} geri sızdı"
+    assert hasattr(sidecar, "HAZIR_DOSYA")

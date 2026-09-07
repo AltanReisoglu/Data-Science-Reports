@@ -145,7 +145,7 @@ def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str 
             # "en yeni kazanır" kuralına düşmeden. Adresi bu, o yüzden
             # manifest de bunu gösteriyor.
             kuyruk = f"  ({kuyruk.strip()[1:-1]}, alias)"
-            digerleri.append(f'  load_artifact(None, "{ad}@{takma}"){kuyruk}')
+            digerleri.append(f'  inputs=["{ad}@{takma}"]{kuyruk}')
             continue
         if workflow_id and wf == workflow_id:
             benim.append(f"  /output/{ad}{kuyruk}")
@@ -154,7 +154,7 @@ def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str 
             # `/output`'ta DEĞİL ve modelin `workflow_id`'yi başka hiçbir
             # yerden öğrenme yolu yok — manifest yazmazsa `load_artifact`
             # çağrılamaz hâle geliyor (2026-09-07'de bulundu).
-            digerleri.append(f'  load_artifact("{wf}", "{ad}"){kuyruk}')
+            digerleri.append(f'  inputs=["{wf}/{ad}"]{kuyruk}')
 
     if not benim and not digerleri:
         return None
@@ -179,8 +179,8 @@ def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str 
         bolumler.append(
             "BAŞKA ÇALIŞTIRMALARDAN (aynı tenant) — BU OTURUMUN işi DEĞİL ve "
             "/output'ta BULUNMAZLAR.\nKullanıcı açıkça istemedikçe bunlara "
-            "dayanma. Gerekiyorsa satırı olduğu gibi çağır; dosyanın yolunu "
-            "döndürür:\n"
+            "dayanma. Gerekiyorsa satırı run_ptc_code'un inputs'una olduğu gibi "
+            "koy; dosya /artifacts/ altında hazır gelir:\n"
             + "\n".join(kirpik)
             + (f"\n  … ve {len(digerleri) - len(kirpik)} tane daha "
                "(gösterilmiyor)" if len(digerleri) > len(kirpik) else ""))

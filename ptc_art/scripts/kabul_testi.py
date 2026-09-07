@@ -82,30 +82,27 @@ sonuc = {{
   "kendi_output_bos": os.listdir("/output") == [],
   "output_sizinti":   os.path.exists("/output/ham.tickets.parquet"),
 }}
-# Başkasınınki ancak KİMLİĞİ verilerek geliyor (KFP: başka bir run'a AÇIK adresle)
-p = load_artifact("{WF_A}", "ham.tickets.parquet")
+# Başkasınınki BEYANLA geliyor — kod hiçbir çağrı yapmıyor, dosya hazır.
+# (KFP: launcher `.uri`leri `.path`e indirir, kullanıcı kodu çağrı yapmaz.)
+p = "/artifacts/{WF_A}/ham.tickets.parquet"
 sonuc["satir"] = len(pd.read_parquet(p))
-sonuc["kunye"] = json.load(open(load_artifact("{WF_A}", "kunye.json")))["kaynak"]
-d = load_artifact("{WF_A}", "model.v1.tar")
-sonuc["dizin"] = open(os.path.join(d, "alt", "derin.txt")).read()
-sonuc["yol"] = p.startswith("/artifacts/{WF_A}/")
-try:
-    load_artifact("{WF_A}", "hic-olmayan.parquet"); sonuc["yok_hatasi"] = "SESSIZ(!)"
-except FileNotFoundError:
-    sonuc["yok_hatasi"] = "FileNotFoundError"
+sonuc["kunye"] = json.load(open("/artifacts/{WF_A}/kunye.json"))["kaynak"]
+sonuc["dizin"] = open("/artifacts/{WF_A}/model.v1/alt/derin.txt").read()
+sonuc["yol"] = os.path.exists(p)
+sonuc["cagri_yok"] = "load_artifact" not in globals()
 set_result(sonuc)
-""", WF_B, "kesif")
+""", WF_B, "kesif", inputs=[f"{WF_A}/ham.tickets.parquet", f"{WF_A}/kunye.json",
+                            f"{WF_A}/model.v1"])
 kontrol("başka workflow okuyabiliyor", r.status.value == "success", r.error_message or "")
 if r.status.value == "success":
     d = eval(r.result_text)
     kontrol("kendi /output'u İZOLE (başkasınınki sızmıyor)",
             d["kendi_output_bos"] and not d["output_sizinti"])
-    kontrol("load_artifact /artifacts/<wf>/ altına indiriyor", d["yol"])
+    kontrol("beyan /artifacts/<wf>/ altına yerleştiriyor", d["yol"])
+    kontrol("sandbox'ta artifact ÇAĞRISI yok", d["cagri_yok"])
     kontrol("parquet düz read_parquet ile okundu", d["satir"] == 150, d["satir"])
     kontrol("json düz open ile okundu", d["kunye"] == "crm")
     kontrol("dizin artifact'i açıldı", d["dizin"] == "derin dosya")
-    kontrol("olmayan artifact AÇIK hata veriyor", d["yok_hatasi"] == "FileNotFoundError",
-            d["yok_hatasi"])
 
 # ══ 3. Türetme + otomatik soy ════════════════════════════════════════════
 basla("3 · TÜRETME — soy ağacı kendiliğinden kuruluyor")
@@ -113,14 +110,14 @@ r = kos(f"""
 import pandas as pd, matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-df = pd.read_parquet(load_artifact("{WF_A}", "ham.tickets.parquet"))
+df = pd.read_parquet("/artifacts/{WF_A}/ham.tickets.parquet")
 ozet = df.groupby("departman")["gun"].mean().round(2)
 ozet.to_frame("ort").to_parquet("/output/departman.ozet.parquet")
 fig, ax = plt.subplots(figsize=(6,3)); ax.bar(list(ozet.index), list(ozet.values))
 fig.savefig("/output/dagilim.png", dpi=100)
 with PdfPages("/output/rapor.pdf") as pdf: pdf.savefig(fig)
 set_result({{"ozet": ozet.to_dict()}})
-""", WF_B, "report")
+""", WF_B, "report", inputs=[f"{WF_A}/ham.tickets.parquet"])
 kontrol("PDF/PNG üretimi", r.status.value == "success", r.error_message or "")
 kimlikleri_al(r)
 soy = {o.name: list(o.parents) for o in r.artifacts if o.op.value == "produced"}
@@ -209,11 +206,20 @@ if r.status.value == "success":
     kontrol("internet kapalı", s["internet"] != "ACIK", s["internet"])
     kontrol("sandbox'ta KAPSAM JETONU da YOK (sidecar'da)",
             s["jeton_sizinti"] == [], s["jeton_sizinti"])
-    kontrol("jetonsuz doğrudan yazma reddedildi (401)",
-            s["jetonsuz_yazma"] == 401, s["jetonsuz_yazma"])
-    kontrol("proxy'de YAZMA uç noktası yok (2xx değil)",
+    # 2026-09-07 (ikinci tur): sandbox'ta artifact istemcisi de, servis
+    # ADRESİ de kalmadı. Eskiden "adresi var ama jetonsuz yazamıyor" diye
+    # ölçüyorduk; artık adres de yok, yani ölçülecek şey değişti.
+    kontrol("sandbox'ta servis ADRESİ yok", s["jetonsuz_yazma"] == "MissingSchema",
+            s["jetonsuz_yazma"])
+    kontrol("sandbox'ta localhost proxy yok",
             not (isinstance(s["proxy_yazma"], int) and 200 <= s["proxy_yazma"] < 300),
             s["proxy_yazma"])
+# Jetonsuz yazmanın 401 döndüğü DIŞARIDAN doğrulanıyor: sandbox'ın adresi
+# olmaması, servisin açık olduğu anlamına gelmez.
+kontrol("jetonsuz doğrudan yazma reddedildi (401)",
+        requests.post(f"{SERVIS}/artifacts", data=b"x",
+                      headers={"X-Artifact-Name": "z.txt", "Content-Type": "text/plain"},
+                      timeout=15).status_code == 401)
 
 # ── tenant sınırı (dışarıdan)
 from grounded_assistant.artifacts.scope import Scope, issue_token
@@ -359,10 +365,10 @@ kontrol("bozuk alias reddediliyor",
                      params={"alias": "../etc"}, headers=H, timeout=20).status_code == 400)
 r = kos(f"""
 import os
-yol = load_artifact(None, "{ALIAS_AD}@kabul")
+yol = "/artifacts/_alias/{ALIAS_AD}"
 set_result({{"yol": yol, "icerik": open(yol).read()}})
-""", str(uuid.uuid4()), inputs=[])
-kontrol("sandbox alias'la okuyabiliyor",
+""", str(uuid.uuid4()), inputs=[f"{ALIAS_AD}@kabul"])
+kontrol("sandbox alias BEYANIYLA okuyabiliyor",
         r.status.value == "success" and eval(r.result_text)["icerik"] == "ILK",
         r.error_message or r.result_text)
 

@@ -28,7 +28,7 @@ yazıldı.
 | **§9.6** | **Aracı nerede duruyor** — baytı kim taşıyor, sarmalayıcı mı sınır mı |
 | **§10** | Karşılaştırma tabloları (izolasyon, ömür, erişim, kayıt defteri, ağ) |
 | **§11** | **Bizim mimarimiz, en baştan en sona** (§11.10 açıklar, §11.11–§11.15 ne değişti) |
-| §11.13–17 | Yerleştirme · beyan/süzgeç/alias · geçmeme kararı · HTTP vekili · **bayt yolu seçimi** |
+| §11.13–18 | Yerleştirme · beyan/süzgeç/alias · HTTP vekili · bayt yolu · **sandbox'ta sıfır ağ** |
 | **§12** | Biz neredeyiz — boyut boyut kiminle örtüştüğümüz |
 | **§13** | Ekipten gelecek soruların hazır cevapları |
 | **§14** | Doğrulanamayanlar |
@@ -2703,6 +2703,106 @@ direct  52/52 canlı kabul kontrolü   ·  sandbox → minio  ULASTI (beklenen)
 | > ~50 MB | **direct** | GB'ları tek bir Python servisinden akıtmak israf |
 
 MLflow'un sunduğu seçimin aynısı (`--serve-artifacts` var/yok).
+
+---
+
+## §11.18 — 2026-09-07: sandbox artifact için HİÇBİR ağ çağrısı yapmıyor
+
+§11.17 bayt yolunu seçilebilir yaptı ama sandbox'ta hâlâ bir HTTP vardı:
+`load_artifact(...)` → localhost proxy. Bu bölüm onu da kaldırıyor.
+
+### Neyi kaldırdık
+
+| Gitti | Yerine |
+|---|---|
+| `load_artifact(wf, ad)` — sandbox'taki tek artifact fonksiyonu | `inputs=["<wf>/<ad>"]` BEYANI |
+| `127.0.0.1:8099` — `/healthz`, `/manifest`, `/fetch` | `/scratch/.ptc-girdiler-hazir` dosyası |
+| `ProxyClient`, `_tari_ac`, `_load_artifact_uret` (entrypoint) | — |
+| `ARTIFACT_SERVICE_ENDPOINT` (sandbox container'ında) | — |
+| Kubernetes'in enjekte ettiği 9 `*_SERVICE_*` değişkeni | `enableServiceLinks: false` |
+
+### Beyanın üç biçimi
+
+```
+ad                  bu çalıştırmanın çıktısı   → /output/<ad>
+<workflow_id>/ad    başka çalıştırmanınki      → /artifacts/<wf>/<ad>
+ad@alias            sabitlenmiş sürüm          → /artifacts/_alias/<ad>
+```
+
+Üçü de KFP'de `.uri` beyanına denk: launcher hepsini `.path`'e indirir,
+kullanıcı kodu hiçbir çağrı yapmaz. Bizde de artık öyle.
+
+Dizin artifact'i için ajan `model.v1` yazabiliyor; depoda ad `model.v1.tar`,
+yerleştirme `.tar`a düşüp açıyor.
+
+### PL-B'de driver/launcher ayrımı LİTERAL oldu
+
+```
+adım 1 (query)    kayıt defterine sorar, workflow_id'yi bulur   ← KFP'nin driver'ı
+adım 2 (sandbox)  inputs=["<o wf>/processed-result.json"]       ← KFP'nin launcher'ı
+                  kod: open("/artifacts/<wf>/processed-result.json")
+```
+
+Beyan çalışma anında kuruluyor; kimlik hiçbir yere gömülü değil. Canlı:
+
+```
+adım 1  çözüldü art_dd422fd3e66b (78 bayt)
+adım 2  beyan edilen girdiler: ['119d1f91-…/processed-result.json']
+        ÜRETİLDİ analysis-input.json  parents=['art_dd422fd3e66b']
+```
+
+### El sıkışma neden dosya
+
+Kubernetes'in yerleşik sidecar'ı ana container'ı sidecar **başlayınca**
+başlatıyor, **bitince** değil — "girdiler hazır" sinyalini biz kurmak
+zorundayız. Önce bir HTTP sunucusu vardı; sandbox'ın başka çağrısı kalmayınca
+yalnızca el sıkışma uğruna sunucu ayakta tutmanın anlamı kalmadı. Argo da 1.29
+öncesinde sonlandırma sinyalini paylaşılan volume'deki bir dosyayla veriyordu.
+
+Dosya `/scratch`te, `/output`ta değil: oraya koysaydık süpürme onu artifact
+sanardı.
+
+### Ölçüm — sandbox'ın içinden
+
+```
+artifact_fonksiyonlari : []                ← hiçbiri yok
+proxy_env              : []                ← adres yok
+localhost_proxy        : URLError          ← sunucu yok
+servis                 : URLError
+minio                  : gaierror          ← DNS'te bile yok
+s3_kimlik              : []
+```
+
+Öncesinde `proxy_env` 9 değişken taşıyordu ve `ARTIFACT_SERVICE_ENDPOINT`
+sandbox'ın ortamındaydı — kullanılmıyordu ama duruyordu.
+
+### Bir hata: dilim fazla genişti
+
+`yerlestir()`i yeniden yazarken aldığım dilim `_tari_ac`, `supur` ve
+`_ad_duzelt`'i de sildi — yani **süpürme gitti**. Birim testleri yakaladı
+(`AttributeError: module 'sidecar' has no attribute 'supur'`), git'ten geri
+alındı. Testler olmasa çalıştırmalar sessizce çıktısız dönerdi.
+
+### Doğrulama
+
+```
+209 birim/entegrasyon testi  ·  52/52 canlı kabul kontrolü
+çapraz workflow: /artifacts/<wf>/ozet.json + /artifacts/<wf>/model.v1/w.json
+                 turev.json parents=[iki girdi de]
+PL-A 5 artifact · PL-B çapraz sınır, beyanla
+```
+
+### Geriye kalan HTTP
+
+Sidecar hâlâ iki yere konuşuyor — ve KFP'de de tam olarak bu ikisi var:
+
+```
+sidecar → nesne deposu   baytlar   (S3 API; KFP'de de aynı)
+sidecar → artifact servisi  künye  (KFP'de MLMD)
+```
+
+Kalkan şey **sandbox'ın** ağ yüzeyiydi. Kayıt defteri kanalı kalkamaz: onun
+adı KFP'de MLMD.
 
 ---
 

@@ -10,7 +10,7 @@ Tool Gateway dışında hiçbir yere çıkamaz (Cilium bunu kernel'de engeller).
 Bu dosyada artık ne yükleme var ne indirme ne de yama. İş bölümü Argo/KFP'nin
 aynısı:
 
-    sidecar.yerlestir()  → kod BAŞLAMADAN `/output`'u doldurur
+    sidecar.yerlestir()  → kod BAŞLAMADAN BÜTÜN girdileri diske koyar
     bu dosya             → kodu çalıştırır; `/output` GERÇEK dosyalar içerir
     sidecar.supur()      → kod BİTİNCE `/output`'u toplar
 
@@ -19,8 +19,15 @@ Yani `pd.read_parquet("/output/x.parquet")` sıradan bir dosya okumasıdır;
 bayt okuma çağrısının ortasında iniyordu — piyasada karşılığı olmayan tek
 desenimizdi.
 
-Geriye tek fonksiyon kaldı: `load_artifact(workflow_id, ad)` — BAŞKA bir
-çalıştırmanın çıktısı için, ve salt okuma.
+Sandbox'ta artifact için HİÇBİR fonksiyon YOK ve hiçbir ağ çağrısı yok.
+Bütün girdiler — kendi çıktıları, başka çalıştırmalarınki, alias'la
+sabitlenmiş sürümler — kod başlamadan diske konuyor:
+
+    /output/<ad>              bu çalıştırmanın çıktıları
+    /artifacts/<wf>/<ad>      beyan edilmiş başka çalıştırmalar
+    /artifacts/_alias/<ad>    beyan edilmiş sabit sürümler
+
+KFP'nin kullanıcı bileşenine verdiği garantinin aynısı.
 
 Kontrat: contracts/sandbox_job_contract.md
 """
@@ -32,13 +39,8 @@ import json
 import os
 import re
 import sys
-import tarfile
 from datetime import UTC, datetime
 
-# `artifact_client.py` imaja bağımsız bir modül olarak kopyalanıyor
-# (bkz. sandbox_image/Dockerfile): sandbox imajına `grounded_assistant`
-# paketinin tamamını (langgraph, langchain…) kurmak istemiyoruz.
-import artifact_client
 from fastmcp import Client
 
 TOOL_GATEWAY_ENDPOINT = os.environ["TOOL_GATEWAY_ENDPOINT"]
@@ -181,13 +183,10 @@ OUTPUT_DIR = os.environ.get("PTC_OUTPUT_DIR", "/output")
 #: — `/output`'a yazsaydık süpürme kendi ara dosyasını da artifact sanardı.
 SCRATCH_DIR = os.environ.get("PTC_SCRATCH_DIR", "/scratch")
 
-#: Dizin artifact'lerinin ad soneki. Paketleme ARTIK BURADA DEĞİL — süpürme
-#: sidecar'a taşındı (bkz. sidecar.py). Burada yalnızca AÇMA tarafı var.
-_DIZIN_SONEKI = ".tar"
-_DIZIN_TIPI = "application/x-tar"
-
 #: Sidecar'ın localhost proxy'si. Kapsam jetonu ONDA; bu container'da yok.
-PROXY_URL = os.environ.get("PTC_ARTIFACT_PROXY", "")
+#: Sidecar'ın "girdiler yerinde" dosyası — `/scratch` iki container'da da
+#: mount edilmiş ve süpürülmüyor.
+HAZIR_DOSYA = os.path.join(SCRATCH_DIR, ".ptc-girdiler-hazir")
 
 #: BAŞKA çalıştırmaların çıktıları buradan okunuyor: `/artifacts/<workflow>/<ad>`.
 #:
@@ -221,38 +220,21 @@ def _gecerli_artifact_adi(dosya_adi: str) -> str:
 
 
 
-def _tari_ac(tar_yolu: str, hedef_dizin: str) -> None:
-    """Tar'ı hedef dizine açar — yol geçişine karşı süzülmüş.
+def _girdileri_bekle(saniye: float = 30.0) -> bool:
+    """Sidecar'ın "girdiler yerinde" dosyasını bekler.
 
-    `filter="data"` (CVE-2007-4559 karşılığı) arşiv dışına yazan girdileri,
-    symlink'leri ve aygıt düğümlerini reddediyor. Arşivi biz üretmiş olsak da
-    `put_artifact` ile depoya BAŞKA bir tar girmiş olabilir; açan taraf
-    kaynağına güvenmemeli.
+    Önceden bu bir HTTP yoklamasıydı (`GET 127.0.0.1:8099/healthz`). Sandbox'ın
+    artifact için başka hiçbir ağ çağrısı kalmayınca, yalnızca el sıkışma
+    uğruna bir sunucu ayakta tutmanın anlamı kalmadı. Argo da 1.29 öncesinde
+    sonlandırma sinyalini paylaşılan volume'deki bir dosyayla veriyordu.
     """
-    with tarfile.open(tar_yolu, "r") as tar:
-        try:
-            tar.extractall(hedef_dizin, filter="data")  # noqa: S202
-        except TypeError:  # `filter` 3.11.4'ten eski sürümlerde yok
-            for uye in tar.getmembers():
-                if not uye.isfile() or os.path.isabs(uye.name) or ".." in uye.name.split("/"):
-                    continue
-                tar.extract(uye, hedef_dizin)  # noqa: S202
-
-
-def _proxy_bekle(taban: str, saniye: float = 10.0) -> bool:
-    """Sidecar'ın localhost sunucusu açılana kadar bekler."""
     import time  # noqa: PLC0415
-
-    import requests  # noqa: PLC0415
 
     son = time.monotonic() + saniye
     while time.monotonic() < son:
-        try:
-            if requests.get(f"{taban.rstrip('/')}/healthz", timeout=1).status_code == 200:
-                return True
-        except Exception:  # noqa: BLE001
-            pass
-        time.sleep(0.1)
+        if os.path.exists(HAZIR_DOSYA):
+            return True
+        time.sleep(0.05)
     return False
 
 
@@ -260,81 +242,6 @@ def _proxy_bekle(taban: str, saniye: float = 10.0) -> bool:
 #: Yerleştirme ağdan indirme içerdiği için proxy'nin salt açılmasından uzun
 #: sürebilir; `activeDeadlineSeconds: 90` içinde rahat kalıyor.
 _SIDECAR_BEKLEME = 30.0
-
-#: `load_artifact`'e verilen çalıştırma kimliği — yol geçişine karşı.
-_GUVENLI_WF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-
-#: Alias biçimi — servisin `_ALIAS_BICIMI`'yle birebir.
-_GUVENLI_ALIAS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-
-
-def _load_artifact_uret(istemci):
-    """BAŞKA bir çalıştırmanın çıktısını yerelleştiren tek fonksiyon.
-
-    Kendi çıktıların için GEREKMİYOR: onlar pod açılırken `/output`'a
-    yerleştirilmiş oluyor, düz `open`/`pd.read_*` yetiyor.
-
-    Bu ayrım KFP'den geliyor. Orada bir bileşen kendi girdilerini `.path`'te
-    HAZIR bulur (driver çözer, launcher indirir); başka bir çalıştırmanın
-    artifact'ine ise ancak onun kimliğini içeren AÇIK bir adresle ulaşır.
-    Burada da öyle: sık olan yol sessiz, nadir olan yol açık.
-
-    Salt okuma. Yükleme uç noktası proxy'de hiç yok — neyin artifact olacağına
-    sidecar `/output`'a bakarak karar veriyor (Argo'nun `wait` container'ı).
-    """
-
-    def load_artifact(workflow_id: str | None, name: str) -> str:
-        """`workflow_id` çalıştırmasının `name` çıktısını indirir, yolunu döner.
-
-        İki adresleme biçimi var:
-
-            load_artifact("<workflow_id>", "rapor.pdf")   # o çalıştırmanınki
-            load_artifact(None, "rapor.pdf@onaylanmis")   # alias'lı sürüm
-
-        İkincisi MLflow'un `models:/<ad>@<alias>`'ı: alias tenant genelinde
-        tek bir sürüme işaret eder, "en yeni kazanır" kuralından kaçırır.
-
-        Dizin artifact'i ise açılır ve dizinin yolu döner.
-        """
-        if istemci is None:
-            raise RuntimeError("artifact servisi bu çalıştırmada kapalı")
-
-        ham = str(name)
-        ad, _, takma = ham.partition("@")
-        ad = _gecerli_artifact_adi(os.path.basename(ad))
-        if takma:
-            if not _GUVENLI_ALIAS.match(takma):
-                raise ValueError(f"geçersiz alias: {takma!r}")
-            wf = ""                      # alias tenant genelinde çözülür
-            istek_adi = f"{ad}@{takma}"
-            klasor = "_alias"
-        else:
-            wf = str(workflow_id or "")
-            if not _GUVENLI_WF.match(wf):
-                raise ValueError(
-                    f"geçersiz çalıştırma kimliği: {workflow_id!r} "
-                    "(alias kullanmıyorsan kimlik zorunlu)")
-            istek_adi = ad
-            klasor = wf
-
-        hedef_dizin = os.path.join(ARTIFACTS_DIR, klasor)
-        os.makedirs(hedef_dizin, exist_ok=True)
-        hedef = os.path.join(hedef_dizin, ad)
-
-        kunye = istemci.fetch_to_file(istek_adi, hedef, workflow_id=wf or None)
-        if not kunye:
-            raise FileNotFoundError(f"{klasor}/{istek_adi} — böyle bir artifact yok")
-
-        if ad.endswith(_DIZIN_SONEKI) and kunye.get("content_type") == _DIZIN_TIPI:
-            dizin = hedef[: -len(_DIZIN_SONEKI)]
-            os.makedirs(dizin, exist_ok=True)
-            _tari_ac(hedef, dizin)
-            os.unlink(hedef)
-            return dizin
-        return hedef
-
-    return load_artifact
-
 
 def main() -> None:
     with open(CODE_PATH, encoding="utf-8") as f:
@@ -346,32 +253,29 @@ def main() -> None:
         """Sandbox kodu, nihai sonucunu bununla bildirir (research.md kontratı)."""
         result_holder["value"] = value
 
-    # GİRDİLER KOD BAŞLAMADAN YERLEŞTİRİLMİŞ OLMALI (2026-09-07, KFP deseni).
+    # GİRDİLER KOD BAŞLAMADAN YERLEŞTİRİLMİŞ OLMALI (KFP deseni).
     #
-    # Eskiden `/output` YALAN bir görünümdü: `os.listdir`, `glob`, pandas
-    # okuyucuları ve `open` yamalanıyor, bayt ancak `read_parquet` çağrısının
-    # ORTASINDA iniyordu. Hiçbir üründe böyle bir şey yok — Argo girdiyi
-    # `init` container'da, KFP launcher'da indiriyor; ikisi de kod BAŞLAMADAN.
-    # Artık biz de öyle: yerleştirmeyi sidecar üstlendi, burada yama kalmadı,
-    # `/output`'taki dosyalar GERÇEK.
+    # Sidecar bütün girdileri — kendi çıktıları, başka çalıştırmalarınki,
+    # alias'la sabitlenmiş sürümler — diske koyduktan SONRA hazır dosyasını
+    # yazıyor. Yani dosyanın varlığı "girdiler yerinde" demek.
     #
-    # Sidecar yerleştirmeyi BİTİRDİKTEN SONRA localhost sunucusunu açıyor;
-    # yani `/healthz`'in cevap vermesi "`/output` hazır" demektir. Bu el
-    # sıkışma artık YÜK TAŞIYOR: cevap gelmezse `/output` yarım kalmış
+    # Bu el sıkışma YÜK TAŞIYOR: dosya gelmezse `/output` yarım kalmış
     # olabilir. Sessizce devam etmek, tam da kovaladığımız "sessizce yanlış"
     # arızası olurdu — o yüzden çalıştırma açık hatayla bitiyor.
-    istemci = artifact_client.ProxyClient(PROXY_URL) if PROXY_URL else None
-    if istemci and not _proxy_bekle(PROXY_URL, _SIDECAR_BEKLEME):
+    if not _girdileri_bekle(_SIDECAR_BEKLEME):
         print(json.dumps({
             "status": "error",
             "message": "artifact sidecar hazır değil — girdiler yerleştirilemedi",
         }))
         sys.exit(0)
 
+    # Artifact için HİÇBİR fonksiyon yok. Kod yalnızca dosya görüyor:
+    #   /output/<ad>              bu çalıştırmanın çıktıları
+    #   /artifacts/<wf>/<ad>      beyan edilmiş başka çalıştırmalar
+    #   /artifacts/_alias/<ad>    beyan edilmiş sabit sürümler
     sandbox_globals: dict = {
         "set_result": set_result,
         **{name: _make_sync_tool(name) for name in ALLOWED_TOOLS},
-        "load_artifact": _load_artifact_uret(istemci),
     }
 
     # SÜPÜRME BURADA DEĞİL. `/output`'a yazılanları sidecar topluyor: ana

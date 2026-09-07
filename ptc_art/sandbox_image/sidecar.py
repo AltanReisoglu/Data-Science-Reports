@@ -35,17 +35,20 @@ kendi karar veriyor. LLM'in etkileyebileceği tek şey dosya yazmak — yani
 zaten kastedilen arayüz. Ad seçmek, TTL koymak, depo kökü belirlemek,
 süpürme kuralını atlamak artık mümkün değil.
 
-## Proxy neden hâlâ var
+## Sandbox artifact için HİÇBİR ağ çağrısı yapmıyor
 
-Kendi çıktıların `yerlestir()` ile hazır geliyor, onlar için ağa çıkmak yok.
-Proxy yalnızca BAŞKA bir çalıştırmanın çıktısı için: sandbox
-`load_artifact(workflow_id, ad)` çağırıyor, istek 127.0.0.1'e geliyor, jeton
-burada ekleniyor. Bu, Cloudflare/Vercel'in "kimlik-bilgisiz istemci +
-imzalayan proxy" deseninin pod içindeki hâli (§9.6.4).
+Girdilerin hepsi — kendi çıktıları, başka çalıştırmalarınki, alias'la
+sabitlenmiş sürümler — kod BAŞLAMADAN diske konuyor. Sandbox yalnızca dosya
+görüyor; ne bir API, ne bir localhost sunucusu, ne bir adres.
 
-2026-09-07'ye kadar proxy'nin asıl işi TEMBEL OKUMAYDI: sandbox'ta
-`os.listdir`/`glob`/pandas/`open` yamalıydı ve bayt okuma çağrısının
-ortasında iniyordu. Piyasada karşılığı olmayan tek desenimizdi; kaldırıldı.
+Bu, KFP'nin kullanıcı bileşeni için sağladığı garantinin aynısı: launcher
+`.uri`'leri `.path`'e indirir, kullanıcı kodu hiçbir çağrı yapmaz.
+
+2026-09-07'ye kadar burada 127.0.0.1'de küçük bir HTTP sunucusu vardı
+(`/healthz`, `/manifest`, `/fetch`) ve `load_artifact` ona konuşuyordu.
+Çapraz-workflow okuma da BEYANA taşınınca o sunucunun tek işi el sıkışma
+kaldı — onun için de paylaşılan volume'de bir dosya yetiyor. Argo da 1.29
+öncesinde sonlandırma sinyalini böyle veriyordu.
 
 Sidecar sunduğu her baytın sha256'sını tutuyor — süpürmede "bunu ben verdim,
 LLM üretmedi" kararını buradan veriyor ve soy ağacının ebeveynlerini de
@@ -61,8 +64,6 @@ import signal
 import sys
 import threading
 from datetime import UTC, datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
 
 import artifact_client
 import serialize
@@ -72,7 +73,9 @@ ARTIFACTS_DIR = os.environ.get("PTC_ARTIFACTS_DIR", "/artifacts")
 SCRATCH_DIR = os.environ.get("PTC_SCRATCH_DIR", "/scratch")
 WORKFLOW_ID = os.environ.get("PTC_WORKFLOW_ID", "")
 SCOPE_TOKEN = os.environ.get("PTC_SCOPE_TOKEN", "")
-PROXY_PORT = int(os.environ.get("PTC_PROXY_PORT", "8099"))
+#: "Girdiler yerinde" el sıkışması. `/scratch` iki container'da da mount
+#: edilmiş ve SÜPÜRÜLMÜYOR — `/output`'a koysaydık artifact sanılırdı.
+HAZIR_DOSYA = os.path.join(SCRATCH_DIR, ".ptc-girdiler-hazir")
 
 #: BEYAN EDİLEN GİRDİLER — Argo'nun `inputs.artifacts`'i, KFP'nin bileşen
 #: girdilerinin karşılığı. Virgülle ayrılmış artifact adları; artifact adı
@@ -135,79 +138,6 @@ def _kaydet(ad: str, ozet: str, artifact_id: str | None, *, istendi: bool) -> No
             _yerlesen_kimlik[ad] = artifact_id
 
 
-# ── Localhost proxy: sandbox'ın OKUMA yolu ────────────────────────────────
-
-
-class Proxy(BaseHTTPRequestHandler):
-    """Yalnızca okuma. Yazma uç noktası BİLEREK yok — yükleme kararı sidecar'ın."""
-
-    def log_message(self, *a):  # pod log'unu HTTP gürültüsüyle doldurma
-        pass
-
-    def _json(self, kod: int, govde) -> None:
-        ham = json.dumps(govde).encode()
-        self.send_response(kod)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(ham)))
-        self.end_headers()
-        self.wfile.write(ham)
-
-    def do_GET(self) -> None:  # noqa: N802
-        yol = urlparse(self.path)
-        if yol.path == "/healthz":
-            self._json(200, {"status": "ok"})
-            return
-
-        if yol.path == "/manifest":
-            try:
-                self._json(200, istemci.list_all())
-            except Exception as exc:  # noqa: BLE001
-                self._json(502, {"hata": str(exc)[:200]})
-            return
-
-        if yol.path == "/fetch":
-            q = parse_qs(yol.query)
-            ad = (q.get("name") or [""])[0]
-            wf = (q.get("workflow") or [None])[0]
-            if not ad:
-                self._json(400, {"hata": "name gerekli"})
-                return
-            gecici = os.path.join(SCRATCH_DIR, f"_proxy_{os.getpid()}_{threading.get_ident()}")
-            try:
-                kunye = istemci.fetch_to_file(ad, gecici, workflow_id=wf)
-                if not kunye:
-                    self._json(404, {"hata": "bulunamadı"})
-                    return
-                with open(gecici, "rb") as f:
-                    ham = f.read()
-            except Exception as exc:  # noqa: BLE001
-                self._json(502, {"hata": str(exc)[:200]})
-                return
-            finally:
-                if os.path.exists(gecici):
-                    os.unlink(gecici)
-
-            _kaydet(ad, hashlib.sha256(ham).hexdigest(), kunye.get("artifact_id"),
-                    istendi=True)
-            _olay("artifact", op="consumed", artifact_id=kunye.get("artifact_id"),
-                  name=kunye.get("name"), size_bytes=kunye.get("size_bytes"),
-                  content_type=kunye.get("content_type"), parents=[])
-
-            self.send_response(200)
-            self.send_header("Content-Type", kunye.get("content_type") or "application/octet-stream")
-            self.send_header("Content-Length", str(len(ham)))
-            if kunye.get("artifact_id"):
-                self.send_header("X-Artifact-Id", kunye["artifact_id"])
-            self.end_headers()
-            self.wfile.write(ham)
-            return
-
-        self._json(404, {"hata": "bilinmeyen yol"})
-
-
-# ── Süpürme: sandbox bitince, SIGTERM ile ─────────────────────────────────
-
-
 def _dosya_ozeti(yol: str) -> str:
     ozet = hashlib.sha256()
     with open(yol, "rb") as f:
@@ -239,29 +169,6 @@ def _dizini_paketle(dizin: str, hedef: str) -> str:
                 with open(tam, "rb") as f:
                     tar.addfile(bilgi, f)
     return _dosya_ozeti(hedef)
-
-
-def beyan_edilenler() -> set[str] | None:
-    """`PTC_INPUTS` → beyan edilen girdi adları; beyan yoksa None.
-
-    Argo bunu `inputs.artifacts[]`, KFP bileşen imzasıyla yapıyor. Bizde
-    beyanı ajan `run_ptc_code(code, inputs=[...])` ile veriyor: manifestte
-    adları zaten görüyor, yazması bedava.
-
-    Neden beyan: yerleştirilen her artifact soy ağacında EBEVEYN oluyor
-    (MLMD `DECLARED_INPUT`). Beyansız çalışınca "bu çalıştırmanın her çıktısı"
-    ebeveyn sayılıyor; grafik zamanla tam bağlı hâle geliyor ve işe yaramaz.
-    """
-    if INPUTS_HAM == "*":
-        return None
-    return {p.strip() for p in INPUTS_HAM.split(",") if p.strip()}
-
-
-def _beyanda_mi(ad: str, beyan: set[str]) -> bool:
-    """Dizin artifact'i depoda `<ad>.tar`, sandbox'ta `<ad>/` görünüyor —
-    ajan hangisini yazarsa yazsın eşleşsin."""
-    return ad in beyan or (
-        ad.endswith(_DIZIN_SONEKI) and ad[: -len(_DIZIN_SONEKI)] in beyan)
 
 
 def _tari_ac(tar_yolu: str, hedef_dizin: str) -> None:
@@ -350,36 +257,105 @@ def _ad_duzelt(dosya_adi: str) -> str:
 # ── Yerleştirme: kod BAŞLAMADAN girdileri /output'a koyar ──────────────────
 
 
+def _beyani_coz(ham: str) -> list[dict] | None:
+    """`PTC_INPUTS` → yerleştirilecek girdilerin listesi; beyan yoksa None.
+
+    Üç adresleme biçimi — üçü de KFP'de bir karşılığa denk geliyor:
+
+        ad                    bu çalıştırmanın çıktısı   → /output/<ad>
+        <workflow_id>/ad      BAŞKA çalıştırmanınki      → /artifacts/<wf>/<ad>
+        ad@alias              sabitlenmiş sürüm          → /artifacts/_alias/<ad>
+
+    KFP'de bunların hepsi `.uri` olarak beyan edilir ve launcher hepsini
+    `.path`'e indirir; kullanıcı kodu hiçbir çağrı yapmaz. Bizde de artık öyle:
+    çapraz-workflow okuma da BEYAN, çalışma anında bir çağrı değil.
+    """
+    if ham == "*":
+        return None
+    girdiler = []
+    for parca in ham.split(","):
+        p = parca.strip()
+        if not p:
+            continue
+        if "@" in p:
+            ad, _, takma = p.partition("@")
+            girdiler.append({"ad": ad, "alias": takma, "wf": None,
+                             "hedef_kok": os.path.join(ARTIFACTS_DIR, "_alias")})
+        elif "/" in p:
+            wf, _, ad = p.rpartition("/")
+            girdiler.append({"ad": ad, "alias": None, "wf": wf,
+                             "hedef_kok": os.path.join(ARTIFACTS_DIR, wf)})
+        else:
+            girdiler.append({"ad": p, "alias": None, "wf": WORKFLOW_ID,
+                             "hedef_kok": OUTPUT_DIR})
+    return girdiler
+
+
+def _yerlestir_bir(g: dict) -> bool:
+    """Tek bir beyan edilmiş girdiyi diske koyar. Başardıysa True."""
+    ad = g["ad"]
+    os.makedirs(g["hedef_kok"], exist_ok=True)
+    hedef = os.path.join(g["hedef_kok"], ad)
+    istek = f"{ad}@{g['alias']}" if g["alias"] else ad
+    try:
+        kunye = istemci.fetch_to_file(istek, hedef, workflow_id=g["wf"])
+        if not kunye and not ad.endswith(_DIZIN_SONEKI) and not g["alias"]:
+            # DİZİN BEYANI: ajan `/output/model.v1/` görüyor, depoda ad
+            # `model.v1.tar`. İkisini de yazabilsin diye `.tar`a düşülüyor.
+            ad = ad + _DIZIN_SONEKI
+            hedef = os.path.join(g["hedef_kok"], ad)
+            kunye = istemci.fetch_to_file(ad, hedef, workflow_id=g["wf"])
+        if not kunye:
+            _olay("beyan_karsilanmadi", eksik=[istek])
+            return False
+        _kaydet(ad, _dosya_ozeti(hedef), kunye.get("artifact_id"),
+                istendi=g["wf"] != WORKFLOW_ID or bool(g["alias"]))
+        # Dizin artifact'i tar olarak duruyor; kod gerçek bir dizin görmeli.
+        # Tar siliniyor — süpürme dizini yeniden paketleyip aynı hash'i
+        # bulacak ve "bunu ben verdim" deyip atlayacak.
+        if ad.endswith(_DIZIN_SONEKI) and kunye.get("content_type") == _DIZIN_TIPI:
+            dizin = hedef[: -len(_DIZIN_SONEKI)]
+            os.makedirs(dizin, exist_ok=True)
+            _tari_ac(hedef, dizin)
+            os.unlink(hedef)
+    except Exception as exc:  # noqa: BLE001 — biri patlarsa diğerleri sürsün
+        _olay("yerlestirme_hatasi", name=istek, detail=str(exc)[:200])
+        if os.path.exists(hedef):
+            os.unlink(hedef)
+        return False
+    _olay("artifact", op="consumed", artifact_id=kunye.get("artifact_id"),
+          name=kunye.get("name"), size_bytes=kunye.get("size_bytes"),
+          content_type=kunye.get("content_type"), parents=[])
+    return True
+
+
 def yerlestir() -> int:
     """KFP'nin driver + launcher'ının karşılığı.
 
     KFP'de bir bileşenin girdileri container doğduğunda `.path`'te HAZIR
     durur: `kfp-driver` init container'ı `.uri`'yi MLMD'den çözer, launcher
     dosyayı indirir, kullanıcı kodu yalnızca yerel bir dosya görür. Argo'da
-    aynı işi `init` container yapıyor. İkisinde de indirme kod BAŞLAMADAN
-    bitiyor.
+    aynı işi `init` container yapıyor.
 
-    2026-09-07'ye kadar bizde öyle değildi: `/output` sahte bir görünümdü
-    (`os.listdir`, `glob`, pandas okuyucuları ve `open` yamalıydı) ve bayt
-    `pd.read_parquet(...)` çağrısının ORTASINDA iniyordu. Hiçbir üründe böyle
-    bir desen yok — tek gerçek icadımızdı. Bu fonksiyon onun yerine geçti.
+    2026-09-07 (ikinci tur): çapraz-workflow okuma da buraya taşındı. Önce
+    sandbox `load_artifact(...)` çağırıyordu — yani kodun çalışma anında bir
+    ağ isteği vardı. Artık YOK: bütün girdiler, hangi çalıştırmadan gelirse
+    gelsin, kod başlamadan yerleştiriliyor. Sandbox artifact için HİÇBİR
+    çağrı yapmıyor.
 
-    Kapsam BU ÇALIŞTIRMA: `/output` yalnızca kendi çıktılarını gösterir
-    (KFP'de `pipeline_root/<run-id>/...`). Başka bir çalıştırmanın çıktısı
-    `load_artifact(workflow_id, ad)` ile AÇIKÇA isteniyor — orada da tembel
-    değil, çağrıldığı anda tamamı iniyor.
-
-    Ölçüm (2026-09-07, 163 artifact'lik depo): workflow başına medyan 3 dosya
-    / 13,7 KiB, azami 7 dosya / 35,3 KiB — `/output`'un 512Mi sınırının on
-    binde yedisi. Eskiden bunu O(tenant) yapan bir prefetch vardı ve sınırı
-    zorluyordu; hatalı olan prefetch değil KAPSAMI'ydı.
+    Beyan yoksa (`*`) bu çalıştırmanın bütün çıktıları yerleşiyor —
+    uyumluluk yolu; soy ağacını genişletir, bkz. §11.14.
     """
     if not WORKFLOW_ID:
         return 0
-    beyan = beyan_edilenler()
-    if beyan is not None and not beyan:
-        _olay("yerlestirme_bitti", sayi=0, beyan=True)
-        return 0  # beyan var ve boş: girdi istenmiyor
+    girdiler = _beyani_coz(INPUTS_HAM)
+
+    if girdiler is not None:
+        sayi = sum(1 for g in girdiler if _yerlestir_bir(g))
+        _olay("yerlestirme_bitti", sayi=sayi, beyan=True)
+        return sayi
+
+    # ── beyansız: bu çalıştırmanın her çıktısı (uyumluluk) ────────────────
     try:
         kayitlar = istemci.list_all()
     except Exception as exc:  # noqa: BLE001 — depo yoksa çalıştırma yine sürsün
@@ -388,49 +364,17 @@ def yerlestir() -> int:
 
     # Ad başına EN YENİ. Servis yeniden-eskiye sıralı döndürüyor, ilk görülen
     # kazanıyor — `latest_in_workflow` ile aynı kural.
-    secilen: dict[str, dict] = {}
+    gorulen: set[str] = set()
+    sayi = 0
     for k in kayitlar:
         ad = k.get("name")
-        if not ad or k.get("workflow_id") != WORKFLOW_ID or ad in secilen:
+        if not ad or k.get("workflow_id") != WORKFLOW_ID or ad in gorulen:
             continue
-        if beyan is not None and not _beyanda_mi(ad, beyan):
-            continue
-        secilen[ad] = k
-
-    if beyan is not None:
-        eksik = sorted(b for b in beyan
-                       if not any(_beyanda_mi(ad, {b}) for ad in secilen))
-        if eksik:
-            # Sessiz kalmak, kodun `/output`'ta olmayan bir dosyayı açıp
-            # anlaşılmaz bir FileNotFoundError almasına yol açardı.
-            _olay("beyan_karsilanmadi", eksik=eksik)
-
-    sayi = 0
-    for ad in sorted(secilen):
-        hedef = os.path.join(OUTPUT_DIR, ad)
-        try:
-            kunye = istemci.fetch_to_file(ad, hedef, workflow_id=WORKFLOW_ID)
-            if not kunye:
-                continue
-            _kaydet(ad, _dosya_ozeti(hedef), kunye.get("artifact_id"), istendi=False)
-            # Dizin artifact'i tar olarak duruyor; kod gerçek bir dizin
-            # görmeli. Tar siliniyor — süpürme dizini yeniden paketleyip
-            # aynı hash'i bulacak ve "bunu ben verdim" deyip atlayacak.
-            if ad.endswith(_DIZIN_SONEKI) and kunye.get("content_type") == _DIZIN_TIPI:
-                dizin = os.path.join(OUTPUT_DIR, ad[: -len(_DIZIN_SONEKI)])
-                os.makedirs(dizin, exist_ok=True)
-                _tari_ac(hedef, dizin)
-                os.unlink(hedef)
-        except Exception as exc:  # noqa: BLE001 — biri patlarsa diğerleri sürsün
-            _olay("yerlestirme_hatasi", name=ad, detail=str(exc)[:200])
-            if os.path.exists(hedef):
-                os.unlink(hedef)
-            continue
-        sayi += 1
-        _olay("artifact", op="consumed", artifact_id=kunye.get("artifact_id"),
-              name=kunye.get("name"), size_bytes=kunye.get("size_bytes"),
-              content_type=kunye.get("content_type"), parents=[])
-    _olay("yerlestirme_bitti", sayi=sayi, beyan=INPUTS_HAM != "*")
+        gorulen.add(ad)
+        if _yerlestir_bir({"ad": ad, "alias": None, "wf": WORKFLOW_ID,
+                           "hedef_kok": OUTPUT_DIR}):
+            sayi += 1
+    _olay("yerlestirme_bitti", sayi=sayi, beyan=False)
     return sayi
 
 
@@ -453,19 +397,26 @@ def main() -> None:
     signal.signal(signal.SIGTERM, kapan)
     signal.signal(signal.SIGINT, kapan)
 
-    # SIRA ÖNEMLİ: önce yerleştirme, sonra sunucu. Sandbox container'ı
-    # `/healthz` cevap verene kadar bekliyor (entrypoint._proxy_bekle), yani
-    # sunucuyu en sonda açmak "girdiler hazır" el sıkışmasının kendisi.
+    # SIRA ÖNEMLİ: önce yerleştirme, sonra HAZIR DOSYASI.
+    #
     # Kubernetes'in yerleşik sidecar'ı ana container'ı sidecar BAŞLAYINCA
-    # başlatıyor, BİTİNCE değil — bu beklemeyi kubelet garanti etmiyor.
+    # başlatıyor, BİTİNCE değil — yani "girdiler hazır" el sıkışmasını kubelet
+    # garanti etmiyor, biz kurmak zorundayız.
+    #
+    # 2026-09-07 (ikinci tur): bu el sıkışma bir HTTP sunucusuydu
+    # (`/healthz`). Artık paylaşılan volume'de bir DOSYA. Sebep: sandbox'ın
+    # artifact için hiçbir ağ çağrısı kalmayınca, yalnızca el sıkışma uğruna
+    # bir sunucu ayakta tutmanın anlamı kalmadı. Argo da 1.29 öncesinde
+    # sonlandırma sinyalini paylaşılan volume'deki bir dosyayla veriyordu.
     yerlestirilen = yerlestir()
-
-    sunucu = ThreadingHTTPServer(("127.0.0.1", PROXY_PORT), Proxy)
-    threading.Thread(target=sunucu.serve_forever, daemon=True).start()
-    _olay("sidecar_hazir", port=PROXY_PORT, yerlestirilen=yerlestirilen)
+    try:
+        with open(HAZIR_DOSYA, "w") as f:
+            f.write(str(yerlestirilen))
+    except OSError as exc:
+        _olay("hazir_dosyasi_yazilamadi", detail=str(exc)[:200])
+    _olay("sidecar_hazir", yerlestirilen=yerlestirilen)
 
     bitti.wait()
-    sunucu.shutdown()
     sys.exit(0)
 
 

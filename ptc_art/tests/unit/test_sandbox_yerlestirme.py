@@ -35,7 +35,6 @@ sys.path.insert(0, str(KOK / "src" / "grounded_assistant" / "artifacts"))
 os.environ.setdefault("TOOL_GATEWAY_ENDPOINT", "http://yok/mcp")
 os.environ.setdefault("ARTIFACT_SERVICE_ENDPOINT", "http://yok")
 
-import entrypoint  # noqa: E402
 import sidecar  # noqa: E402
 
 WF = "wf-bu"
@@ -275,53 +274,63 @@ def test_biri_patlarsa_digerleri_yerlesir(ortam, monkeypatch):
     assert not (ortam / "yok.csv").exists()
 
 
-# ── load_artifact: BAŞKA çalıştırma, açık çağrı ───────────────────────────
+# ── beyanın üç biçimi: sandbox HİÇ çağrı yapmıyor (2026-09-07) ───────────
+#
+# Çapraz-workflow okuma da BEYANA taşındı. Önce `load_artifact(...)` vardı —
+# yani kodun çalışma anında bir ağ isteği. Artık yok: hangi çalıştırmadan
+# gelirse gelsin bütün girdiler kod başlamadan diske konuyor.
 
 
-@pytest.fixture
-def artifacts_koku(tmp_path, monkeypatch):
-    d = tmp_path / "artifacts"
-    d.mkdir()
-    monkeypatch.setattr(entrypoint, "ARTIFACTS_DIR", str(d))
-    return d
+def test_beyan_uc_bicimi_cozuyor(ortam):
+    """`ad` · `<wf>/ad` · `ad@alias` — üçü de KFP'de `.uri` beyanına denk."""
+    g = sidecar._beyani_coz("kendi.csv,wf-baska/onun.csv,rapor.pdf@onaylanmis")
+    assert [x["ad"] for x in g] == ["kendi.csv", "onun.csv", "rapor.pdf"]
+    assert g[0]["wf"] == WF and g[0]["hedef_kok"].endswith("output")
+    assert g[1]["wf"] == "wf-baska" and g[1]["hedef_kok"].endswith("wf-baska")
+    assert g[2]["alias"] == "onaylanmis" and g[2]["hedef_kok"].endswith("_alias")
 
 
-def test_load_artifact_baska_calistirmayi_getirir(artifacts_koku):
-    ust = SahteUst([], {"wf-baska/rapor.csv": b"veri"})
-    yol = entrypoint._load_artifact_uret(ust)("wf-baska", "rapor.csv")
-
-    assert Path(yol).read_bytes() == b"veri"
-    assert Path(yol) == artifacts_koku / "wf-baska" / "rapor.csv"
-    assert ust.indirilenler == [("rapor.csv", "wf-baska")]
+def test_beyan_yoksa_None(ortam, monkeypatch):
+    assert sidecar._beyani_coz("*") is None
 
 
-def test_load_artifact_olmayan_icin_acik_hata(artifacts_koku):
-    ust = SahteUst([], {})
-    with pytest.raises(FileNotFoundError):
-        entrypoint._load_artifact_uret(ust)("wf-baska", "yok.csv")
+def test_capraz_workflow_ARTIFACTS_altina_yerlesiyor(ortam, tmp_path, monkeypatch):
+    """Başkasının çıktısı `/output`'a SIZMAMALI — ayrı kök, KFP'nin
+    `pipeline_root/<run-id>/` düzeni."""
+    art = tmp_path / "artifacts"
+    monkeypatch.setattr(sidecar, "ARTIFACTS_DIR", str(art))
+    ust = SahteUst([], {"wf-baska/onun.csv": b"BASKA"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "wf-baska/onun.csv")
+
+    assert sidecar.yerlestir() == 1
+    assert (art / "wf-baska" / "onun.csv").read_bytes() == b"BASKA"
+    assert not (ortam / "onun.csv").exists()
 
 
-@pytest.mark.parametrize("kotu_wf", ["../../etc", "wf/../..", "/mutlak", ""])
-def test_load_artifact_yol_gecisli_kimligi_reddeder(artifacts_koku, kotu_wf):
-    """Kimlik doğrudan bir dizin adına dönüşüyor — süzülmezse `/artifacts`
-    dışına yazılabilirdi."""
-    ust = SahteUst([], {})
-    with pytest.raises(ValueError):
-        entrypoint._load_artifact_uret(ust)(kotu_wf, "x.csv")
-    assert ust.indirilenler == []
+def test_alias_beyani_ALIAS_kokune_yerlesiyor(ortam, tmp_path, monkeypatch):
+    art = tmp_path / "artifacts"
+    monkeypatch.setattr(sidecar, "ARTIFACTS_DIR", str(art))
+    ust = SahteUst([], {"rapor.pdf@onaylanmis": b"PDF"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "rapor.pdf@onaylanmis")
+
+    assert sidecar.yerlestir() == 1
+    assert (art / "_alias" / "rapor.pdf").read_bytes() == b"PDF"
 
 
-def test_load_artifact_yol_gecisli_adi_temizler(artifacts_koku):
-    """Ad da süzülüyor: `basename` + servisin kabul ettiği biçim."""
-    ust = SahteUst([], {"wf-baska/passwd": b"kok"})
-    yol = entrypoint._load_artifact_uret(ust)("wf-baska", "../../etc/passwd")
+def test_capraz_girdi_KOSULSUZ_ebeveyn(ortam, tmp_path, monkeypatch):
+    """Başka bir çalıştırmadan beyan edilen girdi, atime'a bakılmadan
+    ebeveyn: beyan etmek okumaktır."""
+    monkeypatch.setattr(sidecar, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
+    ust = SahteUst([], {"wf-baska/onun.csv": b"BASKA"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "wf-baska/onun.csv")
+    sidecar.yerlestir()
 
-    assert Path(yol) == artifacts_koku / "wf-baska" / "passwd"
-
-
-def test_servis_kapaliysa_acik_hata(artifacts_koku):
-    with pytest.raises(RuntimeError):
-        entrypoint._load_artifact_uret(None)("wf-baska", "x.csv")
+    (ortam / "turev.txt").write_bytes(b"x")
+    sidecar.supur()
+    assert dict(ust.yuklenenler)["turev.txt"] == ["art_onun.csv"]
 
 
 # ── yüzey: geri sızmasın ──────────────────────────────────────────────────
@@ -334,6 +343,7 @@ def test_LLM_ARTIFACT_YAZMA_API_SI_YOK():
     hatalarının çoğu tam o yüzeyde çıktı. Bu test kasıtlı olarak NEGATİF:
     yüzeyin geri sızmadığını garanti ediyor.
     """
+    import entrypoint  # noqa: PLC0415
     for gitmis in ("_artifact_api", "_launcher_api", "_ciktilari_supur",
                    "_dizini_supur", "_dizini_paketle", "SCOPE_TOKEN"):
         assert not hasattr(entrypoint, gitmis), f"{gitmis} geri sızdı"
@@ -345,10 +355,14 @@ def test_KESIF_YAMALARI_YOK():
     Tek gerçek icadımızdı; yerine Argo/KFP'nin "kod başlamadan yerleştir"
     deseni geçti. Yama geri gelirse `/output` yine yalan söylemeye başlar.
     """
+    import entrypoint  # noqa: PLC0415
     for gitmis in ("_yamala_kesif", "_tembel_oku", "_tembel_okumayi_kur",
                    "_tembel_dizin_ac", "_okuyucu_sarmala", "_bicim_uyari",
                    "Depo", "_manifest", "_yolu_coz",
-                   "_GERCEK_LISTDIR", "_GERCEK_EXISTS"):
+                   "_GERCEK_LISTDIR", "_GERCEK_EXISTS",
+                   # 2026-09-07 (ikinci tur): sandbox artifact için hiçbir
+                   # çağrı yapmıyor — bu yüzey de gitti.
+                   "_load_artifact_uret", "_tari_ac", "_proxy_bekle"):
         assert not hasattr(entrypoint, gitmis), f"{gitmis} geri sızdı"
 
 

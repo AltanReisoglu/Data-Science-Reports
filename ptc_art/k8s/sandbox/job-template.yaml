@@ -26,6 +26,13 @@ spec:
         ptc-run-id: "{run_id}"
     spec:
       restartPolicy: Never
+      # Kubernetes varsayılan olarak namespace'teki HER servisin
+      # adresini ortam değişkeni olarak enjekte ediyor
+      # (MINIO_SERVICE_HOST, ARTIFACT_SERVICE_PORT…). Sandbox'ın
+      # hiçbirine ihtiyacı yok ve LLM'in yazdığı koda hedef
+      # göstermenin faydası da yok. 2026-09-07'de ölçüldü:
+      # kapatılmadan önce 9 tanesi ortamda duruyordu.
+      enableServiceLinks: false
       # OpenShift'in `restricted-v2` SCC'si bunları zaten DAYATIR; burada AÇIKÇA
       # yazmamızın sebebi kind ile OpenShift'in aynı davranması. Yazmasaydık
       # kind'da root olarak çalışıp OpenShift'te rastgele UID'ye düşerdi ve fark
@@ -131,14 +138,10 @@ spec:
               value: "{tool_gateway_endpoint}"
             # Artifact Service (2026-09-04): artifact baytları ARTIK BURADAN
             # gidip geliyor, gateway'den değil. Gateway yalnızca tool proxy'si.
-            - name: ARTIFACT_SERVICE_ENDPOINT
-              value: "{artifact_service_endpoint}"
             # Kapsam jetonu BURADA YOK (2026-09-06). Sidecar taşıyor; bu
             # container yalnızca 127.0.0.1'deki proxy'yi görüyor. Container'lar
             # ortam değişkenlerini paylaşmadığı için LLM'in kodu jetona
             # ulaşamıyor — kimlik izolasyonu artık politika değil, YAPISAL.
-            - name: PTC_ARTIFACT_PROXY
-              value: "http://127.0.0.1:8099"
             # Yalnızca `/workflows/{{id}}/artifacts` yolunu kurmak için. Yetki
             # bundan DEĞİL jetondan geliyor: servis yoldaki değeri jetondakiyle
             # karşılaştırır, uymazsa 404 döner.
