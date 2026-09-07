@@ -2258,52 +2258,170 @@ ile tamamı)" diyordu, oysa o dosyalar `/output`'ta yok. Şimdi kendi grubunda
 ### İkinci kusur: yerleştirilen ≠ okunan
 
 Sorunun devamı: *"aynı workflow'da B'ye A'nın çıktıları veriliyor mu?"* Evet —
-**hepsi**. Ve bu, soy ağacını sessizce bozuyordu.
+**hepsi**. Ve bu, soy ağacını sessizce bozuyordu: üç dosya yerleşip biri
+okununca türev **üç ebeveyn** alıyordu.
 
-Tembel okuma döneminde `/output`'a yalnızca **okunan** dosya iniyordu, o yüzden
-"indirdiklerim = ebeveynler" doğru bir eşitlikti. Yerleştirme gelince
-`/output`'a bu çalıştırmanın **bütün** çıktıları iner oldu; eşitlik ise
-değişmeden kaldı. Ölçüm:
+Kısa süre bunu `atime` ile ölçmeyi denedik; sahada emsali olmayan bir icattı.
+Piyasanın cevabı **beyan** — çözümün tamamı §11.14'te.
 
-```
-1) üç dosya üret          produced a.txt, b.txt, c.txt
-2) SADECE a.txt'yi oku    consumed a.txt, b.txt, c.txt      ← üçü de
-   turev.txt'nin ebeveynleri: (art_a, art_b, art_c)         ← üç ebeveyn
-```
-
-Yine sessiz: hiçbir hata yok, soy grafiği sadece yanlış.
-
-**Çözüm — atime, ölçülerek.** Yerleştirmede her dosyanın atime'ı epoch'a
-çekiliyor; `relatime` (kind ve OpenShift varsayılanı) atime'ı yalnızca eskiyse
-günceller, dolayısıyla ilk okumada kesin güncelliyor. Süpürmede atime'ı hâlâ
-sıfır olan dosya okunmamıştır.
-
-Varsayım yerine **sonda**: `noatime` bir dosya sisteminde bu ölçüm "hiçbiri
-okunmadı" derdi ve soyu tamamen silerdi. Sidecar açılışta küçük bir sonda
-dosyasıyla atime'ın çalışıp çalışmadığını ölçüyor; çalışmıyorsa yerleştirilenlerin
-**hepsi** ebeveyn sayılıyor — aşırı geniş, ama kayıpsız.
-
-Ebeveyn kaynakları da ayrıldı:
-
-| Defter | Ne | Ebeveyn olma koşulu |
-|---|---|---|
-| `_istenen_kimlik` | `load_artifact` ile açıkça istenenler | koşulsuz — istemek okumaktır |
-| `_yerlesen_kimlik` | açılışta yerleştirilenler | yalnızca atime bumped olanlar |
-
-`consumed` olayı da süpürmeye taşındı: yerleştirme anında hangisine
-dokunulacağı bilinemez.
-
-```
-1) üç dosya üret          produced a.txt, b.txt, c.txt
-2) SADECE a.txt'yi oku    consumed a.txt                    ← yalnızca o
-   turev.txt'nin ebeveynleri: (art_a,)                      ← tek ebeveyn
-```
-
-### Kalan tek şey
+### Kalan tek şey### Kalan tek şey
 
 `os.scandir` artık yamayı **delmiyor** çünkü yama yok — ama `/output` da bir
 güvenlik sınırı değil, hiç olmadı. Gerçek sınır ağda (sandbox MinIO'ya da
 artifact-service'e de çıkamıyor) ve jetonda (yalnızca sidecar'da).
+
+---
+
+## §11.14 — 2026-09-07: üç mekanizma daha, üçü de sahadan kopya
+
+§11.13 okuma yolunu Argo/KFP'nin desenine çevirdi ama üç açık bıraktı. Üçünün
+de piyasada karşılığı vardı; icat edilecek bir şey çıkmadı.
+
+### Kapanan üçüncü icat: `atime`
+
+Soy ağacını kesinleştirmek için kısa süre dosya sisteminin erişim zamanına
+baktık: yerleştirmede atime'ı epoch'a çekiyor, süpürmede değişmiş olanı
+"okunmuş" sayıyorduk. Çalışıyordu — ama **sahada emsali yok.**
+
+MLMD'nin olay tipinin adı bu tartışmayı bitiriyor:
+
+```python
+input_event.type  = metadata_store_pb2.Event.DECLARED_INPUT
+output_event.type = metadata_store_pb2.Event.DECLARED_OUTPUT
+```
+
+> *"When an execution happens, events record every artifact that was used by
+> the execution, and every artifact that was produced."*
+
+`DECLARED_` öneki tesadüf değil: KFP, Argo ve Tekton soyu **beyandan**
+çıkarıyor. Hiçbiri "kod bunu gerçekten okudu mu" diye bakmıyor.
+
+Çalışma anında karar veren sistemlerin cevabı da gözlem değil, **motor
+enstrümantasyonu** — OpenLineage'ın Spark entegrasyonu bir `SparkListener` ile
+execution plan'ı dinliyor. Bu, bizim §11.13'te kaldırdığımız pandas
+yamalarının daha derin ve resmî hâli.
+
+| Aile | Nasıl | Kim |
+|---|---|---|
+| **Beyan** | girdiler DAG'da yazılı | KFP, Argo, Tekton, MLMD |
+| Motor enstrümantasyonu | çalıştırma planını dinle | OpenLineage, Unity Catalog |
+| Soy yok | hiç tutulmuyor | Anthropic, OpenAI Files API |
+| ~~Dosya sistemi izi (atime)~~ | ~~sadece biz~~ | **kaldırıldı** |
+
+### ① BEYAN — `run_ptc_code(code, inputs=[...])`
+
+Argo'nun `inputs.artifacts[]`'inin, KFP'nin bileşen girdilerinin karşılığı.
+Ajan manifestte adları zaten görüyor; beyan etmesi bedava. Kodun **içi** hâlâ
+düz Python.
+
+```
+PTC_INPUTS = "*"        → beyan yok; bu çalıştırmanın hepsi yerleşir
+PTC_INPUTS = ""         → beyan var ve boş; hiçbir girdi istenmiyor
+PTC_INPUTS = "a.csv,b"  → yalnızca bunlar
+```
+
+İki kazanç birden:
+
+| | Beyansız | Beyanlı |
+|---|---|---|
+| Yerleşen | bu çalıştırmanın **hepsi** | yalnızca gerekenler |
+| `turev.txt`'nin ebeveyni | `a.txt, b.txt, c.txt` | **`a.txt`** |
+
+Canlı ölçüm:
+
+```
+inputs=["a.txt"]  → gördüğü: ['a.txt','turev.txt']   parents=['art_1742…']
+inputs yok        → gördüğü: ['a.txt','b.txt','c.txt','turev.txt','turev2.txt']
+                     parents=4 tane
+```
+
+Beyansız yol **uyumluluk** için duruyor: ajan unutursa çalıştırma kırılmıyor,
+yalnızca soy genişliyor. Sistem promptu "HER ZAMAN beyan et" diyor.
+
+### ② SÜZGEÇ — MLMD `filter_query`'sinin karşılığı
+
+Manifest 62 addan 39'unu gösteriyordu ve arama yoktu. MLMD'de bunun cevabı
+hazır:
+
+```python
+store.get_artifacts(list_options=mlmd.ListOptions(
+    filter_query='uri LIKE "%/data" AND properties.day.int_value > 0'))
+```
+
+Bizde alan başına parametre — serbest ifade dili SQL enjeksiyonu için yüzey
+bırakırdı, tek tüketici de manifest ve panel:
+
+```
+GET /artifacts?name=rapor.pdf     → 4/200
+GET /artifacts?type=system.Dataset → 64/200
+GET /artifacts?q=turev             → ad içinde geçen
+GET /artifacts?workflow=<wf>
+```
+
+`q` LIKE'a gidiyor ama `%` ve `_` kaçırılıyor — `?q=%` sıfır sonuç döner,
+her şeyi değil.
+
+### ③ ALIAS — MLflow Model Registry'nin karşılığı
+
+Depoda `rapor.pdf` 17 çalıştırmada var ve "en yeni kazanır" kuralı **sessiz**.
+MLflow'un cevabı:
+
+> *"Model aliases allow you to assign a **mutable, named reference** to a
+> particular version… refer to version 1 of MyModel by using the URI
+> `models:/MyModel@champion`."*
+
+Bizdeki hâli:
+
+```
+PUT /artifacts/<id>/alias?alias=onaylanmis
+GET /artifacts/by-name/rapor.pdf@onaylanmis     → o sürüm, "en yeni" değil
+load_artifact(None, "rapor.pdf@onaylanmis")     → sandbox'tan
+```
+
+Canlı doğrulama:
+
+```
+alias'sız by-name    : art_cd7217055459   (en yeni)
+by-name/..@onaylanmis: art_b51b4c46e9bf   ← EN ESKİ sürüm, 15846 bayt
+bozuk alias reddi    : 400
+```
+
+Alias bir (owner, name) içinde **tek sürüme** işaret ediyor — MLflow'da da
+öyle; iki satır kalsaydı yine "en yeni" kuralına düşerdik ve alias'ın varlık
+sebebi ortadan kalkardı.
+
+**Sandbox alias atayamaz:** proxy'de yazma uç noktası yok ve jeton onda değil.
+Alias'ı taşıyan insan ya da CI — MLflow'un kendi gerekçesiyle: *"alias
+assignments can be updated independently of your production code."*
+
+Alias atanmış bir artifact manifestte adresiyle görünüyor:
+
+```
+  load_artifact(None, "rapor.pdf@onaylanmis")  (Artifact, 8170 bayt, alias)
+```
+
+### Doğrulama
+
+```
+206 birim/entegrasyon testi · 51/51 canlı kabul kontrolü
+ajan uçtan uca: produced:stok.parquet → consumed:stok.parquet → "B ürününün adedi 70"
+```
+
+### Bunun sonucu
+
+Şu an mimaride **piyasada karşılığı olmayan hiçbir desen kalmadı**:
+
+| Parça | Kaynak |
+|---|---|
+| init + wait sidecar | Argo Workflows |
+| girdiyi kod başlamadan yerleştir | Argo `init` / KFP `driver`+`launcher` |
+| **girdi beyanı** | **Argo `inputs.artifacts` / KFP bileşen girdisi** |
+| beyandan soy | **MLMD `DECLARED_INPUT`** |
+| run-scoped anahtar yolu | KFP `pipeline_root/<run-id>/` |
+| **künye süzgeci** | **MLMD `ListOptions(filter_query=...)`** |
+| **sürüm alias'ı** | **MLflow Model Registry** |
+| isimler prompt'ta | Google ADK `LoadArtifactsTool` |
+| içerik-hash dedup | S3 / DVC / OCI |
 
 ---
 

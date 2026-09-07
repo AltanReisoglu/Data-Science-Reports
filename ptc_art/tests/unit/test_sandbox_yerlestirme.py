@@ -60,8 +60,9 @@ class SahteUst:
         if ham is None:
             return None
         Path(hedef).write_bytes(ham)
+        tip = "application/x-tar" if name.endswith(".tar") else "text/csv"
         return {"artifact_id": f"art_{name}", "name": name,
-                "content_type": "text/csv", "size_bytes": len(ham)}
+                "content_type": tip, "size_bytes": len(ham)}
 
     def put_file(self, path, content_type, name, ttl_seconds=None, parents=None):
         self.yuklenenler.append((name, list(parents or [])))
@@ -80,7 +81,6 @@ def ortam(tmp_path, monkeypatch):
     monkeypatch.setattr(sidecar, "_sunulan_ozet", {})
     monkeypatch.setattr(sidecar, "_istenen_kimlik", set())
     monkeypatch.setattr(sidecar, "_yerlesen_kimlik", {})
-    monkeypatch.setattr(sidecar, "_ATIME_CALISIYOR", None)
     return cikti
 
 
@@ -172,42 +172,65 @@ def test_OKUNAN_ebeveyn_olur(ortam, monkeypatch):
     assert dict(ust.yuklenenler)["turev.parquet"] == ["art_ham.csv"]
 
 
-def test_OKUNMAYAN_ebeveyn_OLMAZ(ortam, monkeypatch):
-    """ASIL REGRESYON (2026-09-07, kullanıcı sordu: "B'ye önceki çıktılar
-    veriliyor mu?").
+def test_BEYAN_yerlestirmeyi_daraltir(ortam, monkeypatch):
+    """ASIL DESEN (2026-09-07): Argo `inputs.artifacts`, KFP bileşen girdisi.
 
-    Yerleştirme gelince `/output`'a bu çalıştırmanın BÜTÜN çıktıları iniyor.
-    Hepsini ebeveyn saymak soyu şişiriyordu: üç dosya yerleşip biri okununca
-    türev ÜÇ ebeveyn alıyordu. Tembel okuma döneminde bu doğruydu, çünkü
-    yalnızca okunan iniyordu.
-
-    Artık ölçüm atime ile: yerleştirmede atime epoch'a çekiliyor, okuma
-    `relatime` altında bile onu güncelliyor.
+    Beyansız çalışınca bu çalıştırmanın HER çıktısı yerleşiyor ve hepsi soy
+    ağacında ebeveyn oluyordu — üç dosya yerleşip biri okununca türev üç
+    ebeveyn alıyordu. Kısa süre atime ile "hangisi okundu" ölçmeyi denedik;
+    sahada emsali olmayan bir icattı. MLMD'nin cevabı beyan: olay tipinin adı
+    zaten `Event.DECLARED_INPUT`.
     """
     ust = SahteUst([kayit("a.txt"), kayit("b.txt"), kayit("c.txt")],
                    {"a.txt": b"A", "b.txt": b"B", "c.txt": b"C"})
     monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "a.txt")
 
-    sidecar.yerlestir()
-    (ortam / "a.txt").read_bytes()                   # yalnızca a
+    assert sidecar.yerlestir() == 1
+    assert (ortam / "a.txt").exists()
+    assert not (ortam / "b.txt").exists()
+    assert not (ortam / "c.txt").exists()
+
     (ortam / "turev.txt").write_bytes(b"A!")
     sidecar.supur()
-
     assert dict(ust.yuklenenler)["turev.txt"] == ["art_a.txt"]
 
 
-def test_atime_yoksa_HEPSI_ebeveyn(ortam, monkeypatch):
-    """noatime'da ölçüm yapılamaz. O zaman aşırı geniş davranmak, soyu
-    sessizce SİLMEKTEN iyidir."""
+def test_beyan_yoksa_HEPSI_yerlesir(ortam, monkeypatch):
+    """Uyumluluk yolu: ajan beyan etmezse çalıştırma kırılmamalı."""
     ust = SahteUst([kayit("a.txt"), kayit("b.txt")], {"a.txt": b"A", "b.txt": b"B"})
     monkeypatch.setattr(sidecar, "istemci", ust)
-    monkeypatch.setattr(sidecar, "_ATIME_CALISIYOR", False)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "*")
 
-    sidecar.yerlestir()
-    (ortam / "turev.txt").write_bytes(b"x")          # hiçbirini okumadı
+    assert sidecar.yerlestir() == 2
+    (ortam / "turev.txt").write_bytes(b"x")
     sidecar.supur()
-
     assert dict(ust.yuklenenler)["turev.txt"] == ["art_a.txt", "art_b.txt"]
+
+
+def test_bos_beyan_hicbir_sey_yerlestirmez(ortam, monkeypatch):
+    """`inputs=[]` — "girdiye ihtiyacım yok". Ağa da çıkılmıyor."""
+    ust = SahteUst([kayit("a.txt")], {"a.txt": b"A"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "")
+
+    assert sidecar.yerlestir() == 0
+    assert not (ortam / "a.txt").exists()
+
+
+def test_beyanda_dizin_adi_tar_ile_eslesir(ortam, tmp_path, monkeypatch):
+    """Ajan `/output/model.v1/` görüyor, depoda ad `model.v1.tar`. İkisi de
+    yazılabilmeli — yoksa beyan sessizce karşılanmazdı."""
+    kaynak = tmp_path / "k"; kaynak.mkdir(); (kaynak / "w.json").write_text("1")
+    paket = tmp_path / "p.tar"; sidecar._dizini_paketle(str(kaynak), str(paket))
+
+    ust = SahteUst([{"name": "model.v1.tar", "workflow_id": WF, "artifact_id": "art_m"}],
+                   {"model.v1.tar": paket.read_bytes()})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "model.v1")   # tar'sız hâli
+
+    assert sidecar.yerlestir() == 1
+    assert (ortam / "model.v1" / "w.json").exists()
 
 
 def test_load_artifact_ile_istenen_KOSULSUZ_ebeveyn(ortam, monkeypatch):

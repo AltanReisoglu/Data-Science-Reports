@@ -326,9 +326,33 @@ class ArtifactService:
     def metadata_of(self, artifact_id: str, *, owner: str) -> ArtifactMeta:
         return self._yetkili_meta(artifact_id, owner)
 
-    def list(self, *, owner: str, limit: int = 200) -> list[ArtifactMeta]:
-        """Tenant'ta ne var — manifestin kaynağı, workflow'lar arası."""
-        return self.metadata.list_for_owner(owner, limit=limit)
+    def list(
+        self, *, owner: str, limit: int = 200, name: str | None = None,
+        artifact_type: str | None = None, workflow_id: str | None = None,
+        name_contains: str | None = None,
+    ) -> list[ArtifactMeta]:
+        """Tenant'ta ne var — manifestin kaynağı, workflow'lar arası.
+
+        Süzgeçler MLMD'nin `ListOptions(filter_query=...)`'sinin karşılığı;
+        gerekçe `metadata.list_for_owner`'da.
+        """
+        return self.metadata.list_for_owner(
+            owner, limit=limit, name=name, artifact_type=artifact_type,
+            workflow_id=workflow_id, name_contains=name_contains)
+
+    def set_alias(self, artifact_id: str, *, owner: str, alias: str | None) -> bool:
+        """Bir sürümü İSİMLE sabitler — MLflow'un alias'ı.
+
+        Sandbox'tan ÇAĞRILAMAZ: proxy'de yazma uç noktası yok ve bu, servisin
+        kendi uç noktası. Alias'ı taşıyan insan ya da CI olmalı; MLflow'da da
+        öyle (*"alias assignments can be updated independently of your
+        production code"*).
+        """
+        return self.metadata.set_alias(owner, artifact_id, alias)
+
+    def resolve_alias(self, *, owner: str, name: str, alias: str) -> ArtifactMeta | None:
+        """`<ad>@<alias>` → o sürüm. `models:/MyModel@champion` neyse o."""
+        return self.metadata.by_alias(owner, name, alias)
 
     def lineage(self, artifact_id: str, *, owner: str, limit: int = 1000) -> dict:
         """Bir artifact'in soy ağacı: yukarı ATALAR, aşağı ÜRÜNLER.

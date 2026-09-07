@@ -82,7 +82,6 @@ def ortam(tmp_path, monkeypatch):
     monkeypatch.setattr(sidecar, "_sunulan_ozet", {})
     monkeypatch.setattr(sidecar, "_istenen_kimlik", set())
     monkeypatch.setattr(sidecar, "_yerlesen_kimlik", {})
-    monkeypatch.setattr(sidecar, "_ATIME_CALISIYOR", None)
     return cikti
 
 

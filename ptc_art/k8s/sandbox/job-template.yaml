@@ -72,6 +72,13 @@ spec:
               value: "{scope_token}"
             - name: PTC_WORKFLOW_ID
               value: "{workflow_id}"
+            # BEYAN EDİLEN GİRDİLER — Argo'nun `inputs.artifacts`'inin
+            # karşılığı. Virgülle ayrılmış artifact adları; "*" = beyan yok
+            # (bu çalıştırmanın hepsi yerleşir, uyumluluk yolu).
+            # Artifact adı `^[A-Za-z0-9][A-Za-z0-9._-]{{0,127}}$` olduğu için
+            # virgül ayıracı ve YAML tırnağı güvenli.
+            - name: PTC_INPUTS
+              value: "{inputs}"
             - name: TOOL_GATEWAY_ENDPOINT
               value: "{tool_gateway_endpoint}"
           volumeMounts:

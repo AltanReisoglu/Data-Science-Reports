@@ -108,9 +108,8 @@ class ArtifactClient:
     def fetch_to_file(self, name: str, hedef: str, workflow_id: str | None = None) -> dict | None:
         """Artifact'i doğrudan diske yazar — hiçbir noktada tamamı bellekte olmaz.
 
-        `/output` altındaki tembel okuma bunu kullanır: `pd.read_csv` çağrılınca
-        dosya yoksa buraya düşülür, dosya yerine konur, sonra pandas normal
-        şekilde okur.
+        Yerleştirme ve `load_artifact` bunu kullanır. `name` içinde `@` varsa
+        alias çözümü devreye girer: `rapor.pdf@onaylanmis`.
         """
         yanit = self._ham_getir(None, name, workflow_id)
         if yanit is None:
@@ -125,8 +124,14 @@ class ArtifactClient:
         if artifact_id is not None:
             url = f"{self.endpoint}/artifacts/{artifact_id}"
         elif name is not None:
+            # `@` alias ayıracı — quote edilmemeli, servis onu ayrıştırıyor
+            # (MLflow'un `models:/<ad>@<alias>`'ı). Ad ve alias biçimi zaten
+            # `[A-Za-z0-9._-]` ile sınırlı, yani URL'de kaçış gerektiren
+            # başka bir karakter olamaz.
             url = f"{self.endpoint}/artifacts/by-name/{name}"
-            if workflow_id:
+            if workflow_id and "@" not in name:
+                # Alias tenant genelinde çözülür (MLflow'da da registry
+                # genelinde); `workflow` ile daraltmak onu anlamsız kılardı.
                 url += f"?workflow={workflow_id}"
         else:
             raise ValueError("artifact_id ya da name verilmeli")

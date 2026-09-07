@@ -30,6 +30,7 @@ yazılı; gerekçeler ve alıntılar orada.
 | [16](#16--bilinen-açıklar) | Açıklar | Saklamıyoruz |
 | [17](#17--openshift-uyumluluğu) | **OpenShift uyumluluğu** | **Bizimki orada çalışır mı** |
 | [18](#18--aynı-akış-adım-adım-üç-üründe) | **Aynı akış, adım adım** | **Bir dosya nasıl yolculuk ediyor** |
+| [19](#19--beyan-süzgeç-alias--üç-mekanizma-üç-kaynak) | **Beyan · Süzgeç · Alias** | **Hangi deseni kimden aldık** |
 
 ---
 
@@ -222,6 +223,7 @@ hepsini kaldırdı — `docker` için gerekçe *"breaks security completely"*.
 | 4 | **İsimler prompt'a enjekte** | İsimler talimatlarda, içerik talep üzerine | **Google ADK** |
 | 3+4 | **İkisi birden** | Manifest promptta; `/output` kod başlamadan **yerleştirilmiş**, `os.listdir` gerçek dosyaları gösteriyor | **BİZ** |
 | 5 | Semantik arama | Vektör deposunda `file_search` | Llama Stack (RAG) |
+| 6 | **Kayıt defterine sorgu** | `filter_query` ile süzülmüş liste | **MLMD**; bizde `?name=/?type=/?q=` |
 | — | **Keşif YOK** | DAG statik, girdi bağlanmış | KFP, Argo, Airflow, Tekton |
 
 **Desen 4'ün üç kuralı:** isimler her zaman context'te · içerik talep üzerine ·
@@ -307,6 +309,10 @@ code"* diyor. *(§9.7)*
 | **Aktarımı başlatan (sidecar)** | **Argo Workflows** — init + wait |
 | **Girdi yerleştirme (kod başlamadan)** | **Argo `init` / KFP `driver`+`launcher`** |
 | Çapraz-çalıştırma erişimi (açık çağrı) | **KFP** (açık URI) · **Google ADK** (`load_artifact`) |
+| **Girdi beyanı** (`inputs=[...]`) | **Argo** `inputs.artifacts` · **KFP** bileşen girdisi |
+| **Beyandan soy** | **MLMD** `DECLARED_INPUT` |
+| **Künye süzgeci** | **MLMD** `ListOptions(filter_query=...)` |
+| **Sürüm alias'ı** | **MLflow Model Registry** `models:/<ad>@<alias>` |
 | İzolasyon | **Kimse — bizimki daha zayıf** |
 
 *(§12)*
@@ -322,7 +328,7 @@ code"* diyor. *(§9.7)*
 | Workflow state | Postgres yolu test edilmedi | Cluster'da Postgres yok |
 | **Auth** | Yok | Jetonu üretebilen tenant'ın tümünü okur |
 | Büyük dosya | 100 MiB servis / 1 Gi pod | 5 GB çalışmaz |
-| İsim çakışması | Aynı workflow'da "en yeni" kazanır, sessiz | Veri kaybı riski |
+| ~~İsim çakışması~~ | **KAPANDI (2026-09-07)** — `<ad>@<alias>` ile sürüm sabitlenebiliyor | MLflow deseni |
 | ~~Şeffaf okuma~~ | **KAPANDI (2026-09-07)** — yamalar kalktı, `/output` gerçek dosya | Emsalsiz olan tek desenimizdi |
 | `user_metadata` | Süpürme yolunda doldurulamıyor | API kalkınca kapandı |
 | Tip | Yalnızca dosya uzantısından | Metrik/Dataset ayrımı kayboldu |
@@ -535,6 +541,79 @@ yerleştirme sınırın on binde yedisini kullanıyor — ve bu tam olarak KFP'n
 
 ---
 
+## 19 — Beyan · Süzgeç · Alias — üç mekanizma, üç kaynak
+
+2026-09-07'de eklenen üç mekanizmanın hiçbiri bize ait değil; üçü de birebir
+kopya. Kaynak ve alıntılar §11.14'te.
+
+### 19.1 — Soy ağacı: gözlem mi, beyan mı
+
+| Aile | Nasıl | Kim | Bizde |
+|---|---|---|---|
+| **Beyan** | girdiler DAG'da/çağrıda yazılı | KFP, Argo, Tekton, MLMD | ✅ `inputs=[...]` |
+| Motor enstrümantasyonu | `SparkListener`, execution plan | OpenLineage, Unity Catalog | ✗ motoru sahiplenmiyoruz |
+| Soy yok | hiç tutulmuyor | Anthropic, OpenAI Files API | ✗ |
+| ~~Dosya sistemi izi~~ | ~~atime~~ | ~~yalnızca biz~~ | 🔴 **kaldırıldı** |
+
+MLMD'nin olay tipinin adı tartışmayı bitiriyor: **`Event.DECLARED_INPUT`**.
+
+### 19.2 — Beyanın iki etkisi
+
+| | Beyansız | `inputs=["a.txt"]` |
+|---|---|---|
+| `/output`'a yerleşen | bu çalıştırmanın **hepsi** | yalnızca `a.txt` |
+| `turev.txt`'nin ebeveyni | `a.txt, b.txt, c.txt` | **`a.txt`** |
+| Ölçek | O(çalıştırmanın çıktısı) | O(gerçekten gereken) |
+
+### 19.3 — Keşif: sorgu yüzeyi
+
+| Sistem | Sorgu | Bizdeki karşılığı |
+|---|---|---|
+| **MLMD** | `ListOptions(filter_query='uri LIKE "%/data" AND …')` | `?name=`, `?type=`, `?workflow=`, `?q=` |
+| MLflow | `search_registered_models(filter_string=…)` | — |
+| KFP UI | liste sıralama/süzme | panel |
+| Argo / Tekton | **yok** — DAG bağlıyor | — |
+
+Serbest ifade dili yerine alan başına parametre: SQL enjeksiyonu için yüzey
+bırakmamak, ve tek tüketicinin manifest + panel olması.
+
+### 19.4 — Aynı adın 17 sürümü: kim nasıl çözüyor
+
+| Sistem | Çözüm | Adres |
+|---|---|---|
+| **MLflow** | **alias** (mutable named reference) | `models:/MyModel@champion` |
+| **OpenShift AI Model Registry** | sürüm + metadata | registry UI/API |
+| KFP / Argo | çakışma **imkânsız** — yol run-id içeriyor | `pipeline_root/<run-id>/` |
+| DVC / git | içerik hash'i — isim kimlik değil | commit |
+| Unity Catalog | tam nitelikli isim + yetki | `/Volumes/<c>/<s>/<v>/` |
+| **BİZ** | **alias** + run-scoped yol | `by-name/rapor.pdf@onaylanmis` |
+
+Alias bir `(owner, name)` içinde **tek sürüme** işaret eder; ikinci atama
+birinciyi düşürür. İki satır kalsaydı yine "en yeni" kuralına düşerdi.
+
+**Kim atar:** insan ya da CI. Sandbox atayamaz — proxy'de yazma uç noktası
+yok. MLflow'un gerekçesi aynı: *"alias assignments can be updated
+independently of your production code."*
+
+### 19.5 — Sonuç: emsalsiz desen kalmadı
+
+| Parça | Kaynak |
+|---|---|
+| init + wait sidecar | Argo Workflows |
+| girdiyi kod başlamadan yerleştir | Argo `init` / KFP `driver`+`launcher` |
+| **girdi beyanı** | **Argo `inputs.artifacts` / KFP bileşen girdisi** |
+| **beyandan soy** | **MLMD `DECLARED_INPUT`** |
+| run-scoped anahtar yolu | KFP `pipeline_root/<run-id>/` |
+| **künye süzgeci** | **MLMD `filter_query`** |
+| **sürüm alias'ı** | **MLflow Model Registry** |
+| isimler prompt'ta | Google ADK `LoadArtifactsTool` |
+| içerik-hash dedup | S3 / DVC / OCI |
+| kayıt defteri + tipler | KFP / MLMD |
+
+*(§11.14)*
+
+---
+
 ## Kaynaklar
 
 Bütün alıntılar ve linkler
@@ -545,3 +624,11 @@ bölümünde. §17'nin kaynakları:
 - [OpenShift — EgressFirewall API (`k8s.ovn.org/v1`)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/network_apis/egressfirewall-k8s-ovn-org-v1)
 - [OCP 4.16 release notes](https://docs.redhat.com/en/documentation/openshift_container_platform/4.16/html/release_notes/ocp-4-16-release-notes) — Kubernetes 1.29
 - [Kubernetes — Sidecar Containers](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)
+
+§19'un kaynakları (2026-09-07):
+
+- [ML Metadata (MLMD)](https://www.tensorflow.org/tfx/guide/mlmd) — `Event.DECLARED_INPUT` / `DECLARED_OUTPUT`, `ListOptions(filter_query=…)`
+- [OpenLineage — Spark column lineage](https://openlineage.io/docs/integrations/spark/spark_column_lineage/) — `SparkListener` ile execution plan
+- [MLflow — Model Registry](https://mlflow.org/docs/latest/ml/model-registry/) — alias, `models:/<ad>@<alias>`
+- [OpenShift AI — model registries](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25/html/enabling_the_model_registry_component/overview-of-model-registries_model-registry-config)
+- [KFP v2beta1 API](https://www.kubeflow.org/docs/components/pipelines/reference/api/kubeflow-pipeline-api-spec/)

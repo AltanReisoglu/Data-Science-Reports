@@ -36,8 +36,9 @@ def kontrol(ad, kosul, ayrinti=""):
     sonuclar.append((ad, bool(kosul), str(ayrinti)[:110]))
     print(f"  {'PASS' if kosul else 'FAIL'}  {ad}" + (f"  — {str(ayrinti)[:90]}" if ayrinti else ""))
 
-def kos(kod, wf, node=None):
-    return run_sandbox(kod, workflow_id=wf, node_id=node)
+def kos(kod, wf, node=None, inputs="YOK"):
+    kw = {} if inputs == "YOK" else {"inputs": inputs}
+    return run_sandbox(kod, workflow_id=wf, node_id=node, **kw)
 
 def basla(b): print(f"\n{'─'*70}\n{b}\n{'─'*70}")
 
@@ -269,6 +270,77 @@ try:
     kontrol("panel soy grafiği", len(sg.get("nodes", [])) >= 4, len(sg.get("nodes", [])))
 except Exception as e:
     kontrol("panel erişilebilir", False, f"{type(e).__name__}: {e}")
+
+# ══ 9. Kanıtlanmış üç mekanizma (2026-09-07) ═════════════════════════════
+basla("9 · BEYAN · SÜZGEÇ · ALIAS — üçü de sahadan kopya")
+
+# 9a — BEYAN: Argo `inputs.artifacts`, KFP bileşen girdisi, MLMD DECLARED_INPUT
+WF_C = str(uuid.uuid4())
+kos("""
+for ad in ("a.txt","b.txt","c.txt"): open("/output/"+ad,"w").write(ad[0].upper())
+set_result("ok")
+""", WF_C, inputs=[])
+r = kos("""
+import os
+open("/output/turev.txt","w").write(open("/output/a.txt").read()+"!")
+set_result({"gordugu": sorted(os.listdir("/output"))})
+""", WF_C, inputs=["a.txt"])
+kontrol("beyan çalıştı", r.status.value == "success", r.error_message or "")
+if r.status.value == "success":
+    kontrol("beyan yerleştirmeyi daraltıyor",
+            eval(r.result_text)["gordugu"] == ["a.txt", "turev.txt"],
+            eval(r.result_text)["gordugu"])
+    ebeveyn = {o.name: list(o.parents) for o in r.artifacts if o.op.value == "produced"}
+    kontrol("soy YALNIZCA beyan edilen girdiden", len(ebeveyn.get("turev.txt", [])) == 1,
+            ebeveyn.get("turev.txt"))
+
+r = kos("""
+import os
+open("/output/turev2.txt","w").write("x")
+set_result({"gordugu": sorted(os.listdir("/output"))})
+""", WF_C)
+kontrol("beyansız uyumluluk yolu duruyor",
+        r.status.value == "success" and len(eval(r.result_text)["gordugu"]) >= 4,
+        r.error_message or eval(r.result_text)["gordugu"])
+
+# 9b — SÜZGEÇ: MLMD `ListOptions(filter_query=...)` karşılığı
+hepsi = requests.get(f"{SERVIS}/artifacts", headers=H, timeout=20).json()
+ada = requests.get(f"{SERVIS}/artifacts", params={"name": "a.txt"}, headers=H, timeout=20).json()
+tipe = requests.get(f"{SERVIS}/artifacts", params={"type": "system.Dataset"},
+                    headers=H, timeout=20).json()
+ara = requests.get(f"{SERVIS}/artifacts", params={"q": "turev"}, headers=H, timeout=20).json()
+joker = requests.get(f"{SERVIS}/artifacts", params={"q": "%"}, headers=H, timeout=20).json()
+kontrol("?name= süzüyor", 0 < len(ada) < len(hepsi), f"{len(ada)}/{len(hepsi)}")
+kontrol("?type= süzüyor", 0 < len(tipe) < len(hepsi), f"{len(tipe)}/{len(hepsi)}")
+kontrol("?q= ad içinde arıyor", all("turev" in k["name"] for k in ara), len(ara))
+kontrol("LIKE jokeri kaçırılıyor", joker == [], len(joker))
+
+# 9c — ALIAS: MLflow `models:/<ad>@<alias>` karşılığı
+surumler = [k["artifact_id"] for k in
+            requests.get(f"{SERVIS}/artifacts", params={"name": "a.txt"},
+                         headers=H, timeout=20).json()]
+enyeni = requests.get(f"{SERVIS}/artifacts/by-name/a.txt", headers=H, timeout=20)
+pa = requests.put(f"{SERVIS}/artifacts/{surumler[-1]}/alias",
+                  params={"alias": "kabul"}, headers=H, timeout=20)
+kontrol("alias atanıyor", pa.status_code == 200, pa.status_code)
+ra = requests.get(f"{SERVIS}/artifacts/by-name/a.txt@kabul", headers=H, timeout=20)
+kontrol("alias sürümü sabitliyor",
+        ra.status_code == 200 and ra.headers.get("X-Artifact-Id") == surumler[-1],
+        ra.status_code)
+kontrol("alias 'en yeni' kuralından kaçırıyor",
+        len(surumler) == 1 or ra.headers.get("X-Artifact-Id") != enyeni.headers.get("X-Artifact-Id"),
+        f"{ra.headers.get('X-Artifact-Id')} vs {enyeni.headers.get('X-Artifact-Id')}")
+kontrol("bozuk alias reddediliyor",
+        requests.put(f"{SERVIS}/artifacts/{surumler[-1]}/alias",
+                     params={"alias": "../etc"}, headers=H, timeout=20).status_code == 400)
+r = kos("""
+import os
+yol = load_artifact(None, "a.txt@kabul")
+set_result({"yol": yol, "icerik": open(yol).read()})
+""", str(uuid.uuid4()), inputs=[])
+kontrol("sandbox alias'la okuyabiliyor",
+        r.status.value == "success" and eval(r.result_text)["icerik"] == "A",
+        r.error_message or r.result_text)
 
 # ══ ÖZET ═════════════════════════════════════════════════════════════════
 print(f"\n{'═'*70}")

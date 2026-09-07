@@ -139,6 +139,14 @@ def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str 
         if ek:
             kuyruk += f"  {ek}"
         wf = k.get("workflow_id") or ""
+        takma = k.get("alias")
+        if takma:
+            # MLflow'un alias'ı: sabitlenmiş bir sürüme İSİMLE ulaşılıyor,
+            # "en yeni kazanır" kuralına düşmeden. Adresi bu, o yüzden
+            # manifest de bunu gösteriyor.
+            kuyruk = f"  ({kuyruk.strip()[1:-1]}, alias)"
+            digerleri.append(f'  load_artifact(None, "{ad}@{takma}"){kuyruk}')
+            continue
         if workflow_id and wf == workflow_id:
             benim.append(f"  /output/{ad}{kuyruk}")
         else:

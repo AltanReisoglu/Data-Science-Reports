@@ -80,7 +80,7 @@ def _make_ptc_tool(
     websocket_protocol.md). CLI hiç geçmez (`None`), davranışı değişmez."""
 
     @tool
-    def run_ptc_code(code: str) -> str:
+    def run_ptc_code(code: str, inputs: list[str] | None = None) -> str:
         """LLM'in ürettiği Python kodunu, Tool Gateway dışında hiçbir yere
         çıkamayan (Cilium/eBPF ile ağ seviyesinde kısıtlı) ayrı bir Kubernetes
         pod'unda çalıştırır. Bu, veriye/canlı sistemlere erişmenin TEK yoludur —
@@ -104,6 +104,15 @@ def _make_ptc_tool(
         programatik olarak (döngü/koşul ile) sıralamak istediğinde de bunu
         kullan.
 
+        `inputs` — BU ÇALIŞTIRMANIN OKUYACAĞI DOSYALARI BEYAN ET. Sistem
+        mesajındaki "BU OTURUMDA ÜRETİLENLER" listesinden hangilerine
+        ihtiyacın varsa adlarını buraya yaz; yalnızca onlar `/output`'a
+        konur. Örnek: `inputs=["satis.parquet"]`.
+
+        Hiçbir eski dosya okumayacaksan `inputs=[]` ver. Beyan etmezsen bu
+        oturumun bütün çıktıları kopyalanır ve hepsi soy ağacında girdi
+        sayılır — yani grafik yanlış olur. Bu yüzden HER ZAMAN beyan et.
+
         KALICI VERİ — `/output/` dizini. Sandbox pod'u her çalıştırmada
         SIFIRDAN doğar; değişkenler bir sonraki çağrıya TAŞINMAZ. Kalması
         gereken her şeyi `/output/` altına DOSYA olarak yaz.
@@ -119,12 +128,13 @@ def _make_ptc_tool(
         otomatik olarak kalıcı depoya konur. Hata alsan bile o ana kadar
         yazdıkların kurtarılır.
 
-        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — bu oturumun bütün çıktıları
-        `/output/` altında HAZIR duruyor. Pod açılırken oraya yerleştiriliyor,
-        yani sıradan dosyalar; özel bir çağrı yok:
+        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — `inputs` ile beyan ettiklerin
+        `/output/` altında HAZIR olur. Pod açılırken oraya yerleştirilirler,
+        yani sıradan dosyalar; kodun içinde özel bir çağrı yok:
 
-            os.listdir("/output")                # bu oturumun çıktıları
-            pd.read_parquet("/output/x.parquet") # düz dosya okuması
+            run_ptc_code(code, inputs=["x.parquet"])
+            # kodun içinde:
+            pd.read_parquet("/output/x.parquet")  # düz dosya okuması
 
         Kullanıcı önceki bir sonuca atıf yapıyorsa ("az önceki tabloyu", "onu
         departmana göre grupla") veriyi YENİDEN ÜRETME — önce `/output`'a bak,
@@ -182,7 +192,8 @@ def _make_ptc_tool(
                 "Farklı bir URL/domain/şema deneyerek tekrar çağırma; elindeki "
                 "bilgiyle yanıt ver, tahmini değer üretme."
             )
-        run = run_sandbox(code, on_event=on_ptc_event, workflow_id=workflow_id)
+        run = run_sandbox(code, on_event=on_ptc_event, workflow_id=workflow_id,
+                          inputs=inputs)
         trace.record_sandbox_run(run)  # SC-003: çalıştırmanın kendisi (T017)
         for call in run.tool_calls:
             trace.record_tool_call(call)  # T015: çalıştırma içindeki her tool çağrısı

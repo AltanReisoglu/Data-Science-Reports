@@ -70,6 +70,14 @@ CREATE TABLE IF NOT EXISTS artifacts (
 _MIGRASYONLAR = (
     "ALTER TABLE artifacts ADD COLUMN artifact_type TEXT",
     "ALTER TABLE artifacts ADD COLUMN user_metadata TEXT",
+    # 2026-09-07: MLflow Model Registry'nin `alias`'ı — *"a mutable, named
+    # reference to a particular version"*. `models:/MyModel@champion`
+    # neyse, bizde `by-name/rapor.pdf@onaylanmis` o.
+    #
+    # Neden gerekti: aynı ad 13 çalıştırmada olabiliyor ve "en yeni kazanır"
+    # kuralı sessiz. Alias, bir sürümü İSİMLE sabitlemenin sahada kanıtlanmış
+    # yolu; işaretçi taşınabilir, çağıran kod değişmez.
+    "ALTER TABLE artifacts ADD COLUMN alias TEXT",
 )
 
 # workflow+name: "extract.tickets'ın en yenisi" sorgusu (node'lar arası keşif).
@@ -81,13 +89,15 @@ _INDEXES = (
     # owner+name: workflow'lar arası isimle çözme (2026-09-06). Keşif sınırı
     # workflow'dan tenant'a genişleyince bu sorgu sıcak yola girdi.
     "CREATE INDEX IF NOT EXISTS ix_artifacts_owner_name ON artifacts(owner, name)",
+    # owner+alias: `by-name/<ad>@<alias>` çözümü (2026-09-07).
+    "CREATE INDEX IF NOT EXISTS ix_artifacts_owner_alias ON artifacts(owner, alias)",
 )
 
 _COLUMNS = (
     "artifact_id", "name", "workflow_id", "node_id", "run_id",
     "content_hash", "content_type", "size_bytes", "storage_uri",
     "parents", "owner", "created_at", "ttl_seconds",
-    "artifact_type", "user_metadata",
+    "artifact_type", "user_metadata", "alias",
 )
 
 
@@ -116,6 +126,9 @@ class ArtifactMeta:
     #: KFP'deki `.metadata` — çağıranın koyduğu serbest anahtar-değer.
     user_metadata: dict = field(default_factory=dict)
     ttl_seconds: int | None = None
+    #: MLflow Model Registry'nin alias'ı — *"a mutable, named reference to a
+    #: particular version"*. Bir (owner, name) içinde tek sürüme işaret eder.
+    alias: str | None = None
 
     def expires_at(self) -> datetime | None:
         if self.ttl_seconds is None:
@@ -248,14 +261,83 @@ class MetadataStore:
         )
         return next(rows, None)
 
-    def list_for_owner(self, owner: str, limit: int = 200) -> list[ArtifactMeta]:
-        """Tenant'ta ne var — manifestin kaynağı, workflow'lar arası."""
+    def list_for_owner(
+        self, owner: str, limit: int = 200, *,
+        name: str | None = None, artifact_type: str | None = None,
+        workflow_id: str | None = None, name_contains: str | None = None,
+    ) -> list[ArtifactMeta]:
+        """Tenant'ta ne var — manifestin kaynağı, workflow'lar arası.
+
+        Süzgeçler MLMD'nin `ListOptions(filter_query=...)`'sinin karşılığı:
+
+            store.get_artifacts(list_options=mlmd.ListOptions(
+                filter_query='uri LIKE "%/data" AND properties.day.int_value > 0'))
+
+        Orada tam bir ifade dili var; burada dört alan yeterli çünkü tek
+        tüketici manifest ve panel. Serbest ifade yerine ALAN BAŞINA parametre
+        olmasının sebebi: SQL enjeksiyonu için yüzey bırakmamak — hepsi
+        parametreli sorguya gidiyor.
+        """
+        kosullar = [f"owner = {self.placeholder}"]
+        params: list = [owner]
+        for alan, deger in (("name", name), ("artifact_type", artifact_type),
+                            ("workflow_id", workflow_id)):
+            if deger:
+                kosullar.append(f"{alan} = {self.placeholder}")
+                params.append(deger)
+        if name_contains:
+            kosullar.append(f"name LIKE {self.placeholder} ESCAPE '\\'")
+            # LIKE joker karakterleri kullanıcı girdisinden gelmemeli
+            kacan = (name_contains.replace("\\", "\\\\")
+                     .replace("%", "\\%").replace("_", "\\_"))
+            params.append(f"%{kacan}%")
+        params.append(limit)
         return list(self._query(
-            "SELECT * FROM artifacts "
-            f"WHERE owner = {self.placeholder} "
-            f"ORDER BY created_at DESC LIMIT {self.placeholder}",
-            (owner, limit),
+            "SELECT * FROM artifacts WHERE " + " AND ".join(kosullar)
+            + f" ORDER BY created_at DESC LIMIT {self.placeholder}",
+            tuple(params),
         ))
+
+    def by_alias(self, owner: str, name: str, alias: str) -> ArtifactMeta | None:
+        """`<ad>@<alias>` — MLflow'un `models:/<ad>@<alias>`'ı."""
+        return next(self._query(
+            "SELECT * FROM artifacts "
+            f"WHERE owner = {self.placeholder} AND name = {self.placeholder} "
+            f"AND alias = {self.placeholder} "
+            "ORDER BY created_at DESC, artifact_id DESC",
+            (owner, name, alias),
+        ), None)
+
+    def set_alias(self, owner: str, artifact_id: str, alias: str | None) -> bool:
+        """Alias'ı bir sürüme taşır. Aynı (owner, name) içinde TEK sahip olur —
+        MLflow'da da alias bir seferde tek sürüme işaret eder.
+
+        Alias'ı `None` vermek onu kaldırır.
+        """
+        with self._lock:
+            cur = self.connection.cursor()
+            cur.execute(
+                f"SELECT name FROM artifacts WHERE artifact_id = {self.placeholder} "
+                f"AND owner = {self.placeholder}",
+                (artifact_id, owner))
+            satir = cur.fetchone()
+            if satir is None:
+                return False
+            if alias:
+                # Önce eski sahibinden al: alias bir seferde TEK sürüme
+                # işaret eder. Bunu yapmazsak `by_alias` iki satır bulur ve
+                # "en yeni" kuralına düşer — alias'ın varlık sebebi tam da
+                # o kuraldan kaçmaktı.
+                cur.execute(
+                    f"UPDATE artifacts SET alias = NULL WHERE owner = {self.placeholder} "
+                    f"AND name = {self.placeholder} AND alias = {self.placeholder}",
+                    (owner, satir[0], alias))
+            cur.execute(
+                f"UPDATE artifacts SET alias = {self.placeholder} "
+                f"WHERE artifact_id = {self.placeholder}",
+                (alias, artifact_id))
+            self.connection.commit()
+        return True
 
     def latest_by_name(self, workflow_id: str, name: str) -> ArtifactMeta | None:
         """Bir workflow içinde o isimle üretilmiş EN YENİ artifact.
@@ -324,6 +406,7 @@ class MetadataStore:
             json.dumps(list(m.parents)), m.owner, m.created_at.isoformat(),
             m.ttl_seconds, m.artifact_type,
             json.dumps(m.user_metadata) if m.user_metadata else None,
+            m.alias,
         )
 
     @staticmethod
@@ -336,6 +419,7 @@ class MetadataStore:
             created_at=datetime.fromisoformat(row[11]), ttl_seconds=row[12],
             artifact_type=(row[13] if len(row) > 13 else None) or VARSAYILAN_TIP,
             user_metadata=json.loads(row[14]) if len(row) > 14 and row[14] else {},
+            alias=row[15] if len(row) > 15 else None,
         )
 
 

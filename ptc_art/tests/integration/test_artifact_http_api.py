@@ -433,3 +433,145 @@ def test_tip_bayt_yanit_basliginda_da_doner(client):
     y = client.post("/artifacts", content=b"a,b\n1,2\n", headers=bas(ad="t.csv")).json()
     oku = client.get(f"/artifacts/{y['artifact_id']}", headers={"X-Scope-Token": jeton()})
     assert oku.headers["X-Artifact-Type"] == "system.Dataset"
+
+
+# -- MLMD'nin filter_query'si: künye süzgeci (2026-09-07) ------------------
+#
+# MLMD'de karşılığı:
+#     store.get_artifacts(list_options=mlmd.ListOptions(
+#         filter_query='uri LIKE "%/data" AND properties.day.int_value > 0'))
+#
+# Orada tam bir ifade dili var; burada alan başına parametre — SQL enjeksiyonu
+# için yüzey bırakmamak adına. Tek tüketici manifest ve panel.
+
+
+def _uc_artifact(client):
+    client.post("/artifacts", headers=bas(ad="satis.parquet",
+                tip="application/vnd.apache.parquet"), content=b"PAR1x")
+    client.post("/artifacts", headers=bas(ad="rapor.csv"), content=b"a,b\n")
+    client.post("/artifacts", headers=bas(workflow_id="wf_99", ad="rapor.csv"),
+                content=b"c,d\n")
+    client.post("/artifacts", headers=bas(ad="not.txt", tip="text/plain"),
+                content=b"duz metin")
+
+
+def test_ada_gore_suzuluyor(client):
+    _uc_artifact(client)
+    r = client.get("/artifacts", params={"name": "rapor.csv"},
+                   headers={"X-Scope-Token": jeton()})
+    assert r.status_code == 200
+    assert {k["name"] for k in r.json()} == {"rapor.csv"}
+    assert len(r.json()) == 2          # iki çalıştırmada da var
+
+
+def test_tipe_gore_suzuluyor(client):
+    _uc_artifact(client)
+    r = client.get("/artifacts", params={"type": "system.Dataset"},
+                   headers={"X-Scope-Token": jeton()})
+    # .csv de Dataset; ayrım tipte, uzantıda değil
+    assert {k["name"] for k in r.json()} == {"satis.parquet", "rapor.csv"}
+    r = client.get("/artifacts", params={"type": "system.Artifact"},
+                   headers={"X-Scope-Token": jeton()})
+    assert {k["name"] for k in r.json()} == {"not.txt"}
+
+
+def test_workflowa_gore_suzuluyor(client):
+    _uc_artifact(client)
+    r = client.get("/artifacts", params={"workflow": "wf_99"},
+                   headers={"X-Scope-Token": jeton()})
+    assert [k["workflow_id"] for k in r.json()] == ["wf_99"]
+
+
+def test_ad_icinde_arama(client):
+    _uc_artifact(client)
+    r = client.get("/artifacts", params={"q": "sat"},
+                   headers={"X-Scope-Token": jeton()})
+    assert {k["name"] for k in r.json()} == {"satis.parquet"}
+
+
+def test_arama_LIKE_jokerini_kacirıyor(client):
+    """`q=%` her şeyi getirmemeli — joker kullanıcı girdisinden gelmez."""
+    _uc_artifact(client)
+    r = client.get("/artifacts", params={"q": "%"},
+                   headers={"X-Scope-Token": jeton()})
+    assert r.json() == []
+
+
+def test_suzgec_tenant_sinirini_asmiyor(client):
+    _uc_artifact(client)
+    yabanci = issue_token(ANAHTAR, Scope(workflow_id=WF, run_id="r",
+                                         owner="baska-tenant", node_id=None))
+    r = client.get("/artifacts", params={"name": "rapor.csv"},
+                   headers={"X-Scope-Token": yabanci})
+    assert r.json() == []
+
+
+# -- MLflow'un alias'ı: sürümü isimle sabitleme (2026-09-07) ---------------
+#
+#   > "Model aliases allow you to assign a mutable, named reference to a
+#   >  particular version of a registered model."
+#
+# Bizdeki problem: aynı ad 13 çalıştırmada var ve "en yeni kazanır" SESSİZ.
+
+
+def test_alias_eski_surumu_sabitliyor(client):
+    eski = client.post("/artifacts", headers=bas(ad="model.json"),
+                       content=b'{"v":1}').json()["artifact_id"]
+    client.post("/artifacts", headers=bas(ad="model.json"), content=b'{"v":2}')
+
+    # alias yokken "en yeni" gelir
+    assert client.get("/artifacts/by-name/model.json",
+                      headers={"X-Scope-Token": jeton()}).content == b'{"v":2}'
+
+    client.put(f"/artifacts/{eski}/alias", params={"alias": "onaylanmis"},
+               headers={"X-Scope-Token": jeton()})
+
+    # @alias ile ESKİ sürüm gelir — "en yeni" kuralından kaçış
+    r = client.get("/artifacts/by-name/model.json@onaylanmis",
+                   headers={"X-Scope-Token": jeton()})
+    assert r.status_code == 200
+    assert r.content == b'{"v":1}'
+
+
+def test_alias_tek_surume_isaret_eder(client):
+    a = client.post("/artifacts", headers=bas(ad="m.json"), content=b"1").json()["artifact_id"]
+    b = client.post("/artifacts", headers=bas(ad="m.json"), content=b"2").json()["artifact_id"]
+    h = {"X-Scope-Token": jeton()}
+
+    client.put(f"/artifacts/{a}/alias", params={"alias": "champion"}, headers=h)
+    client.put(f"/artifacts/{b}/alias", params={"alias": "champion"}, headers=h)
+
+    # MLflow'da da alias bir seferde tek sürümde. İki satır kalsaydı
+    # "en yeni" kuralına düşerdik — alias'ın varlık sebebi tam da o.
+    assert client.get("/artifacts/by-name/m.json@champion", headers=h).content == b"2"
+    assert client.get(f"/artifacts/{a}/metadata", headers=h).json()["alias"] is None
+
+
+def test_alias_kaldirilabiliyor(client):
+    a = client.post("/artifacts", headers=bas(ad="m.json"), content=b"1").json()["artifact_id"]
+    h = {"X-Scope-Token": jeton()}
+    client.put(f"/artifacts/{a}/alias", params={"alias": "champion"}, headers=h)
+    client.put(f"/artifacts/{a}/alias", headers=h)          # alias yok = kaldır
+    assert client.get("/artifacts/by-name/m.json@champion", headers=h).status_code == 404
+
+
+def test_olmayan_alias_404(client):
+    client.post("/artifacts", headers=bas(ad="m.json"), content=b"1")
+    r = client.get("/artifacts/by-name/m.json@yok", headers={"X-Scope-Token": jeton()})
+    assert r.status_code == 404
+
+
+def test_bozuk_alias_reddediliyor(client):
+    a = client.post("/artifacts", headers=bas(ad="m.json"), content=b"1").json()["artifact_id"]
+    r = client.put(f"/artifacts/{a}/alias", params={"alias": "../etc"},
+                   headers={"X-Scope-Token": jeton()})
+    assert r.status_code == 400
+
+
+def test_baska_tenant_alias_atayamaz(client):
+    a = client.post("/artifacts", headers=bas(ad="m.json"), content=b"1").json()["artifact_id"]
+    yabanci = issue_token(ANAHTAR, Scope(workflow_id=WF, run_id="r",
+                                         owner="baska-tenant", node_id=None))
+    r = client.put(f"/artifacts/{a}/alias", params={"alias": "champion"},
+                   headers={"X-Scope-Token": yabanci})
+    assert r.status_code == 404

@@ -31,10 +31,11 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -106,12 +107,42 @@ def _resolve_artifact_service_endpoint(core_v1: client.CoreV1Api) -> str:
     return f"http://{service.spec.cluster_ip}:{ARTIFACT_SERVICE_PORT}"
 
 
+#: Artifact adı — servisin kabul ettiğiyle birebir. Beyan bu süzgeçten
+#: geçiyor: ad ne virgül ne tırnak içerebiliyor, dolayısıyla virgülle
+#: ayrılmış tek bir ortam değişkenine güvenle sığıyor.
+_AD_BICIMI = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+#: Beyanda en fazla bu kadar ad. Sınır ortam değişkeni boyutu için değil,
+#: "beyan" kavramının anlamı için: yüzlerce girdi beyan etmek beyan etmemekle
+#: aynı şeydir.
+_AZAMI_BEYAN = 32
+
+
+def _beyani_bicimle(inputs) -> str:
+    """`inputs` → `PTC_INPUTS` değeri.
+
+    None  → "*"  : beyan yok, bu çalıştırmanın her çıktısı yerleşir
+    []    → ""   : beyan var ve boş, hiçbir girdi istenmiyor
+    [...] → "a,b": yalnızca bunlar
+
+    Biçimi bozuk adlar SESSİZCE atılmıyor — atılan bir ad, kodun sonradan
+    anlaşılmaz bir `FileNotFoundError` almasına yol açar. Süzülen ad
+    `beyan_atlandi` olayıyla log'a düşüyor (sidecar tarafında
+    `beyan_karsilanmadi` de var).
+    """
+    if inputs is None:
+        return "*"
+    temiz = [a for a in (str(x).strip() for x in inputs) if _AD_BICIMI.match(a)]
+    return ",".join(list(dict.fromkeys(temiz))[:_AZAMI_BEYAN])
+
+
 def _load_job_manifest(
     run_id: str,
     tool_gateway_endpoint: str,
     scope_token: str,
     artifact_service_endpoint: str,
     workflow_id: str,
+    inputs: str = "*",
 ) -> dict:
     template_text = _TEMPLATE_PATH.read_text(encoding="utf-8")
     filled = template_text.format(
@@ -120,6 +151,7 @@ def _load_job_manifest(
         scope_token=scope_token,
         artifact_service_endpoint=artifact_service_endpoint,
         workflow_id=workflow_id,
+        inputs=inputs,
     )
     return yaml.safe_load(filled)
 
@@ -399,6 +431,7 @@ def run_sandbox(
     workflow_id: str | None = None,
     owner: str = "ptc",
     node_id: str | None = None,
+    inputs: Sequence[str] | None = None,
 ) -> SandboxRun:
     """Verilen Python kodunu ayrı bir Kubernetes Job'unda çalıştırır, sonucu bir
     SandboxRun olarak döner.
@@ -409,11 +442,19 @@ def run_sandbox(
     (`on_event=None`), davranışı Faz 2'deki gibi kalır.
 
     `workflow_id` (2026-09-03): artifact deposunun kapsam anahtarı. Verilirse
-    bu çalıştırma için bir kapsam jetonu İMZALANIR ve pod'un ortamına konur —
-    sandbox artık `put_artifact`/`get_artifact`/`cached` çağırabilir ve
-    yazdıkları pod öldükten SONRA da durur. Verilmezse artifact API hiç
+    bu çalıştırma için bir kapsam jetonu İMZALANIR ve sidecar'ın ortamına
+    konur; çıktılar pod öldükten SONRA da durur. Verilmezse artifact yolu hiç
     açılmaz: kapsamı doğrulanamayan bir çalıştırmanın kalıcı depoya yazması,
     çalıştırmalar arası sınırı kaldırmak olurdu (araştırma §6.1).
+
+    `inputs` (2026-09-07): BEYAN EDİLEN GİRDİLER — Argo'nun
+    `inputs.artifacts[]`'i, KFP'nin bileşen girdilerinin karşılığı. Sidecar
+    yalnızca bunları `/output`'a yerleştirir ve soy ağacının ebeveynleri de
+    bunlar olur (MLMD'nin olay tipi zaten `Event.DECLARED_INPUT`).
+
+    Verilmezse (`None`) bu çalıştırmanın HER çıktısı yerleşir ve hepsi
+    ebeveyn sayılır — uyumluluk yolu, ama soy grafiğini zamanla tam bağlı
+    hâle getirir. `[]` ise hiçbir girdi istenmiyor demektir.
     """
     config.load_kube_config()
     core_v1 = client.CoreV1Api()
@@ -447,6 +488,7 @@ def run_sandbox(
         scope_token,
         artifact_service_endpoint,
         workflow_id or "",
+        _beyani_bicimle(inputs),
     )
     job = batch_v1.create_namespaced_job(namespace=NAMESPACE, body=job_manifest)
     # ConfigMap'i Job'a bağla — Job silinince Kubernetes onu da toplasın.

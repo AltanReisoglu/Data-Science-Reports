@@ -74,6 +74,19 @@ WORKFLOW_ID = os.environ.get("PTC_WORKFLOW_ID", "")
 SCOPE_TOKEN = os.environ.get("PTC_SCOPE_TOKEN", "")
 PROXY_PORT = int(os.environ.get("PTC_PROXY_PORT", "8099"))
 
+#: BEYAN EDİLEN GİRDİLER — Argo'nun `inputs.artifacts`'i, KFP'nin bileşen
+#: girdilerinin karşılığı. Virgülle ayrılmış artifact adları; artifact adı
+#: `^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$` olduğu için virgül ayıracı güvenli.
+#:
+#:   "*"        → beyan YOK; bu çalıştırmanın HER çıktısı yerleşir (uyumluluk)
+#:   ""         → beyan var ve BOŞ; hiçbir şey yerleşmez
+#:   "a.csv,b"  → yalnızca bunlar
+#:
+#: Beyan neden önemli: yerleştirilen her artifact soy ağacında EBEVEYN oluyor
+#: (MLMD `DECLARED_INPUT`). Beyansız çalışınca "bu çalıştırmanın her çıktısı"
+#: ebeveyn sayılıyor ve grafik zamanla tam bağlı hâle geliyor.
+INPUTS_HAM = os.environ.get("PTC_INPUTS", "*")
+
 #: Süpürmede yok sayılacak adlar — kullanıcı çıktısı değiller.
 _SUPURME_DISI = (".", "__")
 _DIZIN_TIPI = "application/x-tar"
@@ -85,26 +98,19 @@ istemci = artifact_client.ArtifactClient(artifact_client.ENDPOINT, SCOPE_TOKEN)
 #: LLM üretmedi" kontrolü. Defter sandbox'ta değil, kurcalanamıyor.
 _sunulan_ozet: dict[str, str] = {}
 
-#: Soy ağacının ebeveynleri İKİ kaynaktan geliyor ve ayrı tutuluyorlar:
+#: Soy ağacının ebeveynleri İKİ kaynaktan geliyor:
 #:
-#:   _istenen_kimlik  — `load_artifact` ile AÇIKÇA istenenler. İstenmiş olması
-#:                      okunmuş olmasının kanıtı; koşulsuz ebeveyn.
-#:   _yerlesen_kimlik — açılışta yerleştirilenler (ad -> artifact_id). Bunlar
-#:                      kodun istemesiyle DEĞİL, bu çalıştırmanın çıktısı
-#:                      oldukları için oradalar. Hepsini ebeveyn saymak soyu
-#:                      şişirirdi: 3 dosya yerleştirilip 1'i okunduğunda üç
-#:                      ebeveyn çıkıyordu (2026-09-07'de ölçüldü). O yüzden
-#:                      yalnızca GERÇEKTEN OKUNANLAR ebeveyn oluyor — bkz.
-#:                      `_okundu_mu`.
+#:   _istenen_kimlik  — `load_artifact` ile AÇIKÇA istenenler
+#:   _yerlesen_kimlik — açılışta yerleştirilenler (ad -> artifact_id)
+#:
+#: İkisi de "beyan edilmiş girdi" sayılıyor. MLMD'nin olay tipi zaten bunu
+#: söylüyor: `Event.DECLARED_INPUT` / `DECLARED_OUTPUT`. KFP, Argo ve Tekton
+#: soyu beyandan çıkarıyor; hiçbiri "kod bunu gerçekten okudu mu" diye
+#: BAKMIYOR. (2026-09-07'de kısa süre atime ile bakmayı denedik — sahada
+#: emsali olmayan bir icattı, kaldırıldı.)
 _istenen_kimlik: set[str] = set()
 _yerlesen_kimlik: dict[str, str] = {}
 _kilit = threading.Lock()
-
-#: `_okundu_mu` atime'a bakıyor; dosya sistemi atime tutmuyorsa (noatime)
-#: bu ölçüm sessizce "hiçbiri okunmadı" derdi — soyu tamamen kaybederdik.
-#: O yüzden açılışta bir sonda ile ölçülüyor; çalışmıyorsa yerleştirilenlerin
-#: HEPSİ ebeveyn sayılıyor (eski davranış, aşırı geniş ama kayıpsız).
-_ATIME_CALISIYOR: bool | None = None
 
 
 def _olay(tur: str, **alanlar) -> None:
@@ -127,69 +133,6 @@ def _kaydet(ad: str, ozet: str, artifact_id: str | None, *, istendi: bool) -> No
             _istenen_kimlik.add(artifact_id)
         else:
             _yerlesen_kimlik[ad] = artifact_id
-
-
-def _atime_calisiyor_mu() -> bool:
-    """Dosya sistemi okumayı atime'a yansıtıyor mu — sonda ile ÖLÇ, varsayma.
-
-    `relatime` (kind ve OpenShift varsayılanı) atime'ı yalnızca eskiyse
-    günceller; yerleştirmede atime'ı epoch'a çektiğimiz için ilk okumada
-    kesin güncelleniyor. `noatime` ile hiç güncellenmiyor — o durumda bu
-    ölçümü kullanmak soyu sessizce SİLERDİ.
-    """
-    global _ATIME_CALISIYOR
-    if _ATIME_CALISIYOR is not None:
-        return _ATIME_CALISIYOR
-    sonda = os.path.join(SCRATCH_DIR, "_atime_sonda")
-    try:
-        with open(sonda, "w") as f:
-            f.write("x")
-        os.utime(sonda, (0, os.stat(sonda).st_mtime))
-        with open(sonda) as f:
-            f.read()
-        _ATIME_CALISIYOR = os.stat(sonda).st_atime > 0
-    except OSError:
-        _ATIME_CALISIYOR = False
-    finally:
-        try:
-            os.unlink(sonda)
-        except OSError:
-            pass
-    return _ATIME_CALISIYOR
-
-
-def _atime_sifirla(yol: str) -> None:
-    """atime'ı epoch'a çeker — okunursa `relatime` altında bile güncellenir."""
-    try:
-        os.utime(yol, (0, os.stat(yol).st_mtime))
-    except OSError:
-        pass
-
-
-def _okundu_mu(ad: str) -> bool:
-    """Yerleştirilen bu artifact'e sandbox DOKUNDU mu.
-
-    Dizin artifact'i `<ad>.tar` adıyla kayıtlı ama diske `<ad>/` olarak
-    açılıyor; okuma alt dosyalarda olduğu için dizin özyinelemeli taranıyor.
-    Dosya kaybolmuşsa (LLM sildi/taşıdı) dokunulmuş sayılıyor — soyu
-    kaybetmektense fazladan bir ebeveyn iyidir.
-    """
-    if ad.endswith(_DIZIN_SONEKI):
-        kok = os.path.join(OUTPUT_DIR, ad[: -len(_DIZIN_SONEKI)])
-        if not os.path.isdir(kok):
-            return True
-        for dizin, _alt, dosyalar in os.walk(kok):
-            for d in dosyalar:
-                try:
-                    if os.stat(os.path.join(dizin, d)).st_atime > 0:
-                        return True
-                except OSError:
-                    return True
-        return False
-    try:
-        return os.stat(os.path.join(OUTPUT_DIR, ad)).st_atime > 0
-    except OSError:
-        return True
 
 
 # ── Localhost proxy: sandbox'ın OKUMA yolu ────────────────────────────────
@@ -298,6 +241,29 @@ def _dizini_paketle(dizin: str, hedef: str) -> str:
     return _dosya_ozeti(hedef)
 
 
+def beyan_edilenler() -> set[str] | None:
+    """`PTC_INPUTS` → beyan edilen girdi adları; beyan yoksa None.
+
+    Argo bunu `inputs.artifacts[]`, KFP bileşen imzasıyla yapıyor. Bizde
+    beyanı ajan `run_ptc_code(code, inputs=[...])` ile veriyor: manifestte
+    adları zaten görüyor, yazması bedava.
+
+    Neden beyan: yerleştirilen her artifact soy ağacında EBEVEYN oluyor
+    (MLMD `DECLARED_INPUT`). Beyansız çalışınca "bu çalıştırmanın her çıktısı"
+    ebeveyn sayılıyor; grafik zamanla tam bağlı hâle geliyor ve işe yaramaz.
+    """
+    if INPUTS_HAM == "*":
+        return None
+    return {p.strip() for p in INPUTS_HAM.split(",") if p.strip()}
+
+
+def _beyanda_mi(ad: str, beyan: set[str]) -> bool:
+    """Dizin artifact'i depoda `<ad>.tar`, sandbox'ta `<ad>/` görünüyor —
+    ajan hangisini yazarsa yazsın eşleşsin."""
+    return ad in beyan or (
+        ad.endswith(_DIZIN_SONEKI) and ad[: -len(_DIZIN_SONEKI)] in beyan)
+
+
 def _tari_ac(tar_yolu: str, hedef_dizin: str) -> None:
     """Tar'ı hedef dizine açar — yol geçişine karşı süzülmüş.
 
@@ -328,17 +294,11 @@ def supur() -> None:
         yerlesen = dict(_yerlesen_kimlik)
         sunulan = dict(_sunulan_ozet)
 
-    # Yerleştirilenlerden yalnızca DOKUNULANLAR ebeveyn. Ölçüm yapılamıyorsa
-    # (noatime) hepsi — aşırı geniş ama kayıpsız.
-    kesin = _atime_calisiyor_mu()
-    okunan = {ad: kimlik for ad, kimlik in yerlesen.items()
-              if not kesin or _okundu_mu(ad)}
-    parents = sorted(istenen | set(okunan.values()))
-
-    # `consumed` olayları burada: artık hangisine dokunulduğu belli.
-    for ad in sorted(okunan):
-        _olay("artifact", op="consumed", artifact_id=okunan[ad], name=ad,
-              size_bytes=None, content_type=None, parents=[])
+    # Ebeveyn = BEYAN EDİLEN GİRDİLER. MLMD'nin `Event.DECLARED_INPUT`'u
+    # neyse o: girdiyi kim beyan ettiyse soy ondan çıkar. Beyan `PTC_INPUTS`
+    # ile geliyor (Argo `inputs.artifacts`, KFP bileşen girdisi); ayrıca
+    # `load_artifact` çağrısının kendisi de bir beyan.
+    parents = sorted(istenen | set(yerlesen.values()))
 
     try:
         adlar = sorted(os.listdir(OUTPUT_DIR))
@@ -416,6 +376,10 @@ def yerlestir() -> int:
     """
     if not WORKFLOW_ID:
         return 0
+    beyan = beyan_edilenler()
+    if beyan is not None and not beyan:
+        _olay("yerlestirme_bitti", sayi=0, beyan=True)
+        return 0  # beyan var ve boş: girdi istenmiyor
     try:
         kayitlar = istemci.list_all()
     except Exception as exc:  # noqa: BLE001 — depo yoksa çalıştırma yine sürsün
@@ -427,8 +391,19 @@ def yerlestir() -> int:
     secilen: dict[str, dict] = {}
     for k in kayitlar:
         ad = k.get("name")
-        if ad and k.get("workflow_id") == WORKFLOW_ID and ad not in secilen:
-            secilen[ad] = k
+        if not ad or k.get("workflow_id") != WORKFLOW_ID or ad in secilen:
+            continue
+        if beyan is not None and not _beyanda_mi(ad, beyan):
+            continue
+        secilen[ad] = k
+
+    if beyan is not None:
+        eksik = sorted(b for b in beyan
+                       if not any(_beyanda_mi(ad, {b}) for ad in secilen))
+        if eksik:
+            # Sessiz kalmak, kodun `/output`'ta olmayan bir dosyayı açıp
+            # anlaşılmaz bir FileNotFoundError almasına yol açardı.
+            _olay("beyan_karsilanmadi", eksik=eksik)
 
     sayi = 0
     for ad in sorted(secilen):
@@ -446,21 +421,16 @@ def yerlestir() -> int:
                 os.makedirs(dizin, exist_ok=True)
                 _tari_ac(hedef, dizin)
                 os.unlink(hedef)
-                for kok, _alt, dosyalar in os.walk(dizin):
-                    for d in dosyalar:
-                        _atime_sifirla(os.path.join(kok, d))
-            else:
-                _atime_sifirla(hedef)
         except Exception as exc:  # noqa: BLE001 — biri patlarsa diğerleri sürsün
             _olay("yerlestirme_hatasi", name=ad, detail=str(exc)[:200])
             if os.path.exists(hedef):
                 os.unlink(hedef)
             continue
         sayi += 1
-    # `consumed` olayı BURADA yayınlanmıyor: yerleştirilmiş olmak okunmuş
-    # olmak değil. Hangisine dokunulduğu ancak kod bittikten sonra bilinebilir,
-    # o yüzden olaylar süpürmede yayınlanıyor.
-    _olay("yerlestirme_bitti", sayi=sayi, atime=_atime_calisiyor_mu())
+        _olay("artifact", op="consumed", artifact_id=kunye.get("artifact_id"),
+              name=kunye.get("name"), size_bytes=kunye.get("size_bytes"),
+              content_type=kunye.get("content_type"), parents=[])
+    _olay("yerlestirme_bitti", sayi=sayi, beyan=INPUTS_HAM != "*")
     return sayi
 
 

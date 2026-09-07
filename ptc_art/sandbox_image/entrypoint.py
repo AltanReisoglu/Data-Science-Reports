@@ -264,6 +264,9 @@ _SIDECAR_BEKLEME = 30.0
 #: `load_artifact`'e verilen çalıştırma kimliği — yol geçişine karşı.
 _GUVENLI_WF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
+#: Alias biçimi — servisin `_ALIAS_BICIMI`'yle birebir.
+_GUVENLI_ALIAS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
 
 def _load_artifact_uret(istemci):
     """BAŞKA bir çalıştırmanın çıktısını yerelleştiren tek fonksiyon.
@@ -280,25 +283,47 @@ def _load_artifact_uret(istemci):
     sidecar `/output`'a bakarak karar veriyor (Argo'nun `wait` container'ı).
     """
 
-    def load_artifact(workflow_id: str, name: str) -> str:
+    def load_artifact(workflow_id: str | None, name: str) -> str:
         """`workflow_id` çalıştırmasının `name` çıktısını indirir, yolunu döner.
+
+        İki adresleme biçimi var:
+
+            load_artifact("<workflow_id>", "rapor.pdf")   # o çalıştırmanınki
+            load_artifact(None, "rapor.pdf@onaylanmis")   # alias'lı sürüm
+
+        İkincisi MLflow'un `models:/<ad>@<alias>`'ı: alias tenant genelinde
+        tek bir sürüme işaret eder, "en yeni kazanır" kuralından kaçırır.
 
         Dizin artifact'i ise açılır ve dizinin yolu döner.
         """
         if istemci is None:
             raise RuntimeError("artifact servisi bu çalıştırmada kapalı")
-        wf = str(workflow_id)
-        if not _GUVENLI_WF.match(wf):
-            raise ValueError(f"geçersiz çalıştırma kimliği: {workflow_id!r}")
-        ad = _gecerli_artifact_adi(os.path.basename(str(name)))
 
-        hedef_dizin = os.path.join(ARTIFACTS_DIR, wf)
+        ham = str(name)
+        ad, _, takma = ham.partition("@")
+        ad = _gecerli_artifact_adi(os.path.basename(ad))
+        if takma:
+            if not _GUVENLI_ALIAS.match(takma):
+                raise ValueError(f"geçersiz alias: {takma!r}")
+            wf = ""                      # alias tenant genelinde çözülür
+            istek_adi = f"{ad}@{takma}"
+            klasor = "_alias"
+        else:
+            wf = str(workflow_id or "")
+            if not _GUVENLI_WF.match(wf):
+                raise ValueError(
+                    f"geçersiz çalıştırma kimliği: {workflow_id!r} "
+                    "(alias kullanmıyorsan kimlik zorunlu)")
+            istek_adi = ad
+            klasor = wf
+
+        hedef_dizin = os.path.join(ARTIFACTS_DIR, klasor)
         os.makedirs(hedef_dizin, exist_ok=True)
         hedef = os.path.join(hedef_dizin, ad)
 
-        kunye = istemci.fetch_to_file(ad, hedef, workflow_id=wf)
+        kunye = istemci.fetch_to_file(istek_adi, hedef, workflow_id=wf or None)
         if not kunye:
-            raise FileNotFoundError(f"{wf}/{ad} — böyle bir artifact yok")
+            raise FileNotFoundError(f"{klasor}/{istek_adi} — böyle bir artifact yok")
 
         if ad.endswith(_DIZIN_SONEKI) and kunye.get("content_type") == _DIZIN_TIPI:
             dizin = hedef[: -len(_DIZIN_SONEKI)]
