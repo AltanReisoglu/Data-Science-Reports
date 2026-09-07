@@ -103,8 +103,8 @@ _sunulan_ozet: dict[str, str] = {}
 
 #: Soy ağacının ebeveynleri İKİ kaynaktan geliyor:
 #:
-#:   _istenen_kimlik  — `load_artifact` ile AÇIKÇA istenenler
-#:   _yerlesen_kimlik — açılışta yerleştirilenler (ad -> artifact_id)
+#:   _istenen_kimlik  — AÇIKÇA adreslenmiş beyanlar: `<wf>/ad` ve `ad@alias`
+#:   _yerlesen_kimlik — bu çalıştırmanın kendi çıktıları (ad -> artifact_id)
 #:
 #: İkisi de "beyan edilmiş girdi" sayılıyor. MLMD'nin olay tipi zaten bunu
 #: söylüyor: `Event.DECLARED_INPUT` / `DECLARED_OUTPUT`. KFP, Argo ve Tekton
@@ -125,8 +125,10 @@ def _olay(tur: str, **alanlar) -> None:
 def _kaydet(ad: str, ozet: str, artifact_id: str | None, *, istendi: bool) -> None:
     """Sidecar'ın SUNDUĞU bir baytı deftere işler.
 
-    `istendi=True`  : `/fetch` — kod `load_artifact` ile açıkça istedi.
-    `istendi=False` : açılışta yerleştirildi; okunup okunmadığı henüz belirsiz.
+    `istendi=True`  : beyan başka bir çalıştırmayı ya da bir alias'ı AÇIKÇA
+                      adresliyordu (`<wf>/ad`, `ad@alias`) — soyun ebeveyni.
+    `istendi=False` : bu çalıştırmanın kendi çıktısı; beyansız (`*`) yolda
+                      hepsi yerleşiyor, okunup okunmadığı belirsiz.
     """
     with _kilit:
         _sunulan_ozet[ad] = ozet
@@ -203,8 +205,8 @@ def supur() -> None:
 
     # Ebeveyn = BEYAN EDİLEN GİRDİLER. MLMD'nin `Event.DECLARED_INPUT`'u
     # neyse o: girdiyi kim beyan ettiyse soy ondan çıkar. Beyan `PTC_INPUTS`
-    # ile geliyor (Argo `inputs.artifacts`, KFP bileşen girdisi); ayrıca
-    # `load_artifact` çağrısının kendisi de bir beyan.
+    # ile geliyor (Argo `inputs.artifacts`, KFP bileşen girdisi) — çapraz
+    # workflow ve alias da dâhil; kod hiçbir şey çağırmıyor.
     parents = sorted(istenen | set(yerlesen.values()))
 
     try:

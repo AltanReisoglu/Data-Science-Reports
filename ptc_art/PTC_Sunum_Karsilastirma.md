@@ -3,7 +3,7 @@
 **12 sayfa. Anlatılacak tek hikâye var: sandbox ölür, ürettiği kalır — ve
 bunu yaparken hiçbir şey icat etmedik.**
 
-Tarih: 2026-09-07 · Slaytlar bu dosyadan üretiliyor: `node scripts/sunum_uret.js`
+Tarih: 2026-09-07 · Slaytlar: `node scripts/sunum_uret.js` · Diyagramlar: `python scripts/diyagram_uret.py`
 
 > Bu dosya **sunum**; arşiv değil. Bütün karşılaştırmalar, alıntılar ve
 > ölçümler [PTC_Piyasa_Mentaliteleri.md](PTC_Piyasa_Mentaliteleri.md) ve
@@ -33,8 +33,17 @@ Tarih: 2026-09-07 · Slaytlar bu dosyadan üretiliyor: `node scripts/sunum_uret.
 
 <!-- diyagram: d1-yasam-dongusu -->
 
-**Kodun gördüğü tek şey bir dosya yolu.** Artifact API'si yok, depo adresi yok,
-anahtar yok. `/output`'a yazmak yeterli.
+**Kodun gördüğü tek şey bir dosya yolu.** Artifact fonksiyonu yok, depo adresi
+yok, anahtar yok — ve **hiçbir ağ çağrısı yok.** Ölçüldü:
+
+| sandbox'ın içinden | |
+|---|---|
+| artifact fonksiyonları | `[]` |
+| servis adresi | yok |
+| localhost proxy | yok |
+| `minio` | `gaierror` — DNS'te bile yok |
+
+KFP'nin kullanıcı bileşenine verdiği garantinin aynısı.
 
 ---
 
@@ -48,21 +57,30 @@ kayıt defteri yok. Biz **yerleşimi Argo'dan, kanalı MLflow'dan** aldık.
 
 ---
 
-## Sayfa 4 — HTTP vekili: kimin varsayılanı
+## Sayfa 4 — Baytlar hangi yoldan: iki kip
 
 | | Baytlar | S3 anahtarı | Kayıt defteri |
 |---|---|---|---|
 | **KFP / OpenShift AI** | launcher → S3 doğrudan | **kullanıcı container'ında** | MLMD |
 | **Argo Workflows** | wait sidecar → S3 doğrudan | ayrı container | **yok** |
 | **MLflow** (proxied) | client → **HTTP** → server | **server'da** | tracking DB |
-| **BİZ** | sidecar → **HTTP** → servis | **serviste** | SQLite |
+| **BİZ · `proxy`** | sidecar → HTTP → servis | serviste | SQLite |
+| **BİZ · `direct`** | sidecar → S3 doğrudan | **sidecar'da** | SQLite |
 
-> *"The tracking server works as a **proxy** for accessing remote artifacts.
-> The MLflow clients make **HTTP request to the server** for fetching artifacts."*
-> — MLflow `--serve-artifacts`, orada **varsayılan açık**
+`PTC_ARTIFACT_TRANSFER` ile seçiliyor. `direct` **KFP'nin iki kanalı**:
+bayt depoya, künye kayıt defterine.
 
-**Yani bizim satır MLflow'un satırı.** OpenShift'in varsayılanı değil, ama
-uydurma da değil.
+**`direct`'in ölçülmüş bedeli:** NetworkPolicy **pod** seçer, container değil.
+Sidecar'a depo rotası açmak sandbox'a da açmaktır.
+
+| | `proxy` | `direct` |
+|---|---|---|
+| `sandbox → minio` | **gaierror** | **ULASTI** |
+| sandbox'ta S3 anahtarı | yok | yok |
+
+**Hangisi ne zaman:** < ~50 MB `proxy` (kontroller tek yerde) · > ~50 MB
+`direct` (GB'ları tek bir servisten akıtmak israf). MLflow'un sunduğu seçimin
+aynısı — `--serve-artifacts` var/yok.
 
 ---
 
@@ -84,10 +102,13 @@ doğrudan bağ yok; A çoktan bitmiş, pod'u silinmiş olabilir.
 | Hangi sürüm (8 aday arasından) | çalışma anında, alias/en-yeni kuralıyla |
 
 ```
-load_artifact("{kaynak_wf}", "processed-result.json")
-               ^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^
-               bulunuyor      yazılı
+inputs=["{kaynak_wf}/processed-result.json"]
+         ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+         bulunuyor     yazılı
 ```
+
+Bu bir **çağrı değil, beyan**: kod `open("/artifacts/<wf>/…")` yazıyor, dosya
+zaten orada. Sandbox hiçbir yere bağlanmıyor.
 
 **Adı da modelin seçtiği yol var:** Sohbet sekmesi. Orada hiçbir şey yazılı
 değil — manifest isimleri veriyor, neyi okuyacağına model karar veriyor.
@@ -117,6 +138,14 @@ dünyasında sormak zorundadır, çünkü kendisi de o an icat edilmiştir.**
 | 62 addan 39'u görünüyor, arama yok | **MLMD** `filter_query` | `?name= ?type= ?q=` |
 | Aynı ad 17 kez, hep en yeni geliyor | **MLflow** `models:/<ad>@<alias>` | `by-name/rapor.pdf@onaylanmis` |
 
+**Beyanın üç biçimi** — üçü de KFP'de `.uri` beyanına denk:
+
+```
+inputs=["ozet.json"]             → /output/ozet.json
+inputs=["wf-abc/ozet.json"]      → /artifacts/wf-abc/ozet.json
+inputs=["rapor.pdf@onaylanmis"]  → /artifacts/_alias/rapor.pdf
+```
+
 **Sürüm seçimi canlı doğrulandı:**
 
 | | Seçilen | Üreten çalıştırma |
@@ -126,21 +155,23 @@ dünyasında sormak zorundadır, çünkü kendisi de o an icat edilmiştir.**
 
 ---
 
-## Sayfa 9 — Üç icat ettik, üçünü de attık
+## Sayfa 9 — Dört icat ettik, dördünü de attık
 
 | İcat | Ne oldu | Yerine geçen |
 |---|---|---|
 | LLM'e artifact API'si (5 fonksiyon) | sessiz `None`'lar, anlaşılmaz hatalar | düz Python + `/output` — **KFP** |
 | Şeffaf tembel okuma (~120 satır yama) | `/output` yalan söylüyordu | kod başlamadan yerleştir — **Argo/KFP** |
 | `atime` ile soy ölçümü | çalışıyordu, ama emsali yok | beyan — **MLMD** |
+| sandbox'ta `load_artifact` | çalışma anında ağ çağrısı | çapraz girdi de **beyan** — KFP |
 
 **Hataların hepsi bizim icat ettiğimiz yerlerde çıktı; kopyaladığımız hiçbir
 parçadan çıkmadı.**
 
 | | Öncesi | Sonrası |
 |---|---|---|
-| `entrypoint.py` | 651 satır | **357 satır** |
+| `entrypoint.py` | 651 satır | **298 satır** |
 | Yama satırı | ~120 | **0** |
+| Sandbox'ın ağ çağrısı | 1 (localhost proxy) | **0** |
 | Okuyan çalıştırma | 4,11 sn | **3,13 sn** |
 
 ---
@@ -155,7 +186,9 @@ parçadan çıkmadı.**
 | run-scoped anahtar yolu · kayıt defteri | **KFP `pipeline_root` · MLMD** |
 | künye süzgeci · sürüm alias'ı | **MLMD `filter_query` · MLflow Model Registry** |
 | isimler prompt'ta | **Google ADK `LoadArtifactsTool`** |
-| HTTP vekili | **MLflow proxied artifact access** |
+| bayt yolu · `proxy` | **MLflow** proxied artifact access |
+| bayt yolu · `direct` | **KFP / Argo** — bayt depoya, künye kayıt defterine |
+| **sandbox'ta sıfır ağ çağrısı** | **KFP** — kullanıcı bileşeni hiçbir şey çağırmaz |
 | **İzolasyon** | **Kimse — bizimki daha zayıf (düz container)** |
 
 **Emsalsiz desen kalmadı.**
@@ -164,7 +197,7 @@ parçadan çıkmadı.**
 
 ## Sayfa 11 — Canlı konsol + açıklar
 
-**`/konsol` — dört sekme, sahte veri yok:** Sohbet · Hatlar · Çalıştırma
+**`/konsol` — beş sekme, sahte veri yok:** Sohbet · Hatlar · Çalıştırma
 (gerçek Kubernetes Job'ları) · Depo · Soy ağacı.
 
 | Açık | Durum |
@@ -176,7 +209,7 @@ parçadan çıkmadı.**
 | `SIGKILL` | OOM/deadline'da süpürme çalışmaz (Argo'da da aynı) |
 | Soy imzasız | Tekton Chains bunu çözüyor, bizde yok |
 
-**206 test · 51/51 canlı kabul kontrolü · bütün ölçümler cluster'dan.**
+**209 test · 51/51 (`proxy`) + 52/52 (`direct`) canlı kabul kontrolü · bütün ölçümler cluster'dan.**
 
 ---
 

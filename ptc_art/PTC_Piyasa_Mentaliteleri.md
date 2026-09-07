@@ -2398,7 +2398,7 @@ assignments can be updated independently of your production code."*
 Alias atanmış bir artifact manifestte adresiyle görünüyor:
 
 ```
-  load_artifact(None, "rapor.pdf@onaylanmis")  (Artifact, 8170 bayt, alias)
+  inputs=["rapor.pdf@onaylanmis"]  (Artifact, 8170 bayt, alias)
 ```
 
 ### Doğrulama

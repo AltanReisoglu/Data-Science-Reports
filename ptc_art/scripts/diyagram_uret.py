@@ -190,7 +190,7 @@ def d1_yasam_dongusu():
     kutu(d, (_s(340), _s(120), _s(570), _s(230)), dolgu=D_KIRMIZI, renk=KIRMIZI, r=14)
     yazi(d, (_s(455), _s(148)), "sandbox", 18, INK, kalin=True, hiza="center")
     yazi(d, (_s(455), _s(176)), "LLM'in kodu", 14, KIRMIZI, hiza="center")
-    yazi(d, (_s(455), _s(198)), "jeton YOK · ağ kapalı", 13, SOLUK, hiza="center")
+    yazi(d, (_s(455), _s(198)), "hiçbir ağ çağrısı YOK", 13, SOLUK, hiza="center")
 
     # /output
     kutu(d, (_s(70), _s(265), _s(570), _s(340)), dolgu=D_SARI, renk=TURUNCU, r=14)
@@ -216,8 +216,8 @@ def d1_yasam_dongusu():
     ok(d, (_s(608), _s(258)), (_s(722), _s(258)), YESIL)
     yazi(d, (_s(665), _s(268)), "② süpürür", 13, YESIL, hiza="center")
 
-    yazi(d, (_s(40), _s(392)), "Sandbox depoyu hiç görmez: S3 anahtarı yok, MinIO'ya "
-         "rotası yok. Baytları taşıyan ayrı bir container.", 14, SOLUK)
+    yazi(d, (_s(40), _s(392)), "Sandbox yalnızca dosya görür: artifact fonksiyonu yok, "
+         "servis adresi yok, anahtar yok. Baytları taşıyan ayrı bir container.", 14, SOLUK)
     _kaydet(im, "d1-yasam-dongusu")
 
 
@@ -328,26 +328,30 @@ def d3_capraz_workflow():
         ok(d, (_s(x), _s(114)), (_s(x), _s(220)), SOLUK, kalinlik=2, bas=9, kesik=True)
 
     # WF-B
-    yazi(d, (_s(40), _s(336)), "WORKFLOW B  ·  Artifact Analiz Hattı  —  A'yı hiç bilmiyor",
+    yazi(d, (_s(40), _s(340)), "WORKFLOW B  ·  Artifact Analiz Hattı",
          15, YESIL, kalin=True)
-    for i, ad in enumerate(["Artifact Keşfet", "Artifact Yükle", "Analiz Et", "Bulgu Yayınla"]):
+    for i, ad in enumerate(["Artifact Keşfet", "Girdiyi Beyan Et", "Analiz Et", "Bulgu Yayınla"]):
         adim(40 + i * 240, 358, ad, YESIL, D_YESIL, w=195)
         if i:
             ok(d, (_s(40 + (i - 1) * 240 + 195), _s(386)), (_s(40 + i * 240), _s(386)),
                SOLUK, kalinlik=2, bas=10)
 
     # keşif oku: depodan B'nin 1. adımına
-    ok(d, (_s(625), _s(266)), (_s(137), _s(356)), TURUNCU, kalinlik=3, bas=13)
-    kutu(d, (_s(330), _s(288), _s(730), _s(322)), dolgu=(255, 255, 255), renk=TURUNCU, r=9)
-    yazi(d, (_s(530), _s(305)), 'GET /artifacts?name=processed-result.json', 12,
+    # Ok, B'nin BEYAN düğümüne iniyor: dosya orada yerine konuyor. Künye
+    # kutusu solda, "Artifact Keşfet"in üstünde — sorguyu o düğüm atıyor.
+    ok(d, (_s(625), _s(266)), (_s(377), _s(352)), TURUNCU, kalinlik=3, bas=13)
+    kutu(d, (_s(40), _s(282), _s(412), _s(322)), dolgu=(255, 255, 255), renk=TURUNCU, r=9)
+    yazi(d, (_s(226), _s(294)), 'adım 1  GET /artifacts?name=processed-result.json', 11,
+         INK, hiza="center", dikey="middle", mono=True)
+    yazi(d, (_s(226), _s(310)), 'adım 2  inputs=["<wf>/processed-result.json"]', 11,
          INK, hiza="center", dikey="middle", mono=True)
 
     # B'nin çıktısı aynı depoya
     ok(d, (_s(920), _s(354)), (_s(920), _s(284)), YESIL, kalinlik=2, bas=10, kesik=True)
     yazi(d, (_s(930), _s(312)), "aynı depoya", 11, YESIL)
 
-    yazi(d, (_s(40), _s(432)), "B, A'nın çalıştırma kimliğini kayıt defterinden ÖĞRENİYOR. "
-         "Aralarında doğrudan bağ yok; A çoktan bitmiş olabilir.", 13, SOLUK)
+    yazi(d, (_s(40), _s(432)), "B, A'nın kimliğini kayıt defterinden ÖĞRENİP BEYAN eder; "
+         "dosya kod başlamadan yerine konur. Sandbox hiçbir çağrı yapmaz.", 13, SOLUK)
     _kaydet(im, "d3-capraz-workflow")
 
 
