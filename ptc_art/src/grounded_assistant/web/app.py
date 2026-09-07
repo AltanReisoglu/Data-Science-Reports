@@ -18,7 +18,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from grounded_assistant.agent import graph
@@ -60,15 +60,37 @@ async def index() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+#: Konsolun statik dosyalarına içerik damgası — tarayıcı eski `konsol.js`i
+#: tutmasın. 2026-09-07'de gerçekten yaşandı: soy ağacı düzeltildi ama ekranda
+#: eski sürüm çalışmaya devam etti ve "sayfa yanlış çiziyor" gibi göründü.
+#:
+#: Damga İÇERİKTEN üretiliyor: dosya değişmediyse URL de değişmiyor (önbellek
+#: yine çalışıyor), değiştiyse tarayıcı zorunlu olarak yeniden alıyor. Elle
+#: tutulan bir sürüm numarası ise güncellenmeyi unutulacak tek şeydi.
+_DAMGALANAN = ("style.css", "konsol.css", "app.js", "konsol.js")
+
+
+def _damgala(html: str) -> str:
+    import hashlib  # noqa: PLC0415
+
+    for ad in _DAMGALANAN:
+        yol = _STATIC_DIR / ad
+        if not yol.exists():
+            continue
+        damga = hashlib.sha256(yol.read_bytes()).hexdigest()[:8]
+        html = html.replace(f"/static/{ad}", f"/static/{ad}?v={damga}")
+    return html
+
+
 @app.get("/konsol")
-async def konsol_sayfasi() -> FileResponse:
-    """Dört sekmeli tek panel — workflow'lar, çalıştırma, depo, soy.
+async def konsol_sayfasi() -> HTMLResponse:
+    """Dört sekmeli tek panel — hatlar, çalıştırma, depo, soy.
 
     `durum.html`'in yerine geçmiyor: orası pod/akış odaklı bir denetim ekranı,
     burası artifact yaşam döngüsünün uçtan uca gösterimi. İkisi de aynı
     uçlardan besleniyor.
     """
-    return FileResponse(_STATIC_DIR / "konsol.html")
+    return HTMLResponse(_damgala((_STATIC_DIR / "konsol.html").read_text(encoding="utf-8")))
 
 
 @app.get("/api/pipelines")
