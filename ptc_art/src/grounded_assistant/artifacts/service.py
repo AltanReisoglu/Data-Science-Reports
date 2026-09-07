@@ -76,6 +76,14 @@ class InvalidArtifactName(Exception):
     """İsim yol geçişi içeriyor ya da biçime uymuyor."""
 
 
+class ArtifactMissing(Exception):
+    """`register` çağrıldı ama nesne depoda yok ya da boyutu tutmuyor.
+
+    Doğrudan-yükleme kipine özgü: baytları servis görmediği için kayıt
+    defterinin var olmayan bir nesneye işaret etmesi ancak burada engellenir.
+    """
+
+
 class ArtifactTooLarge(Exception):
     """Boyut sınırı aşıldı."""
 
@@ -249,6 +257,87 @@ class ArtifactService:
                 return self.metadata.latest_in_workflow(owner, workflow_id, name)
             return self.metadata.latest_by_name_for_owner(owner, name, workflow_id)
         raise ValueError("artifact_id ya da name verilmeli")
+
+    # -- doğrudan yükleme kipi (2026-09-07) --------------------------------
+    #
+    # KFP'nin iki kanalı: BAYT nesne deposuna doğrudan, KÜNYE kayıt defterine.
+    # Servis bayt yolundan çıkıyor; yerine üç küçük çağrı geliyor:
+    #
+    #     by_hash   → "bu içerik zaten var mı" (dedup, yüklemeden ÖNCE)
+    #     allocate  → artifact_id + anahtar yolu (durum tutmuyor)
+    #     register  → nesneyi DOĞRULA, sonra kayıt satırını aç
+    #
+    # `register`'ın doğrulaması kritik: baytları görmediğimiz için kayıt
+    # defterinin var olmayan bir nesneye işaret etme ihtimali doğuyor.
+
+    def by_hash(self, *, owner: str, content_hash: str) -> ArtifactMeta | None:
+        """Aynı içerik bu tenant'ta zaten var mı — yükleme yapılmadan sorulur."""
+        return self.metadata.find_by_hash_for_owner(owner, content_hash)
+
+    def allocate(
+        self, *, owner: str, workflow_id: str, run_id: str, name: str,
+        content_type: str, node_id: str | None = None, root: str | None = None,
+    ) -> dict:
+        """Bir artifact_id ve depo anahtarı ayırır. HİÇBİR DURUM TUTMAZ.
+
+        Sidecar bu anahtara yükleyip `register` ile geri dönüyor. Ayırma
+        durum tutmadığı için, yükleme yarıda kalırsa geriye yalnızca yetim
+        bir nesne kalıyor — kayıt defterinde satır olmuyor.
+        """
+        # Ad anahtarda kullanılmıyor (anahtar `artifact_id` + uzantı), ama
+        # burada da reddediliyor: bozuk bir adın `register`a kadar gidip
+        # yükleme YAPILDIKTAN SONRA reddedilmesi yetim nesne bırakırdı.
+        _isim_dogrula(name)
+        artifact_id = "art_" + uuid.uuid4().hex[:12]
+        anahtar = self._anahtar(
+            owner, workflow_id, node_id, run_id, artifact_id, content_type,
+            VARSAYILAN_KOK if root is None else _kok_dogrula(root.strip("/")),
+        )
+        return {"artifact_id": artifact_id, "bucket": self.objects.config.name,
+                "key": anahtar, "storage_uri": self.objects.uri(anahtar)}
+
+    def register(
+        self, *, artifact_id: str, name: str, workflow_id: str, run_id: str,
+        owner: str, content_type: str, content_hash: str, size_bytes: int,
+        storage_uri: str, node_id: str | None = None,
+        parents: tuple[str, ...] = (), ttl_seconds: int | None = None,
+        artifact_type: str | None = None, user_metadata: dict | None = None,
+        dogrula: bool = True,
+    ) -> ArtifactMeta:
+        """Yüklenmiş bir nesne için kayıt satırı açar.
+
+        `dogrula`: nesnenin depoda ve beyan edilen boyutta olduğu kontrol
+        edilir. Dedup yolunda kapatılıyor (nesne zaten başkasının, boyutu da
+        onun künyesinden biliniyor).
+        """
+        _isim_dogrula(name)
+        if size_bytes > self.size_limit:
+            raise ArtifactTooLarge(
+                f"{size_bytes} bayt > {self.size_limit} sınırı.")
+        if dogrula:
+            gercek = self.objects.stat(_anahtar_ayikla(storage_uri))
+            if gercek is None:
+                raise ArtifactMissing(
+                    f"{storage_uri} depoda yok — kayıt açılmadı")
+            if gercek != size_bytes:
+                # "Çok büyük" değil, BEYAN TUTMUYOR: yüklenen nesne künyede
+                # yazandan farklı. Ayrı bir hata sınıfı olmasının sebebi,
+                # 413'ün istemciye "veriyi küçült" demesi — burada yapılacak
+                # şey o değil, yüklemeyi tekrarlamak.
+                raise ArtifactMissing(
+                    f"beyan {size_bytes} bayt, depoda {gercek} bayt — "
+                    "yükleme eksik ya da bozuk")
+        meta = ArtifactMeta(
+            artifact_id=artifact_id, name=name, workflow_id=workflow_id,
+            run_id=run_id, owner=owner, content_type=content_type,
+            content_hash=content_hash, size_bytes=size_bytes,
+            storage_uri=storage_uri, node_id=node_id,
+            parents=tuple(parents), created_at=datetime.now(UTC),
+            ttl_seconds=ttl_seconds,
+            artifact_type=_tip_dogrula(artifact_type or tip_cikar(content_type)),
+            user_metadata=user_metadata or {},
+        )
+        return self.metadata.create(meta)
 
     def iter_bytes(self, meta: ArtifactMeta, chunk_size: int = 1024 * 1024):
         """Çözülmüş bir metadata'nın baytlarını parça parça verir.

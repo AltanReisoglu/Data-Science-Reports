@@ -52,6 +52,7 @@ from grounded_assistant.artifacts.metadata import open_sqlite
 from grounded_assistant.artifacts.scope import InvalidScopeToken, Scope, verify_token
 from grounded_assistant.artifacts.serialize import UnsafeArtifact, guvenlik_kontrolu
 from grounded_assistant.artifacts.service import (
+    ArtifactMissing,
     ArtifactService,
     ArtifactTooLarge,
     InvalidArtifactName,
@@ -266,6 +267,126 @@ def _akit(meta) -> StreamingResponse:
         media_type=meta.content_type,
         headers=_kunye_basliklari(meta),
     )
+
+
+# ── doğrudan yükleme kipi (2026-09-07) ────────────────────────────────────
+#
+# KFP'nin iki kanalı: BAYT nesne deposuna doğrudan gider, KÜNYE buraya. Servis
+# bayt yolundan çıkıyor. Üç uç nokta yeterli:
+#
+#     GET  /artifacts/by-hash/{hash}   dedup — yüklemeden ÖNCE sorulur
+#     POST /artifacts/allocate         artifact_id + anahtar (durum tutmaz)
+#     POST /artifacts/register         nesneyi DOĞRULA, kayıt satırını aç
+#
+# Bu uçlar SIDECAR içindir; sandbox'ın istemcisinde karşılıkları yok ve
+# sandbox'ta kapsam jetonu da yok. Yine de her biri jetonu doğruluyor —
+# ağ katmanına güvenip yetkiyi atlamak, tam da kaçındığımız desen.
+
+
+@app.get("/artifacts/by-hash/{content_hash}")
+async def get_by_hash(
+    content_hash: str = Path(...),
+    x_scope_token: str | None = Header(default=None),
+) -> dict:
+    """Bu içerik tenant'ta zaten var mı — varsa yükleme hiç yapılmıyor."""
+    kapsam = _kapsam(x_scope_token)
+    meta = _service().by_hash(owner=kapsam.owner, content_hash=content_hash)
+    if meta is None:
+        raise HTTPException(404, "bu içerik depoda yok")
+    return {"artifact_id": meta.artifact_id, "storage_uri": meta.storage_uri,
+            "size_bytes": meta.size_bytes, "content_type": meta.content_type}
+
+
+@app.post("/artifacts/allocate")
+async def allocate_artifact(
+    govde: dict,
+    x_scope_token: str | None = Header(default=None),
+    x_artifact_root: str | None = Header(default=None),
+) -> dict:
+    """Bir artifact_id ve depo anahtarı ayırır — sidecar oraya yükleyecek.
+
+    DURUM TUTMUYOR: yükleme yarıda kalırsa geriye yetim bir nesne kalır,
+    kayıt defterinde satır olmaz. Yetimleri TTL reaper'ı değil, bilerek
+    kimse toplamıyor — nadir, küçük, ve bir kayıt satırına bağlı olmadıkları
+    için "silinmiş sanılan ama duran bayt" riski doğurmuyorlar.
+    """
+    kapsam = _kapsam(x_scope_token)
+    ad = govde.get("name") or ""
+    tip = govde.get("content_type") or "application/octet-stream"
+    try:
+        return _service().allocate(
+            owner=kapsam.owner, workflow_id=kapsam.workflow_id,
+            run_id=kapsam.run_id, name=ad, content_type=tip,
+            node_id=kapsam.node_id, root=x_artifact_root)
+    except InvalidArtifactName as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/artifacts/register", status_code=201)
+async def register_artifact(
+    govde: dict,
+    x_scope_token: str | None = Header(default=None),
+) -> dict:
+    """Yüklenmiş bir nesne için kayıt satırı açar.
+
+    `dogrula` yalnızca dedup yolunda kapanıyor: orada nesne zaten var olan
+    başka bir kaydın baytı, boyutu da onun künyesinden geliyor.
+    """
+    kapsam = _kapsam(x_scope_token)
+    try:
+        meta = _service().register(
+            artifact_id=govde["artifact_id"],
+            name=govde["name"],
+            workflow_id=kapsam.workflow_id,
+            run_id=kapsam.run_id,
+            owner=kapsam.owner,
+            node_id=kapsam.node_id,
+            content_type=govde.get("content_type") or "application/octet-stream",
+            content_hash=govde["content_hash"],
+            size_bytes=int(govde["size_bytes"]),
+            storage_uri=govde["storage_uri"],
+            parents=tuple(govde.get("parents") or ()),
+            ttl_seconds=govde.get("ttl_seconds"),
+            artifact_type=govde.get("artifact_type"),
+            user_metadata=govde.get("user_metadata"),
+            dogrula=not govde.get("dedup"),
+        )
+    except KeyError as exc:
+        raise HTTPException(400, f"eksik alan: {exc}") from exc
+    except InvalidArtifactName as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except ArtifactMissing as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ArtifactTooLarge as exc:
+        raise HTTPException(413, str(exc)) from exc
+    return _ozet(meta)
+
+
+@app.get("/artifacts/by-name/{name}/uri")
+async def get_uri_by_name(
+    name: str = Path(...),
+    workflow: str | None = Query(default=None),
+    x_scope_token: str | None = Header(default=None),
+) -> dict:
+    """Baytın NEREDE olduğunu söyler — baytı vermez.
+
+    Yalnızca sidecar için: `_ozet` `storage_uri`'yi bilerek gizliyor, çünkü o
+    künye sandbox'a kadar gidiyor. Burası ayrı bir uç nokta ve sandbox'ın
+    istemcisinde karşılığı yok.
+    """
+    kapsam = _kapsam(x_scope_token)
+    if "@" in name:
+        ad, _, takma = name.partition("@")
+        meta = _service().resolve_alias(owner=kapsam.owner, name=ad, alias=takma)
+    else:
+        meta = _service().resolve(
+            owner=kapsam.owner, workflow_id=workflow or kapsam.workflow_id,
+            name=name, strict=workflow is not None)
+    if meta is None:
+        raise HTTPException(404, f"'{name}' adında artifact yok.")
+    return {"artifact_id": meta.artifact_id, "storage_uri": meta.storage_uri,
+            "content_type": meta.content_type, "size_bytes": meta.size_bytes,
+            "name": meta.name, "workflow_id": meta.workflow_id}
 
 
 @app.get("/artifacts/by-name/{name}")

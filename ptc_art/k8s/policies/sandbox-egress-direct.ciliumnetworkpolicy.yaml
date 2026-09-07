@@ -1,0 +1,34 @@
+# `PTC_ARTIFACT_TRANSFER=direct` için EK politika — ayrı dosya, ayrı karar.
+#
+# Doğrudan kipte sidecar baytları nesne deposuna kendisi yazıyor (KFP'nin iki
+# kanalı). Bunun için pod'un depoya rotası gerekiyor.
+#
+# BEDELİ AÇIK: NetworkPolicy POD seçer, container değil — bir pod'un bütün
+# container'ları aynı ağ isim uzayını paylaşır. Bu kural sidecar'a açılırken
+# SANDBOX'a da açılıyor. Sandbox'ta S3 anahtarı yok ve imajında `minio` paketi
+# de yok (ayrı imaj), ama `proxy` kipinde ölçtüğümüz şu özellik kayboluyor:
+#
+#     sandbox → minio    TimeoutError   ← ulaşamıyor
+#     sandbox → minio    ULASTI         ← bu politika uygulandıktan sonra
+#
+# Bu yüzden temel politikanın İÇİNE konmadı: rotayı açmak, kip anahtarını
+# çevirmenin yan etkisi değil, ayrıca verilmiş bir karar olmalı.
+#
+#     uygula : kubectl apply -f k8s/policies/sandbox-egress-direct.ciliumnetworkpolicy.yaml
+#     geri al: kubectl delete -f k8s/policies/sandbox-egress-direct.ciliumnetworkpolicy.yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: sandbox-egress-direct
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ptc-sandbox
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app: minio
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP

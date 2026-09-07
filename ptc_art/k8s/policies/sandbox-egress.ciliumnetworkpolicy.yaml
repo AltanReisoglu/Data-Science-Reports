@@ -35,7 +35,9 @@ spec:
         - ports:
             - port: "8443"
               protocol: TCP
-    # Artifact baytları ve kayıt defteri.
+    # Artifact kayıt defteri (ve `proxy` kipinde baytlar da).
+    # Depoya rota BURADA YOK — `direct` kipi isteyen,
+    # `sandbox-egress-direct` politikasını AYRICA uygular.
     - toEndpoints:
         - matchLabels:
             app: artifact-service

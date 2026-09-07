@@ -56,11 +56,15 @@ spec:
       # Ve proxy'de yükleme uç noktası yok — neyin yükleneceğine sidecar
       # `/output`'a bakarak karar veriyor.
       initContainers:
+        # AYRI İMAJ (2026-09-07): sidecar `minio` paketine ihtiyaç duyuyor,
+        # sandbox imajı onsuz kalıyor. Aynı imajı paylaşsalardı LLM'in kodu
+        # `import minio` yapabilirdi — doğrudan kipte pod'un depoya rotası da
+        # açık olduğu için geriye tek engel kimlik doğrulama kalırdı.
+        # Argo da aynısını yapıyor: `argoexec` kullanıcının imajından ayrı.
         - name: artifact-sidecar
-          image: ptc-sandbox:local
+          image: ptc-sidecar:local
           imagePullPolicy: Never
           restartPolicy: Always
-          command: ["python", "/sidecar.py"]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -81,6 +85,28 @@ spec:
               value: "{inputs}"
             - name: TOOL_GATEWAY_ENDPOINT
               value: "{tool_gateway_endpoint}"
+            # Bayt yolu: `proxy` (servis üzerinden) | `direct` (depoya doğrudan).
+            # Ayrıntı ve bedeli: PTC_Piyasa_Mentaliteleri.md §11.17
+            - name: PTC_ARTIFACT_TRANSFER
+              value: "{transfer}"
+            # S3 kimlik bilgisi YALNIZCA BU CONTAINER'DA. Container'lar ortam
+            # değişkeni paylaşmıyor; sandbox bunları göremiyor.
+            - name: PTC_S3_ENDPOINT
+              value: "{s3_endpoint}"
+            - name: PTC_S3_BUCKET
+              value: "{s3_bucket}"
+            - name: PTC_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: artifact-bucket
+                  key: AWS_ACCESS_KEY_ID
+                  optional: true
+            - name: PTC_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: artifact-bucket
+                  key: AWS_SECRET_ACCESS_KEY
+                  optional: true
           volumeMounts:
             - name: scratch
               mountPath: /scratch

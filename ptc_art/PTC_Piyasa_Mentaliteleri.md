@@ -28,7 +28,7 @@ yazıldı.
 | **§9.6** | **Aracı nerede duruyor** — baytı kim taşıyor, sarmalayıcı mı sınır mı |
 | **§10** | Karşılaştırma tabloları (izolasyon, ömür, erişim, kayıt defteri, ağ) |
 | **§11** | **Bizim mimarimiz, en baştan en sona** (§11.10 açıklar, §11.11–§11.15 ne değişti) |
-| §11.13–16 | Yerleştirme · beyan/süzgeç/alias · geçmeme kararı · **HTTP vekili neden** |
+| §11.13–17 | Yerleştirme · beyan/süzgeç/alias · geçmeme kararı · HTTP vekili · **bayt yolu seçimi** |
 | **§12** | Biz neredeyiz — boyut boyut kiminle örtüştüğümüz |
 | **§13** | Ekipten gelecek soruların hazır cevapları |
 | **§14** | Doğrulanamayanlar |
@@ -2587,6 +2587,122 @@ LLM'in yazdığı kodun `os.environ`'unda olurdu.
 **Sonuç:** OpenShift'in varsayılanı Model 1; biz Model 2'deyiz. Seçimi zorlayan
 tek şey **kodu LLM'in yazıyor olması** — ve Model 2 de birinci sınıf,
 belgelenmiş, varsayılan-açık bir desen.
+
+---
+
+## §11.17 — 2026-09-07: bayt yolu artık SEÇİLEBİLİR (KFP'nin iki kanalı)
+
+§11.16 "HTTP vekili OpenShift'in varsayılanı değil ama icat da değil" demişti.
+Bu bölüm ikinci yolu da uygulanabilir hâle getiriyor.
+
+### İki kip
+
+```
+proxy   sidecar → HTTP → Artifact Service → depo        (varsayılan)
+direct  sidecar → depo doğrudan;  servise yalnızca KÜNYE  (KFP'nin ayrımı)
+```
+
+`PTC_ARTIFACT_TRANSFER` ile seçiliyor. İkisi de destekleniyor çünkü aralarındaki
+fark bir **tercih**, bir hata değil.
+
+### `direct` protokolü — üç çağrı
+
+Servis bayt yolundan çıkınca `artifact_id` ve anahtar yolunu kimin üreteceği
+sorusu doğuyor. Cevap: yine servis, ama yüklemeden önce.
+
+```
+① GET  /artifacts/by-hash/<sha256>   bu içerik zaten var mı  → varsa yükleme YOK
+② POST /artifacts/allocate           artifact_id + anahtar   (durum tutmaz)
+   PUT  <depo>/<anahtar>             sidecar doğrudan yükler
+③ POST /artifacts/register           nesneyi DOĞRULA, satırı aç
+```
+
+**`register`'ın doğrulaması kritik.** Servis baytları görmüyor; doğrulamasa
+kayıt defteri var olmayan bir nesneye işaret edebilirdi. `stat_object` ile
+nesnenin orada ve **beyan edilen boyutta** olduğu kontrol ediliyor. Boyut
+tutmazsa `409` — "çok büyük" (413) değil, çünkü yapılacak şey veriyi küçültmek
+değil yüklemeyi tekrarlamak.
+
+`allocate` durum tutmuyor: yükleme yarıda kalırsa geriye yalnızca yetim bir
+nesne kalıyor, kayıt defterinde satır olmuyor.
+
+### İki kontrol sidecar'a taşındı
+
+`proxy` kipinde pickle reddi ve boyut sınırı servisin akış yolundaydı. `direct`
+kipinde servis baytı görmediği için ikisi de sidecar'da yapılıyor —
+**hâlâ sandbox'ın DIŞINDA**, yani garanti bozulmuyor, yeri değişiyor.
+
+### Sidecar artık AYRI İMAJ
+
+`direct` kipi `minio` paketini gerektiriyor. Aynı imajı paylaşsalardı LLM'in
+kodu `import minio` yapabilirdi. Argo'nun çözümü aynı: `argoexec` kullanıcının
+imajından ayrı bir imaj. Bizde `Dockerfile.sidecar` → `ptc-sidecar:local`.
+
+Ölçüldü — sandbox imajı temiz kaldı:
+
+```
+minio_sdk : False        ← sandbox'ta paket YOK
+s3_kimlik : []           ← anahtar YOK (ortam değişkenleri container başına)
+```
+
+### BEDEL — ölçülmüş, gizlenmiyor
+
+**NetworkPolicy POD seçer, container değil.** Bir pod'un bütün container'ları
+aynı ağ isim uzayını paylaşıyor. Sidecar'a depoya rota vermek, sandbox'a da
+vermek demek:
+
+| | proxy | direct |
+|---|---|---|
+| `sandbox → minio` | **TimeoutError** | **ULASTI** |
+| `sandbox` S3 anahtarı | yok | yok |
+| `sandbox` imajında `minio` | yok | yok |
+
+Bu **ağ katmanındaki** izolasyon. Anahtar hâlâ yok, ama bucket'ta anonim
+okumaya açık bir yanlış yapılandırma `proxy` kipinde ulaşılamadığı için
+sömürülemezken `direct` kipinde sömürülebilir hâle geliyor.
+
+### Rotayı açan şey KİP DEĞİL, POLİTİKA
+
+İlk uygulamada MinIO kuralını temel politikanın içine koymuştum. Kabul testi
+`proxy` kipinde **düştü**: rota açıktı. Doğru olan ayırmak —
+
+```
+k8s/policies/sandbox-egress.ciliumnetworkpolicy.yaml          rota YOK
+k8s/policies/sandbox-egress-direct.ciliumnetworkpolicy.yaml   rotayı açar
+```
+
+Rotayı açmak, kip anahtarını çevirmenin **yan etkisi** değil, ayrıca verilmiş
+bir karar olmalı. Kabul testi de artık kipe duyarlı: `direct`'te rotanın açık
+olduğunu **doğrulayarak** geçiyor, sessizce atlamıyor.
+
+### Bir de DNS
+
+`direct` kipi ilk denemede sessizce boş döndü: sidecar depoyu `http://minio:9000`
+diye çağırdı, sandbox pod'unun kube-dns'e egress'i olmadığı için çözüm askıda
+kaldı, grace period doldu, SIGKILL geldi, **süpürme hiç çalışmadı**.
+Çalıştırma "success" görünüyordu ama artifact yoktu.
+
+Çözüm, artifact servisinde zaten kullanılan yol: adres **ClusterIP** olarak
+veriliyor, isimle değil. `PTC_S3_ENDPOINT` dışarıdan verilmişse ona dokunulmuyor
+(OpenShift'te ODF/harici S3).
+
+### Doğrulama
+
+```
+proxy   51/51 canlı kabul kontrolü   ·  sandbox → minio  TimeoutError
+direct  52/52 canlı kabul kontrolü   ·  sandbox → minio  ULASTI (beklenen)
+        baytlar MinIO'da: ptc/<wf>/_/<run>/art_….txt
+212 birim/entegrasyon testi
+```
+
+### Hangisi ne zaman
+
+| Artifact | Kip | Neden |
+|---|---|---|
+| < ~50 MB | **proxy** | bant genişliği sorun değil; kontroller ve kayıt defteri tek yerde |
+| > ~50 MB | **direct** | GB'ları tek bir Python servisinden akıtmak israf |
+
+MLflow'un sunduğu seçimin aynısı (`--serve-artifacts` var/yok).
 
 ---
 

@@ -107,6 +107,18 @@ def _resolve_artifact_service_endpoint(core_v1: client.CoreV1Api) -> str:
     return f"http://{service.spec.cluster_ip}:{ARTIFACT_SERVICE_PORT}"
 
 
+#: BAYT YOLU (2026-09-07).
+#:
+#:   proxy   sidecar → HTTP → Artifact Service → depo   (varsayılan)
+#:   direct  sidecar → depo doğrudan; servise yalnızca künye  (KFP'nin ayrımı)
+#:
+#: `direct`, bayt yolundan bir sıçrama siliyor ama pod'un depoya ağ rotasını
+#: açmayı gerektiriyor — ve NetworkPolicy pod seçtiği için o rota sandbox'a da
+#: açılıyor. Tercih, hata değil; gerekçesi PTC_Piyasa_Mentaliteleri §11.17.
+TRANSFER = os.environ.get("PTC_ARTIFACT_TRANSFER", "proxy")
+S3_ENDPOINT = os.environ.get("PTC_S3_ENDPOINT", "")
+S3_BUCKET = os.environ.get("PTC_S3_BUCKET", "")
+
 #: Artifact adı — servisin kabul ettiğiyle birebir. Beyan bu süzgeçten
 #: geçiyor: ad ne virgül ne tırnak içerebiliyor, dolayısıyla virgülle
 #: ayrılmış tek bir ortam değişkenine güvenle sığıyor.
@@ -143,6 +155,8 @@ def _load_job_manifest(
     artifact_service_endpoint: str,
     workflow_id: str,
     inputs: str = "*",
+    transfer: str = "proxy",
+    s3_endpoint: str = "",
 ) -> dict:
     template_text = _TEMPLATE_PATH.read_text(encoding="utf-8")
     filled = template_text.format(
@@ -152,8 +166,34 @@ def _load_job_manifest(
         artifact_service_endpoint=artifact_service_endpoint,
         workflow_id=workflow_id,
         inputs=inputs,
+        transfer=transfer,
+        s3_endpoint=s3_endpoint,
+        s3_bucket=S3_BUCKET,
     )
     return yaml.safe_load(filled)
+
+
+def _resolve_s3_endpoint(core_v1: client.CoreV1Api) -> str:
+    """Nesne deposunun ClusterIP'si — artifact servisiyle AYNI gerekçe: DNS yok.
+
+    2026-09-07'de canlıda tam bunu yaşadık: `direct` kipinde sidecar depoyu
+    `http://minio:9000` diye çağırdı, sandbox pod'unun kube-dns'e egress'i
+    olmadığı için çözüm askıda kaldı, grace period doldu, SIGKILL geldi ve
+    süpürme HİÇ çalışmadı. Sessiz bir kayıptı: çalıştırma "success" görünüyor
+    ama artifact yok.
+
+    Adresi ortamdan verilmişse ona dokunulmuyor (OpenShift'te ODF/harici S3).
+    """
+    disaridan = os.environ.get("PTC_S3_ENDPOINT", "")
+    if disaridan:
+        return disaridan
+    try:
+        svc = core_v1.read_namespaced_service(name="minio", namespace=NAMESPACE)
+    except client.ApiException:
+        return ""
+    port = next((p.port for p in svc.spec.ports if p.port == 9000),
+                svc.spec.ports[0].port)
+    return f"http://{svc.spec.cluster_ip}:{port}"
 
 
 def _read_signing_key(core_v1: client.CoreV1Api) -> str | None:
@@ -489,6 +529,8 @@ def run_sandbox(
         artifact_service_endpoint,
         workflow_id or "",
         _beyani_bicimle(inputs),
+        TRANSFER,
+        _resolve_s3_endpoint(core_v1) if TRANSFER == "direct" else "",
     )
     job = batch_v1.create_namespaced_job(namespace=NAMESPACE, body=job_manifest)
     # ConfigMap'i Job'a bağla — Job silinince Kubernetes onu da toplasın.

@@ -7,7 +7,7 @@ deneniyor. 38 kontrol, hepsi ölçülüyor — hiçbiri varsayılmıyor.
 ## Ön koşullar
 
     kubectl port-forward svc/artifact-service 8080:8080     # kayıt defteri
-    uvicorn grounded_assistant.web.app:app --port 8010      # panel (§8 için)
+    uvicorn grounded_assistant.web.app:app --port 8123      # panel (§8 için)
 
 ## Kullanım
 
@@ -193,7 +193,19 @@ if r.status.value == "success":
     s = eval(r.result_text)
     kontrol("sandbox'ta S3 kimlik bilgisi YOK", s["s3_kimlik"] == [], s["s3_kimlik"])
     kontrol("S3 SDK kurulu değil", s["boto3"] == "yok")
-    kontrol("MinIO'ya doğrudan IP ile gidilemiyor", s["minio_ip"] != "ULASILDI", s["minio_ip"])
+    # Bu kontrol KİPE bağlı ve bilerek öyle: `direct` kipinde sidecar depoya
+    # kendisi yazıyor, bunun için pod'un rotası açılıyor ve NetworkPolicy pod
+    # seçtiği için sandbox da o rotayı kazanıyor. Kip anahtarı bunu
+    # kendiliğinden kapatmıyor — ölçüp yazmak, sessizce geçmekten iyi.
+    _kip = os.environ.get("PTC_ARTIFACT_TRANSFER", "proxy")
+    if _kip == "direct":
+        kontrol("[direct] MinIO'ya rota AÇIK — kipin bilinen bedeli",
+                s["minio_ip"] == "ULASILDI", s["minio_ip"])
+        kontrol("[direct] rotaya rağmen S3 anahtarı YOK", s["s3_kimlik"] == [],
+                s["s3_kimlik"])
+    else:
+        kontrol("[proxy] MinIO'ya doğrudan IP ile gidilemiyor",
+                s["minio_ip"] != "ULASILDI", s["minio_ip"])
     kontrol("internet kapalı", s["internet"] != "ACIK", s["internet"])
     kontrol("sandbox'ta KAPSAM JETONU da YOK (sidecar'da)",
             s["jeton_sizinti"] == [], s["jeton_sizinti"])
@@ -254,7 +266,7 @@ kontrol("aynı içerik → aynı hash (tek bayt)", len(hashler) == 1, hashler)
 
 # ══ 8. Panel API'leri ════════════════════════════════════════════════════
 basla("8 · PANEL")
-PANEL = "http://127.0.0.1:8010"
+PANEL = os.environ.get("PTC_PANEL_URL", "http://127.0.0.1:8123")
 try:
     d = requests.get(f"{PANEL}/api/durum", params={"session": WF_B}, timeout=25).json()
     kontrol("/api/durum yanıt veriyor", d["artifactler"].get("error") is None,
@@ -316,14 +328,26 @@ kontrol("?q= ad içinde arıyor", all("turev" in k["name"] for k in ara), len(ar
 kontrol("LIKE jokeri kaçırılıyor", joker == [], len(joker))
 
 # 9c — ALIAS: MLflow `models:/<ad>@<alias>` karşılığı
+# Alias kontrolü KENDİ artifact'ini üretiyor: "a.txt" gibi ortak bir ada
+# bağlanınca, depoda başka çalıştırmalardan kalan aynı adlı kayıtlar sonucu
+# belirliyordu ve test depo durumuna göre geçip kalıyordu.
+ALIAS_AD = f"alias.{uuid.uuid4().hex[:8]}.txt"
+kos(f"""
+open("/output/{ALIAS_AD}","w").write("ILK")
+set_result("ok")
+""", WF_C, inputs=[])
+kos(f"""
+open("/output/{ALIAS_AD}","w").write("IKINCI")
+set_result("ok")
+""", str(uuid.uuid4()), inputs=[])
 surumler = [k["artifact_id"] for k in
-            requests.get(f"{SERVIS}/artifacts", params={"name": "a.txt"},
+            requests.get(f"{SERVIS}/artifacts", params={"name": ALIAS_AD},
                          headers=H, timeout=20).json()]
-enyeni = requests.get(f"{SERVIS}/artifacts/by-name/a.txt", headers=H, timeout=20)
+enyeni = requests.get(f"{SERVIS}/artifacts/by-name/{ALIAS_AD}", headers=H, timeout=20)
 pa = requests.put(f"{SERVIS}/artifacts/{surumler[-1]}/alias",
                   params={"alias": "kabul"}, headers=H, timeout=20)
 kontrol("alias atanıyor", pa.status_code == 200, pa.status_code)
-ra = requests.get(f"{SERVIS}/artifacts/by-name/a.txt@kabul", headers=H, timeout=20)
+ra = requests.get(f"{SERVIS}/artifacts/by-name/{ALIAS_AD}@kabul", headers=H, timeout=20)
 kontrol("alias sürümü sabitliyor",
         ra.status_code == 200 and ra.headers.get("X-Artifact-Id") == surumler[-1],
         ra.status_code)
@@ -333,13 +357,13 @@ kontrol("alias 'en yeni' kuralından kaçırıyor",
 kontrol("bozuk alias reddediliyor",
         requests.put(f"{SERVIS}/artifacts/{surumler[-1]}/alias",
                      params={"alias": "../etc"}, headers=H, timeout=20).status_code == 400)
-r = kos("""
+r = kos(f"""
 import os
-yol = load_artifact(None, "a.txt@kabul")
-set_result({"yol": yol, "icerik": open(yol).read()})
+yol = load_artifact(None, "{ALIAS_AD}@kabul")
+set_result({{"yol": yol, "icerik": open(yol).read()}})
 """, str(uuid.uuid4()), inputs=[])
 kontrol("sandbox alias'la okuyabiliyor",
-        r.status.value == "success" and eval(r.result_text)["icerik"] == "A",
+        r.status.value == "success" and eval(r.result_text)["icerik"] == "ILK",
         r.error_message or r.result_text)
 
 # ══ ÖZET ═════════════════════════════════════════════════════════════════
