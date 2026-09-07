@@ -31,6 +31,7 @@ yazılı; gerekçeler ve alıntılar orada.
 | [17](#17--openshift-uyumluluğu) | **OpenShift uyumluluğu** | **Bizimki orada çalışır mı** · §17.1 geçiş kararı |
 | [18](#18--aynı-akış-adım-adım-üç-üründe) | **Aynı akış, adım adım** | **Bir dosya nasıl yolculuk ediyor** |
 | [19](#19--beyan-süzgeç-alias--üç-mekanizma-üç-kaynak) | **Beyan · Süzgeç · Alias** | **Hangi deseni kimden aldık** |
+| [20](#20--baytı-http-ile-göndermek-kimin-varsayılanı) | **HTTP vekili** | **Bizim fazladan sıçramamız var mı** |
 
 ---
 
@@ -649,6 +650,79 @@ independently of your production code."*
 
 ---
 
+## 20 — Baytı HTTP ile göndermek: kimin varsayılanı
+
+Sidecar baytları HTTP ile Artifact Service'e gönderiyor, o da MinIO'ya yazıyor.
+**OpenShift'in varsayılanı bu değil** — ama bu bizim icadımız da değil. Sahada
+üç kanonik yerleşim var.
+
+| | Baytlar | Kimlik bilgisi nerede | Kayıt defteri |
+|---|---|---|---|
+| **KFP / OpenShift AI** | launcher → S3 **doğrudan** | **kullanıcı container'ında** | MLMD (ayrı kanal) |
+| **Argo Workflows** | wait sidecar → S3 **doğrudan** | ayrı container | **yok** |
+| **MLflow (proxied)** | client → **HTTP** → server → depo | **server'da** | tracking DB |
+| **BİZ** | sidecar → **HTTP** → servis → MinIO | **servis'te** | SQLite |
+
+### Kaynak cümleler
+
+**KFP** — kimlik bilgisi launcher'da, launcher kullanıcı container'ını sarmalıyor:
+
+> *"the `ConfigMap/kfp-launcher` can also be given pipeline root
+> **authentication details**"*
+
+**MLflow** — bizim yerleşimimiz, ve orada **varsayılan açık** (`--serve-artifacts`):
+
+> *"The tracking server works as a **proxy** for accessing remote artifacts.
+> The MLflow clients make **HTTP request to the server** for fetching artifacts."*
+
+> `--artifacts-only`: *"restricts an MLflow server instance to **only serve
+> artifact-related API requests by proxying to an underlying object store**."*
+
+**MLflow'un gerekçesi = bizim gerekçemiz:**
+
+> *"When not proxying, clients need their own credentials and **direct access
+> to the artifact store**."*
+
+### Neden KFP'nin yolunu almadık
+
+KFP'nin launcher'ı kullanıcı kodunun container'ını **sarmalıyor** → S3 anahtarı
+LLM'in yazdığı kodun `os.environ`'unda olurdu. §8'in dört ailesinde bu **B
+ailesi**: "sarmalayıcı, sınır değil."
+
+KFP için makul, çünkü orada bileşeni **insan** yazıyor. Bizde LLM yazıyor.
+
+### Neden Argo'nun yolunu almadık
+
+Argo'nun `wait`'i ayrı container ve S3'e doğrudan yazıyor — kimlik kullanıcı
+kodunda değil, yani yerleşim doğru. Ama **Argo'da kayıt defteri yok**:
+`artifact_id`, soy, TTL, dedup, pickle reddi hiçbiri. §5'in bulgusu:
+
+> Kayıt defteri, yalnızca yazma yolu **bir bileşenden geçtiğinde** ayakta
+> kalıyor.
+
+### Bizim aldığımız: ikisinin birleşimi
+
+```
+yerleşim  →  Argo   (ayrı container, kimlik kullanıcı kodunda DEĞİL)
+kanal     →  MLflow (HTTP vekili, kimlik serviste, kayıt defteri ayakta)
+```
+
+Ölçüm (canlı):
+
+```
+sandbox → minio             gaierror         (DNS bile çözemiyor)
+sandbox → artifact-service  URLError
+sandbox → S3 kimlik         yok
+sandbox → PTC_SCOPE_TOKEN   yok
+sandbox → 127.0.0.1:8099    {"status":"ok"}   ← tek kapı, salt okuma
+```
+
+KFP'nin modelinde ilk dört satır sağlanamazdı.
+
+*(§11.16)*
+
+---
+
 ## Kaynaklar
 
 Bütün alıntılar ve linkler
@@ -667,3 +741,9 @@ bölümünde. §17'nin kaynakları:
 - [MLflow — Model Registry](https://mlflow.org/docs/latest/ml/model-registry/) — alias, `models:/<ad>@<alias>`
 - [OpenShift AI — model registries](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25/html/enabling_the_model_registry_component/overview-of-model-registries_model-registry-config)
 - [KFP v2beta1 API](https://www.kubeflow.org/docs/components/pipelines/reference/api/kubeflow-pipeline-api-spec/)
+
+§20'nin kaynakları (2026-09-07):
+
+- [MLflow — Tracking Server (proxied artifact access)](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/) — `--serve-artifacts`, `--artifacts-only`
+- [Kubeflow — Object Store Configuration](https://www.kubeflow.org/docs/components/pipelines/operator-guides/configure-object-store/) — `kfp-launcher` ConfigMap, authentication details
+- [Kubeflow — Pipeline Root](https://www.kubeflow.org/docs/components/pipelines/user-guides/data-handling/pipeline-root/)

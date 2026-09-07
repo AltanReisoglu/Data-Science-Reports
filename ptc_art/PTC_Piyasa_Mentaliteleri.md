@@ -28,7 +28,7 @@ yazıldı.
 | **§9.6** | **Aracı nerede duruyor** — baytı kim taşıyor, sarmalayıcı mı sınır mı |
 | **§10** | Karşılaştırma tabloları (izolasyon, ömür, erişim, kayıt defteri, ağ) |
 | **§11** | **Bizim mimarimiz, en baştan en sona** (§11.10 açıklar, §11.11–§11.15 ne değişti) |
-| §11.13–15 | Yerleştirme · beyan/süzgeç/alias · **OpenShift'e geçmeme kararı** |
+| §11.13–16 | Yerleştirme · beyan/süzgeç/alias · geçmeme kararı · **HTTP vekili neden** |
 | **§12** | Biz neredeyiz — boyut boyut kiminle örtüştüğümüz |
 | **§13** | Ekipten gelecek soruların hazır cevapları |
 | **§14** | Doğrulanamayanlar |
@@ -2496,6 +2496,97 @@ Hubble                                     →  karşılığı YOK
 İlk ikisi birebir çevrilebilir ama **kind'da test edilemez** (OVN yok).
 Yazılırsa "yazıldı, denenmedi" diye işaretlenmeli — bu belgede doğrulanmamış
 bir şeyi doğrulanmış gibi göstermemek asıl kural.
+
+---
+
+## §11.16 — "HTTP sıçraması OpenShift varsayılanı mı?" — hayır, ama icat da değil
+
+Soru: sidecar baytları **HTTP ile** Artifact Service'e gönderiyor, o da MinIO'ya
+yazıyor. OpenShift bunu varsayılan olarak böyle mi yapıyor?
+
+**Hayır.** Ama bizimki de uydurma değil — sahada **iki ayrı kanonik model** var
+ve biz ikincisindeyiz.
+
+### Model 1 — doğrudan depoya (KFP / OpenShift AI'ın varsayılanı)
+
+```
+launcher  ──S3 SDK──►  MinIO/S3          (bayt)
+launcher  ──gRPC───►   MLMD              (künye)
+```
+
+> *"The Launcher-v2 writes pipeline artifacts to locations controlled by the
+> `defaultPipelineRoot`… the `ConfigMap/kfp-launcher` can also be given
+> pipeline root **authentication details**."*
+
+Kimlik bilgisi `kfp-launcher` ConfigMap + Secret'tan geliyor ve **launcher
+kullanıcı kodunun container'ını sarmalıyor**. Yani anahtar, kodun okuyabileceği
+bir yerde. §9.6'da bunu "sarmalayıcı, sınır değil" diye ayırmıştık.
+
+KFP için bu makul: oradaki bileşeni **insan** yazıyor. Bizde kodu LLM yazıyor.
+
+### Model 2 — vekil üzerinden HTTP (MLflow'un varsayılanı)
+
+MLflow'un **proxied artifact access**'i birebir bizim yaptığımız şey:
+
+> *"The tracking server works as a **proxy** for accessing remote artifacts.
+> The MLflow clients make **HTTP request to the server** for fetching
+> artifacts."*
+
+Ve saf hâli — bu cümle Artifact Service'in tarifi:
+
+> `--artifacts-only`: *"restricts an MLflow server instance to **only serve
+> artifact-related API requests by proxying to an underlying object store**."*
+
+`--serve-artifacts` MLflow'da **varsayılan açık**.
+
+**Gerekçesi de bizimkiyle aynı cümle:**
+
+> *"When not proxying, clients need their own credentials and **direct access
+> to the artifact store**."*
+>
+> *"…enables users to have an **assumed role** of access to all artifacts that
+> are accessible to the Tracking Server."*
+
+### Model 3 — ayrı container, doğrudan depoya (Argo)
+
+Argo'nun `wait`'i ayrı bir container ve S3'e doğrudan yazıyor; kimlik bilgisi
+kullanıcı kodunda değil. Bizim için de geçerli bir seçenekti.
+
+**Almadık çünkü Argo'da kayıt defteri yok:** `artifact_id`, soy, TTL, dedup,
+pickle reddi — hiçbiri. §9.4'ün en keskin bulgusu buydu: *kayıt defteri,
+yalnızca yazma yolu bir bileşenden geçtiğinde ayakta kalıyor.*
+
+### Dört satırda
+
+| | Baytlar | Kimlik nerede | Kayıt defteri |
+|---|---|---|---|
+| **KFP / OpenShift AI** | launcher → S3 doğrudan | **kullanıcı container'ında** | MLMD (ayrı kanal) |
+| **Argo Workflows** | wait sidecar → S3 doğrudan | ayrı container | **yok** |
+| **MLflow (proxied)** | client → **HTTP** → server → depo | **server'da** | tracking DB |
+| **BİZ** | sidecar → **HTTP** → servis → MinIO | **servis'te** | SQLite |
+
+Bizim satır **MLflow satırının aynısı**; ayrıca yerleşimi Argo'nunki (ayrı
+container) ile birleştiriyoruz — yani kimlik bilgisi hem kullanıcı
+container'ında yok, hem de merkezde.
+
+### Neden bu seçim zorunlu
+
+Ölçüm (canlı):
+
+```
+sandbox → minio             gaierror         (DNS bile çözemiyor)
+sandbox → artifact-service  URLError         (servise de gidemiyor)
+sandbox → S3 kimlik         yok
+sandbox → PTC_SCOPE_TOKEN   yok
+sandbox → 127.0.0.1:8099    {"status":"ok"}  ← tek kapı, salt okuma
+```
+
+KFP'nin modelini alsaydık bu satırların ilk dördü sağlanamazdı: anahtar,
+LLM'in yazdığı kodun `os.environ`'unda olurdu.
+
+**Sonuç:** OpenShift'in varsayılanı Model 1; biz Model 2'deyiz. Seçimi zorlayan
+tek şey **kodu LLM'in yazıyor olması** — ve Model 2 de birinci sınıf,
+belgelenmiş, varsayılan-açık bir desen.
 
 ---
 
