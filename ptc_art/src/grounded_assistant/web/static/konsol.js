@@ -28,8 +28,19 @@ async function getJSON(url, opts) {
 
 const uyari = m => `<div class="uyari">${esc(m)}</div>`;
 
-/* PTC paneline yaz — `app.js`in kullandığı DOM'un aynısı. */
+/* Sol-alt terminale yaz.
+ *
+ * `app.js` zaten bu işi yapan iki fonksiyon tanımlıyor — `appendPtcLine` ve
+ * `appendPtcCodeBlock`. Onları KULLANIYORUZ, kopyalamıyoruz: ikisi de
+ * "sayfa açılışındaki ipucu satırını ilk gerçek olayda temizle" kuralını
+ * (`clearPanelHintOnce`) işletiyor ve kod bloğunu highlight.js ile
+ * renklendiriyor. Kendi başımıza yazınca terminal, sohbetten tetiklenen bir
+ * çalıştırmaya göre farklı görünüyordu — asıl şikâyet buydu.
+ *
+ * `app.js` yüklenmemişse (tek başına test) sade bir yedeğe düşüyoruz.
+ */
 function ptcYaz(metin, sinif = "info") {
+  if (typeof appendPtcLine === "function") { appendPtcLine(metin, sinif); return; }
   const log = $("#ptc-panel-log");
   if (!log) return;
   const d = document.createElement("div");
@@ -38,7 +49,21 @@ function ptcYaz(metin, sinif = "info") {
   log.appendChild(d);
   log.scrollTop = log.scrollHeight;
 }
-function ptcTemizle() { const l = $("#ptc-panel-log"); if (l) l.innerHTML = ""; }
+
+function ptcKod(kod) {
+  try {
+    if (typeof appendPtcCodeBlock === "function") { appendPtcCodeBlock(kod); return; }
+  } catch (e) { /* highlight.js gelmediyse sade yaz */ }
+  ptcYaz(kod, "info");
+}
+
+function ptcTemizle() {
+  const l = $("#ptc-panel-log");
+  if (l) l.innerHTML = "";
+  // `app.js`in ipucu-temizleme bayrağı: biz temizlediysek o da temizlenmiş
+  // saysın, yoksa ilk satırımızı yazdıktan SONRA panosu bir kez daha siliyor.
+  if (typeof panelCleared !== "undefined") { try { panelCleared = true; } catch (e) { /* sabit */ } }
+}
 
 /* ══ üst çubuk ═══════════════════════════════════════════════════ */
 
@@ -237,7 +262,7 @@ function calistir() {
   if (S.calisiyor) return;
   S.durum = {}; S.calisiyor = true; S.adim = null;
   ptcTemizle();
-  ptcYaz(`▶ ${hatOf(S.hat).ad} başlatılıyor…`, "info");
+  ptcYaz(`▶ ${hatOf(S.hat)?.ad || S.hat} başlatılıyor…`, "info");
   ciz_calistir();
 
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -255,20 +280,27 @@ function calistir() {
       ptcYaz(`workflow ${m.workflow_id}`, "info");
     } else if (m.type === "node_start") {
       d(m.n).status = "running"; S.adim = m.n; S.icTab = "log";
-      ptcYaz(`\n[${m.n}] ${m.ad}  ·  ${m.tur === "sandbox" ? "sandbox pod'u" : "kayıt defteri sorgusu"}`, "info");
+      ptcYaz(`${m.tur === "sandbox" ? "⬢" : "🔎"} [${m.n}] ${m.ad} — ${
+        m.tur === "sandbox" ? "sandbox pod'u açılıyor" : "kayıt defteri sorgusu (pod yok)"}`, "info");
       ciz_calistir();
     } else if (m.type === "log") {
       d(m.n).loglar.push(m);
       ptcYaz(`    ${m.ts}  ${m.msg}`, m.cls === "fail" ? "denied" : "info");
     } else if (m.type === "code") {
       d(m.n).kod = m.kod;
+      // Sohbet tarafında `job_created` olayında kod nasıl gösteriliyorsa aynısı.
+      ptcYaz("⚙️ çalıştırılan kod:", "info");
+      ptcKod(m.kod);
     } else if (m.type === "artifact") {
       if (m.op === "produced") {
+        ptcYaz(`  📦 ${m.name} → depoya yazıldı (${m.artifact_id}, ${m.size_bytes || 0} bayt)`, "info");
         d(m.n).artifacts.push({ artifact_id: m.artifact_id, name: m.name, size_bytes: m.size_bytes });
         yenileSayac();
       }
       ciz_calistir();
     } else if (m.type === "node_done") {
+      ptcYaz(`  ${m.status === "success" ? "🏁" : "⛔"} adım ${m.n} · ${m.status} · ${m.dur}`,
+             m.status === "success" ? "info" : "denied");
       Object.assign(d(m.n), {
         status: m.status === "success" ? "success" : "error",
         dur: m.dur, sonuc: m.sonuc, run_id: m.run_id,
@@ -542,5 +574,6 @@ $("#btnTemizle").onclick = () => { if (!S.calisiyor) { S.durum = {}; S.adim = nu
 (async () => {
   await yenileSayac();
   try { S.hatlar = (await getJSON("/api/pipelines")).pipelines; } catch { /* kart alanı gösterir */ }
+  ciz_hatlar();
   setInterval(yenileSayac, 20000);
 })();

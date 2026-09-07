@@ -454,3 +454,7 @@ pre.kod {
 .ic-log .imlec { color: var(--accent); }
 
 .ic-satir { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .5rem; }
+
+/* Terminal her zaman içeriğin üstünde kalsın. `style.css`te z-index yok;
+   sohbet ekranında sorun değildi çünkü orada üst üste binen katman yok. */
+body.konsol .ptc-panel { z-index: 50; }
