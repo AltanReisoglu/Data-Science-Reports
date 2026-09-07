@@ -64,7 +64,8 @@ def ortam(tmp_path, monkeypatch):
     monkeypatch.setattr(sidecar, "OUTPUT_DIR", str(cikti))
     monkeypatch.setattr(sidecar, "SCRATCH_DIR", str(scratch))
     monkeypatch.setattr(sidecar, "_sunulan_ozet", {})
-    monkeypatch.setattr(sidecar, "_sunulan_kimlik", set())
+    monkeypatch.setattr(sidecar, "_istenen_kimlik", set())
+    monkeypatch.setattr(sidecar, "_yerlesen_kimlik", {})
     return cikti
 
 
@@ -72,7 +73,7 @@ def sun(ust, ad: str) -> None:
     """Proxy'nin `/fetch` yolunun yaptığının aynısı — sidecar sunduğunu kaydeder."""
     ham = ust.depo[ad]
     sidecar._sunulan_ozet[ad] = hashlib.sha256(ham).hexdigest()
-    sidecar._sunulan_kimlik.add(f"art_{ad}")
+    sidecar._istenen_kimlik.add(f"art_{ad}")
 
 
 def test_sunulan_dosya_uretilenin_ebeveyni_olur(ortam, monkeypatch):

@@ -80,7 +80,7 @@ def _make_ptc_tool(
     websocket_protocol.md). CLI hiç geçmez (`None`), davranışı değişmez."""
 
     @tool
-    def run_ptc_code(code: str) -> str:
+    def run_ptc_code(code: str, inputs: list[str] | None = None) -> str:
         """LLM'in ürettiği Python kodunu, Tool Gateway dışında hiçbir yere
         çıkamayan (Cilium/eBPF ile ağ seviyesinde kısıtlı) ayrı bir Kubernetes
         pod'unda çalıştırır. Bu, veriye/canlı sistemlere erişmenin TEK yoludur —
@@ -104,6 +104,15 @@ def _make_ptc_tool(
         programatik olarak (döngü/koşul ile) sıralamak istediğinde de bunu
         kullan.
 
+        `inputs` — BU ÇALIŞTIRMANIN OKUYACAĞI DOSYALARI BEYAN ET. Sistem
+        mesajındaki "BU OTURUMDA ÜRETİLENLER" listesinden hangilerine
+        ihtiyacın varsa adlarını buraya yaz; yalnızca onlar `/output`'a
+        konur. Örnek: `inputs=["satis.parquet"]`.
+
+        Hiçbir eski dosya okumayacaksan `inputs=[]` ver. Beyan etmezsen bu
+        oturumun bütün çıktıları kopyalanır ve hepsi soy ağacında girdi
+        sayılır — yani grafik yanlış olur. Bu yüzden HER ZAMAN beyan et.
+
         KALICI VERİ — `/output/` dizini. Sandbox pod'u her çalıştırmada
         SIFIRDAN doğar; değişkenler bir sonraki çağrıya TAŞINMAZ. Kalması
         gereken her şeyi `/output/` altına DOSYA olarak yaz.
@@ -119,28 +128,29 @@ def _make_ptc_tool(
         otomatik olarak kalıcı depoya konur. Hata alsan bile o ana kadar
         yazdıkların kurtarılır.
 
-        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — dosya sistemi deponun görünümüdür.
-        `/output/` altındaki bir dosyayı okumak istediğinde, o dosya bu pod'da
-        fiziksel olarak olmasa bile depodan otomatik iner. Yani:
+        DAHA ÖNCE ÜRETİLENLERİ KULLANMAK — `inputs` ile beyan ettiklerin
+        `/output/` altında HAZIR olur. Pod açılırken oraya yerleştirilirler,
+        yani sıradan dosyalar; kodun içinde özel bir çağrı yok:
 
-            os.listdir("/output")              # depoda ne varsa listeler
-            os.path.exists("/output/x.parquet")  # depodakini de sayar
-            pd.read_parquet("/output/x.parquet") # yoksa indirir, sonra okur
+            run_ptc_code(code, inputs=["x.parquet"])
+            # kodun içinde:
+            pd.read_parquet("/output/x.parquet")  # düz dosya okuması
 
         Kullanıcı önceki bir sonuca atıf yapıyorsa ("az önceki tabloyu", "onu
         departmana göre grupla") veriyi YENİDEN ÜRETME — önce `/output`'a bak,
         oradan oku.
 
-        İKİ AYRI KÖK var, karıştırma:
-        - `/output/` — YALNIZCA BU OTURUMUN çıktıları. "Az önce", "demin",
-          "senin ürettiğin" dendiğinde burası.
-        - `/artifacts/<workflow_id>/` — BAŞKA çalıştırmaların çıktıları.
-          `os.listdir("/artifacts")` hangi çalıştırmalar var onu listeler.
-          Bunlar bu oturumun işi DEĞİL; kullanıcı açıkça istemedikçe
-          kullanma, ve asla kendi çıktın gibi sunma.
+        BAŞKA BİR ÇALIŞTIRMANIN çıktısı `/output`'ta OLMAZ ve kendiliğinden
+        gelmez. Gerekiyorsa açıkça iste:
 
-        Aradığın dosya `/output`'ta yoksa üretmen gerekiyor demektir —
-        `/artifacts` altındaki benzer adlı bir dosyayı onun yerine koyma.
+            yol = load_artifact("<workflow_id>", "rapor.pdf")  # yolu döner
+
+        Bunlar bu oturumun işi DEĞİL. Kullanıcı açıkça istemedikçe kullanma ve
+        asla kendi çıktın gibi sunma. Hangi çalıştırmada ne olduğunu sistem
+        mesajındaki artifact listesinden görürsün.
+
+        Aradığın dosya `/output`'ta yoksa üretmen gerekiyor demektir — başka
+        bir çalıştırmadaki benzer adlı bir dosyayı onun yerine koyma.
 
         PAHALI İŞİ TEKRARLAMA: 5'ten fazla tool çağrısı içeren ya da döngüyle
         veri toplayan bir bloktan önce çıktısı var mı diye bak:
@@ -168,8 +178,7 @@ def _make_ptc_tool(
 
         `/output/` altına bir DİZİN de bırakabilirsin (çok dosyalı model,
         varlıklarıyla birlikte HTML rapor). Tek bir artifact olarak saklanır ve
-        sonraki çalıştırmada `/output/<dizin>/<dosya>` yolunu okuyunca
-        kendiliğinden geri açılır.
+        sonraki çalıştırmada `/output/<dizin>/` olarak açılmış hâlde gelir.
         Panelde PNG ve PDF önizlemesi var, yani ürettiğin belge gerçekten
         görüntülenebilir."""
         if trace.sandbox_run_count() >= MAX_SANDBOX_RUNS_PER_TURN:
@@ -183,7 +192,8 @@ def _make_ptc_tool(
                 "Farklı bir URL/domain/şema deneyerek tekrar çağırma; elindeki "
                 "bilgiyle yanıt ver, tahmini değer üretme."
             )
-        run = run_sandbox(code, on_event=on_ptc_event, workflow_id=workflow_id)
+        run = run_sandbox(code, on_event=on_ptc_event, workflow_id=workflow_id,
+                          inputs=inputs)
         trace.record_sandbox_run(run)  # SC-003: çalıştırmanın kendisi (T017)
         for call in run.tool_calls:
             trace.record_tool_call(call)  # T015: çalıştırma içindeki her tool çağrısı

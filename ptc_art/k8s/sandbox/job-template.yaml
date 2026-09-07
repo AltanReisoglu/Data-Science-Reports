@@ -26,6 +26,19 @@ spec:
         ptc-run-id: "{run_id}"
     spec:
       restartPolicy: Never
+      # OpenShift'in `restricted-v2` SCC'si bunları zaten DAYATIR; burada AÇIKÇA
+      # yazmamızın sebebi kind ile OpenShift'in aynı davranması. Yazmasaydık
+      # kind'da root olarak çalışıp OpenShift'te rastgele UID'ye düşerdi ve fark
+      # ancak orada görülürdü.
+      #
+      # `runAsUser` BİLEREK YOK: OpenShift namespace'e özgü bir UID atıyor; sabit
+      # bir değer yazmak SCC ile çakışırdı. İmaj rastgele UID'ye dayanmak zorunda
+      # — emptyDir 0777 geldiği için `/output` ve `/scratch` yazılabiliyor
+      # (2026-09-07'de SCC taklidiyle doğrulandı).
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       # ── SIDECAR: artifact aktarımı ───────────────────────────────────────
       #
       # Argo Workflows'un `wait` container'ının karşılığı. Argo bu problemi
@@ -48,6 +61,10 @@ spec:
           imagePullPolicy: Never
           restartPolicy: Always
           command: ["python", "/sidecar.py"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: ARTIFACT_SERVICE_ENDPOINT
               value: "{artifact_service_endpoint}"
@@ -55,6 +72,13 @@ spec:
               value: "{scope_token}"
             - name: PTC_WORKFLOW_ID
               value: "{workflow_id}"
+            # BEYAN EDİLEN GİRDİLER — Argo'nun `inputs.artifacts`'inin
+            # karşılığı. Virgülle ayrılmış artifact adları; "*" = beyan yok
+            # (bu çalıştırmanın hepsi yerleşir, uyumluluk yolu).
+            # Artifact adı `^[A-Za-z0-9][A-Za-z0-9._-]{{0,127}}$` olduğu için
+            # virgül ayıracı ve YAML tırnağı güvenli.
+            - name: PTC_INPUTS
+              value: "{inputs}"
             - name: TOOL_GATEWAY_ENDPOINT
               value: "{tool_gateway_endpoint}"
           volumeMounts:
@@ -72,6 +96,10 @@ spec:
         - name: sandbox
           image: ptc-sandbox:local
           imagePullPolicy: Never  # kind load docker-image ile yerelden yüklendi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: TOOL_GATEWAY_ENDPOINT
               value: "{tool_gateway_endpoint}"

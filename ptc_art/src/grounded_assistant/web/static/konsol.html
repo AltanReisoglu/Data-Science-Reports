@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PTC — Konsol</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css"
+  />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/konsol.css" />
+</head>
+<body class="konsol">
+  <div class="k-app">
+    <div class="k-head">
+      <h1>PTC Konsol</h1>
+      <span class="sub">sandbox ölür, ürettiği kalır</span>
+      <span class="right">
+        <span class="connection-dot" id="connection-dot" title="Bağlantı durumu"></span>
+        <span id="k-servis">servis —</span>
+        <span class="badge mono" title="Çalışan arayüz sürümü — sayfa yenilenince değişir">__SURUM__</span>
+      </span>
+    </div>
+
+    <nav class="k-tabs">
+      <button class="k-tab on" data-t="sohbet">Sohbet</button>
+      <button class="k-tab" data-t="hatlar">Hatlar<span class="n">2</span></button>
+      <button class="k-tab" data-t="calistir">Çalıştırma</button>
+      <button class="k-tab" data-t="depo">Depo<span class="n" id="k-art">—</span></button>
+      <button class="k-tab" data-t="soy">Soy ağacı</button>
+    </nav>
+
+    <!-- ══ SOHBET — mevcut ekranın aynısı, app.js olduğu gibi çalışıyor ══ -->
+    <section class="k-view on" id="k-sohbet">
+      <div class="app">
+        <main class="app-main">
+          <form id="question-form" class="question-form">
+            <input type="text" id="question-input" placeholder="Bir soru sorun..." autocomplete="off" required />
+            <button type="submit" id="submit-button">
+              <span class="button-label">Gönder</span>
+              <span class="spinner" hidden></span>
+            </button>
+          </form>
+
+          <div id="example-chips" class="example-chips">
+            <button type="button" class="chip" data-question="200 satırlık örnek ticket verisi üret (departman, cozum_saati), departmana göre ortalama çözüm süresini hesapla, hem ham tabloyu hem özeti sakla.">1 · Veri üret ve sakla</button>
+            <button type="button" class="chip" data-question="Az önce sakladığın özette en yüksek ortalamaya sahip departman hangisi? Veriyi YENİDEN ÜRETME, sakladığından oku.">2 · Yeniden üretmeden oku</button>
+            <button type="button" class="chip" data-question="Sakladığın özetten bir çubuk grafik çiz ve tek sayfalık bir PDF rapora dök.">3 · PDF rapor üret</button>
+            <button type="button" class="chip" data-question="/output altında neler var? Listele ve her birinin ne olduğunu kısaca söyle.">Depoda ne var?</button>
+            <button type="button" class="chip" data-question="Şu an açık kritik ticket sayısı kaç?">Basit tool çağrısı</button>
+          </div>
+
+          <div id="chat" class="chat"></div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ══ HATLAR ══════════════════════════════════════════════════ -->
+    <section class="k-view" id="k-hatlar">
+      <p class="lead">İki tanımlı hat. Her sandbox adımı ayrı bir Kubernetes Job'u açar;
+        ikinci hat, birincinin çıktısını kayıt defterinden bulup okur.</p>
+      <div class="grid2" id="hatGrid"></div>
+    </section>
+
+    <!-- ══ ÇALIŞTIRMA ══════════════════════════════════════════════ -->
+    <section class="k-view" id="k-calistir">
+      <div class="card">
+        <div class="card-h">
+          <h2 id="runTitle">—</h2>
+          <span class="badge" id="runPill">hazır</span>
+          <div style="margin-left:auto;display:flex;gap:.5rem">
+            <button class="k-btn ikincil" id="btnTemizle">Temizle</button>
+            <button class="k-btn" id="btnRun">Hattı çalıştır</button>
+          </div>
+        </div>
+        <p class="muted" id="runDesc" style="margin:-.4rem 0 1rem"></p>
+        <!-- Adımlar yerinde açılıyor: her birinin içi (kod, kendi log'u,
+             girdi/çıktı, pod) kendi satırının altında. -->
+        <div class="adimlar" id="adimlar"></div>
+      </div>
+    </section>
+
+    <!-- ══ DEPO ════════════════════════════════════════════════════ -->
+    <section class="k-view" id="k-depo">
+      <p class="lead">Baytlar üreten pod'da değil burada. Süzgeçler doğrudan servise gider.</p>
+      <div class="split">
+        <div>
+          <div class="suzgec" id="depoSuzgec"></div>
+          <div id="depoCekmece"></div>
+        </div>
+        <div class="card" id="artDetay"></div>
+      </div>
+    </section>
+
+    <!-- ══ SOY ═════════════════════════════════════════════════════ -->
+    <section class="k-view" id="k-soy">
+      <p class="lead">Grafik kayıt defterindeki <code class="mono">parents</code> kenarlarından geliyor —
+        beyan edilen girdiler soyu oluşturur.</p>
+      <div id="soyAlan"></div>
+    </section>
+  </div>
+
+  <!-- Sol-alt PTC ekranı — sohbet ekranındakinin aynısı, hat çalıştırması da buraya akıyor -->
+  <div id="ptc-panel" class="ptc-panel">
+    <div class="ptc-panel-header" id="ptc-panel-header">
+      <div class="traffic-lights">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <span class="ptc-panel-title">PTC Yaşam Döngüsü</span>
+      <span class="ptc-panel-toggle" id="ptc-panel-toggle">‒</span>
+    </div>
+    <div id="ptc-panel-log" class="ptc-panel-log">
+      <div class="line info">Bir PTC çalıştırması tetiklendiğinde burada canlı akacak…</div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/konsol.js"></script>
+</body>
+</html>

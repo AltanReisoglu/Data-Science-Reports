@@ -1,0 +1,460 @@
+/* Konsol — `style.css`in ÜSTÜNE biner, onun yerine geçmez.
+   Tema oradan geliyor (açık, Apple-esque, Inter + JetBrains Mono, #0071e3);
+   burada yalnızca konsola özgü birkaç bileşen var. Renk değişkeni tanımlamıyoruz:
+   hepsi `style.css`teki `:root`tan okunuyor ki iki ekran ayrışmasın. */
+
+/* ── kabuk ────────────────────────────────────────────────────────── */
+
+body.konsol {
+  /* Sol-alt PTC paneli sabit; içerik onun altına kaymasın. */
+  padding-bottom: 0;
+}
+
+.k-app {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 2.25rem 1.5rem calc(min(34rem, 50vh) + 2rem);
+}
+
+.k-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  margin-bottom: 1.25rem;
+}
+
+.k-head h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.k-head .sub {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.k-head .right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+/* ── sekmeler ─────────────────────────────────────────────────────── */
+
+.k-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+
+.k-tab {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 0.6rem 0.9rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.k-tab:hover { color: var(--text-primary); }
+
+.k-tab.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.k-tab .n {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 0.05rem 0.4rem;
+  margin-left: 0.35rem;
+}
+
+.k-view { display: none; }
+.k-view.on { display: block; }
+
+/* ── kart ─────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.25rem;
+}
+
+.card + .card { margin-top: 0.9rem; }
+
+.card-h {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+
+.card-h h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  gap: 0.9rem;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 0.9rem;
+  align-items: start;
+}
+
+@media (max-width: 62rem) { .split { grid-template-columns: 1fr; } }
+
+.muted { color: var(--text-secondary); font-size: 0.86rem; }
+.mono { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+
+.lead { color: var(--text-secondary); margin: 0 0 1.25rem; max-width: 62ch; }
+
+/* ── rozet ────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.12rem 0.5rem;
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.badge.ok   { background: var(--success-bg); color: var(--success-text); border-color: transparent; }
+.badge.err  { background: var(--danger-bg);  color: var(--danger-text);  border-color: transparent; }
+.badge.live { background: var(--chip-bg);    color: var(--accent);       border-color: transparent; }
+.badge.art  { background: #fff5e6; color: #8a5a00; border-color: transparent; }
+
+/* ── hat kartı ────────────────────────────────────────────────────── */
+
+.hat {
+  text-align: left;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.25rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.hat:hover { box-shadow: var(--shadow-md); border-color: rgba(0, 113, 227, 0.35); }
+
+.hat h3 { font-size: 1.02rem; font-weight: 600; margin: 0 0 0.25rem; }
+.hat p  { margin: 0 0 0.85rem; color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; }
+
+.hat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+.hat-meta b { font-family: "JetBrains Mono", monospace; font-weight: 500; display: block; }
+.hat-meta span { color: var(--text-secondary); font-size: 0.72rem; }
+
+/* ── adım listesi ─────────────────────────────────────────────────── */
+
+.adimlar { display: flex; flex-direction: column; }
+
+.adim {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.7rem 0.6rem;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  width: 100%;
+}
+
+.adim:hover { background: var(--bg); }
+.adim.on { background: var(--chip-bg); border-color: rgba(0, 113, 227, 0.25); }
+
+.baloncuk {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  justify-self: center;
+  transition: all 0.25s ease;
+}
+
+/* sandbox adımı: kare-yuvarlak, çünkü GERÇEK bir pod açıyor */
+.adim[data-tur="sandbox"] .baloncuk { border-radius: 9px; }
+
+.baloncuk.calisiyor {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.14);
+}
+
+.baloncuk.bitti { border-color: var(--success-text); background: var(--success-bg); color: var(--success-text); }
+.baloncuk.hata  { border-color: var(--danger-text);  background: var(--danger-bg);  color: var(--danger-text); }
+
+.adim-ad { font-size: 0.92rem; font-weight: 500; }
+.adim-alt { color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.1rem; }
+
+.baglanti {
+  width: 1.5px;
+  height: 0.9rem;
+  background: var(--border);
+  margin-left: 1.7rem;
+}
+.baglanti.bitti { background: var(--success-text); opacity: 0.45; }
+
+/* ── künye listesi ────────────────────────────────────────────────── */
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1rem;
+  font-size: 0.84rem;
+  margin: 0;
+}
+.kv dt { color: var(--text-secondary); }
+.kv dd { margin: 0; font-family: "JetBrains Mono", monospace; font-size: 0.8rem; word-break: break-all; }
+.kv dd.duz { font-family: inherit; font-size: 0.84rem; }
+
+pre.kod {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: var(--text-primary);
+}
+
+/* ── depo ─────────────────────────────────────────────────────────── */
+
+.suzgec { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+
+.suzgec button {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.suzgec button:hover { color: var(--text-primary); }
+.suzgec button.on { background: var(--chip-bg); color: var(--accent); border-color: transparent; font-weight: 500; }
+
+.cekmece + .cekmece { margin-top: 0.6rem; }
+
+.cekmece-yuz {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.cekmece-yuz:hover { background: var(--bg); }
+.cekmece.acik .cekmece-yuz { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+.cekmece-ok { color: var(--text-secondary); transition: transform 0.2s ease; font-size: 0.8rem; }
+.cekmece.acik .cekmece-ok { transform: rotate(90deg); }
+
+.raf {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0.9rem;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: var(--card-bg);
+}
+.cekmece.acik .raf { display: grid; }
+
+.plaka {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.plaka:hover { border-color: rgba(0, 113, 227, 0.35); box-shadow: var(--shadow-sm); }
+.plaka.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.15); }
+
+.plaka .ad { font-family: "JetBrains Mono", monospace; font-size: 0.79rem; word-break: break-all; }
+.plaka .alt { color: var(--text-secondary); font-size: 0.71rem; margin-top: 0.25rem; display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+
+/* ── soy ──────────────────────────────────────────────────────────── */
+
+.soy-svg { width: 100%; height: auto; display: block; }
+.soy-svg .kutu { fill: var(--card-bg); stroke: var(--border); stroke-width: 1; }
+.soy-svg .kutu.merkez { fill: var(--chip-bg); stroke: var(--accent); stroke-width: 1.5; }
+.soy-svg .ad { font-family: "JetBrains Mono", monospace; font-size: 11px; fill: var(--text-primary); }
+.soy-svg .alt { font-family: "JetBrains Mono", monospace; font-size: 9px; fill: var(--text-secondary); }
+.soy-svg .kenar { fill: none; stroke: #c7c7cc; stroke-width: 1.2; }
+.soy-svg .capraz { stroke: var(--accent); stroke-dasharray: 4 3; }
+.soy-svg .bant { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; fill: var(--text-secondary); }
+
+/* ── girdi + düğme ────────────────────────────────────────────────── */
+
+.k-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.45rem 1rem;
+  border-radius: 20px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.k-btn:hover:not(:disabled) { background: var(--accent-hover); }
+.k-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.k-btn.ikincil { background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border); }
+.k-btn.ikincil:hover:not(:disabled) { background: var(--bg); }
+
+.k-input {
+  font: inherit;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+.k-input:focus { outline: 2px solid rgba(0, 113, 227, 0.35); outline-offset: 0; border-color: var(--accent); }
+
+.bos { color: var(--text-secondary); font-size: 0.85rem; font-style: italic; margin: 0; }
+
+.uyari {
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 0.85rem;
+}
+
+.not {
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.83rem;
+  line-height: 1.55;
+}
+.not b { color: var(--text-primary); font-weight: 600; }
+
+/* Sohbet sekmesi `style.css`in `.app` kabuğunu kullanıyor; konsol içinde
+   ortalanmasın diye yalnızca üst boşluğu kısılıyor. */
+#k-sohbet .app { padding-top: 0; padding-bottom: 1rem; max-width: 46rem; }
+#k-sohbet .app-header { margin-bottom: 1.5rem; }
+
+/* ── adımın içi — yerinde açılan bölüm ───────────────────────────── */
+
+.adim-blok { border: 1px solid transparent; border-radius: 12px; transition: border-color .15s ease, background .15s ease; }
+.adim-blok.acik { border-color: var(--border); background: var(--card-bg); box-shadow: var(--shadow-sm); }
+
+.adim-ic { display: none; padding: 0 1rem 1rem 3.9rem; }
+.adim-blok.acik .adim-ic { display: block; }
+
+.ic-tabs { display: flex; gap: .2rem; border-bottom: 1px solid var(--border); margin-bottom: .8rem; }
+
+.ic-tab {
+  border: 0; background: none; font: inherit; font-size: .8rem;
+  color: var(--text-secondary); padding: .4rem .7rem;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
+}
+.ic-tab:hover { color: var(--text-primary); }
+.ic-tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+/* Log kutusu: terminal gibi, ama sayfanın açık temasında okunur kalsın. */
+.ic-log {
+  font-family: "JetBrains Mono", monospace;
+  font-size: .74rem;
+  line-height: 1.65;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .6rem .75rem;
+  max-height: 17rem;
+  overflow: auto;
+}
+.ic-log div { display: flex; gap: .6rem; }
+.ic-log .t { color: var(--text-secondary); flex: none; }
+.ic-log .m.art { color: #8a5a00; }
+.ic-log .m.hi { color: var(--success-text); }
+.ic-log .m.fail { color: var(--danger-text); }
+.ic-log .imlec { color: var(--accent); }
+
+.ic-satir { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .5rem; }
+
+/* Terminal her zaman içeriğin üstünde kalsın. `style.css`te z-index yok;
+   sohbet ekranında sorun değildi çünkü orada üst üste binen katman yok. */
+body.konsol .ptc-panel { z-index: 50; }

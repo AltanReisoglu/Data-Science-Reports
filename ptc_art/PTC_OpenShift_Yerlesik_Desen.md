@@ -88,7 +88,7 @@ OpenShift AI'ın pipeline motoru KFP v2. Orada iş şöyle bölünüyor:
 - **Launcher** süreci adımın çıktısını depoya yüklüyor, girdisini indiriyor.
   Kullanıcının component container'ı S3 ile doğrudan konuşmuyor.
 
-> **Sonuç:** Bizim `entrypoint.py`'deki süpürme + tembel doldurma, KFP'nin
+> **Sonuç:** Bizim sidecar'daki yerleştirme + süpürme, KFP'nin
 > launcher'ıyla **aynı şekil**. Bu deseni biz icat etmedik; OpenShift'in kendi
 > pipeline motoru da böyle çalışıyor.
 
@@ -207,13 +207,13 @@ mevcut kayıtta çalıştı, hiçbiri kaybolmadı, eskiler hâlâ okunuyor.
 | Konu | OpenShift deseni | Bizde |
 |---|---|---|
 | S3'e erişim | SDK (boto3), mount değil | SDK (minio istemcisi) ✓ |
-| Artifact taşıma | Launcher yüklüyor/indiriyor | Süpürme + tembel doldurma ✓ |
+| Artifact taşıma | Launcher yüklüyor/indiriyor | Sidecar yerleştirme + süpürme ✓ |
 | Kimlik bilgisi yeri | Secret → pod ortamı | Secret → **servis** pod'u ✓ (daha dar) |
 | Egress | Varsayılan reddet + allowlist | Aynı ✓ |
 | Artifact tipi | MLMD şema başlıkları | Aynı sözlük ✓ |
 | Artifact `.metadata` | Serbest anahtar-değer | Aynı ✓ |
 | Depo kökü | `pipeline_root`, yapılandırılabilir | `PTC_ARTIFACT_ROOT` ✓ |
-| `.uri` ↔ `.path` kopyalama | Launcher yapıyor | Süpürme + tembel doldurma ✓ |
+| `.uri` ↔ `.path` kopyalama | Launcher yapıyor | Sidecar yerleştirme + süpürme ✓ |
 | Metadata DB | PostgreSQL (MLMD) | SQLite — **açık** |
 
 ### Hâlâ açık olanlar

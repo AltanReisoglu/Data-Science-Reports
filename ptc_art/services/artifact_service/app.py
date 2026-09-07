@@ -41,6 +41,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import tempfile
 from functools import lru_cache
 
@@ -114,6 +115,11 @@ def _metadata_coz(ham: str | None) -> dict | None:
     return cozulen if isinstance(cozulen, dict) else None
 
 
+#: Alias biçimi — artifact adıyla aynı sınıf, ama `@` ayıracı yüzünden `@`
+#: içeremez. URL'de ve ad ayrıştırmasında güvenli kalsın diye dar tutuldu.
+_ALIAS_BICIMI = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
 def _ozet(meta) -> dict:
     """Metadata'nın sandbox'a dönen hâli. `storage_uri` BİLEREK yok."""
     return {
@@ -131,6 +137,9 @@ def _ozet(meta) -> dict:
         "content_hash": meta.content_hash,
         "parents": list(meta.parents),
         "created_at": meta.created_at.isoformat(),
+        # MLflow'un alias'ı — atanmışsa künyede görünür ki panel ve manifest
+        # "en yeni" yerine sabitlenmiş sürümü işaret edebilsin.
+        "alias": meta.alias,
     }
 
 
@@ -271,6 +280,18 @@ async def get_artifact_by_name(
     değil, ismi yeterli.
     """
     kapsam = _kapsam(x_scope_token)
+
+    # `<ad>@<alias>` — MLflow'un `models:/<ad>@<alias>`'ı. Alias, aynı adın
+    # 13 çalıştırmada var olduğu bir depoda "en yeni kazanır" kuralından
+    # kaçmanın sahada kanıtlanmış yolu: işaretçi taşınır, çağıran kod aynı
+    # kalır.
+    if "@" in name:
+        ad, _, takma = name.partition("@")
+        meta = _service().resolve_alias(owner=kapsam.owner, name=ad, alias=takma)
+        if meta is None:
+            raise HTTPException(404, f"'{ad}' adında '@{takma}' alias'ı yok.")
+        return _akit(meta)
+
     # `workflow` verilirse O ÇALIŞTIRMAYA bağlı çözülür (tenant'a düşmez).
     # `/output/<ad>` bunu kullanıyor: bir run'ın kendi dizini yalnızca kendi
     # çıktılarını göstermeli — 2026-09-06'da ajan başka bir run'ın aynı adlı
@@ -294,6 +315,29 @@ async def get_metadata(
     """Künye — baytlar indirilmeden."""
     kapsam = _kapsam(x_scope_token)
     return _ozet(_service().metadata_of(artifact_id, owner=kapsam.owner))
+
+
+@app.put("/artifacts/{artifact_id}/alias")
+async def set_alias(
+    artifact_id: str = Path(...),
+    alias: str | None = Query(default=None, description="boş bırakılırsa kaldırılır"),
+    x_scope_token: str | None = Header(default=None),
+) -> dict:
+    """Bir sürümü İSİMLE sabitler — MLflow Model Registry'nin alias'ı.
+
+    > *"Model aliases allow you to assign a **mutable, named reference** to a
+    > particular version of a registered model."*
+
+    Sandbox bunu ÇAĞIRAMAZ: proxy'de yalnızca `/healthz`, `/manifest`,
+    `/fetch` var ve sandbox'ta jeton yok. Alias'ı taşıyan insan ya da CI —
+    MLflow'da da öyle.
+    """
+    kapsam = _kapsam(x_scope_token)
+    if alias is not None and not _ALIAS_BICIMI.match(alias):
+        raise HTTPException(400, "alias biçimi: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+    if not _service().set_alias(artifact_id, owner=kapsam.owner, alias=alias):
+        raise HTTPException(404, f"{artifact_id} bulunamadı.")
+    return {"artifact_id": artifact_id, "alias": alias}
 
 
 @app.get("/artifacts/{artifact_id}/lineage")
@@ -330,6 +374,10 @@ async def get_artifact(
 @app.get("/artifacts")
 async def list_artifacts(
     limit: int = Query(default=200, le=1000),
+    name: str | None = Query(default=None, description="tam ad eşleşmesi"),
+    type: str | None = Query(default=None, description="system.Dataset gibi"),  # noqa: A002
+    workflow: str | None = Query(default=None),
+    q: str | None = Query(default=None, description="ad içinde geçen"),
     x_scope_token: str | None = Header(default=None),
 ) -> list[dict]:
     """Bu tenant'ta ne var — **çalıştırmalar arası**, künyeler, baytlar değil.
@@ -340,7 +388,9 @@ async def list_artifacts(
     "kimin ürettiği" bilgisi kaybolmuyor — yalnızca görünürlük açılıyor.
     """
     kapsam = _kapsam(x_scope_token)
-    return [_ozet(m) for m in _service().list(owner=kapsam.owner, limit=limit)]
+    return [_ozet(m) for m in _service().list(
+        owner=kapsam.owner, limit=limit, name=name, artifact_type=type,
+        workflow_id=workflow, name_contains=q)]
 
 
 @app.get("/workflows/{workflow_id}/artifacts")

@@ -52,7 +52,8 @@ PTC her şeyi tek script'e ittiği için pratikte en çok **A** işe yarıyor.
 ┌── Sandbox Pod ── her çalıştırmada YENİ, sonunda silinir ──────────┐
 │  ┌─ artifact-sidecar (initContainer, restartPolicy: Always) ──┐  │
 │  │  kapsam jetonu BURADA · 127.0.0.1:8099 okuma proxy'si       │  │
-│  │  SIGTERM'de /output'u süpürüp yükler (Argo `wait` deseni)   │  │
+│  │  Açılışta /output'u YERLEŞTİRİR  (Argo `init` / KFP driver) │  │
+│  │  SIGTERM'de /output'u SÜPÜRÜP yükler (Argo `wait` deseni)   │  │
 │  └─────────────────────────────────────────────────────────────┘  │
 │  ┌─ sandbox ───────────────────────────────────────────────────┐  │
 │  │  /sandbox    configMap → LLM'in kodu (salt okunur)          │  │
@@ -63,9 +64,9 @@ PTC her şeyi tek script'e ittiği için pratikte en çok **A** işe yarıyor.
 │  └─────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  df.to_parquet("/output/tickets.parquet")   ← düz Python, API YOK │
-│  pd.read_parquet("/output/tickets.parquet")  ← yoksa iner         │
-│  os.listdir("/output")        ← depoda ne varsa                   │
-│  os.path.exists("/output/x")  ← depodakini de sayar               │
+│  pd.read_parquet("/output/tickets.parquet")  ← dosya ZATEN orada  │
+│  os.listdir("/output")        ← gerçek dosyalar, yama YOK         │
+│  load_artifact(wf, ad)        ← BAŞKA çalıştırma için açık çağrı  │
 └──────────┬─────────────────────────────────┬──────────────────────┘
            │ MCP/HTTP                        │ akışlı HTTP
            │ (yalnızca tool'lar)             │ (yalnızca artifact)
@@ -269,10 +270,11 @@ Koruduğu şey workflow'lar arası sınırdır.
 **Hiçbir API yok** (2026-09-06). Yalnızca bir dizin:
 
 ```python
-df.to_parquet("/output/extract.tickets.parquet")     # saklanır
-df = pd.read_parquet("/output/extract.tickets.parquet")  # yoksa iner, sonra okunur
-os.listdir("/output")                                 # depoda ne varsa
-os.path.exists("/output/x.parquet")                   # depodakini de sayar
+df.to_parquet("/output/extract.tickets.parquet")          # saklanır
+df = pd.read_parquet("/output/extract.tickets.parquet")  # dosya zaten orada
+os.listdir("/output")                                    # bu koşunun çıktıları
+
+yol = load_artifact("<workflow_id>", "rapor.pdf")        # BAŞKA koşu, açık çağrı
 ```
 
 Bucket adı, anahtar düzeni ve S3 kimlik bilgisi **hiç görünmez**.
@@ -343,46 +345,78 @@ kapısından geçiyor.
 İkisi rakip değil: açık API script-içi erken sorguyu ve tip korunumunu çözüyor,
 süpürme LLM'in API'yi hiç kullanmadığı durumda emniyet ağı oluyor.
 
-### 7.2 Okuma tarafı: tembel doldurma
+### 7.2 Okuma tarafı: girdiler kod başlamadan yerleşiyor
 
 Süpürme yazma tarafını çözüyor. Okuma tarafında simetrik soru şu: LLM
 `pd.read_csv("/output/rapor.csv")` yazdığında, o dosya **başka bir pod'da**
 üretilmişse ne olacak?
 
-**Denenip terk edilen yol — prefetch (2026-09-03 → 09-04).** Pod doğarken
-depodaki her artifact `/output`'a indiriliyordu. Çalıştı, ama iki sorunu vardı
-ve ikisi de ölçekle büyüyordu:
+Bu sorunun cevabı iki kez değişti.
 
-- Maliyet *var olan her şeyle* ölçekleniyordu. Workflow'da N artifact varsa,
-  hiçbirine dokunmayan bir script bile N indirme yapıyordu.
-- `/output` 512Mi. Altı tane 100 MiB'lik artifact biriktiği anda pod, kodu
-  çalıştırmadan tahliye edilirdi.
+**1. Prefetch (2026-09-03 → 09-04).** Pod doğarken depodaki **her** artifact
+`/output`'a indiriliyordu. Maliyet var olan her şeyle ölçekleniyordu ve
+`/output` 512Mi — birkaç büyük artifact biriktiğinde pod kodu çalıştırmadan
+tahliye edilirdi.
 
-**Yerine geçen — manifest + tembel doldurma.** Pod açılışında yalnızca
-**isimler** çekiliyor: tek istek, N'den bağımsız. Baytlar ancak gerçekten
-okunduğunda iniyor. `pd.read_csv`/`read_parquet`/`read_json`/`read_excel`
-sarmalanıyor, ayrıca sandbox'ın globals'ına tembel bir `open` konuyor.
-`builtins` **değiştirilmiyor** — LLM'in doğrudan çağrısı yakalanıyor ama
-kütüphanelerin iç dosya işlemleri hiç etkilenmiyor.
+**2. Tembel doldurma (2026-09-04 → 09-07).** Pod açılışında yalnızca isimler
+çekiliyor, baytlar okuma çağrısının **ortasında** iniyordu. Bunun için
+`os.listdir`, `os.path.exists`, `glob`, beş pandas okuyucusu ve `open`
+yamalanıyordu. Maliyet O(kullanılan)'a düştü — ama `/output` **yalan söyleyen**
+bir görünüm oldu ve piyasada bu desenin emsali yoktu.
 
-Maliyet O(hepsi) yerine **O(kullanılan)**.
+**3. Yerleştirme (2026-09-07, bugünkü).** Argo ve KFP'nin yaptığı: indirme
+**kod başlamadan** biter.
 
-**Simetri bilerek bozuk.** Süpürme otomatik kalıyor çünkü maliyeti *o
-çalıştırmada üretilenle* ölçekleniyor — doğal olarak küçük. Prefetch ise
-sınırsız büyüyordu.
+```
+sidecar.yerlestir()   açılışta, sunucuyu AÇMADAN ÖNCE
+                      → bu çalıştırmanın çıktıları /output'a iner
+                      → dizin artifact'i açılır (tar silinir)
+                      → /healthz cevap vermesi "girdiler hazır" demektir
+sandbox               → yama YOK; /output'taki dosyalar GERÇEK
+```
 
-**İndirilen dosya süpürmede geri yüklenmiyor.** Tembel okuma indirdiği her
-dosyanın (mtime, boyut) çiftini kaydediyor; süpürme dokunulmamış olanı atlıyor.
-Bu kontrol olmadan, sadece okuyan bir çalıştırma bile dosyayı "üretilmiş" sayıp
+Karşılığı doğrudan: Argo'da `init` container, KFP'de `kfp-driver` +
+`kfp-launcher`. İkisinde de dosya, container doğduğunda `.path`'te zaten durur.
+
+**Prefetch'i öldüren kapsamdı, prefetch değil.** Eski prefetch **tenant'ın
+tamamını** indiriyordu. Ölçüm (2026-09-07, 163 artifact'lik canlı depo):
+workflow başına medyan 3 dosya / 13,7 KiB, azami 7 dosya / **35,3 KiB** —
+512Mi'nin **on binde yedisi**. Çalıştırmaya kapsanmış yerleştirme, tam olarak
+KFP'nin `pipeline_root/<run-id>/` kapsamı.
+
+**Başka bir çalıştırmanın çıktısı `/output`'a inmez.** Gerekiyorsa açıkça
+isteniyor:
+
+```python
+yol = load_artifact("<workflow_id>", "rapor.pdf")   # → /artifacts/<wf>/rapor.pdf
+```
+
+Salt okuma; yükleme uç noktası proxy'de hiç yok. KFP'de de bir bileşen başka
+bir run'a ancak açık bir adresle ulaşır; Google ADK'nın `load_artifact`'ı da
+yalnızca okuma tarafındadır.
+
+**Yerleştirilen dosya süpürmede geri yüklenmiyor.** Sidecar sunduğu her baytın
+sha256'sını kendi defterine yazıyor; süpürme dokunulmamış olanı atlıyor. Bu
+kontrol olmadan, sadece okuyan bir çalıştırma bile dosyayı "üretilmiş" sayıp
 geri yükler — dedup baytı tekilleştirse de her seferinde yeni bir `artifact_id`
-ve sahte bir "produced" olayı doğardı. (Prefetch döneminde gerçekten yaşandı,
-2026-09-03; kontrol o yüzden tembel yolda da duruyor.)
+ve sahte bir "produced" olayı doğardı (prefetch döneminde gerçekten yaşandı).
+Defter sandbox'ta **değil**, o yüzden LLM'in kodu etkileyemiyor.
 
-Doğrulandı (2026-09-04, canlı cluster): ayrı bir pod'da
-`pd.read_csv("/output/satislar.csv")` — kod artifact API'sini hiç bilmeden —
-dosyayı getirdi ve olay `consumed` olarak kaydedildi. Hiçbir şeye dokunmayan
-bir çalıştırma ise 3.62 sn sürdü, sıfır artifact olayı üretti ve kayıt
-defterine sıfır satır ekledi.
+Dizin artifact'i için aynı kontrol, açılan dizinin **yeniden paketlenmesiyle**
+yapılıyor; tar bu yüzden tekrarlanabilir olmak zorunda — mtime, uid, gid, uname
+ve **kip** sabitleniyor.
+
+**Ölçüm (2026-09-07, canlı cluster).** Okuyan çalıştırma medyan **3,13 sn**
+(tembel yolda 4,11 sn idi). Süre düştü çünkü yerleştirme sidecar'da, sandbox
+imajı ve Python açılırken paralel ilerliyor; eskiden manifest isteği ve her
+`fetch` çalıştırmanın ortasında seri duruyordu. Doğrulama:
+
+```
+POD 1  →  produced ozet.parquet, model.v1.tar
+POD 2  →  scandir kod başlarken: ['model.v1', 'ozet.parquet']   ← yama yok, gerçek
+          dizin açılmış: ['agirlik.json']                        toplam: 25
+          yalnızca consumed — kopya yüklenmedi
+```
 
 ---
 

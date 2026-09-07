@@ -56,7 +56,8 @@ def ortam(tmp_path, monkeypatch):
     istemci = SahteIstemci()
     monkeypatch.setattr(sidecar, "istemci", istemci)
     monkeypatch.setattr(sidecar, "_sunulan_ozet", {})
-    monkeypatch.setattr(sidecar, "_sunulan_kimlik", set())
+    monkeypatch.setattr(sidecar, "_istenen_kimlik", set())
+    monkeypatch.setattr(sidecar, "_yerlesen_kimlik", {})
     return cikti, istemci
 
 
@@ -176,7 +177,7 @@ def test_soy_sidecarin_SUNDUKLARINDAN_geliyor(ortam):
     LLM'in çalıştığı süreçteydi.
     """
     cikti, istemci = ortam
-    sidecar._sunulan_kimlik.update({"art_ham", "art_kunye"})
+    sidecar._istenen_kimlik.update({"art_ham", "art_kunye"})
     (cikti / "turev.parquet").write_bytes(b"x")
 
     sidecar.supur()

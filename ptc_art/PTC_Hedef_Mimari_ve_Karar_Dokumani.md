@@ -273,7 +273,7 @@ kalıcılık opt-in ve `container.id`'ye bağlı, gönderilmezse her istek temiz
 | Cilium bırakılacak | **Verildi** | Göç riski belgelenmiş; gerekçe ölmüş |
 | ~~Erişim gateway aracılı~~ → **ayrı Artifact Service** | **Revize** (2026-09-04) | Aracılık korunuyor, aracı DEĞİŞTİ — bkz. §5.1 |
 | Artifact taşıması akışlı HTTP | **Verildi** (2026-09-04) | base64+MCP %33 şişme + iki uçta tam tampon |
-| Prefetch → manifest + tembel okuma | **Verildi** (2026-09-04) | O(hepsi) maliyeti 512Mi `/output`'u patlatıyordu |
+| Prefetch → manifest + tembel okuma | **Verildi** (2026-09-04), **geri alındı** (2026-09-07) | Sorun prefetch değil KAPSAMI'ydı: tenant geneli yerine çalıştırmaya kapsanınca azami 35 KiB (§11.13) |
 | Workflow state kalıcı | **Verildi** (2026-09-04) | SQLite checkpointer; Postgres'e geçiş ortam değişkeni — bkz. §5.3 |
 | TTL reaper (CronJob) | **Verildi** (2026-09-04) | Şema/silme kodu vardı, çalıştıran yoktu — bkz. §5.2 |
 | **Depo durable** — PTC'ler artifact'leri oraya yazar | **Verildi** (2026-09-03) | Kullanıcı kararı |

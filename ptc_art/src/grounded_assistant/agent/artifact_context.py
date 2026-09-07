@@ -134,37 +134,64 @@ def manifest_metni(kunyeler: list[dict], workflow_id: str | None = None) -> str 
             continue
         gorulen.add(ad)
         tip = (k.get("type") or "system.Artifact").removeprefix("system.")
-        satir = f"  /output/{ad}  ({tip}, {k.get('size_bytes') or 0} bayt)"
+        kuyruk = f"  ({tip}, {k.get('size_bytes') or 0} bayt)"
         ek = k.get("metadata") or {}
         if ek:
-            satir += f"  {ek}"
-        (benim if workflow_id and k.get("workflow_id") == workflow_id
-         else digerleri).append(satir)
+            kuyruk += f"  {ek}"
+        wf = k.get("workflow_id") or ""
+        takma = k.get("alias")
+        if takma:
+            # MLflow'un alias'ı: sabitlenmiş bir sürüme İSİMLE ulaşılıyor,
+            # "en yeni kazanır" kuralına düşmeden. Adresi bu, o yüzden
+            # manifest de bunu gösteriyor.
+            kuyruk = f"  ({kuyruk.strip()[1:-1]}, alias)"
+            digerleri.append(f'  load_artifact(None, "{ad}@{takma}"){kuyruk}')
+            continue
+        if workflow_id and wf == workflow_id:
+            benim.append(f"  /output/{ad}{kuyruk}")
+        else:
+            # ÇAĞRILABİLİR satır. Yolu yazmak yetmiyordu: bu dosyalar
+            # `/output`'ta DEĞİL ve modelin `workflow_id`'yi başka hiçbir
+            # yerden öğrenme yolu yok — manifest yazmazsa `load_artifact`
+            # çağrılamaz hâle geliyor (2026-09-07'de bulundu).
+            digerleri.append(f'  load_artifact("{wf}", "{ad}"){kuyruk}')
 
     if not benim and not digerleri:
         return None
 
     bolumler = []
     if benim:
+        kendi_kirpik = benim[:_AZAMI_SATIR]
         bolumler.append("BU OTURUMDA ÜRETİLENLER — \"az önce\", \"demin\", "
-                        "\"senin ürettiğin\" dendiğinde YALNIZCA bunları kullan:\n"
-                        + "\n".join(benim[:_AZAMI_SATIR]))
+                        "\"senin ürettiğin\" dendiğinde YALNIZCA bunları kullan.\n"
+                        "Pod açılırken /output'a YERLEŞTİRİLMİŞ oluyorlar; düz "
+                        "dosya okuması yeter:\n"
+                        + "\n".join(kendi_kirpik)
+                        # Kırpma notu bu grupta da olmalı: 40'tan fazla üreten
+                        # bir oturumda model listeyi tam sanıp var olan bir
+                        # dosyayı yeniden üretirdi. Buradaki işaret DOĞRU —
+                        # kendi çıktıların gerçekten `/output`'ta duruyor.
+                        + (f"\n  … ve {len(benim) - len(kendi_kirpik)} tane daha "
+                           "(os.listdir(\"/output\") ile tamamı)"
+                           if len(benim) > len(kendi_kirpik) else ""))
     if digerleri:
         kirpik = digerleri[:_AZAMI_SATIR - min(len(benim), _AZAMI_SATIR // 2)]
         bolumler.append(
-            "BAŞKA ÇALIŞTIRMALARDAN (aynı tenant) — okunabilir, ama BU OTURUMUN "
-            "işi DEĞİL. Kullanıcı açıkça istemedikçe bunlara dayanma:\n"
+            "BAŞKA ÇALIŞTIRMALARDAN (aynı tenant) — BU OTURUMUN işi DEĞİL ve "
+            "/output'ta BULUNMAZLAR.\nKullanıcı açıkça istemedikçe bunlara "
+            "dayanma. Gerekiyorsa satırı olduğu gibi çağır; dosyanın yolunu "
+            "döndürür:\n"
             + "\n".join(kirpik)
             + (f"\n  … ve {len(digerleri) - len(kirpik)} tane daha "
-               "(os.listdir(\"/output\") ile tamamı)" if len(digerleri) > len(kirpik) else ""))
+               "(gösterilmiyor)" if len(digerleri) > len(kirpik) else ""))
 
     return (
         "\n\n".join(bolumler)
-        + "\n\nHepsi pod'da fiziksel olarak durmasa bile okunmak istendiklerinde "
-        "otomatik iniyor. Veriyi YENİDEN ÜRETME; run_ptc_code içinde doğrudan "
-        "yolundan oku (ör. pd.read_parquet(\"/output/<ad>\")). "
-        "Aradığın dosya BU OTURUMDA yoksa, başka bir çalıştırmanınkini kendi "
-        "çıktın gibi sunma — üretmen gerektiğini söyle ya da üret."
+        + "\n\nVeriyi YENİDEN ÜRETME — önce yukarıdaki listeye bak. Kendi "
+        "çıktıların için özel bir çağrı YOK, sıradan dosya okuması yeter "
+        "(ör. pd.read_parquet(\"/output/<ad>\")). Aradığın dosya BU OTURUMDA "
+        "yoksa, başka bir çalıştırmanınkini kendi çıktın gibi sunma — üretmen "
+        "gerektiğini söyle ya da üret."
     )
 
 

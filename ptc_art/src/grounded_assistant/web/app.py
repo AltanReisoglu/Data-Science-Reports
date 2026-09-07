@@ -18,7 +18,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from grounded_assistant.agent import graph
@@ -28,6 +28,7 @@ from grounded_assistant.cli import _build_answer
 from grounded_assistant.ptc.sandbox_runner import run_sandbox
 from grounded_assistant.session import oturum_kimligi
 from grounded_assistant.web import durum as durum_modulu
+from grounded_assistant.web import konsol as konsol_modulu
 from grounded_assistant.trace import Trace
 
 load_dotenv()
@@ -57,6 +58,125 @@ app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
+
+
+#: Konsolun statik dosyalarına içerik damgası — tarayıcı eski `konsol.js`i
+#: tutmasın. 2026-09-07'de gerçekten yaşandı: soy ağacı düzeltildi ama ekranda
+#: eski sürüm çalışmaya devam etti ve "sayfa yanlış çiziyor" gibi göründü.
+#:
+#: Damga İÇERİKTEN üretiliyor: dosya değişmediyse URL de değişmiyor (önbellek
+#: yine çalışıyor), değiştiyse tarayıcı zorunlu olarak yeniden alıyor. Elle
+#: tutulan bir sürüm numarası ise güncellenmeyi unutulacak tek şeydi.
+_DAMGALANAN = ("style.css", "konsol.css", "app.js", "konsol.js")
+
+
+def _damgala(html: str) -> tuple[str, str]:
+    """Statik bağlantılara içerik damgası basar; sürümü de döndürür."""
+    import hashlib  # noqa: PLC0415
+
+    damgalar = []
+    for ad in _DAMGALANAN:
+        yol = _STATIC_DIR / ad
+        if not yol.exists():
+            continue
+        damga = hashlib.sha256(yol.read_bytes()).hexdigest()[:8]
+        damgalar.append(damga)
+        html = html.replace(f"/static/{ad}", f"/static/{ad}?v={damga}")
+    surum = hashlib.sha256("".join(damgalar).encode()).hexdigest()[:8]
+    return html.replace("__SURUM__", surum), surum
+
+
+@app.get("/konsol")
+async def konsol_sayfasi() -> HTMLResponse:
+    """Dört sekmeli tek panel — hatlar, çalıştırma, depo, soy.
+
+    `durum.html`'in yerine geçmiyor: orası pod/akış odaklı bir denetim ekranı,
+    burası artifact yaşam döngüsünün uçtan uca gösterimi. İkisi de aynı
+    uçlardan besleniyor.
+    """
+    html, _ = _damgala((_STATIC_DIR / "konsol.html").read_text(encoding="utf-8"))
+    # HTML'in KENDİSİ önbelleğe girerse damgalar da onunla birlikte donuyor ve
+    # sayfa eski JS'i istemeye devam ediyor — 2026-09-07'de tam bunu yaşadık:
+    # dosya güncellenmişti, sunucu yenisini veriyordu, tarayıcı eski sayfayı
+    # açık tutuyordu. Damga yalnızca TAZE bir HTML ile işe yarıyor.
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, must-revalidate"})
+
+
+@app.get("/api/pipelines")
+async def api_pipelines() -> dict:
+    """Tanımlı hatlar ve adımları — kodları dahil, panelde gösteriliyor."""
+    return {"pipelines": konsol_modulu.pipelines()}
+
+
+@app.get("/api/depo")
+async def api_depo(name: str | None = None, type: str | None = None,  # noqa: A002
+                   workflow: str | None = None, q: str | None = None,
+                   limit: int = 200) -> dict:
+    """Kayıt defteri, süzgeçleriyle (§11.14 — MLMD `filter_query` karşılığı)."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(
+        konsol_modulu.depo, _kapsam_jetonu,
+        name=name, type=type, workflow=workflow, q=q, limit=limit)
+
+
+@app.get("/api/depo/{artifact_id}/soy")
+async def api_depo_soy(artifact_id: str) -> dict:
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(konsol_modulu.soy, _kapsam_jetonu, artifact_id)
+
+
+@app.put("/api/depo/{artifact_id}/alias")
+async def api_depo_alias(artifact_id: str, alias: str | None = None) -> dict:
+    """Sürümü isimle sabitler — MLflow'un alias'ı. İnsan/CI tarafı."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(
+        konsol_modulu.alias_ata, _kapsam_jetonu, artifact_id, alias)
+
+
+@app.websocket("/ws/pipeline")
+async def pipeline_socket(websocket: WebSocket) -> None:
+    """Gerçek bir pipeline çalıştırır ve HER adımı akıtır.
+
+    `run_sandbox` bloklayıcı olduğu için ayrı bir thread'de dönüyor; olaylar
+    thread-safe bir kuyruğa yazılıp buradan WebSocket'e boşaltılıyor —
+    `/ws`'deki `_drain_ptc_events` ile aynı desen.
+    """
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    await websocket.accept()
+    try:
+        while True:
+            mesaj = await websocket.receive_json()
+            if mesaj.get("type") != "run":
+                continue
+            kuyruk: queue.Queue = queue.Queue()
+
+            async def _bosalt() -> None:
+                loop = asyncio.get_running_loop()
+                while True:
+                    olay = await loop.run_in_executor(None, kuyruk.get)
+                    if olay is _QUEUE_SENTINEL:
+                        return
+                    await websocket.send_json(olay)
+
+            bosaltici = asyncio.create_task(_bosalt())
+            try:
+                await asyncio.to_thread(
+                    konsol_modulu.pipeline_calistir,
+                    mesaj.get("key", "a"), mesaj.get("kaynak_wf"),
+                    _kapsam_jetonu, kuyruk.put)
+            except Exception as exc:  # noqa: BLE001 — panel kapanmasın
+                kuyruk.put({"type": "log", "n": 0, "ts": "", "cls": "fail",
+                            "msg": f"{type(exc).__name__}: {exc}"})
+                kuyruk.put({"type": "pipeline_done", "status": "error"})
+            finally:
+                kuyruk.put(_QUEUE_SENTINEL)
+                await bosaltici
+    except WebSocketDisconnect:
+        return
 
 
 @app.get("/durum")
