@@ -5,6 +5,9 @@ biri "ne işe yaradığı" başlığıyla. (`PTC_Komut_Referansi.md`'nin daha ka
 sıfırdan-kurulum odaklı hâlinden farklı olarak, bu dosya GÜNLÜK kullanılan,
 tekrar eden komutlara odaklanıyor.)
 
+> Depoda ne var, kim üretti, kim okudu →
+> [PTC_Artifact_Inceleme_Komutlari.md](PTC_Artifact_Inceleme_Komutlari.md)
+
 ## 1. Bir politikayı değiştirdikten sonra yeniden uygulama
 
 ```bash
