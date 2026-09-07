@@ -27,7 +27,8 @@ yazıldı.
 | **§9.5** | **Artifact storage** — baytlar fiilen hangi üründe duruyor, ne kadar |
 | **§9.6** | **Aracı nerede duruyor** — baytı kim taşıyor, sarmalayıcı mı sınır mı |
 | **§10** | Karşılaştırma tabloları (izolasyon, ömür, erişim, kayıt defteri, ağ) |
-| **§11** | **Bizim mimarimiz, en baştan en sona** (§11.10 açıklar, §11.11 ne değişti) |
+| **§11** | **Bizim mimarimiz, en baştan en sona** (§11.10 açıklar, §11.11–§11.15 ne değişti) |
+| §11.13–15 | Yerleştirme · beyan/süzgeç/alias · **OpenShift'e geçmeme kararı** |
 | **§12** | Biz neredeyiz — boyut boyut kiminle örtüştüğümüz |
 | **§13** | Ekipten gelecek soruların hazır cevapları |
 | **§14** | Doğrulanamayanlar |
@@ -2422,6 +2423,79 @@ ajan uçtan uca: produced:stok.parquet → consumed:stok.parquet → "B ürünü
 | **sürüm alias'ı** | **MLflow Model Registry** |
 | isimler prompt'ta | Google ADK `LoadArtifactsTool` |
 | içerik-hash dedup | S3 / DVC / OCI |
+
+---
+
+## §11.15 — 2026-09-07: OpenShift'e GEÇİLMEYECEK, ve neden
+
+§11.14 son icadı da kaldırınca doğal soru geldi: *"direkt OpenShift'i kursak
+olur mu?"*
+
+Cevap **hayır**. Gerekçe teknik bir engel değil, **getirinin küçük olması**.
+
+### Ne kazandırırdı
+
+Yalnızca **doğrulama**, yeni yetenek değil:
+
+| Açık | CRC'de |
+|---|---|
+| `restricted-v2` SCC | taklit yerine **gerçek** |
+| **OVN-K + `EgressFirewall`** | kind'da imkânsız olan tek şey |
+| `kind load` → internal registry | ✅ |
+| port-forward → `Route` | ✅ |
+
+§17 zaten iş yükünün uyumlu olduğunu SCC taklidiyle **ölçmüş** durumda
+(rastgele UID 1000670000, `drop ALL`, `RuntimeDefault` altında tam akış
+geçti). Geçiş "benziyor"u "ölçtüm"e çevirirdi.
+
+### Ne kazandırmazdı
+
+- **Hubble'ın karşılığı yok** — canlı akış paneli orada da kapalı kalırdı.
+- **OpenShift AI (DSP/KFP + MLMD + Model Registry)** bu makinenin RAM'ine
+  sığmaz. Yani tam da §11.14'te karşılaştırma yaptığımız yığını
+  çalıştıramazdık.
+- Çok düğümlü davranış — tek düğümlü CRC zaten vermiyor.
+
+### Makine ölçümü
+
+| | Var | CRC istiyor |
+|---|---|---|
+| Fiziksel çekirdek | 10 | 4 ✅ |
+| RAM | **15,35 GB** (8 GB boş) | **10,5 GB boş** ⚠️ |
+| Disk | 112 GB boş | 35 GB ✅ |
+| KVM | var, `libvirtd` pasif | gerekli ⚠️ |
+| OS | **Ubuntu 24.04** | *"Ubuntu and Debian: **Not supported**"* ⚠️ |
+
+CRC 10,5 GB alınca geriye ~4 GB kalıyor; MinIO, artifact-service, sandbox
+pod'ları ve ajan süreci hepsi oraya sığacaktı.
+
+### Hız tarafı
+
+kind'da bir çalıştırma **3,1 saniye**. CRC'nin açılışı dakikalar sürüyor;
+geliştirme döngüsünü oraya taşımak bu belgedeki her ölçümü yavaşlatırdı.
+
+### Karar
+
+Cluster **kind `ptc-sec`** olarak kalıyor. Altan'ın ifadesiyle: *"şu an
+OpenShift'i baya baya kopya ediyorsak geçmeyelim."*
+
+Bunu savunulabilir kılan şey §19'daki tablo: mimarideki **her parçanın**
+sahada bir kaynağı var ve hepsi canlı doğrulandı. Geçiş, kopyanın doğruluğunu
+değil yalnızca ölçümün ortamını değiştirirdi.
+
+### Bunun bıraktığı tek açık
+
+Cilium politikalarının OVN karşılığı **yazılmadı**:
+
+```
+CiliumNetworkPolicy (pod→pod, 4 politika)  →  standart NetworkPolicy
+Cilium FQDN allowlist                      →  EgressFirewall (k8s.ovn.org/v1)
+Hubble                                     →  karşılığı YOK
+```
+
+İlk ikisi birebir çevrilebilir ama **kind'da test edilemez** (OVN yok).
+Yazılırsa "yazıldı, denenmedi" diye işaretlenmeli — bu belgede doğrulanmamış
+bir şeyi doğrulanmış gibi göstermemek asıl kural.
 
 ---
 

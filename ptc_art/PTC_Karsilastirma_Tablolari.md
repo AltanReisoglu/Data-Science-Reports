@@ -28,7 +28,7 @@ yazılı; gerekçeler ve alıntılar orada.
 | [14](#14--cognition--cerebras--databricks) | Üç şirket daha | Devin, Cerebras, Databricks |
 | [15](#15--biz-neredeyiz) | Biz neredeyiz | Boyut boyut |
 | [16](#16--bilinen-açıklar) | Açıklar | Saklamıyoruz |
-| [17](#17--openshift-uyumluluğu) | **OpenShift uyumluluğu** | **Bizimki orada çalışır mı** |
+| [17](#17--openshift-uyumluluğu) | **OpenShift uyumluluğu** | **Bizimki orada çalışır mı** · §17.1 geçiş kararı |
 | [18](#18--aynı-akış-adım-adım-üç-üründe) | **Aynı akış, adım adım** | **Bir dosya nasıl yolculuk ediyor** |
 | [19](#19--beyan-süzgeç-alias--üç-mekanizma-üç-kaynak) | **Beyan · Süzgeç · Alias** | **Hangi deseni kimden aldık** |
 
@@ -413,6 +413,41 @@ Sık değişen IP'ler ve joker adlar için `DNSNameResolver` var — ama o
 **Tek cümle:** Ürünün kendisi OpenShift varsayılanında çalışıyor; **kind'a
 özgü olan altyapı katmanı** (Cilium, Hubble, `kind load`), ve bunların
 OpenShift karşılıkları belli.
+
+### 17.1 — Karar: OpenShift'e GEÇİLMEYECEK (2026-09-07)
+
+Soru soruldu ve ölçüldü: *"direkt OpenShift'i kursak olur mu?"* Cevap **hayır**
+— ve gerekçe teknik değil, **getiri**.
+
+**Ne kazandırırdı:** yalnızca doğrulama. `restricted-v2` SCC'yi taklit yerine
+gerçekte, `EgressFirewall`'ı canlı, `kind load` yerine internal registry,
+port-forward yerine `Route`. Yeni bir yetenek yok — §17 zaten iş yükünün
+uyumlu olduğunu ölçmüş durumda.
+
+**Makine ölçümü (bu laptop):**
+
+| | Var | CRC istiyor |
+|---|---|---|
+| Fiziksel çekirdek | 10 | 4 ✅ |
+| RAM | **15,35 GB** (8 GB boş) | **10,5 GB boş** ⚠️ |
+| Disk | 112 GB boş | 35 GB ✅ |
+| OS | **Ubuntu 24.04** | *"Ubuntu and Debian: Not supported"* ⚠️ |
+
+CRC 10,5 GB alınca geriye ~4 GB kalıyor; MinIO, artifact-service, sandbox
+pod'ları ve ajan süreci oraya sığacak. **OpenShift AI (DSP/KFP + MLMD + Model
+Registry) o RAM'e zaten sığmaz** — yani karşılaştırma yaptığımız yığını
+çalıştıramazdık.
+
+**Karşı taraf:** kind'daki çalıştırma **3,1 saniye**; CRC'nin açılışı dakikalar
+sürüyor. Geliştirme döngüsünü oraya taşımak her ölçümü yavaşlatırdı.
+
+**Sonuç:** desenlerin hepsi kopyalandı ve canlı doğrulandı (§19); geçiş
+"benziyor"u "ölçtüm"e çevirirdi, o kadar. Cluster **kind `ptc-sec`** olarak
+kalıyor.
+
+**Bunun bıraktığı tek açık:** Cilium politikalarının OVN karşılığı
+(`NetworkPolicy` + `EgressFirewall`) **yazılmadı**. Yazılırsa kind'da test
+edilemez, o yüzden "yazıldı, denenmedi" etiketiyle durması gerekir.
 
 ---
 
