@@ -2,7 +2,7 @@
 
 **Her sayfa bir özellik. Her sayfada bir tablo. Sonunda "biz neredeyiz".**
 
-Tarih: 2026-09-04 · Detaylar: [PTC_Piyasa_Mentaliteleri.md](PTC_Piyasa_Mentaliteleri.md)
+Tarih: 2026-09-07 · Detaylar: [PTC_Piyasa_Mentaliteleri.md](PTC_Piyasa_Mentaliteleri.md)
 
 ---
 
@@ -302,7 +302,125 @@ keşif için Google ADK'yı.
 
 ---
 
-## Sayfa 15 — Açıklar (saklamıyoruz)
+## Sayfa 15 — Girdi yerleştirme: icadı bırakmak
+
+**Emsalsiz olan son desenimiz 2026-09-07'de kaldırıldı.**
+
+| | Öncesi (icat) | Sonrası (Argo/KFP) |
+|---|---|---|
+| `/output` içeriği | manifestten uydurulmuş isimler | **gerçek dosyalar** |
+| İndirme anı | okuma çağrısının **ortasında** | pod açılışında, sidecar'da |
+| `os.scandir("/output")` | `[]` — yamayı deliyordu | `['x.parquet']` |
+| Yama satırı | ~120 | **0** |
+| `entrypoint.py` | 651 satır | **357 satır** |
+| Okuyan çalıştırma | 4,11 sn | **3,13 sn** |
+
+Yaptığı iş FUSE'un işiydi (Databricks, E2B, Vercel onu kullanıyor); OpenShift
+`restricted-v2` `/dev/fuse` vermediği için kullanıcı alanında taklit etmiştik.
+
+**Prefetch'i öldüren kapsamdı, prefetch değil.** Eski prefetch tenant'ın
+tamamını indiriyordu. Ölçüm: workflow başına medyan 3 dosya / 13,7 KiB,
+azami **35,3 KiB** — 512Mi'nin **on binde yedisi**.
+
+---
+
+## Sayfa 16 — Beyan · Süzgeç · Alias
+
+**Üç açık, üç kanonik cevap. Üçü de kopya.**
+
+| Açık | Kaynak | Bizdeki hâli |
+|---|---|---|
+| Hangi girdi okundu (soy şişiyordu) | **MLMD** `Event.DECLARED_INPUT` | `run_ptc_code(kod, inputs=[...])` |
+| 62 addan 39'u görünüyor, arama yok | **MLMD** `ListOptions(filter_query=…)` | `?name= ?type= ?workflow= ?q=` |
+| Aynı ad 17 kez, hep en yeni geliyor | **MLflow** `models:/<ad>@<alias>` | `by-name/rapor.pdf@onaylanmis` |
+
+**Beyanın iki etkisi birden:**
+
+| | Beyansız | `inputs=["a.txt"]` |
+|---|---|---|
+| `/output`'a yerleşen | çalıştırmanın **hepsi** | yalnızca `a.txt` |
+| `turev.txt`'nin ebeveyni | `a.txt, b.txt, c.txt` | **`a.txt`** |
+
+**Ara denemeydi, atıldı:** soyu `atime` ile ölçmeyi denedik — çalışıyordu ama
+sahada emsali yok. Piyasa soyu **gözlemlemiyor, beyan ediyor**; olay tipinin
+adı zaten `DECLARED_INPUT`.
+
+---
+
+## Sayfa 17 — Baytı HTTP ile göndermek: kimin varsayılanı
+
+**OpenShift'in varsayılanı değil — ama icat da değil.**
+
+| | Baytlar | S3 anahtarı nerede | Kayıt defteri |
+|---|---|---|---|
+| **KFP / OpenShift AI** | launcher → S3 **doğrudan** | **kullanıcı container'ında** | MLMD (ayrı kanal) |
+| **Argo Workflows** | wait sidecar → S3 doğrudan | ayrı container | **yok** |
+| **MLflow (proxied)** | client → **HTTP** → server → depo | **server'da** | tracking DB |
+| **BİZ** | sidecar → **HTTP** → servis → MinIO | **serviste** | SQLite |
+
+> *"The tracking server works as a **proxy** for accessing remote artifacts.
+> The MLflow clients make **HTTP request to the server** for fetching artifacts."*
+> — `--serve-artifacts`, MLflow'da **varsayılan açık**
+
+**KFP'yi neden alamadık:** launcher kullanıcı kodunun container'ını *sarmalıyor*
+→ S3 anahtarı LLM'in `os.environ`'unda olurdu.
+**Argo'yu neden alamadık:** yerleşimi doğru ama **kayıt defteri yok**.
+
+**Aldığımız:** yerleşim Argo'dan (ayrı container), kanal MLflow'dan (HTTP vekili).
+
+---
+
+## Sayfa 18 — OpenShift'e geçilmeyecek
+
+**Soru soruldu, ölçüldü, cevap hayır — gerekçe teknik değil, getiri.**
+
+| | Var (bu laptop) | CRC istiyor |
+|---|---|---|
+| Fiziksel çekirdek | 10 | 4 ✅ |
+| RAM | **15,35 GB** (8 boş) | **10,5 GB boş** ⚠️ |
+| OS | **Ubuntu 24.04** | *"Ubuntu and Debian: Not supported"* ⚠️ |
+
+**Kazandıracağı tek şey doğrulama:** `restricted-v2` SCC'yi taklit yerine
+gerçekte, `EgressFirewall`'ı canlı. §17 iş yükünün uyumluluğunu SCC taklidiyle
+**zaten ölçtü** (rastgele UID 1000670000, `drop ALL`, `RuntimeDefault`).
+
+**Kazandırmayacağı:** Hubble'ın karşılığı yok · OpenShift AI (KFP+MLMD+Model
+Registry) o RAM'e sığmaz · kind'da çalıştırma **3,1 sn**, CRC açılışı dakikalar.
+
+**Kalan tek açık:** Cilium → `NetworkPolicy` + `EgressFirewall` çevirisi
+yazılmadı; yazılırsa kind'da test edilemez.
+
+---
+
+## Sayfa 19 — Canlı konsol: her şey gerçek
+
+**`/konsol` — dört sekme, sahte veri yok.**
+
+| Sekme | Kaynağı |
+|---|---|
+| **Sohbet** | mevcut ajan ekranı, `app.js` tek satır değişmeden |
+| **Hatlar** | `/api/pipelines` — iki hat, adımları ve kodlarıyla |
+| **Çalıştırma** | `/ws/pipeline` — **gerçek Kubernetes Job'ları** |
+| **Depo** | `/api/depo` — kayıt defteri + süzgeçler |
+| **Soy ağacı** | `/api/depo/<id>/soy` — gerçek `parents` kenarları |
+
+**İki node türü, fark uydurma değil:**
+`sandbox` gerçek PTC pod'u açar · `query` kayıt defterine sorgu atar, **pod açmaz**.
+Sandbox'ın listeleme yolu hiç yok — keşif host tarafında olur.
+
+**Çapraz workflow canlı doğrulandı:**
+
+```
+adım 1  GET /artifacts?name=processed-result.json → üreten wf e841efd4
+adım 2  load_artifact("e841efd4-…", "processed-result.json")
+        analysis-input.json  parents=['art_5605dd638cab']   ← sınır geçildi
+```
+
+Sol altta PTC terminali: pod adı, çalıştırılan kod, süpürülen artifact — canlı.
+
+---
+
+## Sayfa 20 — Açıklar (saklamıyoruz)
 
 | Konu | Durum | Etki |
 |---|---|---|
@@ -320,7 +438,7 @@ keşif için Google ADK'yı.
 
 ---
 
-## Sayfa 16 — Ekibe dört soru
+## Sayfa 21 — Ekibe dört soru
 
 | # | Soru | Neden önemli |
 |---|---|---|
