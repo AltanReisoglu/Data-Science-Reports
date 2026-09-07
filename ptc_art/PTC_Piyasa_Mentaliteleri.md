@@ -2221,6 +2221,40 @@ ADIM 4  başka tenant     → FileNotFoundError
 Ajan uçtan uca: 1. tur `produced:butce.parquet`, 2. tur `consumed:butce.parquet`
 → "İK departmanının harcaması 45".
 
+### Aynı gün bulunan kusur: manifest çağrılamaz hâldeydi
+
+Değişiklikten hemen sonra sorulan soru: *"LLM o adresi kullanacağını nereden
+biliyor?"*
+
+Bilmiyordu. `manifest_metni` başkasının çıktısını hâlâ `/output/<ad>` diye
+gösteriyor ve **`workflow_id`'yi hiç yazmıyordu**. Model o kimliği başka
+hiçbir yerden öğrenemez — yani `load_artifact` fiilen **çağrılamaz** hâldeydi.
+Ve hiçbir yerde hata yoktu: model sadece "erişemiyorum" derdi.
+
+Bu, bu projede üçüncü kez aynı sınıf: **arayüz değişti, onu tarif eden metin
+değişmedi.** Öncekiler `put_artifact`ın sessiz `None`'ı ve düz isim uzayındaki
+"7,46" cevabıydı.
+
+Manifest artık satırı **olduğu gibi çağrılabilir** veriyor:
+
+```
+BU OTURUMDA ÜRETİLENLER — … Pod açılırken /output'a YERLEŞTİRİLMİŞ oluyorlar:
+  /output/benim.parquet  (Dataset, 10 bayt)
+
+BAŞKA ÇALIŞTIRMALARDAN — BU OTURUMUN işi DEĞİL ve /output'ta BULUNMAZLAR.
+Gerekiyorsa satırı olduğu gibi çağır; dosyanın yolunu döndürür:
+  load_artifact("wf-URETICI-6d5725", "rapor.pdf")  (Artifact, 8170 bayt)
+```
+
+Canlı doğrulama: A oturumu `kira.parquet` üretti; **başka** bir oturum
+"başka bir çalıştırmada üretilmiş kira.parquet var, İzmir'in kirasını söyle"
+sorusuna `consumed:kira.parquet` ile **420** dedi — kimliği yalnızca
+manifestten öğrenerek.
+
+Ayrıca kırpma notu düzeltildi: eskiden "…ve N tane daha (`os.listdir("/output")`
+ile tamamı)" diyordu, oysa o dosyalar `/output`'ta yok. Şimdi kendi grubunda
+`os.listdir` doğru işaret, diğer grupta hiç işaret yok.
+
 ### Kalan tek şey
 
 `os.scandir` artık yamayı **delmiyor** çünkü yama yok — ama `/output` da bir

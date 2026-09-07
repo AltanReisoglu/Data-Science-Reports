@@ -59,19 +59,65 @@ def test_bos_liste_mesaj_uretmiyor():
     assert manifest_metni([]) is None
 
 
-def test_ayni_isim_tek_satir(): 
+def test_ayni_isim_tek_satir():
     """Aynı ad birden çok çalıştırmada olabilir; okuma en yeniyi çözüyor,
     manifest de tek satır göstermeli — yoksa liste tekrarla dolardı."""
-    cok = [{"name": "rapor.csv", "type": "system.Dataset", "size_bytes": i}
-           for i in range(5)]
-    assert manifest_metni(cok).count("/output/rapor.csv") == 1
+    cok = [{"name": "rapor.csv", "type": "system.Dataset", "size_bytes": i,
+            "workflow_id": "wf_ben"} for i in range(5)]
+    assert manifest_metni(cok, "wf_ben").count("/output/rapor.csv") == 1
 
 
 def test_uzun_liste_kirpiliyor():
-    cok = [{"name": f"a{i}", "type": "system.Artifact", "size_bytes": 1} for i in range(120)]
-    metin = manifest_metni(cok)
+    cok = [{"name": f"a{i}", "type": "system.Artifact", "size_bytes": 1,
+            "workflow_id": "wf_ben"} for i in range(120)]
+    metin = manifest_metni(cok, "wf_ben")
     assert "ve 80 tane daha" in metin
     assert metin.count("\n  /output/") == 40
+    # kendi çıktıları için `os.listdir("/output")` DOĞRU bir işaret
+    assert 'os.listdir("/output")' in metin
+
+
+# -- çağrılabilirlik: modelin workflow_id'yi öğrenebileceği TEK yer ---------
+
+
+def test_baskasinin_satiri_CAGRILABILIR():
+    """ASIL REGRESYON (2026-09-07, kullanıcı sordu: "LLM o adresi nereden bilecek?").
+
+    2026-09-07'de okuma yolu `load_artifact(workflow_id, ad)`'a çevrildi.
+    Manifest ise başkasının dosyasını hâlâ `/output/<ad>` diye gösteriyor ve
+    `workflow_id`'yi HİÇ yazmıyordu. Model o kimliği başka hiçbir yerden
+    öğrenemez — yani çağrı fiilen yapılamaz hâldeydi ve hiçbir yerde hata
+    yoktu; model sadece "erişemiyorum" derdi.
+
+    Manifest artık satırı olduğu gibi çağrılabilir biçimde veriyor.
+    """
+    metin = manifest_metni(KARISIK, "wf_ben")
+    _, ikinci = metin.split("BAŞKA ÇALIŞTIRMALARDAN")
+
+    assert 'load_artifact("wf_baska", "baskasinin.parquet")' in ikinci
+    # kendi çıktısı için çağrı YOK — o zaten /output'ta
+    ilk = metin.split("BAŞKA ÇALIŞTIRMALARDAN")[0]
+    assert "load_artifact" not in ilk
+    assert "/output/benim.parquet" in ilk
+
+
+def test_baskasininki_output_ta_DEGIL_denmis():
+    """Yol yanlış gösterilirse model `/output/<ad>` deneyip FileNotFoundError
+    alır ve dosyanın yok olduğunu sanar."""
+    metin = manifest_metni(KARISIK, "wf_ben")
+    _, ikinci = metin.split("BAŞKA ÇALIŞTIRMALARDAN")
+    assert "/output/baskasinin.parquet" not in ikinci
+    assert "/output'ta BULUNMAZLAR" in ikinci
+
+
+def test_kirpilan_kuyruk_output_a_yonlendirmiyor():
+    """Kırpma notu eskiden `os.listdir("/output") ile tamamı` diyordu —
+    başkalarının dosyaları orada olmadığı için bu doğrudan yanıltıcıydı."""
+    cok = [{"name": f"a{i}", "type": "system.Artifact", "size_bytes": 1,
+            "workflow_id": f"wf{i}"} for i in range(120)]
+    metin = manifest_metni(cok, "wf_ben")
+    assert "tane daha" in metin
+    assert "os.listdir" not in metin
 
 
 def test_servis_tanimsizsa_ag_istegi_yok(monkeypatch):
