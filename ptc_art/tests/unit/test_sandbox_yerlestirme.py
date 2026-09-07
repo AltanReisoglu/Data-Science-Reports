@@ -78,7 +78,9 @@ def ortam(tmp_path, monkeypatch):
     monkeypatch.setattr(sidecar, "SCRATCH_DIR", str(scratch))
     monkeypatch.setattr(sidecar, "WORKFLOW_ID", WF)
     monkeypatch.setattr(sidecar, "_sunulan_ozet", {})
-    monkeypatch.setattr(sidecar, "_sunulan_kimlik", set())
+    monkeypatch.setattr(sidecar, "_istenen_kimlik", set())
+    monkeypatch.setattr(sidecar, "_yerlesen_kimlik", {})
+    monkeypatch.setattr(sidecar, "_ATIME_CALISIYOR", None)
     return cikti
 
 
@@ -142,8 +144,8 @@ def test_yerlestirilen_dosya_supurmede_geri_yuklenmez(ortam, monkeypatch):
     assert ust.yuklenenler == []
 
 
-def test_llm_degistirirse_yeniden_yuklenir_ve_soy_kurulur(ortam, monkeypatch):
-    """İçerik değişmişse artık "biz verdik" değil — yüklenir, ebeveyni bilinir."""
+def test_llm_degistirirse_yeniden_yuklenir(ortam, monkeypatch):
+    """İçerik değişmişse artık "biz verdik" değil — yüklenir."""
     ust = SahteUst([kayit("ham.csv")], {"ham.csv": b"a,b\n1,2\n"})
     monkeypatch.setattr(sidecar, "istemci", ust)
 
@@ -152,9 +154,73 @@ def test_llm_degistirirse_yeniden_yuklenir_ve_soy_kurulur(ortam, monkeypatch):
     (ortam / "turev.parquet").write_bytes(b"x")      # ve yeni bir şey üretti
     sidecar.supur()
 
-    yuklenen = dict(ust.yuklenenler)
-    assert set(yuklenen) == {"ham.csv", "turev.parquet"}
-    assert yuklenen["turev.parquet"] == ["art_ham.csv"]
+    assert set(dict(ust.yuklenenler)) == {"ham.csv", "turev.parquet"}
+
+
+# ── soy: yerleştirilen ≠ okunan (2026-09-07) ──────────────────────────────
+
+
+def test_OKUNAN_ebeveyn_olur(ortam, monkeypatch):
+    ust = SahteUst([kayit("ham.csv")], {"ham.csv": b"a,b\n1,2\n"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+
+    sidecar.yerlestir()
+    (ortam / "ham.csv").read_bytes()                 # OKUDU
+    (ortam / "turev.parquet").write_bytes(b"x")
+    sidecar.supur()
+
+    assert dict(ust.yuklenenler)["turev.parquet"] == ["art_ham.csv"]
+
+
+def test_OKUNMAYAN_ebeveyn_OLMAZ(ortam, monkeypatch):
+    """ASIL REGRESYON (2026-09-07, kullanıcı sordu: "B'ye önceki çıktılar
+    veriliyor mu?").
+
+    Yerleştirme gelince `/output`'a bu çalıştırmanın BÜTÜN çıktıları iniyor.
+    Hepsini ebeveyn saymak soyu şişiriyordu: üç dosya yerleşip biri okununca
+    türev ÜÇ ebeveyn alıyordu. Tembel okuma döneminde bu doğruydu, çünkü
+    yalnızca okunan iniyordu.
+
+    Artık ölçüm atime ile: yerleştirmede atime epoch'a çekiliyor, okuma
+    `relatime` altında bile onu güncelliyor.
+    """
+    ust = SahteUst([kayit("a.txt"), kayit("b.txt"), kayit("c.txt")],
+                   {"a.txt": b"A", "b.txt": b"B", "c.txt": b"C"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+
+    sidecar.yerlestir()
+    (ortam / "a.txt").read_bytes()                   # yalnızca a
+    (ortam / "turev.txt").write_bytes(b"A!")
+    sidecar.supur()
+
+    assert dict(ust.yuklenenler)["turev.txt"] == ["art_a.txt"]
+
+
+def test_atime_yoksa_HEPSI_ebeveyn(ortam, monkeypatch):
+    """noatime'da ölçüm yapılamaz. O zaman aşırı geniş davranmak, soyu
+    sessizce SİLMEKTEN iyidir."""
+    ust = SahteUst([kayit("a.txt"), kayit("b.txt")], {"a.txt": b"A", "b.txt": b"B"})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "_ATIME_CALISIYOR", False)
+
+    sidecar.yerlestir()
+    (ortam / "turev.txt").write_bytes(b"x")          # hiçbirini okumadı
+    sidecar.supur()
+
+    assert dict(ust.yuklenenler)["turev.txt"] == ["art_a.txt", "art_b.txt"]
+
+
+def test_load_artifact_ile_istenen_KOSULSUZ_ebeveyn(ortam, monkeypatch):
+    """`/fetch` yolunda istenmiş olmak okunmuş olmanın kanıtı — atime'a
+    bakılmıyor, çünkü dosya `/artifacts` altında ve süpürülmüyor."""
+    ust = SahteUst([], {})
+    monkeypatch.setattr(sidecar, "istemci", ust)
+
+    sidecar._kaydet("baskasi.csv", "ozet", "art_baskasi", istendi=True)
+    (ortam / "turev.txt").write_bytes(b"x")
+    sidecar.supur()
+
+    assert dict(ust.yuklenenler)["turev.txt"] == ["art_baskasi"]
 
 
 def test_depo_erisilemezse_calistirma_surer(ortam, monkeypatch):

@@ -81,12 +81,30 @@ _DIZIN_SONEKI = ".tar"
 
 istemci = artifact_client.ArtifactClient(artifact_client.ENDPOINT, SCOPE_TOKEN)
 
-#: Sidecar'ın SUNDUĞU artifact'ler. İki işi var:
-#:   ad -> sha256   : süpürmede "bunu ben verdim" kontrolü
-#:   artifact_id'ler: soy ağacının ebeveynleri
+#: Sidecar'ın SUNDUĞU her baytın özeti — süpürmede "bunu ben verdim,
+#: LLM üretmedi" kontrolü. Defter sandbox'ta değil, kurcalanamıyor.
 _sunulan_ozet: dict[str, str] = {}
-_sunulan_kimlik: set[str] = set()
+
+#: Soy ağacının ebeveynleri İKİ kaynaktan geliyor ve ayrı tutuluyorlar:
+#:
+#:   _istenen_kimlik  — `load_artifact` ile AÇIKÇA istenenler. İstenmiş olması
+#:                      okunmuş olmasının kanıtı; koşulsuz ebeveyn.
+#:   _yerlesen_kimlik — açılışta yerleştirilenler (ad -> artifact_id). Bunlar
+#:                      kodun istemesiyle DEĞİL, bu çalıştırmanın çıktısı
+#:                      oldukları için oradalar. Hepsini ebeveyn saymak soyu
+#:                      şişirirdi: 3 dosya yerleştirilip 1'i okunduğunda üç
+#:                      ebeveyn çıkıyordu (2026-09-07'de ölçüldü). O yüzden
+#:                      yalnızca GERÇEKTEN OKUNANLAR ebeveyn oluyor — bkz.
+#:                      `_okundu_mu`.
+_istenen_kimlik: set[str] = set()
+_yerlesen_kimlik: dict[str, str] = {}
 _kilit = threading.Lock()
+
+#: `_okundu_mu` atime'a bakıyor; dosya sistemi atime tutmuyorsa (noatime)
+#: bu ölçüm sessizce "hiçbiri okunmadı" derdi — soyu tamamen kaybederdik.
+#: O yüzden açılışta bir sonda ile ölçülüyor; çalışmıyorsa yerleştirilenlerin
+#: HEPSİ ebeveyn sayılıyor (eski davranış, aşırı geniş ama kayıpsız).
+_ATIME_CALISIYOR: bool | None = None
 
 
 def _olay(tur: str, **alanlar) -> None:
@@ -95,17 +113,83 @@ def _olay(tur: str, **alanlar) -> None:
                       **alanlar}), flush=True)
 
 
-def _kaydet(ad: str, ozet: str, artifact_id: str | None) -> None:
+def _kaydet(ad: str, ozet: str, artifact_id: str | None, *, istendi: bool) -> None:
     """Sidecar'ın SUNDUĞU bir baytı deftere işler.
 
-    İki yerden çağrılıyor: açılıştaki yerleştirme ve çalışma sırasındaki
-    `/fetch`. Defter sandbox'ta değil burada — süpürmedeki "bunu ben verdim"
-    kararı da, soy ağacının ebeveynleri de kurcalanamıyor.
+    `istendi=True`  : `/fetch` — kod `load_artifact` ile açıkça istedi.
+    `istendi=False` : açılışta yerleştirildi; okunup okunmadığı henüz belirsiz.
     """
     with _kilit:
         _sunulan_ozet[ad] = ozet
-        if artifact_id:
-            _sunulan_kimlik.add(artifact_id)
+        if not artifact_id:
+            return
+        if istendi:
+            _istenen_kimlik.add(artifact_id)
+        else:
+            _yerlesen_kimlik[ad] = artifact_id
+
+
+def _atime_calisiyor_mu() -> bool:
+    """Dosya sistemi okumayı atime'a yansıtıyor mu — sonda ile ÖLÇ, varsayma.
+
+    `relatime` (kind ve OpenShift varsayılanı) atime'ı yalnızca eskiyse
+    günceller; yerleştirmede atime'ı epoch'a çektiğimiz için ilk okumada
+    kesin güncelleniyor. `noatime` ile hiç güncellenmiyor — o durumda bu
+    ölçümü kullanmak soyu sessizce SİLERDİ.
+    """
+    global _ATIME_CALISIYOR
+    if _ATIME_CALISIYOR is not None:
+        return _ATIME_CALISIYOR
+    sonda = os.path.join(SCRATCH_DIR, "_atime_sonda")
+    try:
+        with open(sonda, "w") as f:
+            f.write("x")
+        os.utime(sonda, (0, os.stat(sonda).st_mtime))
+        with open(sonda) as f:
+            f.read()
+        _ATIME_CALISIYOR = os.stat(sonda).st_atime > 0
+    except OSError:
+        _ATIME_CALISIYOR = False
+    finally:
+        try:
+            os.unlink(sonda)
+        except OSError:
+            pass
+    return _ATIME_CALISIYOR
+
+
+def _atime_sifirla(yol: str) -> None:
+    """atime'ı epoch'a çeker — okunursa `relatime` altında bile güncellenir."""
+    try:
+        os.utime(yol, (0, os.stat(yol).st_mtime))
+    except OSError:
+        pass
+
+
+def _okundu_mu(ad: str) -> bool:
+    """Yerleştirilen bu artifact'e sandbox DOKUNDU mu.
+
+    Dizin artifact'i `<ad>.tar` adıyla kayıtlı ama diske `<ad>/` olarak
+    açılıyor; okuma alt dosyalarda olduğu için dizin özyinelemeli taranıyor.
+    Dosya kaybolmuşsa (LLM sildi/taşıdı) dokunulmuş sayılıyor — soyu
+    kaybetmektense fazladan bir ebeveyn iyidir.
+    """
+    if ad.endswith(_DIZIN_SONEKI):
+        kok = os.path.join(OUTPUT_DIR, ad[: -len(_DIZIN_SONEKI)])
+        if not os.path.isdir(kok):
+            return True
+        for dizin, _alt, dosyalar in os.walk(kok):
+            for d in dosyalar:
+                try:
+                    if os.stat(os.path.join(dizin, d)).st_atime > 0:
+                        return True
+                except OSError:
+                    return True
+        return False
+    try:
+        return os.stat(os.path.join(OUTPUT_DIR, ad)).st_atime > 0
+    except OSError:
+        return True
 
 
 # ── Localhost proxy: sandbox'ın OKUMA yolu ────────────────────────────────
@@ -160,7 +244,8 @@ class Proxy(BaseHTTPRequestHandler):
                 if os.path.exists(gecici):
                     os.unlink(gecici)
 
-            _kaydet(ad, hashlib.sha256(ham).hexdigest(), kunye.get("artifact_id"))
+            _kaydet(ad, hashlib.sha256(ham).hexdigest(), kunye.get("artifact_id"),
+                    istendi=True)
             _olay("artifact", op="consumed", artifact_id=kunye.get("artifact_id"),
                   name=kunye.get("name"), size_bytes=kunye.get("size_bytes"),
                   content_type=kunye.get("content_type"), parents=[])
@@ -239,8 +324,21 @@ def supur() -> None:
     olmadığı için kurcalanamıyor.
     """
     with _kilit:
-        parents = sorted(_sunulan_kimlik)
+        istenen = set(_istenen_kimlik)
+        yerlesen = dict(_yerlesen_kimlik)
         sunulan = dict(_sunulan_ozet)
+
+    # Yerleştirilenlerden yalnızca DOKUNULANLAR ebeveyn. Ölçüm yapılamıyorsa
+    # (noatime) hepsi — aşırı geniş ama kayıpsız.
+    kesin = _atime_calisiyor_mu()
+    okunan = {ad: kimlik for ad, kimlik in yerlesen.items()
+              if not kesin or _okundu_mu(ad)}
+    parents = sorted(istenen | set(okunan.values()))
+
+    # `consumed` olayları burada: artık hangisine dokunulduğu belli.
+    for ad in sorted(okunan):
+        _olay("artifact", op="consumed", artifact_id=okunan[ad], name=ad,
+              size_bytes=None, content_type=None, parents=[])
 
     try:
         adlar = sorted(os.listdir(OUTPUT_DIR))
@@ -339,7 +437,7 @@ def yerlestir() -> int:
             kunye = istemci.fetch_to_file(ad, hedef, workflow_id=WORKFLOW_ID)
             if not kunye:
                 continue
-            _kaydet(ad, _dosya_ozeti(hedef), kunye.get("artifact_id"))
+            _kaydet(ad, _dosya_ozeti(hedef), kunye.get("artifact_id"), istendi=False)
             # Dizin artifact'i tar olarak duruyor; kod gerçek bir dizin
             # görmeli. Tar siliniyor — süpürme dizini yeniden paketleyip
             # aynı hash'i bulacak ve "bunu ben verdim" deyip atlayacak.
@@ -348,15 +446,21 @@ def yerlestir() -> int:
                 os.makedirs(dizin, exist_ok=True)
                 _tari_ac(hedef, dizin)
                 os.unlink(hedef)
+                for kok, _alt, dosyalar in os.walk(dizin):
+                    for d in dosyalar:
+                        _atime_sifirla(os.path.join(kok, d))
+            else:
+                _atime_sifirla(hedef)
         except Exception as exc:  # noqa: BLE001 — biri patlarsa diğerleri sürsün
             _olay("yerlestirme_hatasi", name=ad, detail=str(exc)[:200])
             if os.path.exists(hedef):
                 os.unlink(hedef)
             continue
         sayi += 1
-        _olay("artifact", op="consumed", artifact_id=kunye.get("artifact_id"),
-              name=kunye.get("name"), size_bytes=kunye.get("size_bytes"),
-              content_type=kunye.get("content_type"), parents=[])
+    # `consumed` olayı BURADA yayınlanmıyor: yerleştirilmiş olmak okunmuş
+    # olmak değil. Hangisine dokunulduğu ancak kod bittikten sonra bilinebilir,
+    # o yüzden olaylar süpürmede yayınlanıyor.
+    _olay("yerlestirme_bitti", sayi=sayi, atime=_atime_calisiyor_mu())
     return sayi
 
 

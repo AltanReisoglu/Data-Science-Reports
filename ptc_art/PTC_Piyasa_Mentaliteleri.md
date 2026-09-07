@@ -2255,6 +2255,50 @@ Ayrıca kırpma notu düzeltildi: eskiden "…ve N tane daha (`os.listdir("/outp
 ile tamamı)" diyordu, oysa o dosyalar `/output`'ta yok. Şimdi kendi grubunda
 `os.listdir` doğru işaret, diğer grupta hiç işaret yok.
 
+### İkinci kusur: yerleştirilen ≠ okunan
+
+Sorunun devamı: *"aynı workflow'da B'ye A'nın çıktıları veriliyor mu?"* Evet —
+**hepsi**. Ve bu, soy ağacını sessizce bozuyordu.
+
+Tembel okuma döneminde `/output`'a yalnızca **okunan** dosya iniyordu, o yüzden
+"indirdiklerim = ebeveynler" doğru bir eşitlikti. Yerleştirme gelince
+`/output`'a bu çalıştırmanın **bütün** çıktıları iner oldu; eşitlik ise
+değişmeden kaldı. Ölçüm:
+
+```
+1) üç dosya üret          produced a.txt, b.txt, c.txt
+2) SADECE a.txt'yi oku    consumed a.txt, b.txt, c.txt      ← üçü de
+   turev.txt'nin ebeveynleri: (art_a, art_b, art_c)         ← üç ebeveyn
+```
+
+Yine sessiz: hiçbir hata yok, soy grafiği sadece yanlış.
+
+**Çözüm — atime, ölçülerek.** Yerleştirmede her dosyanın atime'ı epoch'a
+çekiliyor; `relatime` (kind ve OpenShift varsayılanı) atime'ı yalnızca eskiyse
+günceller, dolayısıyla ilk okumada kesin güncelliyor. Süpürmede atime'ı hâlâ
+sıfır olan dosya okunmamıştır.
+
+Varsayım yerine **sonda**: `noatime` bir dosya sisteminde bu ölçüm "hiçbiri
+okunmadı" derdi ve soyu tamamen silerdi. Sidecar açılışta küçük bir sonda
+dosyasıyla atime'ın çalışıp çalışmadığını ölçüyor; çalışmıyorsa yerleştirilenlerin
+**hepsi** ebeveyn sayılıyor — aşırı geniş, ama kayıpsız.
+
+Ebeveyn kaynakları da ayrıldı:
+
+| Defter | Ne | Ebeveyn olma koşulu |
+|---|---|---|
+| `_istenen_kimlik` | `load_artifact` ile açıkça istenenler | koşulsuz — istemek okumaktır |
+| `_yerlesen_kimlik` | açılışta yerleştirilenler | yalnızca atime bumped olanlar |
+
+`consumed` olayı da süpürmeye taşındı: yerleştirme anında hangisine
+dokunulacağı bilinemez.
+
+```
+1) üç dosya üret          produced a.txt, b.txt, c.txt
+2) SADECE a.txt'yi oku    consumed a.txt                    ← yalnızca o
+   turev.txt'nin ebeveynleri: (art_a,)                      ← tek ebeveyn
+```
+
 ### Kalan tek şey
 
 `os.scandir` artık yamayı **delmiyor** çünkü yama yok — ama `/output` da bir
