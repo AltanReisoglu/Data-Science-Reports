@@ -69,20 +69,19 @@
 
     <!-- ══ ÇALIŞTIRMA ══════════════════════════════════════════════ -->
     <section class="k-view" id="k-calistir">
-      <div class="split">
-        <div class="card">
-          <div class="card-h">
-            <h2 id="runTitle">—</h2>
-            <span class="badge" id="runPill">hazır</span>
-            <div style="margin-left:auto;display:flex;gap:.5rem">
-              <button class="k-btn ikincil" id="btnTemizle">Temizle</button>
-              <button class="k-btn" id="btnRun">Hattı çalıştır</button>
-            </div>
+      <div class="card">
+        <div class="card-h">
+          <h2 id="runTitle">—</h2>
+          <span class="badge" id="runPill">hazır</span>
+          <div style="margin-left:auto;display:flex;gap:.5rem">
+            <button class="k-btn ikincil" id="btnTemizle">Temizle</button>
+            <button class="k-btn" id="btnRun">Hattı çalıştır</button>
           </div>
-          <p class="muted" id="runDesc" style="margin:-.4rem 0 1rem"></p>
-          <div class="adimlar" id="adimlar"></div>
         </div>
-        <div class="card" id="adimDetay"></div>
+        <p class="muted" id="runDesc" style="margin:-.4rem 0 1rem"></p>
+        <!-- Adımlar yerinde açılıyor: her birinin içi (kod, kendi log'u,
+             girdi/çıktı, pod) kendi satırının altında. -->
+        <div class="adimlar" id="adimlar"></div>
       </div>
     </section>
 

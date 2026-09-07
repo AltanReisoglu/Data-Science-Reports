@@ -415,3 +415,42 @@ pre.kod {
    ortalanmasın diye yalnızca üst boşluğu kısılıyor. */
 #k-sohbet .app { padding-top: 0; padding-bottom: 1rem; max-width: 46rem; }
 #k-sohbet .app-header { margin-bottom: 1.5rem; }
+
+/* ── adımın içi — yerinde açılan bölüm ───────────────────────────── */
+
+.adim-blok { border: 1px solid transparent; border-radius: 12px; transition: border-color .15s ease, background .15s ease; }
+.adim-blok.acik { border-color: var(--border); background: var(--card-bg); box-shadow: var(--shadow-sm); }
+
+.adim-ic { display: none; padding: 0 1rem 1rem 3.9rem; }
+.adim-blok.acik .adim-ic { display: block; }
+
+.ic-tabs { display: flex; gap: .2rem; border-bottom: 1px solid var(--border); margin-bottom: .8rem; }
+
+.ic-tab {
+  border: 0; background: none; font: inherit; font-size: .8rem;
+  color: var(--text-secondary); padding: .4rem .7rem;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
+}
+.ic-tab:hover { color: var(--text-primary); }
+.ic-tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+/* Log kutusu: terminal gibi, ama sayfanın açık temasında okunur kalsın. */
+.ic-log {
+  font-family: "JetBrains Mono", monospace;
+  font-size: .74rem;
+  line-height: 1.65;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .6rem .75rem;
+  max-height: 17rem;
+  overflow: auto;
+}
+.ic-log div { display: flex; gap: .6rem; }
+.ic-log .t { color: var(--text-secondary); flex: none; }
+.ic-log .m.art { color: #8a5a00; }
+.ic-log .m.hi { color: var(--success-text); }
+.ic-log .m.fail { color: var(--danger-text); }
+.ic-log .imlec { color: var(--accent); }
+
+.ic-satir { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .5rem; }

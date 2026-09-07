@@ -16,7 +16,7 @@ const kb = b => !b ? "0 B" : b >= 1e6 ? (b / 1048576).toFixed(2) + " MB" : b >= 
 const kisa = s => String(s || "").slice(0, 8);
 
 const S = {
-  hatlar: [], hat: "a", adim: null, durum: {}, calisiyor: false,
+  hatlar: [], hat: "a", adim: null, icTab: "genel", durum: {}, calisiyor: false,
   wfSon: {}, kayitlar: [], filtre: "hepsi", acik: {}, art: null, soyId: null,
 };
 
@@ -102,6 +102,7 @@ function ciz_calistir() {
 
   $("#adimlar").innerHTML = h.nodes.map((n, i) => {
     const d = S.durum[n.n] || {};
+    const acik = S.adim === n.n;
     const cls = d.status === "success" ? "bitti" : d.status === "running" ? "calisiyor"
               : d.status === "error" ? "hata" : "";
     const bag = i ? `<div class="baglanti ${S.durum[h.nodes[i - 1].n]?.status === "success" ? "bitti" : ""}"></div>` : "";
@@ -109,66 +110,125 @@ function ciz_calistir() {
               : n.tur === "sandbox" ? `<span class="badge">pod</span>`
               : `<span class="badge">sorgu</span>`;
     const cikti = (d.artifacts || []).map(a => `<span class="badge art">${esc(a.name)}</span>`).join(" ");
-    return `${bag}<button class="adim ${S.adim === n.n ? "on" : ""}" data-tur="${n.tur}" data-n="${n.n}">
-      <span class="baloncuk ${cls}">${n.n}</span>
-      <span>
-        <span class="adim-ad">${esc(n.ad)}</span>
-        <span class="adim-alt">${cikti || esc(n.aciklama)}</span>
-      </span>
-      ${sag}
-    </button>`;
+
+    return `${bag}<div class="adim-blok ${acik ? "acik" : ""}">
+      <button class="adim ${acik ? "on" : ""}" data-tur="${n.tur}" data-n="${n.n}">
+        <span class="baloncuk ${cls}">${n.n}</span>
+        <span>
+          <span class="adim-ad">${esc(n.ad)}</span>
+          <span class="adim-alt">${cikti || esc(n.aciklama)}</span>
+        </span>
+        ${sag}
+      </button>
+      <div class="adim-ic">${acik ? adimIci(n, d) : ""}</div>
+    </div>`;
   }).join("");
 
   $$("#adimlar .adim").forEach(b => b.onclick = () => {
     const n = +b.dataset.n;
-    S.adim = S.adim === n ? null : n; ciz_calistir();
+    S.adim = S.adim === n ? null : n; S.icTab = "genel"; ciz_calistir();
   });
-  ciz_adimDetay();
+  $$("#adimlar .ic-tab").forEach(b => b.onclick = e => {
+    e.stopPropagation(); S.icTab = b.dataset.ic; ciz_calistir();
+  });
+  $$("#adimlar .adim-ic [data-art]").forEach(b => b.onclick = e => {
+    e.stopPropagation(); acArtifact(b.dataset.art);
+  });
+
+  // Çalışırken log'un dibinde kal.
+  const lg = $("#adimlar .ic-log");
+  if (lg && S.calisiyor) lg.scrollTop = lg.scrollHeight;
 }
 
-function ciz_adimDetay() {
-  const kutu = $("#adimDetay"), h = hatOf(S.hat);
-  if (!S.adim || !h) {
-    kutu.innerHTML = `<p class="bos">Bir adım seçin: kodunu, beyan ettiği girdileri ve ürettiği artifact'i gösterir.</p>`;
-    return;
+/* Bir adımın İÇİ — kod, kendi log'u, girdi/çıktı, pod bilgisi.
+ *
+ * Log'lar zaten adım başına toplanıyordu ama hiçbir yerde gösterilmiyordu:
+ * yalnızca alttaki ORTAK panele akıyordu ve orada hangi satırın hangi adıma
+ * ait olduğu kayboluyordu. Artık her adım kendi satırının altında açılıyor.
+ */
+function adimIci(n, d) {
+  const tab = S.icTab || "genel";
+  const sekmeler = [
+    ["genel", "Genel"],
+    n.tur === "sandbox" ? ["kod", "Kod"] : ["sorgu", "Sorgu"],
+    ["log", `Log${(d.loglar || []).length ? " · " + d.loglar.length : ""}`],
+    ["cikti", `Çıktı${(d.artifacts || []).length ? " · " + d.artifacts.length : ""}`],
+  ];
+
+  let govde = "";
+
+  if (tab === "genel") {
+    govde = `
+      <p class="muted" style="margin:0 0 .8rem">${esc(n.aciklama)}</p>
+      <div class="not" style="margin-bottom:.8rem">${n.tur === "sandbox"
+        ? `<b>Gerçek pod.</b> Bu adım için ayrı bir Kubernetes Job açılıyor. Kapsam jetonu
+           sidecar'da; sandbox container'ında S3 anahtarı yok ve ağı kapalı — baytları
+           içeri/dışarı sidecar taşıyor.`
+        : `<b>Pod açılmıyor.</b> Bu adım kayıt defterine bir HTTP sorgusu. Keşif sandbox'ta
+           değil host tarafında olur; sandbox'ın listeleme yolu hiç yok.`}</div>
+      <dl class="kv">
+        <dt>Beyan edilen girdi</dt><dd>${n.inputs.length ? esc(JSON.stringify(n.inputs)) : "[] — yok"}</dd>
+        <dt>Beklenen çıktı</dt><dd>${n.bekleniyor.length ? esc(n.bekleniyor.join(", ")) : "— üretmiyor"}</dd>
+        <dt>Durum</dt><dd class="duz">${
+          d.status === "success" ? "tamamlandı · " + (d.dur || "")
+          : d.status === "running" ? "çalışıyor…"
+          : d.status === "error" ? "hata" : "beklemede"}</dd>
+        ${d.run_id ? `<dt>Pod</dt><dd>ptc-sandbox-${esc(d.run_id)}</dd>` : ""}
+      </dl>
+      ${d.sonuc ? `<div style="margin-top:.8rem">
+        <div class="muted" style="margin-bottom:.3rem">Adımın döndürdüğü</div>
+        <pre class="kod">${esc(typeof d.sonuc === "string" ? d.sonuc : JSON.stringify(d.sonuc, null, 2))}</pre>
+      </div>` : ""}`;
   }
-  const n = h.nodes.find(x => x.n === S.adim), d = S.durum[n.n] || {};
 
-  kutu.innerHTML = `
-    <div class="card-h">
-      <h2>${esc(n.ad)}</h2>
-      <span class="badge ${d.status === "success" ? "ok" : d.status === "error" ? "err" : ""}">${
-        n.tur === "sandbox" ? "sandbox pod'u" : "kayıt defteri sorgusu"}</span>
-    </div>
+  else if (tab === "kod") {
+    const kod = d.kod || n.kod || "";
+    govde = kod
+      ? `<pre class="kod">${esc(kod.trim())}</pre>
+         <p class="muted" style="margin:.6rem 0 0">Düz Python. Artifact API'si yok —
+         <span class="mono">/output</span>'a dosya yazmak yeterli.
+         ${d.kod && d.kod !== n.kod
+            ? " Bu, <b>gerçekten çalıştırılan</b> hâli: çapraz workflow kimliği yerine konmuş."
+            : ""}</p>`
+      : `<p class="bos">Bu adım kod çalıştırmıyor.</p>`;
+  }
 
-    <div class="not" style="margin-bottom:.9rem">${n.tur === "sandbox"
-      ? `<b>Gerçek pod.</b> Ayrı bir Job açılıyor; kapsam jetonu sidecar'da, sandbox'ta S3 anahtarı yok, ağı kapalı.`
-      : `<b>Pod açılmıyor.</b> Kayıt defterine HTTP sorgusu — keşif sandbox'ta değil, host tarafında olur.`}</div>
+  else if (tab === "sorgu") {
+    govde = `<pre class="kod">GET /artifacts?${esc(new URLSearchParams(n.sorgu || {}).toString())}</pre>
+      <p class="muted" style="margin:.6rem 0 0">Kayıt defterine ada göre sorgu. Cevaptaki
+      <span class="mono">workflow_id</span> bir sonraki adıma veriliyor — kimlik hiçbir yere gömülü değil.</p>
+      ${d.sonuc && typeof d.sonuc === "object" ? `<div style="margin-top:.7rem">
+        <div class="muted" style="margin-bottom:.3rem">Cevap</div>
+        <pre class="kod">${esc(JSON.stringify(d.sonuc, null, 2))}</pre></div>` : ""}`;
+  }
 
-    <p class="muted" style="margin:0 0 .9rem">${esc(n.aciklama)}</p>
+  else if (tab === "log") {
+    const L = d.loglar || [];
+    govde = L.length
+      ? `<div class="ic-log">${L.map(l =>
+          `<div><span class="t">${esc(l.ts)}</span><span class="m ${esc(l.cls || "")}">${esc(l.msg)}</span></div>`).join("")}
+         ${d.status === "running" ? `<div><span class="t">—</span><span class="imlec">▌</span></div>` : ""}</div>
+         <p class="muted" style="margin:.6rem 0 0">Bu satırlar bu adımın pod'undan geliyor.
+         Alttaki panelde bütün adımlar iç içe akıyor; burada yalnızca bu adım var.</p>`
+      : `<p class="bos">Bu adım henüz çalışmadı.</p>`;
+  }
 
-    <dl class="kv" style="margin-bottom:.9rem">
-      <dt>Beyan edilen girdi</dt><dd>${n.inputs.length ? esc(JSON.stringify(n.inputs)) : "[] — yok"}</dd>
-      ${n.sorgu ? `<dt>Sorgu</dt><dd>?${esc(new URLSearchParams(n.sorgu).toString())}</dd>` : ""}
-      <dt>Durum</dt><dd class="duz">${d.status === "success" ? "tamamlandı " + (d.dur || "")
-        : d.status === "running" ? "çalışıyor…" : d.status === "error" ? "hata" : "beklemede"}</dd>
-      ${d.run_id ? `<dt>Pod</dt><dd>ptc-sandbox-${esc(d.run_id)}</dd>` : ""}
-    </dl>
+  else {
+    const A = d.artifacts || [];
+    govde = A.length
+      ? A.map(a => `<button class="plaka" data-art="${esc(a.artifact_id)}" style="width:100%;margin-bottom:.4rem">
+          <span class="ad">${esc(a.name)}</span>
+          <span class="alt">${esc(a.artifact_id)} · ${kb(a.size_bytes)} · depoda aç →</span></button>`).join("")
+        + `<p class="muted" style="margin:.4rem 0 0">Bunlar pod ölmeden önce sidecar tarafından
+           süpürüldü; kod hiçbir yükleme çağrısı yapmadı.</p>`
+      : `<p class="bos">${n.bekleniyor.length
+          ? "Henüz üretilmedi. Beklenen: " + esc(n.bekleniyor.join(", "))
+          : "Bu adım artifact üretmiyor — sonucu bellekte kalıyor ve depoya girmiyor."}</p>`;
+  }
 
-    ${(d.artifacts || []).length ? `<div style="margin-bottom:.9rem">
-      <div class="muted" style="margin-bottom:.35rem">Üretilen artifact</div>
-      ${d.artifacts.map(a => `<button class="plaka" data-art="${esc(a.artifact_id)}" style="width:100%;margin-bottom:.35rem">
-        <span class="ad">${esc(a.name)}</span>
-        <span class="alt">${esc(a.artifact_id)} · ${kb(a.size_bytes)} · depoda aç →</span></button>`).join("")}
-    </div>` : ""}
-
-    ${d.sonuc ? `<div style="margin-bottom:.9rem"><div class="muted" style="margin-bottom:.35rem">Sonuç</div>
-      <pre class="kod">${esc(typeof d.sonuc === "string" ? d.sonuc : JSON.stringify(d.sonuc, null, 2))}</pre></div>` : ""}
-
-    ${(d.kod || n.kod) ? `<details><summary class="muted" style="cursor:pointer;font-size:.83rem">Sandbox'ta çalışan kod</summary>
-      <pre class="kod" style="margin-top:.5rem">${esc((d.kod || n.kod).trim())}</pre></details>` : ""}`;
-
-  $$("[data-art]", kutu).forEach(b => b.onclick = () => acArtifact(b.dataset.art));
+  return `<div class="ic-tabs">${sekmeler.map(([k, l]) =>
+      `<button class="ic-tab ${tab === k ? "on" : ""}" data-ic="${k}">${l}</button>`).join("")}
+    </div>${govde}`;
 }
 
 let WS = null;
@@ -194,7 +254,7 @@ function calistir() {
       S.wfSon[m.key] = m.workflow_id;
       ptcYaz(`workflow ${m.workflow_id}`, "info");
     } else if (m.type === "node_start") {
-      d(m.n).status = "running"; S.adim = m.n;
+      d(m.n).status = "running"; S.adim = m.n; S.icTab = "log";
       ptcYaz(`\n[${m.n}] ${m.ad}  ·  ${m.tur === "sandbox" ? "sandbox pod'u" : "kayıt defteri sorgusu"}`, "info");
       ciz_calistir();
     } else if (m.type === "log") {
