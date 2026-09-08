@@ -638,7 +638,7 @@ hatayı üç kez almak** bir tıkanma işareti. Bu bir *retry sınırı* değil,
 | **Self-Debugging iterasyon sayısı** | Özette belirtilmiyor. |
 | **LangGraph / Aider / CrewAI** | Bu turda incelenmedi. §1.5 tablosu bu üçünü kapsamıyor. |
 | **Claude Code retry bütçesi** | Davranışta sabit bir deneme sınırı gözlenmedi; kaynak kod açık olmadığı için doğrulanamadı. "Sınır yok" iddiası DEĞİL — ölçemedim. |
-| **Claude Code kırpma eşiği** | 2,8 MB'ta dosyaya taşındı, 3,5 MB'ta (60k satır, `tail` ile) taşınmadı — eşiğin tam değerini ve neye göre (bayt/token/satır) hesaplandığını belirleyemedim. |
+| **Claude Code kırpma eşiği** | İkiye bölerek daralttım: **12,0 KB tam geldi, 39,5 KB dosyaya taşındı** — eşik bu ikisinin arasında. Tam değeri ve neye göre (bayt / token / satır) hesaplandığını belirleyemedim. (Not: ilk denemede 3,5 MB'ın taşınmaması ölçüm hatasıydı — komut `tail -3` ile bitiyordu, yani araca ulaşan çıktı zaten üç satırdı.) |
 | **GitHub Copilot coding agent** | Döngünün VARLIĞI resmî yayınlarda belgeli ("self-correct", "monitors test output, automatically attempts to fix and rerun"), ama MEKANİZMA hiç belgelenmemiş: geri bildirim yükü, kırpma, bütçe, sebep sınıflandırması bulunamadı. §7.4 tablosunda bu yüzden beş "belgelenmemiş" var. |
 | **Codex deneme bütçesi** | Kaynak kod açık ama kod-hatası döngüsü için bir üst sınır sabiti bulamadım. Bulduğum retry mantığı ALTYAPI içindi (429, kapasite, akış kopması) — farklı konu. |
 | **Cursor / Devin / Google Jules** | İncelenmedi. |
