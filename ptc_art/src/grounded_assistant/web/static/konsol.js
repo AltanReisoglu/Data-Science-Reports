@@ -634,6 +634,7 @@ async function ciz_depo() {
     const acik = S.acik[wf] !== undefined ? S.acik[wf]
                : (q ? true : kendi || sirali.findIndex(([k]) => k === wf) < 3);
     return `<div class="cekmece ${acik ? "acik" : ""}" data-wf="${esc(wf)}">
+      <div class="cekmece-bas">
       <button class="cekmece-yuz">
         <span class="cekmece-ok">▸</span>
         <span style="flex:1;min-width:0">
@@ -643,6 +644,8 @@ async function ciz_depo() {
         ${wf === sohbet ? `<span class="badge live">sohbet</span>`
           : kendi ? `<span class="badge live">bu oturum</span>` : ""}
       </button>
+      <button class="cekmece-sil" data-wf="${esc(wf)}" title="Bu çalıştırmanın ${list.length} artifact'ini sil">🗑</button>
+      </div>
       <div class="raf">${list.map(plaka).join("")}</div>
     </div>`;
   }).join("") : `<p class="bos">${q ? `"${esc(q)}" ile eşleşen artifact yok.`
@@ -661,14 +664,20 @@ async function ciz_depo() {
 }
 
 function plaka(a) {
-  return `<button class="plaka ${S.art === a.artifact_id ? "on" : ""}" data-art="${esc(a.artifact_id)}">
+  // Sarmalayıcı gerekli: `.plaka` bir <button> ve içine ikinci bir <button>
+  // koymak geçersiz HTML. İkisi yan yana duruyor, silme simgesi hover'da.
+  return `<div class="plaka-sar">
+    <button class="plaka ${S.art === a.artifact_id ? "on" : ""}" data-art="${esc(a.artifact_id)}">
     <span class="ad">${esc(a.name)}</span>
     <span class="alt">
       <span class="badge">${esc((a.type || "").replace("system.", ""))}</span>
       ${kb(a.size_bytes)}
       ${a.parents?.length ? `· ${a.parents.length} ebeveyn` : ""}
       ${a.alias ? `<span class="badge live">@${esc(a.alias)}</span>` : ""}
-    </span></button>`;
+    </span></button>
+    <button class="plaka-sil" data-sil="${esc(a.artifact_id)}"
+            data-ad="${esc(a.name)}" title="Sil">✕</button>
+  </div>`;
 }
 
 async function ciz_artDetay() {

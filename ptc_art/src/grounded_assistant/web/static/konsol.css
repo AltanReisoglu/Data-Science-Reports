@@ -648,3 +648,52 @@ body.konsol .ptc-panel { z-index: 50; }
 }
 .k-btn.tehlike:hover:not(:disabled) { background: var(--danger-bg); }
 .k-btn.tehlike:disabled { opacity: 0.5; }
+
+/* ── satır içi silme simgeleri ────────────────────────────────────── */
+/* Hover'da beliriyorlar: her satırda duran bir çöp kutusu, listeyi gürültülü
+   yapar ve yanlış tıklamayı davet eder. Klavyeyle gezenler için `focus-within`
+   de aynı işi görüyor — simge görünmezken sekmeyle ulaşılabilir olmalı. */
+
+.cekmece-bas { display: flex; align-items: stretch; gap: 0.35rem; }
+.cekmece-bas .cekmece-yuz { flex: 1; min-width: 0; }
+
+.cekmece-sil,
+.plaka-sil {
+  flex: none;
+  font: inherit;
+  line-height: 1;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  border-radius: 9px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.cekmece-sil { padding: 0 0.75rem; font-size: 0.95rem; }
+
+.cekmece-bas:hover .cekmece-sil,
+.cekmece-bas:focus-within .cekmece-sil { opacity: 1; }
+
+.cekmece-sil:hover:not(:disabled),
+.plaka-sil:hover {
+  color: var(--danger-text);
+  border-color: var(--danger-text);
+  background: var(--danger-bg);
+}
+.cekmece-sil:disabled { opacity: 0.4; cursor: not-allowed; }
+.cekmece-sil:focus-visible,
+.plaka-sil:focus-visible { opacity: 1; outline: 2px solid var(--danger-text); outline-offset: 1px; }
+
+.plaka-sar { position: relative; }
+.plaka-sar .plaka { width: 100%; }
+.plaka-sil {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  font-size: 0.72rem;
+}
+.plaka-sar:hover .plaka-sil,
+.plaka-sar:focus-within .plaka-sil { opacity: 1; }
