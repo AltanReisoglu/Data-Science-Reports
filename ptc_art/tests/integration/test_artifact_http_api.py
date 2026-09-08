@@ -53,6 +53,12 @@ class SahteMinio:
 
         return _Yanit()
 
+    def stat_object(self, bucket, key):
+        """`register`ın "nesne gerçekten orada mı" doğrulaması bunu çağırıyor."""
+        if key not in self.nesneler:
+            raise KeyError(key)
+        return type("Stat", (), {"size": len(self.nesneler[key])})()
+
     def remove_object(self, bucket, key):
         self.nesneler.pop(key, None)
 

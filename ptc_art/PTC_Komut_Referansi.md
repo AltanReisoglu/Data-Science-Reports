@@ -4,6 +4,10 @@ Bu doküman, PoC'yi sıfırdan kurmak, çalıştırmak, gözlemlemek ve test etm
 gereken TÜM komutları tek yerde topluyor. Kaynak: `README.md`, `specs/*/quickstart.md`
 ve bu oturumda canlı doğrulanmış komutlar.
 
+> **Artifact tarafı ayrı dosyada:**
+> [PTC_Artifact_Inceleme_Komutlari.md](PTC_Artifact_Inceleme_Komutlari.md) —
+> kayıt defteri sorguları, MinIO nesneleri, SQLite, soy ağacı, alias.
+
 **Önemli düzeltme:** `specs/002-ptc-code-sandbox/quickstart.md`'deki `docker build`
 komutları ARTIK YANLIŞ — Dockerfile'lar daha sonra repo-kökü build context'i
 gerektirecek şekilde değişti (`COPY src/`, `COPY sample_docs/`, `COPY sandbox_image/entrypoint.py`

@@ -27,7 +27,24 @@ from grounded_assistant.trace import Trace
 # çalıştırması). Bu, hem maliyeti hem PTC panelindeki gürültüyü katlıyor.
 # Bir turda (bir kullanıcı sorusunda) en fazla bu kadar sandbox çalıştırmasına
 # izin verilir; aşılırsa `run_ptc_code` YENİ bir pod yaratmadan reddeder.
+#: AĞ ENGELİ sonrası bütçe — bilerek dar (Altan, 2026-09-01): ajan engellenen
+#: bir hedefi farklı URL/şema ile tekrar tekrar deneyip her seferinde yeni bir
+#: pod açıyordu.
 MAX_SANDBOX_RUNS_PER_TURN = 2
+
+#: KOD HATASI için ayrı ve daha geniş bütçe (2026-09-08).
+#:
+#: Tek sayaç üç farklı başarısızlığı (kod hatası / ağ engeli / timeout) aynı
+#: kutuya koyuyordu ve self-repair'e pratikte 1 deneme kalıyordu. Ayrımın
+#: sahadaki emsali: Anthropic tipli `error_code`, Codex
+#: `is_likely_sandbox_denied()`. Bizde tahmine gerek yok — reddi biz
+#: ürettiğimiz için `DENIED_ACTION` zaten kesin bir sinyal.
+#:
+#: Sayının gerekçesi: Olausson (ICLR 2024) "derin onarım yerine geniş ilk
+#: deneme" diyor, yani sınırsız retry yanlış hedef; OpenHands aynı hatanın
+#: 3. tekrarını tıkanma sayıyor. Beş çalıştırma, birkaç düzeltme turuna yer
+#: bırakıp maliyeti sınırlıyor. (PTC_Error_Recovery_Piyasa_Arastirmasi.md §5.5)
+MAX_KOD_HATASI_CALISTIRMA = 5
 
 
 _SYSTEM_PROMPT = (
@@ -47,12 +64,20 @@ _SYSTEM_PROMPT = (
     "bir ayrıntı biliyorsan bile bunu tool'dan gelmiş gibi sunma — açıkça "
     "'yalnızca bir arama snippet'i görebiliyorum, sayfanın tam içeriğine "
     "erişimim yok' de.\n\n"
-    f"Önemli bir sınır: bir soruda en fazla {MAX_SANDBOX_RUNS_PER_TURN} kez "
-    "run_ptc_code çalıştırabilirsin. Bir hedef ağ seviyesinde engellendiyse "
-    "(denied_action / 'Sandbox ... engellendi' mesajı), bu KESİN bir karar — "
-    "farklı bir URL/domain/şema (http yerine https gibi) deneyerek bunu "
-    "AŞMAYA ÇALIŞMA, bu sadece yeni bir engellemeye yol açar. Sınıra "
-    "ulaştığında elindeki bilgiyle yanıt ver, tahmini değer üretme."
+    "Saklı artifact'leri aramak için artifact_ara aracın var. Sistem "
+    "mesajındaki liste yalnızca EN YENİ birkaçını gösteriyor; depoda çok daha "
+    "fazlası olabilir. Kullanıcı 'geçen sefer', 'daha önce', 'eski' gibi bir "
+    "şeye atıf yapıyorsa ve dosya listede yoksa, YENİDEN ÜRETMEDEN ÖNCE "
+    "artifact_ara ile ara. Arama yalnızca isim/tip/boyut döner; dosyayı "
+    "gerçekten okumak için dönen satırı run_ptc_code'un inputs'una koy.\n\n"
+    f"Sınırlar: bir soruda en fazla {MAX_KOD_HATASI_CALISTIRMA} kez "
+    "run_ptc_code çalıştırabilirsin. Kod hatası alırsan DÜZELTİP TEKRAR DENE — "
+    "hata mesajı sana tipi, satırı ve o ana kadarki çıktıyı veriyor. Ama aynı "
+    "kodu aynen tekrar gönderme; aynı hatayı iki kez aldıysan farklı bir "
+    f"yaklaşım dene. Bir hedef ağ seviyesinde engellendiyse sınır "
+    f"{MAX_SANDBOX_RUNS_PER_TURN}'ye düşer ve bu KESİN bir karardır — farklı "
+    "bir URL/domain/şema (http yerine https gibi) deneyerek AŞMAYA ÇALIŞMA. "
+    "Sınıra ulaştığında elindeki bilgiyle yanıt ver, tahmini değer üretme."
 )
 
 
@@ -140,10 +165,16 @@ def _make_ptc_tool(
         departmana göre grupla") veriyi YENİDEN ÜRETME — önce `/output`'a bak,
         oradan oku.
 
-        BAŞKA BİR ÇALIŞTIRMANIN çıktısı `/output`'ta OLMAZ ve kendiliğinden
-        gelmez. Gerekiyorsa açıkça iste:
+        BAŞKA BİR ÇALIŞTIRMANIN çıktısı da BEYANLA gelir — kod içinde çağrı
+        yok, dosya hazır olur:
 
-            yol = load_artifact("<workflow_id>", "rapor.pdf")  # yolu döner
+            run_ptc_code(kod, inputs=["<workflow_id>/rapor.pdf"])
+            # kodun içinde:  open("/artifacts/<workflow_id>/rapor.pdf")
+
+        Sabitlenmiş bir sürüm istiyorsan:
+
+            run_ptc_code(kod, inputs=["rapor.pdf@onaylanmis"])
+            # kodun içinde:  open("/artifacts/_alias/rapor.pdf")
 
         Bunlar bu oturumun işi DEĞİL. Kullanıcı açıkça istemedikçe kullanma ve
         asla kendi çıktın gibi sunma. Hangi çalıştırmada ne olduğunu sistem
@@ -181,16 +212,32 @@ def _make_ptc_tool(
         sonraki çalıştırmada `/output/<dizin>/` olarak açılmış hâlde gelir.
         Panelde PNG ve PDF önizlemesi var, yani ürettiğin belge gerçekten
         görüntülenebilir."""
-        if trace.sandbox_run_count() >= MAX_SANDBOX_RUNS_PER_TURN:
-            # Altan'ın kararı (2026-09-01): agent, engellenen bir hedefi farklı
-            # bir URL/şema ile tekrar tekrar deneyip her seferinde yeni bir
-            # ConfigMap+Job+Pod (~7sn) yaratabiliyordu. Sınıra ulaşılınca YENİ
-            # bir pod hiç yaratılmadan (run_sandbox çağrılmadan) reddedilir.
+        # SEBEP-FARKINDA KAPI (2026-09-08). Sınıra ulaşılınca YENİ bir pod hiç
+        # yaratılmadan (run_sandbox çağrılmadan) reddediliyor.
+        toplam = trace.sandbox_run_count()
+        # `denied_action` 2026-09-03'ten beri ÜRETİLMİYOR (Hubble bağımlılığı
+        # kalktı, bkz. `sandbox_runner` başlığı): ağa çıkma denemesi sıradan
+        # bir `error` olarak dönüyor — DNS kapalı olduğu için `gaierror`.
+        # Yani yalnızca `denied_action`a bakan bir sayaç ağ denemesini hiç
+        # göremez ve 2026-09-01'deki dar sınır fiilen devre dışı kalırdı
+        # (2026-09-08'de bulundu). Ayrım metinden kuruluyor —
+        # `models.ag_engeli_gibi`, Codex `is_likely_sandbox_denied()` deseni.
+        engellenen = trace.sandbox_run_count(("denied_action", "error:ag"))
+        if engellenen and toplam >= MAX_SANDBOX_RUNS_PER_TURN:
+            # Ağ engeli görüldüyse ESKİ dar sınır aynen geçerli.
             return (
                 f"Bu soruda zaten {MAX_SANDBOX_RUNS_PER_TURN} kez run_ptc_code "
-                "çalıştırıldı — sınıra ulaşıldı, YENİ bir sandbox çalıştırılmadı. "
-                "Farklı bir URL/domain/şema deneyerek tekrar çağırma; elindeki "
-                "bilgiyle yanıt ver, tahmini değer üretme."
+                "çalıştırıldı ve bir erişim ağ seviyesinde engellendi — sınıra "
+                "ulaşıldı, YENİ bir sandbox çalıştırılmadı. Farklı bir "
+                "URL/domain/şema deneyerek tekrar çağırma; elindeki bilgiyle "
+                "yanıt ver, tahmini değer üretme."
+            )
+        if toplam >= MAX_KOD_HATASI_CALISTIRMA:
+            return (
+                f"Bu soruda {MAX_KOD_HATASI_CALISTIRMA} kez run_ptc_code "
+                "çalıştırıldı — sınıra ulaşıldı, YENİ bir sandbox "
+                "çalıştırılmadı. Elindeki bilgiyle yanıt ver; neyi "
+                "başaramadığını açıkça söyle ve tahmini değer üretme."
             )
         run = run_sandbox(code, on_event=on_ptc_event, workflow_id=workflow_id,
                           inputs=inputs)
@@ -211,10 +258,57 @@ def _make_ptc_tool(
                 "Sandbox, onaylı Tool Gateway dışında bir hedefe erişmeye çalıştı; "
                 "bu ağ seviyesinde (Cilium) engellendi. Tahmini bir değer üretme."
             )
-        detail = f" Hata: {run.error_message}" if run.error_message else ""
-        return f"Sandbox çalıştırması başarısız oldu.{detail} Tahmini bir değer üretme."
+        # 2026-09-08: bu metin eskiden yalnızca "Tahmini bir değer üretme"
+        # diyordu — yani modeli DURMAYA teşvik ediyordu, düzeltmeye değil.
+        # Yasak yerinde ve kalıyor (uydurma cevabı engelliyor) ama tek başına
+        # kaldığında self-repair'i de kesiyordu. Sahadaki iki bağımsız emsal
+        # (smolagents `memory.py`, OpenHands `get_action_error_nudge`) iki
+        # şeyi BİRLİKTE söylüyor: tekrar dene VE aynısını tekrarlama.
+        #
+        # "Ne yapmalı" yönergesinin kendisi `entrypoint.py`'nin ürettiği
+        # `error_message` içinde geliyor (hata tipi + kullanıcı karelerinin
+        # izi + hata anına kadarki stdout ile birlikte).
+        detail = f"\n{run.error_message}" if run.error_message else ""
+        kalan = MAX_KOD_HATASI_CALISTIRMA - trace.sandbox_run_count()
+        return (f"Sandbox çalıştırması başarısız oldu.{detail}\n\n"
+                f"(Bu turda kalan çalıştırma hakkı: {max(kalan, 0)})")
 
     return run_ptc_code
+
+
+def _make_artifact_ara_tool(workflow_id: str | None):
+    """Kayıt defterinde arama — MLMD `filter_query`'nin ajana açılmış hâli.
+
+    Manifest (`ArtifactContextMiddleware`) her turda en yeni 40 ismi context'e
+    koyuyor; depoda yüzlercesi varken gerisi modele GÖRÜNMEZ kalıyordu.
+    Manifesti büyütmek yanlış çözüm — o liste her çağrıda taşınıyor. Doğrusu
+    aramayı modelin isteğine bırakmak (2026-09-08).
+    """
+    @tool
+    def artifact_ara(ad: str | None = None, tip: str | None = None,
+                     metin: str | None = None) -> str:
+        """Saklı artifact'leri ADI, TİPİ ya da ad içindeki bir METİNLE arar.
+
+        Sistem mesajındaki liste yalnızca EN YENİ birkaç artifact'i gösteriyor.
+        Aradığın dosya orada yoksa ama var olabileceğini düşünüyorsan (kullanıcı
+        "geçen sefer", "daha önce", "eski raporu" gibi bir şey diyorsa) BU
+        ARACI ÇAĞIR — listede yok diye yeniden üretmeye kalkma.
+
+        En az bir süzgeç ver:
+          ad    — tam dosya adı, ör. "rapor.pdf"
+          tip   — "system.Dataset" | "system.Artifact" | "system.Model"
+          metin — ad içinde geçen bir parça, ör. "ticket" (en kullanışlısı)
+
+        Yalnızca İSİM/TİP/BOYUT döner, içerik DÖNMEZ. Dosyayı gerçekten
+        okumak için dönen satırı `run_ptc_code`'un `inputs`'una koy.
+        """
+        jeton = _kapsam_jetonu(workflow_id)
+        if not workflow_id or not jeton:
+            return "Artifact kapsamı yok — arama yapılamadı."
+        return artifact_context.ara(workflow_id, jeton,
+                                    ad=ad, tip=tip, metin=metin)
+
+    return artifact_ara
 
 
 def _build_tools(
@@ -231,8 +325,14 @@ def _build_tools(
     doğrudan değil, her zaman `run_ptc_code` içinden yazdığı kodla ulaşıyor.
     Sonuç: her etkileşim PTC panelinde (configmap/job/tool_call/final) görünür
     oluyor; bedeli, basit sorularda bile bir K8s Job'unun ayağa kalkması kadar
-    gecikme (demo/gözlemlenebilirlik için kabul edilen takas)."""
-    return [_make_ptc_tool(trace, on_ptc_event, workflow_id)]
+    gecikme (demo/gözlemlenebilirlik için kabul edilen takas).
+
+    2026-09-08: yanına `artifact_ara` eklendi. Bu bir istisna DEĞİL, aynı
+    kuralın devamı: sandbox'ın hâlâ listeleme yolu yok — arama HOST tarafında,
+    tıpkı manifest gibi. Model neyin var olduğunu öğreniyor, baytları değil.
+    (§10.6 desen 6: kayıt defterine sorgu — MLMD `filter_query`.)"""
+    return [_make_ptc_tool(trace, on_ptc_event, workflow_id),
+            _make_artifact_ara_tool(workflow_id)]
 
 
 def build_checkpointer():

@@ -2,12 +2,13 @@
 
 `pytest` birim/entegrasyon testleri kodu sınıyor; bu script ÜRÜNÜ sınıyor:
 gerçek pod'lar doğuyor, gerçek MinIO'ya yazılıyor, gerçek ağ politikası
-deneniyor. 38 kontrol, hepsi ölçülüyor — hiçbiri varsayılmıyor.
+deneniyor. 52 kontrol (`direct` kipinde 53), hepsi ölçülüyor — hiçbiri
+varsayılmıyor.
 
 ## Ön koşullar
 
     kubectl port-forward svc/artifact-service 8080:8080     # kayıt defteri
-    uvicorn grounded_assistant.web.app:app --port 8010      # panel (§8 için)
+    uvicorn grounded_assistant.web.app:app --port 8123      # panel (§8 için)
 
 ## Kullanım
 
@@ -73,7 +74,7 @@ kontrol("3 artifact saklandı (dosya+json+dizin)",
         uretilen == {"ham.tickets.parquet", "kunye.json", "model.v1.tar"}, sorted(uretilen))
 
 # ══ 2. Çalıştırmalar arası keşif + kullanım ══════════════════════════════
-basla("2 · BAŞKA WORKFLOW — /output izole, load_artifact ile açık erişim")
+basla("2 · BAŞKA WORKFLOW — /output izole, çapraz girdi BEYANLA")
 r = kos(f"""
 import os, pandas as pd, json
 # KENDİ /output'u BOŞ olmalı — başka run'ın çıktısı buraya sızmamalı.
@@ -82,30 +83,27 @@ sonuc = {{
   "kendi_output_bos": os.listdir("/output") == [],
   "output_sizinti":   os.path.exists("/output/ham.tickets.parquet"),
 }}
-# Başkasınınki ancak KİMLİĞİ verilerek geliyor (KFP: başka bir run'a AÇIK adresle)
-p = load_artifact("{WF_A}", "ham.tickets.parquet")
+# Başkasınınki BEYANLA geliyor — kod hiçbir çağrı yapmıyor, dosya hazır.
+# (KFP: launcher `.uri`leri `.path`e indirir, kullanıcı kodu çağrı yapmaz.)
+p = "/artifacts/{WF_A}/ham.tickets.parquet"
 sonuc["satir"] = len(pd.read_parquet(p))
-sonuc["kunye"] = json.load(open(load_artifact("{WF_A}", "kunye.json")))["kaynak"]
-d = load_artifact("{WF_A}", "model.v1.tar")
-sonuc["dizin"] = open(os.path.join(d, "alt", "derin.txt")).read()
-sonuc["yol"] = p.startswith("/artifacts/{WF_A}/")
-try:
-    load_artifact("{WF_A}", "hic-olmayan.parquet"); sonuc["yok_hatasi"] = "SESSIZ(!)"
-except FileNotFoundError:
-    sonuc["yok_hatasi"] = "FileNotFoundError"
+sonuc["kunye"] = json.load(open("/artifacts/{WF_A}/kunye.json"))["kaynak"]
+sonuc["dizin"] = open("/artifacts/{WF_A}/model.v1/alt/derin.txt").read()
+sonuc["yol"] = os.path.exists(p)
+sonuc["cagri_yok"] = "load_artifact" not in globals()
 set_result(sonuc)
-""", WF_B, "kesif")
+""", WF_B, "kesif", inputs=[f"{WF_A}/ham.tickets.parquet", f"{WF_A}/kunye.json",
+                            f"{WF_A}/model.v1"])
 kontrol("başka workflow okuyabiliyor", r.status.value == "success", r.error_message or "")
 if r.status.value == "success":
     d = eval(r.result_text)
     kontrol("kendi /output'u İZOLE (başkasınınki sızmıyor)",
             d["kendi_output_bos"] and not d["output_sizinti"])
-    kontrol("load_artifact /artifacts/<wf>/ altına indiriyor", d["yol"])
+    kontrol("beyan /artifacts/<wf>/ altına yerleştiriyor", d["yol"])
+    kontrol("sandbox'ta artifact ÇAĞRISI yok", d["cagri_yok"])
     kontrol("parquet düz read_parquet ile okundu", d["satir"] == 150, d["satir"])
     kontrol("json düz open ile okundu", d["kunye"] == "crm")
     kontrol("dizin artifact'i açıldı", d["dizin"] == "derin dosya")
-    kontrol("olmayan artifact AÇIK hata veriyor", d["yok_hatasi"] == "FileNotFoundError",
-            d["yok_hatasi"])
 
 # ══ 3. Türetme + otomatik soy ════════════════════════════════════════════
 basla("3 · TÜRETME — soy ağacı kendiliğinden kuruluyor")
@@ -113,14 +111,14 @@ r = kos(f"""
 import pandas as pd, matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-df = pd.read_parquet(load_artifact("{WF_A}", "ham.tickets.parquet"))
+df = pd.read_parquet("/artifacts/{WF_A}/ham.tickets.parquet")
 ozet = df.groupby("departman")["gun"].mean().round(2)
 ozet.to_frame("ort").to_parquet("/output/departman.ozet.parquet")
 fig, ax = plt.subplots(figsize=(6,3)); ax.bar(list(ozet.index), list(ozet.values))
 fig.savefig("/output/dagilim.png", dpi=100)
 with PdfPages("/output/rapor.pdf") as pdf: pdf.savefig(fig)
 set_result({{"ozet": ozet.to_dict()}})
-""", WF_B, "report")
+""", WF_B, "report", inputs=[f"{WF_A}/ham.tickets.parquet"])
 kontrol("PDF/PNG üretimi", r.status.value == "success", r.error_message or "")
 kimlikleri_al(r)
 soy = {o.name: list(o.parents) for o in r.artifacts if o.op.value == "produced"}
@@ -158,6 +156,12 @@ kontrol("soy grafiği ürünleri buluyor",
 
 # ══ 5. Güvenlik sınırları ════════════════════════════════════════════════
 basla("5 · GÜVENLİK SINIRLARI")
+# MinIO'nun IP'sini DIŞARIDAN veriyoruz. Eskiden sonda bunu
+# `MINIO_PORT_9000_TCP_ADDR`'den okuyordu; `enableServiceLinks: false`
+# konunca o değişken kalktı ve sonda IP'yi bulamayıp KeyError veriyordu —
+# yani "rota kapalı" DEĞİL, "adres bilinmiyor" ölçülüyordu. İkisi ayrı şey:
+# adresi bilmemek bir engel değil, rota testinin de sorusu bu değil.
+_MINIO_IP = os.popen("kubectl get svc minio -o jsonpath='{.spec.clusterIP}'").read().strip()
 r = kos("""
 import os, socket, requests
 s = {}
@@ -165,7 +169,7 @@ s["s3_kimlik"] = [k for k in os.environ if k.startswith(("AWS_ACCESS","AWS_SECRE
 try: import boto3; s["boto3"]="VAR"
 except ImportError: s["boto3"]="yok"
 try:
-    socket.create_connection((os.environ["MINIO_PORT_9000_TCP_ADDR"],9000),timeout=6).close()
+    socket.create_connection(("__MINIO_IP__",9000),timeout=6).close()
     s["minio_ip"]="ULASILDI"
 except Exception as e: s["minio_ip"]=type(e).__name__
 try:
@@ -187,21 +191,42 @@ try:
 except Exception as e:
     s["proxy_yazma"] = type(e).__name__
 set_result(s)
-""", str(uuid.uuid4()), "guvenlik")
+""".replace("__MINIO_IP__", _MINIO_IP), str(uuid.uuid4()), "guvenlik")
 kontrol("güvenlik sondası çalıştı", r.status.value == "success", r.error_message or "")
 if r.status.value == "success":
     s = eval(r.result_text)
     kontrol("sandbox'ta S3 kimlik bilgisi YOK", s["s3_kimlik"] == [], s["s3_kimlik"])
     kontrol("S3 SDK kurulu değil", s["boto3"] == "yok")
-    kontrol("MinIO'ya doğrudan IP ile gidilemiyor", s["minio_ip"] != "ULASILDI", s["minio_ip"])
+    # Bu kontrol KİPE bağlı ve bilerek öyle: `direct` kipinde sidecar depoya
+    # kendisi yazıyor, bunun için pod'un rotası açılıyor ve NetworkPolicy pod
+    # seçtiği için sandbox da o rotayı kazanıyor. Kip anahtarı bunu
+    # kendiliğinden kapatmıyor — ölçüp yazmak, sessizce geçmekten iyi.
+    _kip = os.environ.get("PTC_ARTIFACT_TRANSFER", "proxy")
+    if _kip == "direct":
+        kontrol("[direct] MinIO'ya rota AÇIK — kipin bilinen bedeli",
+                s["minio_ip"] == "ULASILDI", s["minio_ip"])
+        kontrol("[direct] rotaya rağmen S3 anahtarı YOK", s["s3_kimlik"] == [],
+                s["s3_kimlik"])
+    else:
+        kontrol("[proxy] MinIO'ya doğrudan IP ile gidilemiyor",
+                s["minio_ip"] != "ULASILDI", s["minio_ip"])
     kontrol("internet kapalı", s["internet"] != "ACIK", s["internet"])
     kontrol("sandbox'ta KAPSAM JETONU da YOK (sidecar'da)",
             s["jeton_sizinti"] == [], s["jeton_sizinti"])
-    kontrol("jetonsuz doğrudan yazma reddedildi (401)",
-            s["jetonsuz_yazma"] == 401, s["jetonsuz_yazma"])
-    kontrol("proxy'de YAZMA uç noktası yok (2xx değil)",
+    # 2026-09-07 (ikinci tur): sandbox'ta artifact istemcisi de, servis
+    # ADRESİ de kalmadı. Eskiden "adresi var ama jetonsuz yazamıyor" diye
+    # ölçüyorduk; artık adres de yok, yani ölçülecek şey değişti.
+    kontrol("sandbox'ta servis ADRESİ yok", s["jetonsuz_yazma"] == "MissingSchema",
+            s["jetonsuz_yazma"])
+    kontrol("sandbox'ta localhost proxy yok",
             not (isinstance(s["proxy_yazma"], int) and 200 <= s["proxy_yazma"] < 300),
             s["proxy_yazma"])
+# Jetonsuz yazmanın 401 döndüğü DIŞARIDAN doğrulanıyor: sandbox'ın adresi
+# olmaması, servisin açık olduğu anlamına gelmez.
+kontrol("jetonsuz doğrudan yazma reddedildi (401)",
+        requests.post(f"{SERVIS}/artifacts", data=b"x",
+                      headers={"X-Artifact-Name": "z.txt", "Content-Type": "text/plain"},
+                      timeout=15).status_code == 401)
 
 # ── tenant sınırı (dışarıdan)
 from grounded_assistant.artifacts.scope import Scope, issue_token
@@ -254,7 +279,7 @@ kontrol("aynı içerik → aynı hash (tek bayt)", len(hashler) == 1, hashler)
 
 # ══ 8. Panel API'leri ════════════════════════════════════════════════════
 basla("8 · PANEL")
-PANEL = "http://127.0.0.1:8010"
+PANEL = os.environ.get("PTC_PANEL_URL", "http://127.0.0.1:8123")
 try:
     d = requests.get(f"{PANEL}/api/durum", params={"session": WF_B}, timeout=25).json()
     kontrol("/api/durum yanıt veriyor", d["artifactler"].get("error") is None,
@@ -316,14 +341,26 @@ kontrol("?q= ad içinde arıyor", all("turev" in k["name"] for k in ara), len(ar
 kontrol("LIKE jokeri kaçırılıyor", joker == [], len(joker))
 
 # 9c — ALIAS: MLflow `models:/<ad>@<alias>` karşılığı
+# Alias kontrolü KENDİ artifact'ini üretiyor: "a.txt" gibi ortak bir ada
+# bağlanınca, depoda başka çalıştırmalardan kalan aynı adlı kayıtlar sonucu
+# belirliyordu ve test depo durumuna göre geçip kalıyordu.
+ALIAS_AD = f"alias.{uuid.uuid4().hex[:8]}.txt"
+kos(f"""
+open("/output/{ALIAS_AD}","w").write("ILK")
+set_result("ok")
+""", WF_C, inputs=[])
+kos(f"""
+open("/output/{ALIAS_AD}","w").write("IKINCI")
+set_result("ok")
+""", str(uuid.uuid4()), inputs=[])
 surumler = [k["artifact_id"] for k in
-            requests.get(f"{SERVIS}/artifacts", params={"name": "a.txt"},
+            requests.get(f"{SERVIS}/artifacts", params={"name": ALIAS_AD},
                          headers=H, timeout=20).json()]
-enyeni = requests.get(f"{SERVIS}/artifacts/by-name/a.txt", headers=H, timeout=20)
+enyeni = requests.get(f"{SERVIS}/artifacts/by-name/{ALIAS_AD}", headers=H, timeout=20)
 pa = requests.put(f"{SERVIS}/artifacts/{surumler[-1]}/alias",
                   params={"alias": "kabul"}, headers=H, timeout=20)
 kontrol("alias atanıyor", pa.status_code == 200, pa.status_code)
-ra = requests.get(f"{SERVIS}/artifacts/by-name/a.txt@kabul", headers=H, timeout=20)
+ra = requests.get(f"{SERVIS}/artifacts/by-name/{ALIAS_AD}@kabul", headers=H, timeout=20)
 kontrol("alias sürümü sabitliyor",
         ra.status_code == 200 and ra.headers.get("X-Artifact-Id") == surumler[-1],
         ra.status_code)
@@ -333,13 +370,13 @@ kontrol("alias 'en yeni' kuralından kaçırıyor",
 kontrol("bozuk alias reddediliyor",
         requests.put(f"{SERVIS}/artifacts/{surumler[-1]}/alias",
                      params={"alias": "../etc"}, headers=H, timeout=20).status_code == 400)
-r = kos("""
+r = kos(f"""
 import os
-yol = load_artifact(None, "a.txt@kabul")
-set_result({"yol": yol, "icerik": open(yol).read()})
-""", str(uuid.uuid4()), inputs=[])
-kontrol("sandbox alias'la okuyabiliyor",
-        r.status.value == "success" and eval(r.result_text)["icerik"] == "A",
+yol = "/artifacts/_alias/{ALIAS_AD}"
+set_result({{"yol": yol, "icerik": open(yol).read()}})
+""", str(uuid.uuid4()), inputs=[f"{ALIAS_AD}@kabul"])
+kontrol("sandbox alias BEYANIYLA okuyabiliyor",
+        r.status.value == "success" and eval(r.result_text)["icerik"] == "ILK",
         r.error_message or r.result_text)
 
 # ══ ÖZET ═════════════════════════════════════════════════════════════════

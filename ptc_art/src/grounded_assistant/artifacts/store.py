@@ -227,6 +227,19 @@ class ObjectStore:
         )
         return self.uri(key)
 
+    def stat(self, key: str) -> int | None:
+        """Nesnenin boyutu; yoksa None.
+
+        `register` bunu kullanıyor: doğrudan-yükleme kipinde baytları servis
+        görmüyor, dolayısıyla kayıt defterine satır açmadan önce nesnenin
+        GERÇEKTEN orada ve beyan edilen boyutta olduğunu doğrulaması gerekiyor.
+        Doğrulamasak, kayıt defteri var olmayan bayta işaret edebilirdi.
+        """
+        try:
+            return self._client.stat_object(self.config.name, key).size
+        except Exception:  # noqa: BLE001 — yok ya da erişilemiyor; ikisi de "None"
+            return None
+
     def get(self, key: str) -> bytes:
         yanit = self._client.get_object(self.config.name, key)
         try:

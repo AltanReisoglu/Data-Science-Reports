@@ -91,6 +91,8 @@ _INDEXES = (
     "CREATE INDEX IF NOT EXISTS ix_artifacts_owner_name ON artifacts(owner, name)",
     # owner+alias: `by-name/<ad>@<alias>` çözümü (2026-09-07).
     "CREATE INDEX IF NOT EXISTS ix_artifacts_owner_alias ON artifacts(owner, alias)",
+    # owner+hash: doğrudan-yükleme kipinde dedup sorgusu (2026-09-07).
+    "CREATE INDEX IF NOT EXISTS ix_artifacts_owner_hash ON artifacts(owner, content_hash)",
 )
 
 _COLUMNS = (
@@ -352,6 +354,21 @@ class MetadataStore:
             (workflow_id, name),
         )
         return next(rows, None)
+
+    def find_by_hash_for_owner(self, owner: str, content_hash: str) -> ArtifactMeta | None:
+        """Aynı içerik bu TENANT'ta var mı.
+
+        `find_by_hash` workflow'a kapalı; doğrudan-yükleme kipinde sidecar
+        yüklemeden ÖNCE soruyor ve o an hangi çalıştırmanın ürettiği önemsiz —
+        önemli olan baytın tenant'ta zaten durup durmadığı. Kapsam sınırı yine
+        `owner` (2026-09-06'daki genişletmeyle aynı gerekçe).
+        """
+        return next(self._query(
+            "SELECT * FROM artifacts "
+            f"WHERE owner = {self.placeholder} AND content_hash = {self.placeholder} "
+            "ORDER BY created_at ASC LIMIT 1",
+            (owner, content_hash),
+        ), None)
 
     def find_by_hash(self, workflow_id: str, content_hash: str) -> ArtifactMeta | None:
         """`cached()` için: bu içerik bu workflow'da zaten üretilmiş mi?"""

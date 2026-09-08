@@ -31,7 +31,6 @@ sys.path.insert(0, str(KOK / "src" / "grounded_assistant" / "artifacts"))
 os.environ.setdefault("TOOL_GATEWAY_ENDPOINT", "http://yok/mcp")
 os.environ.setdefault("ARTIFACT_SERVICE_ENDPOINT", "http://yok")
 
-import entrypoint  # noqa: E402
 import sidecar  # noqa: E402
 
 WF = "wf-bu"
@@ -140,24 +139,24 @@ def test_yol_gecisli_tar_disari_yazmiyor(ortam, tmp_path):
 
     hedef = ortam / "acilan"
     hedef.mkdir()
-    for ac in (sidecar._tari_ac, entrypoint._tari_ac):
-        try:
-            ac(str(kotu), str(hedef))
-        except Exception:  # noqa: BLE001 — reddetmek de geçerli bir sonuç
-            pass
-        assert not (tmp_path / "kacis.txt").exists()
-        assert not (ortam.parent / "kacis.txt").exists()
+    try:
+        sidecar._tari_ac(str(kotu), str(hedef))
+    except Exception:  # noqa: BLE001 — reddetmek de geçerli bir sonuç
+        pass
+    assert not (tmp_path / "kacis.txt").exists()
+    assert not (ortam.parent / "kacis.txt").exists()
 
 
-def test_baska_calistirmanin_dizini_load_artifact_ile_aciliyor(tmp_path, monkeypatch):
-    """`/output`'a inmez; açıkça istenince `/artifacts/<wf>/<dizin>/` olur."""
-    d = tmp_path / "artifacts"
-    d.mkdir()
-    monkeypatch.setattr(entrypoint, "ARTIFACTS_DIR", str(d))
-
+def test_baska_calistirmanin_dizini_BEYANLA_aciliyor(ortam, tmp_path, monkeypatch):
+    """`/output`'a inmez; `<wf>/<ad>` beyan edilince `/artifacts/<wf>/<ad>/`
+    olarak AÇILMIŞ hâlde gelir. Sandbox hiçbir çağrı yapmıyor."""
+    art = tmp_path / "artifacts"
+    monkeypatch.setattr(sidecar, "ARTIFACTS_DIR", str(art))
     ust = SahteUst([], {"wf-baska/model.v1.tar": tar_uret(tmp_path, {"a.json": "1"})})
-    yol = entrypoint._load_artifact_uret(ust)("wf-baska", "model.v1.tar")
+    monkeypatch.setattr(sidecar, "istemci", ust)
+    monkeypatch.setattr(sidecar, "INPUTS_HAM", "wf-baska/model.v1")
 
-    assert Path(yol) == d / "wf-baska" / "model.v1"
-    assert (Path(yol) / "a.json").read_text() == "1"
-    assert not (d / "wf-baska" / "model.v1.tar").exists()
+    assert sidecar.yerlestir() == 1
+    assert (art / "wf-baska" / "model.v1" / "a.json").read_text() == "1"
+    assert not (art / "wf-baska" / "model.v1.tar").exists()
+    assert not (ortam / "model.v1").exists()

@@ -1,0 +1,22 @@
+# Sidecar imajı — sandbox imajından AYRI.
+#
+# Neden ayrı: doğrudan-yükleme kipinde sidecar `minio` paketine ihtiyaç
+# duyuyor. Aynı imajı paylaşsalardı LLM'in kodu `import minio` yapabilirdi.
+# Kimlik bilgisi orada olmadığı için bir şey yapamazdı, ama o kipte pod'un
+# depoya AĞ ROTASI da açılıyor — geriye tek engel olarak kimlik doğrulama
+# kalırdı. Argo da aynısını yapıyor: `argoexec` kullanıcının imajından ayrı.
+#
+# Kabul testindeki "sandbox'ta S3 SDK yok" kontrolü bu ayrımı koruyor.
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir requests minio
+
+COPY src/grounded_assistant/artifacts/serialize.py /serialize.py
+COPY sandbox_image/artifact_client.py /artifact_client.py
+COPY sandbox_image/s3_client.py /s3_client.py
+COPY sandbox_image/sidecar.py /sidecar.py
+
+ENV PYTHONPATH=/ PYTHONUNBUFFERED=1
+# runAsNonRoot sayısal UID istiyor — isim çözemiyor (2026-09-07, SCC taklidi).
+USER 1001
+ENTRYPOINT ["python", "/sidecar.py"]

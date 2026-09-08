@@ -1,8 +1,14 @@
-# PTC Artifact Persistence — Karşılaştırmalı Sunum
+# PTC Artifact Persistence — Sunum
 
-**Her sayfa bir özellik. Her sayfada bir tablo. Sonunda "biz neredeyiz".**
+**13 sayfa. Anlatılacak tek hikâye var: sandbox ölür, ürettiği kalır — ve
+bunu yaparken hiçbir şey icat etmedik.**
 
-Tarih: 2026-09-04 · Detaylar: [PTC_Piyasa_Mentaliteleri.md](PTC_Piyasa_Mentaliteleri.md)
+Tarih: 2026-09-07 · Slaytlar: `node scripts/sunum_uret.js` · Diyagramlar: `python scripts/diyagram_uret.py`
+
+> Bu dosya **sunum**; arşiv değil. Bütün karşılaştırmalar, alıntılar ve
+> ölçümler [PTC_Piyasa_Mentaliteleri.md](PTC_Piyasa_Mentaliteleri.md) ve
+> [PTC_Karsilastirma_Tablolari.md](PTC_Karsilastirma_Tablolari.md) içinde.
+> Soru gelirse oradan açılır.
 
 ---
 
@@ -18,317 +24,241 @@ Tarih: 2026-09-04 · Detaylar: [PTC_Piyasa_Mentaliteleri.md](PTC_Piyasa_Mentalit
 
 **Kural:** Sandbox'ın yaşam süresi, ürettiğinin yaşam süresini belirlememeli.
 
-**Karıştırılmaması gereken üçlü:**
-
-| Ne | Örnek | Nerede durmalı |
-|---|---|---|
-| Geçici dosya | Ara hesap, cache | Sandbox diski — **ölmesi istenir** |
-| Artifact | 40 sn'de üretilen tablo | Kalıcı depo |
-| State | "Konuşmada nerede kaldım" | Ayrı, ama o da kalıcı |
+**Karıştırılmaması gereken üçlü:** geçici dosya (ölmesi *istenir*) · artifact
+(kalıcı depo) · state (ayrı, o da kalıcı).
 
 ---
 
-## Sayfa 2 — İzolasyon: kod nerede çalışıyor
+## Sayfa 2 — Bir adım nasıl çalışıyor
 
-| Yöntem | Ne demek | Kim kullanıyor | Güç |
+<!-- diyagram: d1-yasam-dongusu -->
+
+**Kodun gördüğü tek şey bir dosya yolu.** Artifact fonksiyonu yok, depo adresi
+yok, anahtar yok — ve **hiçbir ağ çağrısı yok.** Ölçüldü:
+
+| sandbox'ın içinden | |
+|---|---|
+| artifact fonksiyonları | `[]` |
+| servis adresi | yok |
+| localhost proxy | yok |
+| `minio` | `gaierror` — DNS'te bile yok |
+
+KFP'nin kullanıcı bileşenine verdiği garantinin aynısı.
+
+---
+
+## Sayfa 3 — Baytı kim taşıyor: üç yerleşim
+
+<!-- diyagram: d2-aracinin-yeri -->
+
+**Seçimi zorlayan tek şey:** kodu LLM yazıyor. KFP'nin launcher'ı kullanıcı
+container'ının içinde — anahtar orada dururdu. Argo'nun yerleşimi doğru ama
+kayıt defteri yok. Biz **yerleşimi Argo'dan, kanalı MLflow'dan** aldık.
+
+---
+
+## Sayfa 4 — Baytlar hangi yoldan: iki kip
+
+| | Baytlar | S3 anahtarı | Kayıt defteri |
 |---|---|---|---|
-| Container (runc) | Kernel paylaşılır | **BİZ** | En zayıf |
-| V8 isolate | JS motoru içinde bölge | Cloudflare Code Mode | Dar ama sıkı |
-| gVisor | Araya sahte kernel | Google GKE Agent Sandbox | Orta |
-| Kata / microVM | Pod başına kendi kernel'i | Red Hat önerisi, E2B, Vercel | Güçlü |
-| Hyper-V | Donanım sanallaştırma | Microsoft | Güçlü |
+| **KFP / OpenShift AI** | launcher → S3 doğrudan | **kullanıcı container'ında** | MLMD |
+| **Argo Workflows** | wait sidecar → S3 doğrudan | ayrı container | **yok** |
+| **MLflow** (proxied) | client → **HTTP** → server | **server'da** | tracking DB |
+| **BİZ · `proxy`** | sidecar → HTTP → servis | serviste | SQLite |
+| **BİZ · `direct`** | sidecar → S3 doğrudan | **sidecar'da** | SQLite |
 
-**Sonuç:** Bu listede en zayıf olan biziz. Red Hat AI-üretimi kod için açıkça
-Kata öneriyor. Kod değişikliği gerektirmez — node seviyesinde önkoşul.
+`PTC_ARTIFACT_TRANSFER` ile seçiliyor. `direct` **KFP'nin iki kanalı**:
+bayt depoya, künye kayıt defterine.
+
+**`direct`'in ölçülmüş bedeli:** NetworkPolicy **pod** seçer, container değil.
+Sidecar'a depo rotası açmak sandbox'a da açmaktır.
+
+| | `proxy` | `direct` |
+|---|---|---|
+| `sandbox → minio` (IP ile) | **TimeoutError** | **ULASILDI** |
+| sandbox'ta S3 anahtarı | yok | yok |
+
+**Hangisi ne zaman:** < ~50 MB `proxy` (kontroller tek yerde) · > ~50 MB
+`direct` (GB'ları tek bir servisten akıtmak israf). MLflow'un sunduğu seçimin
+aynısı — `--serve-artifacts` var/yok.
 
 ---
 
-## Sayfa 3 — Sandbox ömrü
+## Sayfa 5 — Çapraz workflow: vakanın kendisi
 
-| Model | Kim | Süre |
-|---|---|---|
-| Her çağrıda yeni, saklanmaz | **BİZ** | 3.14 sn |
-| Efemer + cooldown'da yok edilir | Microsoft | Havuzdan ms |
-| Varsayılan yeni, id ile canlanır | Anthropic | **30 gün** (5 dk'da checkpoint) |
-| Adlandırılmış, uzun ömürlü | Google Agent Engine | **14 gün** |
-| Süre sınırlı oturum | AWS | 15 dk – 8 saat |
-| Kalıcı workspace + snapshot | OpenAI | — |
+<!-- diyagram: d3-capraz-workflow -->
 
-**Ayrım:** Anthropic *container'ı* saklıyor (değişkenler, dosyalar, hatta
-yorumlayıcı durumu). Biz *artifact'i* saklıyoruz. Farklı problem, farklı çözüm.
+**B, A'nın çalıştırma kimliğini kayıt defterinden öğreniyor.** Aralarında
+doğrudan bağ yok; A çoktan bitmiş, pod'u silinmiş olabilir.
 
 ---
 
-## Sayfa 4 — Depoya erişim: mount mu, API mi
+## Sayfa 6 — Ne yazılı, ne çalışma anında bulunuyor
 
-| Yaklaşım | Yazınca ne olur | Kim |
-|---|---|---|
-| **Mount** | Yol = bucket. Yazdığın an gider | E2B, Modal, Daytona, Vercel, Cloudflare, Fly.io |
-| **API/SDK** | Sıradan klasör; bir bileşen taşır | **BİZ**, Anthropic, OpenAI, Red Hat |
-
-**Red Hat ne diyor:**
-> *"…you must create a local client … by using an AWS SDK such as Boto3."*
-
-FUSE mount ve CSI sürücüsü dokümanda **hiç geçmiyor**.
-
-**Mount'un bedeli:**
-
-| | Mount | Bizimki |
-|---|---|---|
-| Çok büyük dosya (>512Mi) | ✓ | ✗ |
-| Kısmi/akan yazma | ✓ | ✗ |
-| **Kayıt defteri** | ✗ | ✓ |
-| **İçerik doğrulaması** | ✗ | ✓ |
-| Kapsam granülaritesi | Bucket/prefix | **Çalıştırma başına** |
-
----
-
-## Sayfa 5 — Anahtar kimde
-
-| Konum | Kim | Risk |
-|---|---|---|
-| **Sandbox'ın içinde** | E2B (`/root/.passwd-s3fs`), Vercel (düz), Daytona (external) | Denetlenmemiş kod anahtarı görüyor |
-| Sandbox'ta ama IAM ile dar | AWS (execution role) | Rol kadar |
-| **Dışarıda, aracıda** | Cloudflare (binding/proxy), Vercel (proxy) | Mount var, anahtar yok |
-| **Hiç yok** | **BİZ**, Anthropic, OpenAI, Fly.io | — |
-
-**Bizde:** sandbox'ta S3 anahtarı yok, MinIO'ya rota yok, DNS yok.
-**Doğrulandı:** `gaierror` + `ConnectionRefusedError`.
-
----
-
-## Sayfa 6 — Kayıt defteri var mı
-
-| Var | Yok |
+| | Nereden geliyor |
 |---|---|
-| **BİZ** (`artifact_id`, tip, soy, TTL, hash) | E2B, Modal, Daytona, Vercel |
-| Anthropic (Files API) | Cloudflare, Fly.io, Microsoft |
-| Red Hat / KFP (MLMD) | AWS (denetim CloudTrail'de) |
+| Ne aranacak (`processed-result.json`) | **yazılı** — hat tanımında, Argo/KFP gibi |
+| Hangi çalıştırma üretmiş | çalışma anında, kayıt defteri sorgusundan |
+| Hangi sürüm (8 aday arasından) | çalışma anında, alias/en-yeni kuralıyla |
 
-**Araştırmanın en keskin bulgusu:**
-> Mount eden sağlayıcıların **hiçbirinde** artifact registry yok. Yazılan
-> dosyanın `artifact_id`'si, soyu, TTL'i yok — sadece bir S3 anahtarı var.
-> Dokümanlar "persistent data access" diyor; **hiçbiri "artifact" demiyor.**
+```
+inputs=["{kaynak_wf}/processed-result.json"]
+         ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+         bulunuyor     yazılı
+```
 
-**Kural:** Kayıt defteri, yalnızca yazma yolu **bir bileşenden geçtiğinde**
-ayakta kalıyor. Doğrudan mount = "sadece bucket".
+Bu bir **çağrı değil, beyan**: kod `open("/artifacts/<wf>/…")` yazıyor, dosya
+zaten orada. Sandbox hiçbir yere bağlanmıyor.
+
+**Adı da modelin seçtiği yol var:** Sohbet sekmesi. Orada hiçbir şey yazılı
+değil — manifest isimleri veriyor, neyi okuyacağına model karar veriyor.
 
 ---
 
-## Sayfa 7 — Ağ duruşu
+## Sayfa 7 — Keşif: ajan çekeceğini nasıl anlıyor
 
-| Duruş | Kim |
+| Desen | Nasıl | Kim |
+|---|---|---|
+| Sadece tool tarifi | Model çağırmayı *seçmek* zorunda | *(eskiden biz)* |
+| Dosya sistemi + `ls` | Sandbox yaşıyorsa model bakar | Anthropic, Google |
+| **İsimler prompt'a enjekte** | İsimler talimatlarda, içerik talep üzerine | **Google ADK**, **BİZ** |
+| Kayıt defterine sorgu | `filter_query` ile süzülmüş liste | **MLMD**, **BİZ** |
+| **Keşif YOK** | DAG statik, girdi bağlanmış | KFP, Argo, Airflow, Tekton |
+
+**Klasik pipeline'da 5. adım bir şey anlamaz — kendisine söylenir. Ajan
+dünyasında sormak zorundadır, çünkü kendisi de o an icat edilmiştir.**
+
+---
+
+## Sayfa 8 — Beyan · Süzgeç · Alias
+
+| Açık | Kaynak | Bizdeki hâli |
+|---|---|---|
+| Hangi girdi okundu (soy şişiyordu) | **MLMD** `DECLARED_INPUT` | `run_ptc_code(kod, inputs=[…])` |
+| 62 addan 39'u görünüyor, arama yok | **MLMD** `filter_query` | `?name= ?type= ?q=` |
+| Aynı ad 17 kez, hep en yeni geliyor | **MLflow** `models:/<ad>@<alias>` | `by-name/rapor.pdf@onaylanmis` |
+
+**Beyanın üç biçimi** — üçü de KFP'de `.uri` beyanına denk:
+
+```
+inputs=["ozet.json"]             → /output/ozet.json
+inputs=["wf-abc/ozet.json"]      → /artifacts/wf-abc/ozet.json
+inputs=["rapor.pdf@onaylanmis"]  → /artifacts/_alias/rapor.pdf
+```
+
+**Sürüm seçimi canlı doğrulandı:**
+
+| | Seçilen | Üreten çalıştırma |
+|---|---|---|
+| alias yokken | `art_dd422fd3e66b` — **en yeni** | 119d1f91 |
+| `@onaylanmis` sabitliyken | `art_cfa44f0298f5` — **en eski** | bfc62bbe |
+
+---
+
+## Sayfa 9 — Dört icat ettik, dördünü de attık
+
+| İcat | Ne oldu | Yerine geçen |
+|---|---|---|
+| LLM'e artifact API'si (5 fonksiyon) | sessiz `None`'lar, anlaşılmaz hatalar | düz Python + `/output` — **KFP** |
+| Şeffaf tembel okuma (~120 satır yama) | `/output` yalan söylüyordu | kod başlamadan yerleştir — **Argo/KFP** |
+| `atime` ile soy ölçümü | çalışıyordu, ama emsali yok | beyan — **MLMD** |
+| sandbox'ta `load_artifact` | çalışma anında ağ çağrısı | çapraz girdi de **beyan** — KFP |
+
+**Hataların hepsi bizim icat ettiğimiz yerlerde çıktı; kopyaladığımız hiçbir
+parçadan çıkmadı.**
+
+| | Öncesi | Sonrası |
+|---|---|---|
+| `entrypoint.py` | 651 satır | **298 satır** |
+| Yama satırı | ~120 | **0** |
+| Sandbox'ın ağ çağrısı | 1 (localhost proxy) | **0** |
+| Okuyan çalıştırma | 4,11 sn | **3,13 sn** |
+
+---
+
+## Sayfa 10 — Hata kurtarma: sinyali zenginleştirdik
+
+**Sandbox patlayınca modele giden metin. Önce ve sonra:**
+
+```
+ÖNCE   Hata: 'yok'          ← tip yok, satır yok, stdout yok
+       Tahmini bir değer üretme.        ← modele DUR diyor
+
+SONRA  File "/sandbox/code.py", line 6, in ic
+           def ic(): return d["yok"]
+                            ~^^^^^^^
+       KeyError: 'yok'                  ← tip + satır + ifade
+       Hata anına kadar yazılan çıktı:
+       adim 1: veri yuklendi            ← print'ler korunuyor
+       Hatayı düzeltip TEKRAR çalıştır. Aynı kodu aynen gönderme…
+```
+
+| Parça | Kimden kopya |
 |---|---|
-| Tamamen kapalı | Anthropic (*"Completely disabled for security"*) |
-| **Varsayılan reddet + allowlist** | **BİZ**, Red Hat/OpenShell, Google GKE |
-| Açık, yapılandırılabilir | AWS ("network modes") |
-| Opsiyonel kontroller | Microsoft |
+| Yalnızca **kullanıcı kodunun** kareleri | **SWE-agent** — "tip olmadan model yanlış teşhis koyuyor" |
+| Hata anına kadarki **stdout** | **smolagents** — bunun için ayrı testi var |
+| **20 000 karakterde ortadan** kırpma | **smolagents · Codex** |
+| Kırpıldığını **söyle** + ne yapacağını **öğret** | **SWE-agent** |
+| "tekrar dene" **ve** "aynısını tekrarlama" | **smolagents + OpenHands** |
+| **Sebep-farkında** sayaç | **Anthropic `error_code` · Codex `is_likely_sandbox_denied`** |
 
-**Red Hat'in ifadesi:**
-> *"The default posture is deny-all. In practice, you write a policy that
-> allowlists exactly the endpoints your agent needs."*
+**Sayaç neden bölündü:** tek sayaç kod hatasını, ağ engelini ve timeout'u aynı
+kutuya koyuyordu. Sınır ağ engeli için konmuştu; kod hatası da aynı bütçeden
+yediği için self-repair'e **1 deneme** kalıyordu. Artık ağ engeli **2**, kod
+hatası **5**.
 
-**Bizde iki servis ayrı:** Tool Gateway internete çıkar, depoya çıkamaz.
-Artifact Service depoya çıkar, internete çıkamaz. Tek workload'ın ele
-geçirilmesi ikisini birden vermiyor.
+> **Bütçeyi büyütmek tek başına çözüm değil.** Olausson (ICLR 2024):
+> self-repair kazancı *"mütevazı, bazen hiç yok"*; darboğaz deneme sayısı
+> değil **geri bildirim kalitesi** — aynı koda insan geri bildirimi verilince
+> başarı **%33 → %52**. Sıra: önce sinyal, en son bütçe.
 
----
+## Sayfa 11 — Biz neredeyiz
 
-## Sayfa 8 — Yazmayı kim tetikliyor
-
-| Mekanizma | Kim | LLM bilmek zorunda mı |
-|---|---|---|
-| `$OUTPUT_DIR` süpürme | Anthropic | **Hayır** |
-| `/mnt/data` | OpenAI | **Hayır** |
-| Workspace dizini | OpenHands | **Hayır** |
-| `.path` → launcher kopyalar | KFP / OpenShift AI | **Hayır** |
-| `/output` süpürme | **BİZ** | **Hayır** |
-| Açık RPC zorunlu | Cloudflare Code Mode *(dosya sistemi yok)* | Evet |
-
-**Dokuz sistemin dokuzu da bir DOSYA YOLU.** Hiçbiri sandbox'taki koda
-artifact fonksiyonu sunmuyor.
-
-**2026-09-06: bizdeki açık API kaldırıldı.** `put_artifact`/`get_artifact`/
-`cached` piyasada emsalsizdi ve canlı hataların hepsi o yüzeydeydi.
-
-| | Önce | Şimdi |
-|---|---|---|
-| Yazma | `put_artifact(df, name=...)` | `df.to_parquet("/output/x.parquet")` |
-| Okuma | `get_artifact("x")` | `pd.read_parquet("/output/x.parquet")` |
-| Keşif | `list_artifacts()` | `os.listdir("/output")` |
-| Retry atlama | `cached(...)` | `if os.path.exists(...)` |
-
-**Süpürme = bucket'a kopyalama:**
-`/output/x.parquet` → HTTP akış → Artifact Service → S3 PUT → bucket
-
----
-
-## Sayfa 9 — KEŞİF: ajan çekeceğini nasıl anlıyor
-
-**Bu, oturum boyunca en çok kafa karıştıran soruydu.**
-
-| # | Desen | Nasıl | Kim |
-|---|---|---|---|
-| 1 | Sadece tool tarifi | Model çağırmayı *seçmek* zorunda | *(eskiden biz)* |
-| 2 | Referans otomatik context'te | `file_id` tool sonucunda döner | Anthropic |
-| 3 | Dosya sistemi + `ls` | Sandbox yaşıyorsa model bakar | Anthropic, Google, OpenHands |
-| 4 | **İsimler prompt'a enjekte** | İsimler talimatlarda, içerik talep üzerine | **Google ADK**, **BİZ** |
-| 3+4 | **İkisi birden** | Manifest promptta **ve** `os.listdir("/output")` çalışıyor | **BİZ** (2026-09-06) |
-| 5 | Semantik arama | Vektör deposunda `file_search` | Llama Stack (RAG) |
-| — | **Keşif YOK** | DAG statik, girdi bağlanmış | KFP, Argo, Airflow, Tekton |
-
-**Desen 4'ün üç kuralı:**
-1. İsimler her zaman context'te — ucuz, model unutamaz
-2. İçerik talep üzerine — pahalı olan sadece istendiğinde
-3. İçerik geçmişe kalıcı yazılmaz — context şişmez
-
----
-
-## Sayfa 10 — Klasik pipeline vs ajan: neden farklı
-
-| | Klasik pipeline | Ajan dünyası |
-|---|---|---|
-| DAG | İnsan önceden yazar | LLM o an icat eder |
-| 5. adımın girdisi | **Bağlanmış** | **Keşfedilmeli** |
-| Kim çözer | Driver, adım başlamadan | Modelin kendisi |
-| Örnek | `adim5(girdi=adim1.ciktilar["features"])` | `os.listdir("/output")` |
-| Kim | Airflow, Argo, KFP, Tekton | Anthropic, Google ADK, biz |
-
-**Tek cümle:** Klasik pipeline'da 5. adım bir şey *anlamaz* — kendisine söylenir.
-Ajan dünyasında sormak zorundadır, çünkü kendisi de o an icat edilmiştir.
-
----
-
-## Sayfa 11 — OpenShift ne öneriyor
-
-| Konu | OpenShift'in cevabı |
+| Parça | Kimden |
 |---|---|
-| Nesne deposu | **Çekirdekte YOK** — depolama dokümanı baştan sona PV/PVC/CSI |
-| Ama AI ürünü | **S3 zorunlu** — *"You have an existing S3-compatible object storage bucket"* |
-| Erişim | **SDK (boto3)**, mount değil |
-| Kimlik bilgisi | Secret → pod ortamı (`AWS_S3_ENDPOINT`, `AWS_S3_BUCKET`…) |
-| Artifact taşıma | **Launcher** `.path` ↔ `.uri` kopyalıyor |
-| Depo kökü | `pipeline_root` — **3 düzeyde yapılandırılabilir** |
-| Artifact tipleri | MLMD şema başlıkları (`system.Dataset`…) |
-| Kapsam | **Namespace** düzeyinde (`kfp-launcher` ConfigMap) |
-| Tekton farklı | Workspace → **PVC**, nesne deposu değil |
-| Güvenilmeyen kod | **Kata** öneriliyor |
-| **Keşif** | **Yerleşik cevabı YOK** ← |
+| init + wait sidecar | **Argo Workflows** |
+| girdiyi kod başlamadan yerleştir | **Argo `init` / KFP `driver`+`launcher`** |
+| girdi beyanı · beyandan soy | **Argo `inputs.artifacts` · MLMD `DECLARED_INPUT`** |
+| run-scoped anahtar yolu · kayıt defteri | **KFP `pipeline_root` · MLMD** |
+| künye süzgeci · sürüm alias'ı | **MLMD `filter_query` · MLflow Model Registry** |
+| isimler prompt'ta | **Google ADK `LoadArtifactsTool`** |
+| bayt yolu · `proxy` | **MLflow** proxied artifact access |
+| bayt yolu · `direct` | **KFP / Argo** — bayt depoya, künye kayıt defterine |
+| **sandbox'ta sıfır ağ çağrısı** | **KFP** — kullanıcı bileşeni hiçbir şey çağırmaz |
+| hata sinyali · kırpma · "ne yapmalı" | **SWE-agent · smolagents · Codex** |
+| sebep-farkında retry sayacı | **Anthropic `error_code` · Codex `is_likely_sandbox_denied`** |
+| **İzolasyon** | **Kimse — bizimki daha zayıf (düz container)** |
 
-**Neden keşif cevabı yok:**
-
-| | Artifact kavramı | Ajan kavramı |
-|---|---|---|
-| KFP / DSP | ✓ | ✗ |
-| Llama Stack | ✗ (RAG belgeleri) | ✓ |
-
-Bizim durumumuz tam bu boşlukta. Depolama için OpenShift'i kopyaladık,
-keşif için Google ADK'yı.
+**Emsalsiz desen kalmadı.**
 
 ---
 
-## Sayfa 12 — Hız
+## Sayfa 12 — Canlı konsol + açıklar
 
-| Sistem | Açılış | Nasıl |
-|---|---|---|
-| Cloudflare | milisaniyeler | Isolate hafif, havuza gerek yok |
-| Microsoft | milisaniyeler | **Warm pool** |
-| Google GKE | < 1 sn | Warm pool + snapshot = "instant-on" |
-| **BİZ** | **3.14 sn** | Havuz yok |
+**`/konsol` — beş sekme, sahte veri yok:** Sohbet · Hatlar · Çalıştırma
+(gerçek Kubernetes Job'ları) · Depo · Soy ağacı.
 
-**Bizim 3.14 sn'nin dağılımı:** 1.62 sn pod başlatma + 1.49 sn süreç açılışı.
-
-**Yani warm pool'un tavanı 1.6 saniye.** Ölçtük, karmaşıklığa değmedi.
-
----
-
-## Sayfa 13 — Biz neredeyiz: özet
-
-| Boyut | Kimle aynı |
+| Açık | Durum |
 |---|---|
-| PTC tezi (kod yaz, tool çağırma) | **Cloudflare** |
-| Ağ (kapalı + allowlist) | **Anthropic**, Red Hat, Google GKE |
-| Depoya erişim (SDK, mount yok) | **Red Hat**, Anthropic, OpenAI |
-| Çıktı yakalama (`/output`) | **Anthropic**, OpenAI |
-| Launcher deseni | **Red Hat / KFP** |
-| Kayıt defteri + tipler + kök | **Red Hat / KFP (MLMD)** |
-| Keşif (isimler prompt'ta) | **Google ADK** |
-| Sandbox ömrü (efemer) | Microsoft |
-| **LLM yüzeyi (dosya, API yok)** | **hepsi** — KFP, Anthropic, OpenAI, MS |
-| **Kapsam (tenant)** | **Red Hat / KFP** — `pipeline_root` paylaşımlı |
-| **İzolasyon** | **Kimse — bizimki daha zayıf** |
-| **Girdi yerleştirme (kod başlamadan)** | **Argo `init` / KFP `launcher`** |
-| Çapraz-çalıştırma erişimi (açık çağrı) | **KFP** (açık URI) · **Google ADK** (`load_artifact`) |
+| **İzolasyon** | Düz container, Kata yok — Red Hat'in önerisine uymuyoruz |
+| **Ağ politikaları** | Cilium'a bağımlı; OVN karşılığı yazılmadı |
+| **Auth** | Yok — jetonu üretebilen tenant'ın tamamını okur |
+| **Metadata DB** | SQLite, tek replika |
+| `SIGKILL` | OOM/deadline'da süpürme çalışmaz (Argo'da da aynı) |
+| Soy imzasız | Tekton Chains bunu çözüyor, bizde yok |
 
-**Üç cümle:**
-1. Omurga tartışmasız SOTA — tezi Cloudflare'den, veri modelini Anthropic'ten,
-   platform desenini Red Hat'ten aldık.
-2. İzolasyonda herkesin gerisindeyiz (düz container). Warm pool yok ama
-   kazancını ölçtük: ≤1.6 sn.
-3. Emsalsiz olan **üç şeyi de** bıraktık: LLM'e artifact API'si ve
-   çalıştırma başına kapsam (2026-09-06), sonra şeffaf tembel okuma
-   (2026-09-07) — yerine Argo/KFP'nin "girdiyi kod başlamadan yerleştir"
-   deseni geçti. Hataların hepsi bizim icat ettiğimiz yerlerde çıkıyordu.
+**209 test · 52/52 (`proxy`) + 53/53 (`direct`) canlı kabul kontrolü · bütün ölçümler cluster'dan.**
 
 ---
 
-## Sayfa 14 — Ne değişti (2026-09-04 → 09-06)
-
-| Değişiklik | Öncesi | Sonrası |
-|---|---|---|
-| Artifact servisi ayrıldı | Tool Gateway'de, base64+MCP | Kendi pod'unda, akışlı HTTP |
-| Prefetch kapsamı daraltıldı | Tenant'ın tamamı iniyordu, O(hepsi) | Çalıştırmaya kapsanmış yerleştirme, azami 35 KiB |
-| TTL reaper | Şema vardı, çalıştıran yoktu | Saat başı CronJob |
-| Oturum kimliği | Her bağlantıda yeni → artifact erişilemez | `localStorage` / `--session` |
-| Workflow state | `InMemorySaver` | `AsyncSqliteSaver` (Postgres'e hazır) |
-| Depo sözleşmesi | Yalnızca OBC | OBC **+** OpenShift AI connection |
-| Artifact tipleri | Yok | MLMD şema başlıkları + `.metadata` |
-| Depo kökü | Sabit kod | `PTC_ARTIFACT_ROOT` |
-| **Keşif** | Yumuşak garanti | **İsimler prompt'ta** (ADK deseni) |
-
-**2026-09-06 — büyük sadeleşme:**
-
-| Değişiklik | Öncesi | Sonrası |
-|---|---|---|
-| **LLM artifact API'si** | 5 fonksiyon | **YOK** — düz Python + `/output` |
-| Keşif | `list_artifacts()` | Manifest promptta + `/output` yerleştirilmiş |
-| Kapsam | Çalıştırma başına mühürlü | **Tenant** (KFP gibi) |
-| Dizin çıktısı | Sessizce kayboluyordu | Tek tar, açılmış hâlde yerleşiyor |
-| Soy ağacı | Kaydediliyor, okunmuyordu | Otomatik + panelde mermaid grafiği |
-| PDF/PNG | `.bin` olarak duruyordu | Gerçek tip + panelde önizleme |
-| **Çalıştırma izolasyonu** | `/output` düz — başkasınınki sızıyordu | **İki kök:** `/output` + `/artifacts/<wf>/` |
-
-**Test sayısı:** 179 · **Canlı doğrulanan:** hepsi
-
----
-
-## Sayfa 15 — Açıklar (saklamıyoruz)
-
-| Konu | Durum | Etki |
-|---|---|---|
-| **İzolasyon** | Düz container, Kata yok | Red Hat'in önerisine uymuyoruz |
-| **Metadata DB** | SQLite | Tek replika sınırı |
-| **Workflow state** | Postgres yolu **test edilmedi** | Cluster'da Postgres yok |
-| **Auth** | Yok | Uuid'yi bilen okur |
-| **Büyük dosya** | 100 MiB / 512Mi | 5 GB çalışmaz |
-| **İsim çakışması** | "En yeni" kazanır, sessiz | Tenant genelinde daha olası |
-| ~~**Şeffaf okuma**~~ | **KAPANDI (2026-09-07)** — yama yok, dosyalar gerçek | Emsalsiz olan son desenimizdi |
-| **`user_metadata`** | Süpürme yolunda doldurulamıyor | `put_artifact` kalkınca kapandı |
-| **Tip** | Yalnızca dosya uzantısından | Metrik/Dataset ayrımı kayboldu |
-| **Soy imzasız** | Kayıt defterine yazabilen değiştirebilir | Tekton Chains bunu çözüyor |
-| **Gerçek OBC/ODF** | Test edilmedi | ODF kapsam dışı |
-
----
-
-## Sayfa 16 — Ekibe dört soru
+## Sayfa 13 — Ekibe dört soru
 
 | # | Soru | Neden önemli |
 |---|---|---|
-| 1 | **Kurumda S3-uyumlu depo var mı?** | ODF yok → S3'ü biz getireceğiz. Red Hat'in kendi ürünü de zorunlu tutuyor |
-| 2 | **Hangi StorageClass'lar var, RWX destekleyen var mı?** | Tekton'un PVC deseni mümkün mü belirler |
-| 3 | **OpenShift Sandboxed Containers (Kata) kurulu mu?** | En büyük açığımız; kod değişikliği gerektirmez |
+| 1 | **Kurumda S3-uyumlu depo var mı?** | ODF yok → S3'ü biz getireceğiz |
+| 2 | **RWX destekleyen StorageClass var mı?** | Tekton'un PVC deseni mümkün mü |
+| 3 | **Sandboxed Containers (Kata) kurulu mu?** | En büyük açığımız; kod değişikliği gerektirmez |
 | 4 | **PostgreSQL sağlanabilir mi?** | Hem artifact metadata hem workflow state |
 
-**1. soru en kritik** — ODF kapsam dışına çıkınca "S3 nereden gelecek" cevapsız
-kaldı. Varsa endpoint + bucket + anahtar yeter, **kod hazır** (iki sözleşmeyi
-de okuyor).
+**1. soru en kritik** — varsa endpoint + bucket + anahtar yeter, **kod hazır**
+(hem OBC hem OpenShift AI connection sözleşmesini okuyor).

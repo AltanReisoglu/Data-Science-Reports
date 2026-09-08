@@ -26,6 +26,13 @@ spec:
         ptc-run-id: "{run_id}"
     spec:
       restartPolicy: Never
+      # Kubernetes varsayılan olarak namespace'teki HER servisin
+      # adresini ortam değişkeni olarak enjekte ediyor
+      # (MINIO_SERVICE_HOST, ARTIFACT_SERVICE_PORT…). Sandbox'ın
+      # hiçbirine ihtiyacı yok ve LLM'in yazdığı koda hedef
+      # göstermenin faydası da yok. 2026-09-07'de ölçüldü:
+      # kapatılmadan önce 9 tanesi ortamda duruyordu.
+      enableServiceLinks: false
       # OpenShift'in `restricted-v2` SCC'si bunları zaten DAYATIR; burada AÇIKÇA
       # yazmamızın sebebi kind ile OpenShift'in aynı davranması. Yazmasaydık
       # kind'da root olarak çalışıp OpenShift'te rastgele UID'ye düşerdi ve fark
@@ -56,11 +63,15 @@ spec:
       # Ve proxy'de yükleme uç noktası yok — neyin yükleneceğine sidecar
       # `/output`'a bakarak karar veriyor.
       initContainers:
+        # AYRI İMAJ (2026-09-07): sidecar `minio` paketine ihtiyaç duyuyor,
+        # sandbox imajı onsuz kalıyor. Aynı imajı paylaşsalardı LLM'in kodu
+        # `import minio` yapabilirdi — doğrudan kipte pod'un depoya rotası da
+        # açık olduğu için geriye tek engel kimlik doğrulama kalırdı.
+        # Argo da aynısını yapıyor: `argoexec` kullanıcının imajından ayrı.
         - name: artifact-sidecar
-          image: ptc-sandbox:local
+          image: ptc-sidecar:local
           imagePullPolicy: Never
           restartPolicy: Always
-          command: ["python", "/sidecar.py"]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -81,6 +92,28 @@ spec:
               value: "{inputs}"
             - name: TOOL_GATEWAY_ENDPOINT
               value: "{tool_gateway_endpoint}"
+            # Bayt yolu: `proxy` (servis üzerinden) | `direct` (depoya doğrudan).
+            # Ayrıntı ve bedeli: PTC_Piyasa_Mentaliteleri.md §11.17
+            - name: PTC_ARTIFACT_TRANSFER
+              value: "{transfer}"
+            # S3 kimlik bilgisi YALNIZCA BU CONTAINER'DA. Container'lar ortam
+            # değişkeni paylaşmıyor; sandbox bunları göremiyor.
+            - name: PTC_S3_ENDPOINT
+              value: "{s3_endpoint}"
+            - name: PTC_S3_BUCKET
+              value: "{s3_bucket}"
+            - name: PTC_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: artifact-bucket
+                  key: AWS_ACCESS_KEY_ID
+                  optional: true
+            - name: PTC_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: artifact-bucket
+                  key: AWS_SECRET_ACCESS_KEY
+                  optional: true
           volumeMounts:
             - name: scratch
               mountPath: /scratch
@@ -105,14 +138,10 @@ spec:
               value: "{tool_gateway_endpoint}"
             # Artifact Service (2026-09-04): artifact baytları ARTIK BURADAN
             # gidip geliyor, gateway'den değil. Gateway yalnızca tool proxy'si.
-            - name: ARTIFACT_SERVICE_ENDPOINT
-              value: "{artifact_service_endpoint}"
             # Kapsam jetonu BURADA YOK (2026-09-06). Sidecar taşıyor; bu
             # container yalnızca 127.0.0.1'deki proxy'yi görüyor. Container'lar
             # ortam değişkenlerini paylaşmadığı için LLM'in kodu jetona
             # ulaşamıyor — kimlik izolasyonu artık politika değil, YAPISAL.
-            - name: PTC_ARTIFACT_PROXY
-              value: "http://127.0.0.1:8099"
             # Yalnızca `/workflows/{{id}}/artifacts` yolunu kurmak için. Yetki
             # bundan DEĞİL jetondan geliyor: servis yoldaki değeri jetondakiyle
             # karşılaştırır, uymazsa 404 döner.

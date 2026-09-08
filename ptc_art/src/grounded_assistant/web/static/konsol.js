@@ -18,7 +18,26 @@ const kisa = s => String(s || "").slice(0, 8);
 const S = {
   hatlar: [], hat: "a", adim: null, icTab: "genel", durum: {}, calisiyor: false,
   wfSon: {}, kayitlar: [], filtre: "hepsi", acik: {}, art: null, soyId: null,
+  kurucu: null, ara: "", sirala: "yeni",
 };
+
+/* Sohbet sekmesinin oturum kimliği = onun `workflow_id`'si.
+ *
+ * `app.js` bunu `_oturum` diye bir global'de tutuyor ve WebSocket'e
+ * `?session=` olarak veriyor; sunucu da aynı değeri sandbox'ın `workflow_id`'si
+ * yapıyor. Depo sekmesi bunu bilmediği için "Bu oturum" YALNIZCA hat
+ * çalıştırmalarını sayıyordu — sohbette üretilen dosyalar 40 küsur çekmece
+ * arasında kayboluyordu (2026-09-07'de bulundu). */
+// try/catch: `_oturum` bir global `const`. `app.js` ona ULAŞMADAN patlarsa
+// değişken TDZ'de kalır ve `typeof` bile ReferenceError atar — o durumda
+// Depo sekmesinin komple ölmesindense sohbet rozetinden vazgeçiyoruz.
+function sohbetWf() {
+  try { return (typeof _oturum !== "undefined" && _oturum) || null; }
+  catch { return null; }
+}
+
+const benimWf = () => new Set([...Object.values(S.wfSon).filter(Boolean),
+                               sohbetWf()].filter(Boolean));
 
 async function getJSON(url, opts) {
   const r = await fetch(url, opts);
@@ -91,8 +110,14 @@ function ciz_hatlar() {
     const wf = S.wfSon[h.key];
     const uretilen = S.kayitlar.filter(a => a.workflow_id === wf).length;
     const podlar = h.nodes.filter(n => n.tur === "sandbox").length;
+    const araclar = h.kullanici ? `<span class="hat-araclar">
+        <button class="hat-duzenle" data-hat="${h.key}" title="Düzenle">✎</button>
+        <button class="hat-sil" data-hat="${h.key}" title="Sil">✕</button>
+      </span>` : "";
     return `<button class="hat" data-hat="${h.key}">
-      <h3>${esc(h.ad)} <span class="badge ${wf ? "ok" : ""}">${wf ? "çalıştı" : "hiç çalışmadı"}</span></h3>
+      ${araclar}
+      <h3>${esc(h.ad)} <span class="badge ${wf ? "ok" : ""}">${wf ? "çalıştı" : "hiç çalışmadı"}</span>
+        ${h.kullanici ? '<span class="badge kul">konsoldan</span>' : ""}</h3>
       <p>${esc(h.aciklama)}</p>
       <div class="hat-meta">
         <div><b>${h.nodes.length}</b><span>adım</span></div>
@@ -106,6 +131,204 @@ function ciz_hatlar() {
   $$("#hatGrid .hat").forEach(b => b.onclick = () => {
     S.hat = b.dataset.hat; S.adim = null; S.durum = {}; git("calistir");
   });
+  $$("#hatGrid .hat-duzenle").forEach(b => b.onclick = e => {
+    e.stopPropagation(); kurucuAc(hatOf(b.dataset.hat));
+  });
+  $$("#hatGrid .hat-sil").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const k = b.dataset.hat;
+    if (!confirm(`'${k}' hattı silinsin mi? Ürettiği artifact'ler depoda kalır.`)) return;
+    try {
+      await getJSON(`/api/pipelines/${encodeURIComponent(k)}`, { method: "DELETE" });
+      await hatlariYenile();
+      if (S.hat === k) { S.hat = "a"; S.durum = {}; S.adim = null; }
+    } catch (err) { alert("Silinemedi: " + err.message); }
+  });
+}
+
+async function hatlariYenile() {
+  S.hatlar = (await getJSON("/api/pipelines")).pipelines;
+  const t = $('.k-tab[data-t="hatlar"] .n');
+  if (t) t.textContent = S.hatlar.length;
+  ciz_hatlar();
+}
+
+/* ══ 1b · KURUCU — konsoldan hat kurma ═══════════════════════════
+ *
+ * Kurulan hat, yerleşik dördüyle AYNI sözleşmeyi konuşuyor; sunucu tarafında
+ * `pipeline_calistir` ikisini ayırt etmiyor. Buradaki tek iş formu o
+ * sözleşmeye çevirmek — doğrulama sunucuda, çünkü tek gerçek kapı orası.
+ */
+
+const BOS_NODE = () => ({ ad: "", tur: "sandbox", aciklama: "", kod: "",
+                          inputs: "", bekleniyor: "", sorgu_ad: "",
+                          tercih_alias: "", alias: "", sec: "en_yeni",
+                          istek: "" });
+
+function kurucuAc(hat) {
+  S.kurucu = hat ? {
+    key: hat.key, ad: hat.ad, aciklama: hat.aciklama, duzenleme: true,
+    nodes: hat.nodes.map(n => ({
+      ad: n.ad, tur: n.tur, aciklama: n.aciklama || "", kod: n.kod || "",
+      inputs: (n.inputs || []).join(", "),
+      bekleniyor: (n.bekleniyor || []).join(", "),
+      sorgu_ad: n.sorgu?.name || "", tercih_alias: n.sorgu?.alias || "",
+      alias: n.alias || "", istek: n.istek || "",
+      sec: n.sec || "en_yeni",
+    })),
+  } : { key: "", ad: "", aciklama: "", duzenleme: false, nodes: [BOS_NODE()] };
+  $("#kurucuBaslik").textContent = hat ? `Hattı düzenle — ${hat.ad}` : "Yeni hat";
+  $("#kAnahtar").disabled = !!hat;   // key kimlik: değişirse ayrı bir hat olur
+  $("#kurucu").hidden = false;
+  kurucuYaz();
+  $("#kurucu").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function kurucuKapat() { $("#kurucu").hidden = true; hataGoster(""); }
+
+function hataGoster(m) {
+  const e = $("#kurucuHata");
+  e.hidden = !m; e.textContent = m || "";
+}
+
+/* Formu S.kurucu'dan çizer. Kod alanları textarea; her adımın türü
+ * hangi alanların anlamlı olduğunu belirliyor. */
+function kurucuYaz() {
+  const k = S.kurucu;
+  $("#kAnahtar").value = k.key;
+  $("#kAd").value = k.ad;
+  $("#kAciklama").value = k.aciklama;
+
+  $("#kNodeListe").innerHTML = k.nodes.map((n, i) => `
+    <div class="node-kart" data-i="${i}">
+      <div class="node-bas">
+        <span class="baloncuk">${i + 1}</span>
+        <input class="n-ad" placeholder="Adım adı" maxlength="60" value="${esc(n.ad)}" />
+        <select class="n-tur">
+          <option value="sandbox"${n.tur === "sandbox" ? " selected" : ""}>sandbox — pod açar</option>
+          <option value="query"${n.tur === "query" ? " selected" : ""}>query — pod açmaz</option>
+          <option value="alias"${n.tur === "alias" ? " selected" : ""}>alias — pod açmaz</option>
+          <option value="ajan"${n.tur === "ajan" ? " selected" : ""}>ajan — LLM karar verir</option>
+        </select>
+        <button class="node-yukari" title="Yukarı" ${i ? "" : "disabled"}>↑</button>
+        <button class="node-asagi" title="Aşağı" ${i < k.nodes.length - 1 ? "" : "disabled"}>↓</button>
+        <button class="node-sil" title="Adımı sil" ${k.nodes.length > 1 ? "" : "disabled"}>✕</button>
+      </div>
+      <input class="n-aciklama" placeholder="Bu adım ne yapıyor? (panelde gösterilir)"
+             maxlength="400" value="${esc(n.aciklama)}" />
+      ${n.tur === "ajan" ? `
+        <textarea class="n-istek" rows="5" spellcheck="false"
+          placeholder="Ajana ne yapmasını söylüyorsun? Kodu O yazacak.&#10;Örn: Açık ticketları departmana göre say, bir grafik çiz ve /output'a kaydet.">${esc(n.istek)}</textarea>
+        <div class="not" style="margin-bottom:.7rem">
+          Ajan hattın <b>aynı workflow'unda</b> çalışır — ürettiği dosyalar sonraki
+          adımlarda ham adla okunabilir. Elinde <span class="mono">run_ptc_code</span> ve
+          <span class="mono">artifact_ara</span> var: kendi girdisini keşfeder, kendi kodunu yazar.
+        </div>` : n.tur === "sandbox" ? `
+        <textarea class="n-kod" rows="7" spellcheck="false"
+          placeholder="# Sandbox'ta çalışacak Python.&#10;# Girdiler kod başlamadan yerinde olur; çıktıyı /output'a yaz.&#10;open('/output/sonuc.json','w').write('{}')">${esc(n.kod)}</textarea>
+        <div class="alan-satir">
+          <label>Beyan edilen girdiler
+            <input class="n-inputs" placeholder="ad · &lt;wf&gt;/ad · ad@alias (virgülle)"
+                   value="${esc(n.inputs)}" />
+            <small>Kod başlamadan yerine konur — çalışma anında çağrı YOK</small>
+          </label>
+          <label>Beklenen çıktılar
+            <input class="n-bekleniyor" placeholder="sonuc.json (virgülle)"
+                   value="${esc(n.bekleniyor)}" />
+            <small>Yalnızca panelde gösterilir; süpürme /output'a bakar</small>
+          </label>
+        </div>` : `
+        <div class="alan-satir">
+          <label>Aranacak ad
+            <input class="n-sorgu" placeholder="processed-result.json" value="${esc(n.sorgu_ad)}" />
+            <small>Kayıt defterine <code>?name=</code> sorgusu</small>
+          </label>
+          ${n.tur === "query" ? `
+          <label>İstenen alias <small>(boş = en yeni)</small>
+            <input class="n-tercih" placeholder="onaylanmis" value="${esc(n.tercih_alias)}" />
+            <small>MLflow'un <span class="mono">models:/&lt;ad&gt;@&lt;alias&gt;</span>'ı — adıyla istenir</small>
+          </label>` : ""}
+          ${n.tur === "alias" ? `
+          <label>Atanacak alias
+            <input class="n-alias" placeholder="onaylanmis" value="${esc(n.alias)}" />
+          </label>
+          <label>Hangi sürüm
+            <select class="n-sec">
+              <option value="en_yeni"${n.sec === "en_yeni" ? " selected" : ""}>en yeni</option>
+              <option value="en_eski"${n.sec === "en_eski" ? " selected" : ""}>en eski</option>
+            </select>
+          </label>` : ""}
+        </div>`}
+    </div>`).join("");
+
+  // Alanlar değiştikçe S.kurucu'yu güncelle. Tür değişimi formu yeniden çizer.
+  $$("#kNodeListe .node-kart").forEach(kart => {
+    const i = +kart.dataset.i, n = k.nodes[i];
+    const bagla = (sec, alan) => {
+      const el = kart.querySelector(sec);
+      if (el) el.oninput = () => { n[alan] = el.value; };
+    };
+    bagla(".n-ad", "ad"); bagla(".n-aciklama", "aciklama"); bagla(".n-kod", "kod");
+    bagla(".n-inputs", "inputs"); bagla(".n-bekleniyor", "bekleniyor");
+    bagla(".n-sorgu", "sorgu_ad"); bagla(".n-alias", "alias");
+    bagla(".n-tercih", "tercih_alias"); bagla(".n-istek", "istek");
+    const sec = kart.querySelector(".n-sec");
+    if (sec) sec.onchange = () => { n.sec = sec.value; };
+    kart.querySelector(".n-tur").onchange = e => { n.tur = e.target.value; kurucuYaz(); };
+    kart.querySelector(".node-sil").onclick = () => {
+      if (k.nodes.length > 1) { k.nodes.splice(i, 1); kurucuYaz(); }
+    };
+    kart.querySelector(".node-yukari").onclick = () => {
+      if (i) { [k.nodes[i - 1], k.nodes[i]] = [k.nodes[i], k.nodes[i - 1]]; kurucuYaz(); }
+    };
+    kart.querySelector(".node-asagi").onclick = () => {
+      if (i < k.nodes.length - 1) {
+        [k.nodes[i + 1], k.nodes[i]] = [k.nodes[i], k.nodes[i + 1]]; kurucuYaz();
+      }
+    };
+  });
+}
+
+const virgul = s => String(s || "").split(",").map(x => x.trim()).filter(Boolean);
+
+async function kurucuKaydet() {
+  const k = S.kurucu;
+  k.key = $("#kAnahtar").value.trim().toLowerCase();
+  k.ad = $("#kAd").value.trim();
+  k.aciklama = $("#kAciklama").value.trim();
+
+  const govde = {
+    key: k.key, ad: k.ad, aciklama: k.aciklama,
+    nodes: k.nodes.map(n => {
+      const nd = { ad: n.ad, tur: n.tur, aciklama: n.aciklama,
+                   inputs: virgul(n.inputs), bekleniyor: virgul(n.bekleniyor) };
+      if (n.tur === "ajan") nd.istek = n.istek;
+      else if (n.tur === "sandbox") nd.kod = n.kod;
+      else {
+        nd.sorgu_ad = n.sorgu_ad;
+        if (n.tur === "query") nd.tercih_alias = n.tercih_alias;
+        if (n.tur === "alias") { nd.alias = n.alias; nd.sec = n.sec; }
+      }
+      return nd;
+    }),
+  };
+
+  try {
+    const r = await fetch("/api/pipelines", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(govde),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      hataGoster(j.detail || `${r.status} ${r.statusText}`);
+      return;
+    }
+    const hat = await r.json();
+    kurucuKapat();
+    await hatlariYenile();
+    S.hat = hat.key; S.durum = {}; S.adim = null;
+    git("calistir");
+  } catch (err) { hataGoster(err.message); }
 }
 
 /* ══ 2 · ÇALIŞTIRMA ══════════════════════════════════════════════ */
@@ -133,6 +356,8 @@ function ciz_calistir() {
     const bag = i ? `<div class="baglanti ${S.durum[h.nodes[i - 1].n]?.status === "success" ? "bitti" : ""}"></div>` : "";
     const sag = d.dur ? `<span class="badge">${esc(d.dur)}</span>`
               : n.tur === "sandbox" ? `<span class="badge">pod</span>`
+              : n.tur === "ajan" ? `<span class="badge">ajan</span>`
+              : n.tur === "alias" ? `<span class="badge">alias</span>`
               : `<span class="badge">sorgu</span>`;
     const cikti = (d.artifacts || []).map(a => `<span class="badge art">${esc(a.name)}</span>`).join(" ");
 
@@ -175,7 +400,9 @@ function adimIci(n, d) {
   const tab = S.icTab || "genel";
   const sekmeler = [
     ["genel", "Genel"],
-    n.tur === "sandbox" ? ["kod", "Kod"] : ["sorgu", "Sorgu"],
+    n.tur === "sandbox" ? ["kod", "Kod"]
+      : n.tur === "ajan" ? ["istek", "İstek"]
+      : ["sorgu", n.tur === "alias" ? "Alias" : "Sorgu"],
     ["log", `Log${(d.loglar || []).length ? " · " + d.loglar.length : ""}`],
     ["cikti", `Çıktı${(d.artifacts || []).length ? " · " + d.artifacts.length : ""}`],
   ];
@@ -189,6 +416,13 @@ function adimIci(n, d) {
         ? `<b>Gerçek pod.</b> Bu adım için ayrı bir Kubernetes Job açılıyor. Kapsam jetonu
            sidecar'da; sandbox container'ında S3 anahtarı yok ve ağı kapalı — baytları
            içeri/dışarı sidecar taşıyor.`
+        : n.tur === "ajan"
+        ? `<b>LLM karar veriyor.</b> Kodu bu adımda İNSAN yazmıyor — model
+           yazıyor. Kaç pod açılacağı da ona bağlı. Hattın aynı workflow'unda
+           çalışıyor, yani ürettiği dosyalar sonraki adımlarda ham adla okunur.`
+        : n.tur === "alias"
+        ? `<b>Pod açılmıyor.</b> Bu adım bir sürümü alias'la sabitliyor. Alias'ı insan ya da
+           CI koyar — MLflow'da da öyle; sandbox'ın böyle bir yolu yok ve olmamalı.`
         : `<b>Pod açılmıyor.</b> Bu adım kayıt defterine bir HTTP sorgusu. Keşif sandbox'ta
            değil host tarafında olur; sandbox'ın listeleme yolu hiç yok.`}</div>
       <dl class="kv">
@@ -218,10 +452,36 @@ function adimIci(n, d) {
       : `<p class="bos">Bu adım kod çalıştırmıyor.</p>`;
   }
 
+  else if (tab === "istek") {
+    // Ajan düğümünde iki metin var ve ikisi farklı: İSTEK insanın yazdığı
+    // (hat tanımında sabit), KOD modelin o an ürettiği. Kodu ayrı bir blokta
+    // gösteriyoruz ki "hangisini insan yazdı" karışmasın.
+    govde = `<pre class="kod">${esc((n.istek || "").trim())}</pre>
+      <p class="muted" style="margin:.6rem 0 0">Bu metni <b>insan</b> yazdı.
+      Ne yapılacağına, kaç pod açılacağına ve kodun ne olacağına <b>model</b> karar veriyor.</p>
+      ${d.kod ? `<div style="margin-top:.8rem">
+        <div class="muted" style="margin-bottom:.3rem">Modelin yazdığı kod</div>
+        <pre class="kod">${esc(d.kod.trim())}</pre></div>` : ""}
+      ${d.sonuc && typeof d.sonuc === "object" ? `<div style="margin-top:.7rem">
+        <div class="muted" style="margin-bottom:.3rem">Ajanın cevabı</div>
+        <pre class="kod">${esc(d.sonuc.cevap || "")}</pre></div>` : ""}`;
+  }
+
   else if (tab === "sorgu") {
-    govde = `<pre class="kod">GET /artifacts?${esc(new URLSearchParams(n.sorgu || {}).toString())}</pre>
-      <p class="muted" style="margin:.6rem 0 0">Kayıt defterine ada göre sorgu. Cevaptaki
-      <span class="mono">workflow_id</span> bir sonraki adıma veriliyor — kimlik hiçbir yere gömülü değil.</p>
+    govde = `<pre class="kod">GET /artifacts?${esc(new URLSearchParams(n.sorgu || {}).toString())}${
+        n.tur === "alias"
+          ? `\nPUT /artifacts/&lt;${esc(n.sec === "en_eski" ? "en eski" : "en yeni")} aday&gt;/alias?alias=${esc(n.alias || "")}`
+          : ""}</pre>
+      <p class="muted" style="margin:.6rem 0 0">${n.tur === "alias"
+        ? `Önce adaylar listeleniyor, sonra <b>${esc(n.sec === "en_eski" ? "en eski" : "en yeni")}</b>
+           olanına <span class="mono">@${esc(n.alias || "")}</span> alias'ı atanıyor. Bundan sonra o adı
+           <span class="mono">ad@alias</span> diye beyan eden herkes bu sürümü alır — "en yeni kazanır"
+           kuralı devre dışı.`
+        : `Kayıt defterine ada göre sorgu. Cevaptaki
+           <span class="mono">workflow_id</span> bir sonraki adıma veriliyor — kimlik hiçbir yere gömülü değil.
+           ${n.sorgu?.alias
+             ? `Sürüm <b>@${esc(n.sorgu.alias)}</b> adıyla isteniyor.`
+             : `Alias istenmedi: <b>en yeni</b> kazanır.`}`}</p>
       ${d.sonuc && typeof d.sonuc === "object" ? `<div style="margin-top:.7rem">
         <div class="muted" style="margin-bottom:.3rem">Cevap</div>
         <pre class="kod">${esc(JSON.stringify(d.sonuc, null, 2))}</pre></div>` : ""}`;
@@ -280,8 +540,12 @@ function calistir() {
       ptcYaz(`workflow ${m.workflow_id}`, "info");
     } else if (m.type === "node_start") {
       d(m.n).status = "running"; S.adim = m.n; S.icTab = "log";
-      ptcYaz(`${m.tur === "sandbox" ? "⬢" : "🔎"} [${m.n}] ${m.ad} — ${
-        m.tur === "sandbox" ? "sandbox pod'u açılıyor" : "kayıt defteri sorgusu (pod yok)"}`, "info");
+      ptcYaz(`${m.tur === "sandbox" ? "⬢" : m.tur === "ajan" ? "✨"
+                : m.tur === "alias" ? "📌" : "🔎"} [${m.n}] ${m.ad} — ${
+        m.tur === "ajan" ? "ajan turu — kodu model yazacak"
+        : m.tur === "sandbox" ? "sandbox pod'u açılıyor"
+        : m.tur === "alias" ? "sürüm sabitleniyor (pod yok)"
+        : "kayıt defteri sorgusu (pod yok)"}`, "info");
       ciz_calistir();
     } else if (m.type === "log") {
       d(m.n).loglar.push(m);
@@ -320,62 +584,130 @@ function calistir() {
 async function ciz_depo() {
   const cek = $("#depoCekmece"), suz = $("#depoSuzgec");
   let d;
-  try { d = await getJSON("/api/depo?limit=1000"); }
+  // Arama SUNUCUDA: `?q=` servisin kendi süzgeci (§11.14). İstemcide filtrelemek
+  // yalnızca çekilen 1000 satırı süzerdi; sunucu bütün defteri süzüyor.
+  const q = S.ara.trim();
+  try { d = await getJSON(`/api/depo?limit=1000${q ? `&q=${encodeURIComponent(q)}` : ""}`); }
   catch (e) { cek.innerHTML = uyari(e.message); suz.innerHTML = ""; return; }
   if (d.error) { cek.innerHTML = uyari(d.error); suz.innerHTML = ""; return; }
 
   S.kayitlar = d.kayitlar;
   const arts = d.kayitlar;
   const tipler = [...new Set(arts.map(a => a.type))];
+  const benim = benimWf();
+  const sohbet = sohbetWf();
 
   suz.innerHTML =
     `<button class="${S.filtre === "hepsi" ? "on" : ""}" data-f="hepsi">Hepsi · ${arts.length}</button>` +
     tipler.map(t => `<button class="${S.filtre === "t:" + t ? "on" : ""}" data-f="t:${esc(t)}">${esc(t.replace("system.", ""))} · ${arts.filter(a => a.type === t).length}</button>`).join("") +
-    (Object.values(S.wfSon).filter(Boolean).length
-      ? `<button class="${S.filtre === "benim" ? "on" : ""}" data-f="benim">Bu oturum</button>` : "");
+    (benim.size
+      ? `<button class="${S.filtre === "benim" ? "on" : ""}" data-f="benim">Bu oturum · ${
+          arts.filter(a => benim.has(a.workflow_id)).length}</button>` : "") +
+    (sohbet && arts.some(a => a.workflow_id === sohbet)
+      ? `<button class="${S.filtre === "sohbet" ? "on" : ""}" data-f="sohbet">Sohbet · ${
+          arts.filter(a => a.workflow_id === sohbet).length}</button>` : "") +
+    (arts.some(a => a.alias)
+      ? `<button class="${S.filtre === "alias" ? "on" : ""}" data-f="alias">Sabitlenmiş · ${
+          arts.filter(a => a.alias).length}</button>` : "");
 
   let gosterilen = arts;
   if (S.filtre.startsWith("t:")) gosterilen = arts.filter(a => a.type === S.filtre.slice(2));
-  if (S.filtre === "benim") gosterilen = arts.filter(a => Object.values(S.wfSon).includes(a.workflow_id));
+  if (S.filtre === "benim") gosterilen = arts.filter(a => benim.has(a.workflow_id));
+  if (S.filtre === "sohbet") gosterilen = arts.filter(a => a.workflow_id === sohbet);
+  if (S.filtre === "alias") gosterilen = arts.filter(a => a.alias);
 
   const grup = {};
   gosterilen.forEach(a => (grup[a.workflow_id] = grup[a.workflow_id] || []).push(a));
-  const sirali = Object.entries(grup).sort((x, y) => y[1].length - x[1].length);
+  // Varsayılan sıra ARTIK ADET DEĞİL, TAZELİK. Sohbetin 3 dosyalık çalıştırması
+  // 60 dosyalık hat çalıştırmalarının altına gömülüyordu ve "az önce ürettiğim
+  // nerede" sorusu cevapsız kalıyordu.
+  const enYeni = l => l.reduce((m, a) => a.created_at > m ? a.created_at : m, "");
+  const sirali = Object.entries(grup).sort((x, y) =>
+    S.sirala === "adet" ? y[1].length - x[1].length
+                        : enYeni(y[1]).localeCompare(enYeni(x[1])));
 
   cek.innerHTML = sirali.length ? sirali.map(([wf, list]) => {
-    const acik = S.acik[wf] !== false;
-    const benim = Object.values(S.wfSon).includes(wf);
+    list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    // 40+ çalıştırma varken hepsi açık gelmesin: yalnızca ilk üçü ve bu
+    // oturumunkiler açık. Arama varken hepsi açık — aradığını görmek istersin.
+    const kendi = benim.has(wf);
+    const acik = S.acik[wf] !== undefined ? S.acik[wf]
+               : (q ? true : kendi || sirali.findIndex(([k]) => k === wf) < 3);
     return `<div class="cekmece ${acik ? "acik" : ""}" data-wf="${esc(wf)}">
+      <div class="cekmece-bas">
       <button class="cekmece-yuz">
         <span class="cekmece-ok">▸</span>
         <span style="flex:1;min-width:0">
           <span class="mono" style="font-size:.82rem">${esc(wf)}</span>
           <span class="muted" style="display:block;font-size:.74rem">${list.length} artifact · ${kb(list.reduce((s, a) => s + (a.size_bytes || 0), 0))}</span>
         </span>
-        ${benim ? `<span class="badge live">bu oturum</span>` : ""}
+        ${wf === sohbet ? `<span class="badge live">sohbet</span>`
+          : kendi ? `<span class="badge live">bu oturum</span>` : ""}
       </button>
+      <button class="cekmece-sil" data-wf="${esc(wf)}" title="Bu çalıştırmanın ${list.length} artifact'ini sil">🗑</button>
+      </div>
       <div class="raf">${list.map(plaka).join("")}</div>
     </div>`;
-  }).join("") : `<p class="bos">Bu süzgeçle eşleşen artifact yok.</p>`;
+  }).join("") : `<p class="bos">${q ? `"${esc(q)}" ile eşleşen artifact yok.`
+                                     : "Bu süzgeçle eşleşen artifact yok."}</p>`;
 
   $$("#depoSuzgec button").forEach(b => b.onclick = () => { S.filtre = b.dataset.f; ciz_depo(); });
   $$("#depoCekmece .cekmece-yuz").forEach(b => b.onclick = () => {
     const wf = b.closest(".cekmece").dataset.wf;
-    S.acik[wf] = S.acik[wf] === false; ciz_depo();
+    // Açık/kapalı artık üç değerli (undefined = varsayılan kural). Tıklama
+    // varsayılanı KESİN bir değere çeviriyor.
+    const suanAcik = b.closest(".cekmece").classList.contains("acik");
+    S.acik[wf] = !suanAcik; ciz_depo();
   });
   $$("#depoCekmece .plaka").forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); ciz_artDetay(); });
+
+  // Tek artifact silme — plakanın sağ üstünde, hover'da beliriyor.
+  $$("#depoCekmece .plaka-sil").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    if (!confirm(`"${b.dataset.ad}" silinsin mi?\n${b.dataset.sil}\n\nGeri alınamaz.`)) return;
+    try {
+      const r = await getJSON(`/api/depo/${b.dataset.sil}`, { method: "DELETE" });
+      if (r.error) { alert(r.error); return; }
+      if (S.art === b.dataset.sil) S.art = null;
+      await ciz_depo(); yenileSayac();
+    } catch (err) { alert("Silinemedi: " + err.message); }
+  });
+
+  // Çalıştırmanın TAMAMI — `?workflow=` süzgeciyle, tek tek değil.
+  $$("#depoCekmece .cekmece-sil").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const wf = b.dataset.wf, n = (grup[wf] || []).length;
+    if (!confirm(`Bu çalıştırmanın ${n} artifact'i silinecek.\n\n${wf}\n\n`
+        + "Geri alınamaz. Devam edilsin mi?")) return;
+    b.disabled = true;
+    try {
+      const r = await getJSON(`/api/depo/topluca-sil?workflow=${encodeURIComponent(wf)}`,
+                              { method: "POST" });
+      if (r.error) { alert(r.error); return; }
+      if (r.hata_sayisi) alert(`${r.silinen}/${r.istenen} silindi.\n` + r.hata.join("\n"));
+      S.art = null; delete S.acik[wf];
+      await ciz_depo(); yenileSayac();
+    } catch (err) { alert("Silinemedi: " + err.message); }
+    finally { b.disabled = false; }
+  });
   ciz_artDetay();
 }
 
 function plaka(a) {
-  return `<button class="plaka ${S.art === a.artifact_id ? "on" : ""}" data-art="${esc(a.artifact_id)}">
+  // Sarmalayıcı gerekli: `.plaka` bir <button> ve içine ikinci bir <button>
+  // koymak geçersiz HTML. İkisi yan yana duruyor, silme simgesi hover'da.
+  return `<div class="plaka-sar">
+    <button class="plaka ${S.art === a.artifact_id ? "on" : ""}" data-art="${esc(a.artifact_id)}">
     <span class="ad">${esc(a.name)}</span>
     <span class="alt">
       <span class="badge">${esc((a.type || "").replace("system.", ""))}</span>
       ${kb(a.size_bytes)}
       ${a.parents?.length ? `· ${a.parents.length} ebeveyn` : ""}
       ${a.alias ? `<span class="badge live">@${esc(a.alias)}</span>` : ""}
-    </span></button>`;
+    </span></button>
+    <button class="plaka-sil" data-sil="${esc(a.artifact_id)}"
+            data-ad="${esc(a.name)}" title="Sil">✕</button>
+  </div>`;
 }
 
 async function ciz_artDetay() {
@@ -407,6 +739,11 @@ async function ciz_artDetay() {
     </div>
 
     <div style="margin-bottom:1rem">
+      <div class="muted" style="margin-bottom:.35rem">Kullananlar</div>
+      <div id="kullananlar"><p class="bos">Yükleniyor…</p></div>
+    </div>
+
+    <div style="margin-bottom:1rem">
       <div class="muted" style="margin-bottom:.35rem">Sürümü sabitle</div>
       <div style="display:flex;gap:.5rem">
         <input id="aliasIn" class="k-input" value="${esc(a.alias || "")}" placeholder="ör. onaylanmis" />
@@ -417,13 +754,28 @@ async function ciz_artDetay() {
 
     <div style="display:flex;gap:.5rem;margin-bottom:1rem">
       <button class="k-btn ikincil" id="soyBtn">Soy ağacını aç</button>
+      <button class="k-btn tehlike" id="silBtn">Sil</button>
     </div>
+    <div id="silSonuc"></div>
 
     <div class="muted" style="margin-bottom:.35rem">Önizleme</div>
     <div id="onizleme"><p class="bos">Yükleniyor…</p></div>`;
 
   $$("[data-art]", kutu).forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); });
   $("#soyBtn", kutu).onclick = () => { S.soyId = a.artifact_id; git("soy"); };
+  $("#silBtn", kutu).onclick = async () => {
+    if (!confirm(`"${a.name}" silinsin mi?\n\n${a.artifact_id} · ${kb(a.size_bytes)}\n`
+        + "Bu işlem geri alınamaz. Aynı baytı başka künyeler de gösteriyorsa "
+        + "bayt durur, yalnızca bu kayıt düşer.")) return;
+    const out = $("#silSonuc");
+    out.innerHTML = `<p class="bos">Siliniyor…</p>`;
+    try {
+      const r = await getJSON(`/api/depo/${a.artifact_id}`, { method: "DELETE" });
+      if (r.error) { out.innerHTML = uyari(r.error); return; }
+      S.art = null;
+      await ciz_depo(); yenileSayac();
+    } catch (e) { out.innerHTML = uyari(e.message); }
+  };
   $("#aliasBtn", kutu).onclick = async () => {
     const v = $("#aliasIn").value.trim(), out = $("#aliasSonuc");
     out.innerHTML = `<p class="bos">Gönderiliyor…</p>`;
@@ -434,6 +786,40 @@ async function ciz_artDetay() {
       if (!r.error) ciz_depo();
     } catch (e) { out.innerHTML = uyari(e.message); }
   };
+
+  // TERS SOY — "bu artifact'i kim kullandı".
+  //
+  // Ebeveynler künyede hazır geliyordu ama ÜRÜNLER gelmiyordu; artifact'e
+  // bakan biri onu başka bir workflow'un tükettiğini göremiyordu. Vakanın
+  // tamamı da tam bu yön: A üretir, B tüketir.
+  (async () => {
+    const el0 = $("#kullananlar"); if (!el0) return;
+    try {
+      const g = await getJSON(`/api/depo/${a.artifact_id}/soy`);
+      const urun = (g.nodes || []).filter(n => n.depth > 0);
+      const el = $("#kullananlar"); if (!el) return;
+      if (g.error || g.hata) { el.innerHTML = `<p class="bos">${esc(g.error || g.hata)}</p>`; return; }
+      if (!urun.length) { el.innerHTML = `<p class="bos">Henüz kimse tüketmedi.</p>`; return; }
+
+      const capraz = urun.filter(n => n.workflow_id !== a.workflow_id);
+      el.innerHTML = urun.map(n => {
+        const disari = n.workflow_id !== a.workflow_id;
+        return `<button class="plaka" data-art="${esc(n.artifact_id)}" style="width:100%;margin-bottom:.35rem">
+          <span class="ad">${esc(n.name)}</span>
+          <span class="alt">
+            ${disari ? `<span class="badge live">başka çalıştırma</span>` : `<span class="badge">aynı çalıştırma</span>`}
+            <span class="mono">${esc(kisa(n.workflow_id))}</span> · ${n.depth} adım ileride
+          </span></button>`;
+      }).join("") + (capraz.length ? `<div class="not" style="margin-top:.5rem">
+        <b>Sınır geçildi.</b> Bu artifact'i ${capraz.length} farklı çalıştırma tüketti.
+        Onlar bunu üreten çalıştırmayı bilmiyordu — kayıt defterine ada göre sorup buldular.
+      </div>` : "");
+
+      $$("#kullananlar [data-art]").forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); });
+    } catch (e) {
+      const el = $("#kullananlar"); if (el) el.innerHTML = `<p class="bos">Soy alınamadı.</p>`;
+    }
+  })();
 
   try {
     const o = await getJSON(`/api/artifact/${a.artifact_id}?session=${encodeURIComponent(a.workflow_id)}`);
@@ -568,12 +954,55 @@ function git(t) {
 }
 
 $$(".k-tab").forEach(b => b.onclick = () => git(b.dataset.t));
+$("#btnYeniHat").onclick = () => kurucuAc(null);
+$("#btnKurucuKapat").onclick = kurucuKapat;
+$("#btnKurucuKaydet").onclick = kurucuKaydet;
+$("#btnNodeEkle").onclick = () => { S.kurucu.nodes.push(BOS_NODE()); kurucuYaz(); };
 $("#btnRun").onclick = calistir;
+
+/* Arama: her tuşta sunucuya gitmesin diye 250 ms bekletiliyor. */
+let _araGecikme;
+$("#depoAra").oninput = e => {
+  S.ara = e.target.value;
+  clearTimeout(_araGecikme);
+  _araGecikme = setTimeout(() => { S.acik = {}; ciz_depo(); }, 250);
+};
+$("#depoSirala").onchange = e => { S.sirala = e.target.value; S.acik = {}; ciz_depo(); };
+$("#depoYenile").onclick = () => { S.acik = {}; ciz_depo(); yenileSayac(); };
+
+/* GÖRÜNENLERİ SİL — "hepsini sil" değil.
+ *
+ * Kör bir "her şeyi sil" düğmesi, panelde yanlışlıkla basılabilecek tek
+ * yıkıcı şey olurdu. Bu düğme EKRANDA NE VARSA onu siliyor: arama kutusu ve
+ * tip süzgeci neyse o. Süzgeç boşsa gerçekten hepsi — ama o zaman da
+ * kullanıcı listeyi görmüş oluyor ve onay kutusunda sayıyı okuyor. */
+$("#depoTopluSil").onclick = async () => {
+  const q = S.ara.trim();
+  const tip = S.filtre.startsWith("t:") ? S.filtre.slice(2) : null;
+  const gorunen = S.kayitlar.length;
+  const ne = [q && `arama "${q}"`, tip && `tip ${tip}`].filter(Boolean).join(" · ")
+             || "SÜZGEÇ YOK — tenant'taki her şey";
+  if (!confirm(`${gorunen} artifact silinecek.\n\n${ne}\n\n`
+      + "Bu işlem geri alınamaz. Devam edilsin mi?")) return;
+  const btn = $("#depoTopluSil");
+  btn.disabled = true; btn.textContent = "siliniyor…";
+  try {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (tip) p.set("type", tip);
+    const r = await getJSON(`/api/depo/topluca-sil?${p}`, { method: "POST" });
+    alert(r.error ? r.error
+      : `${r.silinen} / ${r.istenen} silindi.`
+        + (r.hata_sayisi ? `\n${r.hata_sayisi} hata:\n` + r.hata.join("\n") : ""));
+    S.art = null; S.acik = {};
+    await ciz_depo(); yenileSayac();
+  } catch (e) { alert("Silinemedi: " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "Görünenleri sil"; }
+};
 $("#btnTemizle").onclick = () => { if (!S.calisiyor) { S.durum = {}; S.adim = null; ciz_calistir(); } };
 
 (async () => {
   await yenileSayac();
-  try { S.hatlar = (await getJSON("/api/pipelines")).pipelines; } catch { /* kart alanı gösterir */ }
-  ciz_hatlar();
+  try { await hatlariYenile(); } catch { ciz_hatlar(); /* kart alanı uyarıyı gösterir */ }
   setInterval(yenileSayac, 20000);
 })();

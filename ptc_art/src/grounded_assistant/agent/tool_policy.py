@@ -35,7 +35,13 @@ ALLOWED_TOOLS = (
 # değil, o pod'un CiliumNetworkPolicy'sinde (research.md §4.1). `calculator`
 # (Faz 4) de burada — tamamen yerel/ağsız, `eval()` değil kısıtlı bir AST
 # yürütücüsü kullanıyor (mock_live_system/calculator.py).
-LOCAL_TOOLS = ("search_knowledge_base", "run_ptc_code", "calculator")
+#
+# `artifact_ara` (2026-09-08) burada çünkü Tool Gateway'e değil, HOST
+# tarafındaki Artifact Service'e gidiyor — sandbox'a hiç uğramıyor ve dış bir
+# hedefe çıkmıyor. Yalnızca isim/tip/boyut döndürüyor; baytlara ulaşmanın tek
+# yolu `inputs` beyanı ve sidecar yerleştirmesi olarak kalıyor.
+LOCAL_TOOLS = ("search_knowledge_base", "run_ptc_code", "calculator",
+               "artifact_ara")
 
 # Agent'a eklenmesine izin verilen TÜM tool'lar — assert_known_tools bununla
 # karşılaştırır (bkz. graph.py). Yeni bir tool buraya (ya ALLOWED_TOOLS ya

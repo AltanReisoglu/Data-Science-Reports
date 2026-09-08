@@ -1,0 +1,947 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>PTC Artifact — Hızlı Tur</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;700&family=Architects+Daughter&display=swap">
+<style>
+:root{
+  --bg:#0a1017; --bg2:#111a24; --fg:#eef4f9; --dim:#8fa3b5; --line:#22323f;
+  --amber:#e8a94e; --green:#5fd39a; --red:#ef7f66; --blue:#6ab6e8;
+}
+:root[data-theme="light"]{
+  --bg:#fbfaf7; --bg2:#ffffff; --fg:#101720; --dim:#5d7182; --line:#dfe5ea;
+  --amber:#a86c12; --green:#1a6d44; --red:#a63419; --blue:#175682;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#fbfaf7; --bg2:#ffffff; --fg:#101720; --dim:#5d7182; --line:#dfe5ea;
+    --amber:#a86c12; --green:#1a6d44; --red:#a63419; --blue:#175682;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);overflow:hidden;
+  font-family:"Source Sans 3",system-ui,sans-serif;
+  font-size:clamp(13px,1.02vw,17px);line-height:1.42}
+h1,h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;
+  letter-spacing:-.03em;line-height:1;margin:0;text-wrap:balance}
+.mono,code,pre{font-family:"JetBrains Mono",ui-monospace,monospace}
+
+#deck{height:100dvh;position:relative}
+.s{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;
+  padding:clamp(1rem,3vh,2rem) clamp(1.1rem,4vw,3.6rem) 3rem;overflow-y:auto}
+.s.on{display:flex}
+/* Flex çocukları sıkışınca .wrap içindeki tablo DİKEY olarak kırpılıyordu:
+   overflow-x:auto, overflow-y'yi de auto'ya çeviriyor. Sıkışmayı kapat. */
+.s > *{flex-shrink:0}
+/* Yoğun sayfa: dikey boşlukları kıs, tablo + kartlar tek ekrana sığsın */
+.s.sik{padding-bottom:1.3rem}
+.s.sik .body{margin-top:.45rem}
+.s.sik td,.s.sik th{padding-top:.18rem;padding-bottom:.18rem}
+.s::-webkit-scrollbar{width:5px}.s::-webkit-scrollbar-thumb{background:var(--line)}
+
+.kicker{font-family:"JetBrains Mono",monospace;font-size:.7em;letter-spacing:.17em;
+  text-transform:uppercase;color:var(--amber);margin-bottom:.45rem}
+h2{font-size:clamp(1.4rem,3.3vw,2.7rem)}
+h2.sm{font-size:clamp(1.15rem,2.45vw,2rem)}
+.say{color:var(--dim);font-size:clamp(.84rem,1.1vw,1rem);margin:.7rem 0 0;max-width:82ch}
+.say b,.say strong{color:var(--fg)}
+.am{color:var(--amber)}.gr{color:var(--green)}.rd{color:var(--red)}
+.bl{color:var(--blue)}.dim{color:var(--dim)}
+.body{margin-top:clamp(.6rem,1.7vh,1.1rem)}
+
+pre{background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:9px;padding:.55rem .75rem;margin:0;
+  font-size:clamp(.58rem,.8vw,.76rem);line-height:1.55;overflow-x:auto;color:var(--fg)}
+pre.bl{border-left-color:var(--blue)}pre.gr{border-left-color:var(--green)}
+pre.rd{border-left-color:var(--red)}
+
+.sec{display:flex;align-items:center;gap:.5rem;margin:.7rem 0 .3rem;
+  font-family:"JetBrains Mono",monospace;font-size:.68em;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--amber)}
+.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.grid{display:grid;gap:clamp(.4rem,.95vw,.75rem)}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g21{grid-template-columns:1.35fr 1fr}
+@media(max-width:900px){.g2,.g3,.g4,.g21{grid-template-columns:1fr 1fr}}
+.k{background:var(--bg2);border:1px solid var(--line);border-radius:10px;
+  padding:clamp(.45rem,1vw,.75rem)}
+.k h3{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:.96em;margin:0 0 .2rem}
+.k p{margin:0;color:var(--dim);font-size:.9em}
+.k.am{border-color:var(--amber)}.k.gr{border-color:var(--green)}.k.rd{border-color:var(--red)}
+.k.bl{border-color:var(--blue)}
+
+/* ── çizim kutusu ─────────────────────────────────────── */
+.cz{width:100%;height:auto;display:block;overflow:visible;
+  margin-inline:auto;max-height:42vh}
+.czw{background:var(--bg2);border:1px solid var(--line);border-radius:12px;
+  padding:.55rem .7rem .65rem}
+.czw.am{border-color:color-mix(in srgb,var(--amber) 45%,var(--line))}
+.czw.gr{border-color:color-mix(in srgb,var(--green) 45%,var(--line))}
+.czw.rd{border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
+.czw.bl{border-color:color-mix(in srgb,var(--blue) 45%,var(--line))}
+.czt{font-family:"JetBrains Mono",monospace;font-size:.66em;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--amber);margin:0 0 .25rem}
+.czw.gr .czt{color:var(--green)}.czw.rd .czt{color:var(--red)}.czw.bl .czt{color:var(--blue)}
+.czn{margin:.3rem 0 0;color:var(--dim);font-size:.86em}
+.czn b{color:var(--fg)}
+
+.n{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;
+  font-size:clamp(1.4rem,3.1vw,2.4rem);line-height:.9;letter-spacing:-.04em;
+  font-variant-numeric:tabular-nums;color:var(--amber)}
+.n.gr{color:var(--green)}.n.rd{color:var(--red)}.n.bl{color:var(--blue)}
+.nl{display:block;color:var(--dim);font-size:.74rem;margin-top:.3rem;
+  font-family:"Source Sans 3",sans-serif;font-weight:400;letter-spacing:0}
+
+table{border-collapse:collapse;width:100%;font-size:clamp(.62rem,.85vw,.82rem)}
+th{text-align:left;font-family:"JetBrains Mono",monospace;font-size:.78em;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--amber);padding:.2rem .42rem;border-bottom:1px solid var(--line)}
+td{padding:.24rem .42rem;border-bottom:1px solid var(--line);color:var(--dim)}
+td:first-child{color:var(--fg);font-weight:600}
+tr:last-child td{border-bottom:none}
+tr.us td{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--fg)}
+.wrap{overflow-x:auto}
+
+#bar{position:fixed;left:0;bottom:0;height:3px;background:var(--amber);z-index:20;transition:width .25s}
+#hud{position:fixed;right:1rem;bottom:.8rem;display:flex;gap:.35rem;z-index:20}
+#hud button{font:inherit;font-family:"JetBrains Mono",monospace;font-size:.74em;
+  background:var(--bg2);color:var(--dim);border:1px solid var(--line);border-radius:6px;
+  padding:.24rem .55rem;cursor:pointer}
+#hud button:hover{color:var(--amber);border-color:var(--amber)}
+#hud button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+#c{font-variant-numeric:tabular-nums;min-width:4.2em;text-align:center}
+#ov{position:fixed;inset:0;background:var(--bg);z-index:30;padding:clamp(1rem,3vw,2rem);
+  overflow-y:auto;display:grid;gap:.55rem;align-content:start;
+  grid-template-columns:repeat(auto-fill,minmax(185px,1fr))}
+#ov[hidden]{display:none}
+.oc{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:.5rem .68rem;
+  cursor:pointer;text-align:left;font:inherit;color:var(--fg)}
+.oc:hover,.oc:focus-visible{border-color:var(--amber);outline:none}
+.oc small{display:block;font-family:"JetBrains Mono",monospace;color:var(--amber);font-size:.7em}
+@media(prefers-reduced-motion:reduce){#bar{transition:none}}
+</style>
+
+<div id="deck">
+
+<!-- 01 ── PROBLEM ─────────────────────────────────────── -->
+<section class="s on" data-t="Problem">
+  <div class="kicker">PTC Artifact Persistence · 2026-09-08 · ölçümler canlı cluster'dan</div>
+  <h2>Sandbox ölür.<br><span class="am">Ürettiği kalır.</span></h2>
+  <div class="body grid g21">
+    <div class="czw">
+      <p class="czt">çelişki</p>
+      <svg class="cz" data-d="sorun" viewBox="0 0 700 230" role="img"
+           aria-label="Sandbox kutusu ölüyor, ürettiği dosya depoya geçiyor"></svg>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="k rd"><h3>Sandbox <span class="rd">yaşarsa</span></h3>
+        <p>Bir çalıştırma diğerine bulaşır — izolasyon yok.</p></div>
+      <div class="k rd"><h3>Artifact <span class="rd">ölürse</span></h3>
+        <p>40 saniyelik iş her turda tekrarlanır.</p></div>
+      <div class="k am"><h3>Kodu <span class="am">LLM yazıyor</span></h3>
+        <p>Yani güvenilmez. Kod çalıştıran her sistem bu çelişkiyle karşılaşıyor.</p></div>
+    </div>
+  </div>
+  <p class="say">Önce <b class="am">piyasanın nasıl çözdüğüne</b> bakalım — sonra
+    bizimkinin nereye oturduğuna.</p>
+</section>
+
+<!-- 02 ── BEŞ SORU ────────────────────────────────────── -->
+<section class="s" data-t="Piyasa haritası">
+  <div class="kicker">Piyasa · 01 · çerçeve</div>
+  <h2 class="sm">Herkes aynı beş soruyu cevaplamak zorunda</h2>
+  <div class="body wrap"><table>
+    <tr><th>Ürün</th><th>Tezi</th><th>Anahtar sandbox'ta</th><th>Kayıt defteri</th><th>Sandbox ömrü</th></tr>
+    <tr><td>Anthropic</td><td>container'ı sakla</td><td><span class="gr">hayır</span></td><td><span class="rd">file_id — soy yok</span></td><td>30 gün</td></tr>
+    <tr><td>OpenAI</td><td>çalışma alanı ≠ kalıcı durum</td><td><span class="gr">hayır</span></td><td><span class="rd">yok</span></td><td>20 dakika</td></tr>
+    <tr><td>Cloudflare</td><td>kod yaz, tool çağırma</td><td>proxy'de</td><td><span class="rd">olamaz</span></td><td>mount</td></tr>
+    <tr><td>Google ADK</td><td>isim ucuz, içerik pahalı</td><td><span class="gr">hayır</span></td><td><span class="gr">ad + sürüm</span></td><td>framework</td></tr>
+    <tr><td>Red Hat / KFP</td><td>DAG yazılıdır</td><td><span class="rd">EVET</span></td><td><span class="gr">MLMD</span></td><td>pod</td></tr>
+    <tr><td>Argo Workflows</td><td>aktarımı dışarı çıkar</td><td><span class="gr">hayır</span></td><td><span class="rd">yok</span></td><td>pod</td></tr>
+    <tr><td>Databricks</td><td>denetimli mount</td><td><span class="gr">hayır</span></td><td><span class="gr">UC + MLflow</span></td><td>100 GB</td></tr>
+    <tr><td>AWS · Microsoft</td><td>mount / havuzdan al</td><td><span class="rd">EVET</span> / —</td><td><span class="rd">yok</span></td><td>8 saat / oturum</td></tr>
+    <tr><td>E2B · Modal · Vercel</td><td>depoyu sen getir</td><td><span class="rd">EVET</span></td><td><span class="rd">yok</span></td><td>bucket</td></tr>
+    <tr><td>Devin</td><td>artifact git'tir</td><td>—</td><td>git commit</td><td>süresiz</td></tr>
+  </table></div>
+  <p class="say"><b class="am">Araştırmanın en keskin bulgusu:</b> kayıt defteri yalnızca
+    yazma yolu <b>bir bileşenden geçtiğinde</b> ayakta kalıyor. Dosya sistemine mount eden
+    hiçbir üründe artifact registry <b>yok</b> — çünkü mount'ta araya girecek yer yok.</p>
+</section>
+
+<!-- 03 ── DÖRT AİLE ───────────────────────────────────── -->
+<section class="s" data-t="Dört aile">
+  <div class="kicker">Piyasa · 02 · mekanizma</div>
+  <h2 class="sm">Baytı kim taşıyor — <span class="am">dört aile</span></h2>
+  <div class="body grid g4">
+    <div class="czw rd"><p class="czt">A · mount</p>
+      <svg class="cz" data-d="aile-a" viewBox="0 0 340 210" role="img"
+        aria-label="Kod doğrudan FUSE ile bucket'a yazıyor, araya girecek yer yok"></svg>
+      <p class="czn">Cloudflare · AWS · E2B · Vercel · Fly</p></div>
+    <div class="czw am"><p class="czt">B · sarmalayıcı</p>
+      <svg class="cz" data-d="aile-b" viewBox="0 0 340 210" role="img"
+        aria-label="Launcher ve kullanıcı kodu aynı container'da, kod launcher'ı atlayabiliyor"></svg>
+      <p class="czn">KFP · OpenShift AI</p></div>
+    <div class="czw gr"><p class="czt">C · sınır</p>
+      <svg class="cz" data-d="aile-c" viewBox="0 0 340 210" role="img"
+        aria-label="Kod dizine yazıyor, ayrı bir container taşıyor"></svg>
+      <p class="czn">Argo · Tekton · Anthropic · OpenAI</p></div>
+    <div class="czw bl"><p class="czt">D · denetimli mount</p>
+      <svg class="cz" data-d="aile-d" viewBox="0 0 340 215" role="img"
+        aria-label="Mount var ama sürücü Unity Catalog'a izin soruyor"></svg>
+      <p class="czn">Databricks</p></div>
+  </div>
+  <p class="say"><b class="am">Argo bunu deneyerek buldu:</b> dört farklı yerleşim denemişler
+    (<code>docker</code>, <code>kubelet</code>, <code>k8sapi</code>, <code>pns</code>) ve
+    v3.4'te hepsini kaldırmışlar. <code>docker</code> için gerekçe:
+    <b class="rd"><i>“breaks security completely.”</i></b></p>
+</section>
+
+<!-- 04 ── ADIM ADIM · DÖRT ÜRÜN ───────────────────────── -->
+<section class="s" data-t="Adım adım · dört ürün">
+  <div class="kicker">Mentalite · 01 · bir dosya nasıl yazılıyor, nasıl geri okunuyor</div>
+  <h2 class="sm">Dört ürün, <span class="am">dört akış</span></h2>
+  <div class="body grid g2">
+    <div class="czw bl"><p class="czt">Anthropic — bayt Files API'de, konuşmada yalnızca fiş</p>
+      <svg class="cz" data-d="anthropic" viewBox="0 0 700 235" role="img"
+        aria-label="Kod OUTPUT_DIR'e yazar, platform dizine bakar, Files API'ye kaydeder, konuşmaya file_id döner"></svg></div>
+    <div class="czw bl"><p class="czt">OpenAI — container yaşadığı sürece /mnt/data</p>
+      <svg class="cz" data-d="openai" viewBox="0 0 700 165" role="img"
+        aria-label="Container /mnt/data, 20 dakika hareketsizlikte container gider"></svg></div>
+    <div class="czw rd"><p class="czt">Cloudflare — R2 mount, arada katman yok</p>
+      <svg class="cz" data-d="cloudflare" viewBox="0 0 700 165" role="img"
+        aria-label="Kod FUSE ile doğrudan R2 bucket'a yazıyor"></svg></div>
+    <div class="czw gr"><p class="czt">Google ADK — isim ucuz, içerik pahalı</p>
+      <svg class="cz" data-d="adk" viewBox="0 0 700 165" role="img"
+        aria-label="İsimler sistem talimatlarında, içerik istek üzerine eklenir, sonraki turda yok"></svg></div>
+  </div>
+  <p class="say"><b class="am">Üstteki ikisinde platform araya giriyor, alttaki ikisinde
+    girmiyor.</b> Anthropic dizine bakıp fiş üretiyor — kayıt defteri buradan çıkıyor.
+    Cloudflare'de bakacak kimse yok. ADK ise baytı hiç taşımıyor,
+    <b>yalnızca isimleri</b> her turda talimatlara yazıyor.</p>
+</section>
+
+<!-- 05 ── RED HAT / OPENSHIFT AI ──────────────────────── -->
+<section class="s" data-t="Red Hat / OpenShift AI">
+  <div class="kicker">Mentalite · 02 · Red Hat / OpenShift AI · Data Science Pipelines</div>
+  <h2 class="sm">Pod'un içi — ve launcher neden bir <span class="rd">sınır değil</span></h2>
+  <div class="body grid g21">
+    <div class="czw am">
+      <p class="czt">bir hat adımı — kim nerede duruyor</p>
+      <svg class="cz" data-d="kfp" viewBox="0 0 720 350" role="img"
+        aria-label="Pod içinde init container kfp-driver ve main container kfp-launcher; launcher kullanıcı kodunu alt süreç olarak çalıştırıyor"></svg>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="k am"><h3>Kullanıcı ne yazıyor</h3>
+        <pre style="margin-top:.35rem">@dsl.component
+def f(cikti: Output[Dataset]):
+    df.to_parquet(cikti.path)   # ← YEREL</pre>
+        <p style="margin-top:.35rem">Kod S3'ü <b>hiç görmüyor</b>. Kopyalamayı sistem yapıyor;
+          girdi kod başlamadan <code>.path</code>'te duruyor.</p></div>
+      <div class="k"><h3>Artifact'in dört alanı</h3>
+        <pre style="margin-top:.35rem">.name       kimlik
+.uri        nesne deposundaki GERÇEK yer
+.path       container içindeki YEREL yol
+.metadata   serbest anahtar-değer</pre>
+        <p style="margin-top:.35rem"><code>pipeline_root</code> nereye yazılacağını söylüyor —
+          <b>kodda sabit değil</b>, ConfigMap / anotasyon / çalıştırma argümanı.</p></div>
+    </div>
+  </div>
+  <div class="body czw am">
+    <p class="czt">kritik fark — aynı container mı, ayrı container mı</p>
+    <svg class="cz" data-d="kfp-vs-biz" viewBox="0 0 760 245" role="img"
+      aria-label="KFP'de launcher ve kod aynı container'da; bizde sidecar ve sandbox ayrı container"></svg>
+  </div>
+  <p class="say">Alt süreç ebeveyninin <b>ortamını devralır</b> — aynı env, aynı dosya sistemi,
+    aynı ağ. <b class="am">KFP için bu doğru karar:</b> oradaki kodu bir insan yazdı, gözden
+    geçirdi; sarmalayıcının işi güvenlik değil <b>kolaylık</b>. Bizde kodu LLM yazıyor.</p>
+</section>
+
+<!-- 06 ── KALAN DÖRT DESEN ────────────────────────────── -->
+<section class="s" data-t="Tekton · Argo · Databricks · Devin">
+  <div class="kicker">Mentalite · 03 · kalan dört desen</div>
+  <h2 class="sm">Referans · ayrı imaj · denetimli mount · <span class="am">hiç ölmeyen sandbox</span></h2>
+  <div class="body grid g2">
+    <div class="czw gr"><p class="czt">Tekton — artifact = referans, kap değil</p>
+      <svg class="cz" data-d="tekton" viewBox="0 0 700 215" role="img"
+        aria-label="Adımlar workspace PVC paylaşıyor, artifact uri ve digest olarak duyuruluyor, Chains imzalı attestation üretiyor"></svg>
+      <p class="czn"><i>“only metadata and attestations are stored, <b>not artifact content</b>.”</i></p></div>
+    <div class="czw gr"><p class="czt">Argo — aktarımı kodun dışına çıkar</p>
+      <svg class="cz" data-d="argo" viewBox="0 0 700 200" role="img"
+        aria-label="init container indirir, kullanıcı kodu düz dosya okur, wait sidecar yükler; argoexec ayrı imaj"></svg>
+      <p class="czn"><b class="am">Bizim yerleşimimiz buradan geliyor.</b></p></div>
+    <div class="czw bl"><p class="czt">Databricks — mount ailesindeki tek istisna</p>
+      <svg class="cz" data-d="databricks" viewBox="0 0 700 175" role="img"
+        aria-label="Kod /Volumes yoluna yazıyor, FUSE sürücüsü Unity Catalog'a izin soruyor"></svg></div>
+    <div class="czw am"><p class="czt">Devin — soruyu ortadan kaldırıyor</p>
+      <svg class="cz" data-d="devin" viewBox="0 0 700 160" role="img"
+        aria-label="microVM snapshot RAM süreç disk saklıyor, iş bitince git commit"></svg></div>
+  </div>
+  <p class="say"><b>İki uçtaki cevap:</b> Databricks aracıyı <b>sürücüye</b> gömüyor,
+    Devin <b>sandbox'ı hiç öldürmeyerek</b> soruyu ortadan kaldırıyor.
+    Bizim sandbox'ımız <b class="rd">4 saniye</b> yaşıyor — ikisi de bize kapalı.</p>
+</section>
+
+<!-- 07 ── KEŞİF VE KAYIT DEFTERİ ──────────────────────── -->
+<section class="s" data-t="Keşif ve kayıt defteri">
+  <div class="kicker">Piyasa · 04 · ajan istediğini nasıl buluyor</div>
+  <h2 class="sm">Tek belirleyici: <span class="am">sandbox yaşıyor mu</span></h2>
+  <div class="body czw">
+    <svg class="cz" data-d="omur" viewBox="0 0 700 140" role="img"
+      aria-label="Sandbox yaşıyorsa ls yeter, dört saniye ölüyorsa ayrı kanal gerekiyor"></svg></div>
+  <div class="body grid g2">
+    <div class="wrap"><table>
+      <tr><th>Keşif deseni</th><th>Kim</th></tr>
+      <tr><td>Referans context'e düşer <span class="dim">— <code>file_id</code> tool sonucunda</span></td><td>Anthropic</td></tr>
+      <tr><td>Dosya sistemi + <code>ls</code></td><td>Anthropic, OpenAI, Cloudflare, Google</td></tr>
+      <tr><td>İsimler prompt'a enjekte</td><td><b>Google ADK</b></td></tr>
+      <tr><td>Semantik arama <span class="dim">— RAG, artifact değil</span></td><td>Llama Stack</td></tr>
+      <tr><td>Kayıt defterine sorgu <span class="dim">— <code>filter_query</code></span></td><td>MLMD</td></tr>
+      <tr class="us"><td><b>Keşif YOK</b> — DAG statik, girdi bağlanmış</td><td><b>KFP, Argo, Tekton, Airflow</b></td></tr>
+    </table></div>
+    <div class="wrap"><table>
+      <tr><th>Aynı adın 12 sürümü</th><th>Nasıl çözülüyor</th></tr>
+      <tr><td>MLflow</td><td>alias — <code>models:/MyModel@champion</code></td></tr>
+      <tr><td>KFP / Argo</td><td>çakışma <b>imkânsız</b> — yol run-id içeriyor</td></tr>
+      <tr><td>Google ADK</td><td>sürüm numarası — <code>load_artifact()</code> en yeniyi verir</td></tr>
+      <tr><td>DVC / git</td><td>içerik hash'i — isim kimlik değil</td></tr>
+    </table></div>
+  </div>
+  <p class="say">Pipeline dünyasında soru hiç doğmuyor: DAG'ı <b>insan</b> yazıyor,
+    girdi <b>bağlanmış</b> geliyor. <b class="am">Bizde ajan karar veriyor ve sandbox ölüyor</b>
+    — iki şart birden. Bir S3 anahtarı dosyayı bulur, ama neyden türediğini,
+    hangi sürümün onaylı olduğunu, ne zaman sileceğini <b>söylemez</b>.</p>
+</section>
+
+<!-- 08 ── BİZ · BEYAN + ÜÇ KANAL ──────────────────────── -->
+<section class="s" data-t="Biz · beyan ve keşif">
+  <div class="kicker">Biz · 01</div>
+  <h2>Çağrı değil. <span class="am">Beyan.</span></h2>
+  <div class="body grid g2">
+    <div class="czw gr"><p class="czt">biçim yolu belirliyor — üçü de beyan</p>
+      <svg class="cz" data-d="beyan" viewBox="0 0 720 235" role="img"
+        aria-label="inputs listesi üç biçimde: kendi, çapraz workflow ve alias"></svg>
+      <p class="czn">Kod <code>open()</code> yazıyor, dosya zaten orada.
+        <b>KFP ve Argo tam böyle yapıyor</b> — orada beyanı insan yazıyor, bizde model.</p></div>
+    <div class="czw am"><p class="czt">üç kanal — çünkü sandbox 4 saniye yaşıyor</p>
+      <svg class="cz" data-d="uc-kanal" viewBox="0 0 720 215" role="img"
+        aria-label="Manifest, artifact_ara ve os.listdir kanalları modele bilgi taşıyor"></svg>
+      <p class="czn">Diğerleri birer desenle idare ediyor çünkü <b>sandbox'ları yaşıyor</b>.</p></div>
+  </div>
+  <div class="body grid g2">
+    <pre class="gr">ARAMA NEDEN GEREKLİ — canlı
+
+model: "listede 'kopya' geçen 4 dosya gördüm,
+        kesin sayı için artifact_ara kullanacağım"
+arama: 24 eşleşme</pre>
+    <pre class="rd">100 DOSYA ÜRETTİK — ölçüldü
+
+beyansız  →  100 iner ·  soy 100 EBEVEYN
+beyanlı   →    2 iner ·  soy   2 ebeveyn
+             ↑ kod tek dosya okudu</pre>
+  </div>
+  <p class="say">Asıl bedel indirme değil <b class="am">soy şişmesi</b> — beyan tam bunun için var.
+    Soy da beyandan çıkıyor: <b>MLMD'nin <code>DECLARED_INPUT</code>'u.</b></p>
+</section>
+
+<!-- 09 ── BİZ · POD + OPENSHIFT ───────────────────────── -->
+<section class="s" data-t="Biz · pod ve OpenShift">
+  <div class="kicker">Biz · 02 · bir çalıştırma · ölçüldü</div>
+  <h2 class="sm">İki container, bir <code>/output</code> — ve OpenShift'te
+    <span class="gr">varsayılanlarla çalışıyor</span></h2>
+  <div class="body grid g21">
+    <div class="czw gr"><p class="czt">pod — yaklaşık 4 saniye</p>
+      <svg class="cz" data-d="bizim-pod" viewBox="0 0 720 250" role="img"
+        aria-label="Pod içinde artifact-sidecar ve sandbox ayrı container, aralarında /output emptyDir"></svg></div>
+    <div class="grid" style="align-content:start">
+      <div class="k gr"><h3>Sandbox'tan bakınca</h3>
+        <pre class="gr" style="margin-top:.35rem">S3 kimlik bilgisi   []
+S3 SDK kurulu       hayır
+kapsam jetonu       []
+MinIO'ya IP ile     TimeoutError
+internet            ConnectionError</pre></div>
+      <div class="k gr"><h3><code>restricted-v2</code> SCC ile tam akış</h3>
+        <p class="dim" style="margin-bottom:.25rem">rastgele UID 1000670000 ·
+          <code>runAsNonRoot</code> · <code>drop: [ALL]</code></p>
+        <p>sidecar + sandbox açılışı <b class="gr">✓</b> ·
+           <code>/output</code> yazılabilir <b class="gr">✓</b> ·
+           matplotlib · Parquet · PNG <b class="gr">✓</b> ·
+           süpürme + yükleme + soy <b class="gr">✓</b></p></div>
+    </div>
+  </div>
+  <div class="body wrap"><table>
+    <tr><th>Bizde (kind)</th><th>OpenShift</th><th></th></tr>
+    <tr><td>Depo sözleşmesi</td><td>ODF/OBC ya da harici S3</td><td><span class="gr">✓ ikisi de okunuyor</span></td></tr>
+    <tr><td><code>securityContext</code></td><td>SCC enjekte ediyor</td><td><span class="gr">✓ şablonda</span></td></tr>
+    <tr><td>Yerleşik sidecar</td><td>OCP 4.16+</td><td><span class="gr">✓ sürüm koşulu</span></td></tr>
+    <tr><td>Kayıt defteri</td><td>PostgreSQL</td><td><span class="gr">✓ <code>open_postgres()</code> hazır</span></td></tr>
+  </table></div>
+  <p class="say">Kalıcılık için gereken tek şey <b>bir S3-uyumlu depo</b>: endpoint + bucket +
+    anahtar. Yerleşim <b class="am">Argo'nun C ailesi</b> — <code>argoexec</code> gibi ayrı bir imaj.
+    <b class="am">İzolasyonu güçlendirmek için Kata</b>: Red Hat'in kendi önerisi,
+    <b>kod değişikliği gerektirmiyor</b>.</p>
+</section>
+
+<!-- 10 ── HATA GERİ BİLDİRİMİ ─────────────────────────── -->
+<section class="s" data-t="Hata geri bildirimi">
+  <div class="kicker">Piyasa · 05 · aynı hata, altı cevap</div>
+  <h2 class="sm">Kod patlıyor. Modele <span class="am">ne dönüyor?</span></h2>
+  <div class="body grid g21">
+    <div class="czw"><p class="czt">iyi sinyalin üç parçası</p>
+      <svg class="cz" data-d="hata-akis" viewBox="0 0 700 165" role="img"
+        aria-label="Kod patlar, çıkış kodu tam traceback ve korunan stdout döner, model düzeltir"></svg></div>
+    <pre class="rd">print("veri yuklendi")     # ← bu çalıştı
+d = {"a": 1}
+d["yok"]                   # ← burada patladı</pre>
+  </div>
+  <div class="body grid g3">
+    <div class="k gr"><h3>Claude Code</h3>
+      <pre style="border:none;padding:.3rem 0;background:none">Exit code 1
+veri yuklendi          ← stdout KORUNDU
+Traceback (most recent call last):
+  File "kod.py", line 3, in &lt;module&gt;
+    d["yok"]
+KeyError: 'yok'</pre></div>
+    <div class="k gr"><h3>Codex <span class="dim">· kaynak kod</span></h3>
+      <pre style="border:none;padding:.3rem 0;background:none">Exit code: 1
+Wall time: 0.4 seconds
+Total output lines: 6
+Output:
+veri yuklendi
+… KeyError: 'yok'</pre></div>
+    <div class="k gr"><h3>Anthropic API</h3>
+      <pre style="border:none;padding:.3rem 0;background:none">{"stdout": "veri yuklendi",
+ "stderr": "Traceback …KeyError",
+ "return_code": 1}
++ tipli error_code
+  execution_time_exceeded …</pre></div>
+    <div class="k"><h3>smolagents</h3>
+      <pre style="border:none;padding:.3rem 0;background:none">Code execution failed at line
+'d["yok"]' due to:
+KeyError: 'yok'
+Execution logs:
+veri yuklendi</pre>
+      <p style="margin-top:.25rem" class="dim">Satırın <b>kaynak metni</b> + tip + stdout.
+        Traceback yok.</p></div>
+    <div class="k"><h3>AutoGen / AG2</h3>
+      <pre style="border:none;padding:.3rem 0;background:none">exitcode: 1 (execution failed)
+Code output:
+Traceback (most recent call last):
+  …
+KeyError: 'yok'</pre>
+      <p style="margin-top:.25rem" class="dim">Tam stderr, <b class="rd">kırpma yok</b>.
+        Timeout ayrı: kod <b>124</b>.</p></div>
+    <div class="k rd"><h3>Eski hâlimiz</h3>
+      <pre style="border:none;padding:.3rem 0;background:none">Hata: 'yok'
+Tahmini bir değer üretme.</pre>
+      <p style="margin-top:.25rem" class="dim">Tip yok · satır yok · stdout yok.
+        Ve metin modele <b class="rd">DUR</b> diyor.</p></div>
+  </div>
+  <p class="say"><b class="am">Üçünde aynı üçlü var:</b> çıkış kodu · tam traceback ·
+    hata anında korunan stdout. <b>SWE-agent</b> kırptığında bunu söylüyor
+    <i>ve ne yapacağını öğretiyor</i>; <b>OpenHands</b> aynı hatayı 3 kez alınca
+    öldürmüyor, <b>dürtüyor</b>; <b>Copilot</b>'ta döngünün varlığı belgeli ama
+    <b class="rd">mekanizma değil</b>.</p>
+</section>
+
+<!-- 11 ── ÖLÇÜM ──────────────────────────────────────── -->
+<section class="s sik" data-t="Hata biçimleri · ölçüldü">
+  <div class="kicker">Piyasa · 06 · 10 biçim × 5 arıza · koşuldu ve teste bağlandı</div>
+  <h2 class="sm">Aynı hata, on biçim — <span class="am">ölçülmüş</span></h2>
+  <div class="body grid g21">
+    <div class="czw"><p class="czt">ölçüm düzeneği</p>
+      <svg class="cz" data-d="olcum" viewBox="0 0 700 80" role="img"
+        aria-label="Beş arıza aynı ham malzemeye çevriliyor, on biçimlendiriciye veriliyor, yedi ölçütte puanlanıyor"></svg>
+      <p class="czn">Hepsi <b>AYNI</b> malzemeyi alıyor — fark yalnızca
+        <b>nasıl sunduğu</b>.</p></div>
+    <div class="k"><h3>Sütunlar ne soruyor</h3>
+      <pre style="margin-top:.3rem">tip      KeyError   yazıyor mu
+satır    line 4     yazıyor mu
+kaynak   d["yok"]   yazıyor mu
+stdout   hataya kadarki çıktı korundu mu
+çıkış    exit code bildiriliyor mu
+kırpma   kırpıldığı SÖYLENİYOR mu
+talimat  ne yapacağı söyleniyor mu</pre>
+      <p style="margin-top:.35rem"><b class="gr">✓</b> = 5 senaryonun hepsinde ·
+        <b class="rd">✗</b> = hiçbirinde · <b class="am">4/5</b> = kısmi.
+        Kısmi puanların çoğu <b>“o senaryoda ölçüt zaten uygulanmıyordu”</b>
+        demek — <code>kırpma 4/5</code> = kırpılacak bir şey olmayan 4 senaryo
+        otomatik geçti, tek gerçek sınavda kaldı.</p></div>
+  </div>
+  <div class="body wrap"><table>
+    <tr><th>Biçim</th><th>tip</th><th>satır</th><th>kaynak</th><th>stdout</th><th>çıkış</th>
+        <th>kırpma</th><th>talimat</th><th>sinyal</th><th>tekrar</th><th>sızıntı</th><th>ort. bayt</th></tr>
+    <tr><td>Bizim <span class="dim">(eski)</span></td>
+      <td><span class="rd">1/5</span></td><td><span class="rd">2/5</span></td><td><span class="rd">2/5</span></td>
+      <td><span class="rd">1/5</span></td><td><span class="rd">✗</span></td><td><span class="am">4/5</span></td>
+      <td><span class="rd">✗</span></td><td><b class="rd">10/35</b></td><td><span class="rd">✗</span></td>
+      <td><span class="gr">0</span></td><td>56</td></tr>
+    <tr><td>Claude Code</td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="rd">✗</span></td><td><b class="gr">30/35</b></td><td><span class="rd">✗</span></td>
+      <td><span class="am">2</span></td><td>2 701</td></tr>
+    <tr><td>Codex</td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="rd">✗</span></td><td><b class="gr">30/35</b></td><td><span class="rd">✗</span></td>
+      <td><span class="am">2</span></td><td><b>2 356</b></td></tr>
+    <tr><td>Anthropic API</td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="am">4/5</span></td>
+      <td><span class="rd">✗</span></td><td>29/35</td><td><span class="rd">✗</span></td>
+      <td><span class="am">2</span></td><td><span class="rd">43 437</span></td></tr>
+    <tr><td>smolagents</td>
+      <td><span class="gr">✓</span></td><td><span class="rd">2/5</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="rd">✗</span></td><td><span class="gr">✓</span></td>
+      <td><span class="rd">✗</span></td><td>22/35</td><td><span class="rd">✗</span></td>
+      <td><span class="gr">0</span></td><td>4 114</td></tr>
+    <tr><td>AutoGen / AG2</td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="am">4/5</span></td>
+      <td><span class="rd">✗</span></td><td>29/35</td><td><span class="rd">✗</span></td>
+      <td><span class="am">2</span></td><td><span class="rd">42 587</span></td></tr>
+    <tr><td>SWE-agent <span class="dim">varsayılan</span></td>
+      <td><span class="rd">4/5</span></td><td><span class="rd">4/5</span></td><td><span class="rd">4/5</span></td>
+      <td><span class="gr">✓</span></td><td><span class="rd">✗</span></td><td><span class="gr">✓</span></td>
+      <td><span class="am">1/5</span></td><td>23/35</td><td><span class="rd">✗</span></td>
+      <td><span class="am">2</span></td><td><b>2 331</b></td></tr>
+    <tr><td>SWE-agent <span class="dim">bash_only</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="rd">✗</span></td><td><span class="gr">✓</span></td>
+      <td><span class="am">1/5</span></td><td>26/35</td><td><span class="rd">✗</span></td>
+      <td><span class="am">2</span></td><td><b>2 331</b></td></tr>
+    <tr><td>OpenHands</td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="am">4/5</span></td>
+      <td><span class="rd">✗</span></td><td>29/35</td><td><b class="gr">✓</b></td>
+      <td><span class="am">2</span></td><td><span class="rd">42 555</span></td></tr>
+    <tr class="us"><td>Bizim <span class="dim">(şimdi)</span></td>
+      <td><span class="gr">✓</span></td><td><span class="gr">✓</span></td><td><span class="gr">✓</span></td>
+      <td><span class="gr">✓</span></td><td><span class="dim">yok</span></td><td><span class="gr">✓</span></td>
+      <td><b class="gr">✓</b></td><td><b class="gr">30/35</b></td><td><span class="rd">✗</span></td>
+      <td><b class="gr">0</b></td><td>4 538</td></tr>
+  </table></div>
+  <div class="body grid g3">
+    <div class="k rd"><h3>① Kırpma <span class="rd">yönü</span> hatayı yiyor</h3>
+      <p>SWE-agent'ın varsayılan şablonu <code>observation[:10000]</code> —
+        <b>baştan</b> kesiyor. Hata en sonda olduğu için 160 KB'lık çıktıda
+        <code>ValueError</code> modele <b class="rd">hiç ulaşmıyor</b>.
+        <code>bash_only</code>'nin baş-yarı + son-yarısı kaybetmiyor:
+        <b>23 → 26</b>, tek satırlık ayar farkı.</p></div>
+    <div class="k rd"><h3>② Kırpmamanın bedeli</h3>
+      <p>Tek bir hatada, modele giden bayt:</p>
+      <p style="margin-top:.25rem"><b class="rd">AutoGen 211 360</b> ·
+        <b class="rd">OpenHands 211 328</b> · <b class="rd">Anthropic 215 415</b>
+        &nbsp;—&nbsp; <b class="gr">Bizim 20 615</b> ·
+        <b class="gr">Codex 10 113</b></p>
+      <p style="margin-top:.25rem">Üstteki üçü sınır <b>koymuyor</b>.</p></div>
+    <div class="k gr"><h3>③ <span class="gr">Talimat</span> sütunu neredeyse boş</h3>
+      <p>On biçimden <b>dokuzu</b> ne olduğunu anlatıyor, <b>ne yapılacağını</b>
+        söylemiyor. SWE-agent sadece kırpınca (1/5). <b class="am">Tekrar tespiti
+        ise yalnızca OpenHands'te</b> — bizdeki tek gerçek açık.</p></div>
+  </div>
+  <p class="say"><b class="am">Dürüst okuma:</b> ölçüt listesi bizim araştırmamızdan çıktı ve
+    bizim biçimimizi de o araştırma şekillendirdi — sıralamada <b>dairesellik var</b>.
+    Kıyaslanabilir olan sinyal değil <b>sinyal/bayt</b>: Codex aynı 30/35'i <b>2 356</b>
+    baytla taşıyor, biz <b>4 538</b>'le; fark her mesajda giden talimat metni.
+    <span class="dim"><code>scripts/hata_bicim_kiyas.py</code> · 17 test ·
+    <code>PTC_Hata_Bicimleri_Kiyas.md</code></span></p>
+</section>
+
+</div>
+
+<div id="bar"></div>
+<div id="hud">
+  <button id="p" aria-label="Önceki">←</button>
+  <button id="c" aria-label="Genel bakış">1 / 11</button>
+  <button id="x" aria-label="Sonraki">→</button>
+</div>
+<div id="ov" hidden></div>
+
+<script>/* roughjs 4.6.6 — gömülü, CDN gerekmez */
+var rough=function(){"use strict";function t(t,e,s){if(t&&t.length){const[n,o]=e,a=Math.PI/180*s,h=Math.cos(a),r=Math.sin(a);for(const e of t){const[t,s]=e;e[0]=(t-n)*h-(s-o)*r+n,e[1]=(t-n)*r+(s-o)*h+o}}}function e(t,e){return t[0]===e[0]&&t[1]===e[1]}function s(s,n,o,a=1){const h=o,r=Math.max(n,.1),i=s[0]&&s[0][0]&&"number"==typeof s[0][0]?[s]:s,c=[0,0];if(h)for(const e of i)t(e,c,h);const l=function(t,s,n){const o=[];for(const s of t){const t=[...s];e(t[0],t[t.length-1])||t.push([t[0][0],t[0][1]]),t.length>2&&o.push(t)}const a=[];s=Math.max(s,.1);const h=[];for(const t of o)for(let e=0;e<t.length-1;e++){const s=t[e],n=t[e+1];if(s[1]!==n[1]){const t=Math.min(s[1],n[1]);h.push({ymin:t,ymax:Math.max(s[1],n[1]),x:t===s[1]?s[0]:n[0],islope:(n[0]-s[0])/(n[1]-s[1])})}}if(h.sort(((t,e)=>t.ymin<e.ymin?-1:t.ymin>e.ymin?1:t.x<e.x?-1:t.x>e.x?1:t.ymax===e.ymax?0:(t.ymax-e.ymax)/Math.abs(t.ymax-e.ymax))),!h.length)return a;let r=[],i=h[0].ymin,c=0;for(;r.length||h.length;){if(h.length){let t=-1;for(let e=0;e<h.length&&!(h[e].ymin>i);e++)t=e;h.splice(0,t+1).forEach((t=>{r.push({s:i,edge:t})}))}if(r=r.filter((t=>!(t.edge.ymax<=i))),r.sort(((t,e)=>t.edge.x===e.edge.x?0:(t.edge.x-e.edge.x)/Math.abs(t.edge.x-e.edge.x))),(1!==n||c%s==0)&&r.length>1)for(let t=0;t<r.length;t+=2){const e=t+1;if(e>=r.length)break;const s=r[t].edge,n=r[e].edge;a.push([[Math.round(s.x),i],[Math.round(n.x),i]])}i+=n,r.forEach((t=>{t.edge.x=t.edge.x+n*t.edge.islope})),c++}return a}(i,r,a);if(h){for(const e of i)t(e,c,-h);!function(e,s,n){const o=[];e.forEach((t=>o.push(...t))),t(o,s,n)}(l,c,-h)}return l}function n(t,e){var n;const o=e.hachureAngle+90;let a=e.hachureGap;a<0&&(a=4*e.strokeWidth),a=Math.round(Math.max(a,.1));let h=1;return e.roughness>=1&&((null===(n=e.randomizer)||void 0===n?void 0:n.next())||Math.random())>.7&&(h=a),s(t,a,o,h||1)}class o{constructor(t){this.helper=t}fillPolygons(t,e){return this._fillPolygons(t,e)}_fillPolygons(t,e){const s=n(t,e);return{type:"fillSketch",ops:this.renderLines(s,e)}}renderLines(t,e){const s=[];for(const n of t)s.push(...this.helper.doubleLineOps(n[0][0],n[0][1],n[1][0],n[1][1],e));return s}}function a(t){const e=t[0],s=t[1];return Math.sqrt(Math.pow(e[0]-s[0],2)+Math.pow(e[1]-s[1],2))}class h extends o{fillPolygons(t,e){let s=e.hachureGap;s<0&&(s=4*e.strokeWidth),s=Math.max(s,.1);const o=n(t,Object.assign({},e,{hachureGap:s})),h=Math.PI/180*e.hachureAngle,r=[],i=.5*s*Math.cos(h),c=.5*s*Math.sin(h);for(const[t,e]of o)a([t,e])&&r.push([[t[0]-i,t[1]+c],[...e]],[[t[0]+i,t[1]-c],[...e]]);return{type:"fillSketch",ops:this.renderLines(r,e)}}}class r extends o{fillPolygons(t,e){const s=this._fillPolygons(t,e),n=Object.assign({},e,{hachureAngle:e.hachureAngle+90}),o=this._fillPolygons(t,n);return s.ops=s.ops.concat(o.ops),s}}class i{constructor(t){this.helper=t}fillPolygons(t,e){const s=n(t,e=Object.assign({},e,{hachureAngle:0}));return this.dotsOnLines(s,e)}dotsOnLines(t,e){const s=[];let n=e.hachureGap;n<0&&(n=4*e.strokeWidth),n=Math.max(n,.1);let o=e.fillWeight;o<0&&(o=e.strokeWidth/2);const h=n/4;for(const r of t){const t=a(r),i=t/n,c=Math.ceil(i)-1,l=t-c*n,u=(r[0][0]+r[1][0])/2-n/4,p=Math.min(r[0][1],r[1][1]);for(let t=0;t<c;t++){const a=p+l+t*n,r=u-h+2*Math.random()*h,i=a-h+2*Math.random()*h,c=this.helper.ellipse(r,i,o,o,e);s.push(...c.ops)}}return{type:"fillSketch",ops:s}}}class c{constructor(t){this.helper=t}fillPolygons(t,e){const s=n(t,e);return{type:"fillSketch",ops:this.dashedLine(s,e)}}dashedLine(t,e){const s=e.dashOffset<0?e.hachureGap<0?4*e.strokeWidth:e.hachureGap:e.dashOffset,n=e.dashGap<0?e.hachureGap<0?4*e.strokeWidth:e.hachureGap:e.dashGap,o=[];return t.forEach((t=>{const h=a(t),r=Math.floor(h/(s+n)),i=(h+n-r*(s+n))/2;let c=t[0],l=t[1];c[0]>l[0]&&(c=t[1],l=t[0]);const u=Math.atan((l[1]-c[1])/(l[0]-c[0]));for(let t=0;t<r;t++){const a=t*(s+n),h=a+s,r=[c[0]+a*Math.cos(u)+i*Math.cos(u),c[1]+a*Math.sin(u)+i*Math.sin(u)],l=[c[0]+h*Math.cos(u)+i*Math.cos(u),c[1]+h*Math.sin(u)+i*Math.sin(u)];o.push(...this.helper.doubleLineOps(r[0],r[1],l[0],l[1],e))}})),o}}class l{constructor(t){this.helper=t}fillPolygons(t,e){const s=e.hachureGap<0?4*e.strokeWidth:e.hachureGap,o=e.zigzagOffset<0?s:e.zigzagOffset,a=n(t,e=Object.assign({},e,{hachureGap:s+o}));return{type:"fillSketch",ops:this.zigzagLines(a,o,e)}}zigzagLines(t,e,s){const n=[];return t.forEach((t=>{const o=a(t),h=Math.round(o/(2*e));let r=t[0],i=t[1];r[0]>i[0]&&(r=t[1],i=t[0]);const c=Math.atan((i[1]-r[1])/(i[0]-r[0]));for(let t=0;t<h;t++){const o=2*t*e,a=2*(t+1)*e,h=Math.sqrt(2*Math.pow(e,2)),i=[r[0]+o*Math.cos(c),r[1]+o*Math.sin(c)],l=[r[0]+a*Math.cos(c),r[1]+a*Math.sin(c)],u=[i[0]+h*Math.cos(c+Math.PI/4),i[1]+h*Math.sin(c+Math.PI/4)];n.push(...this.helper.doubleLineOps(i[0],i[1],u[0],u[1],s),...this.helper.doubleLineOps(u[0],u[1],l[0],l[1],s))}})),n}}const u={};class p{constructor(t){this.seed=t}next(){return this.seed?(2**31-1&(this.seed=Math.imul(48271,this.seed)))/2**31:Math.random()}}const f=0,d=1,g=2,M={A:7,a:7,C:6,c:6,H:1,h:1,L:2,l:2,M:2,m:2,Q:4,q:4,S:4,s:4,T:2,t:2,V:1,v:1,Z:0,z:0};function k(t,e){return t.type===e}function b(t){const e=[],s=function(t){const e=new Array;for(;""!==t;)if(t.match(/^([ \t\r\n,]+)/))t=t.substr(RegExp.$1.length);else if(t.match(/^([aAcChHlLmMqQsStTvVzZ])/))e[e.length]={type:f,text:RegExp.$1},t=t.substr(RegExp.$1.length);else{if(!t.match(/^(([-+]?[0-9]+(\.[0-9]*)?|[-+]?\.[0-9]+)([eE][-+]?[0-9]+)?)/))return[];e[e.length]={type:d,text:`${parseFloat(RegExp.$1)}`},t=t.substr(RegExp.$1.length)}return e[e.length]={type:g,text:""},e}(t);let n="BOD",o=0,a=s[o];for(;!k(a,g);){let h=0;const r=[];if("BOD"===n){if("M"!==a.text&&"m"!==a.text)return b("M0,0"+t);o++,h=M[a.text],n=a.text}else k(a,d)?h=M[n]:(o++,h=M[a.text],n=a.text);if(!(o+h<s.length))throw new Error("Path data ended short");for(let t=o;t<o+h;t++){const e=s[t];if(!k(e,d))throw new Error("Param not a number: "+n+","+e.text);r[r.length]=+e.text}if("number"!=typeof M[n])throw new Error("Bad segment: "+n);{const t={key:n,data:r};e.push(t),o+=h,a=s[o],"M"===n&&(n="L"),"m"===n&&(n="l")}}return e}function y(t){let e=0,s=0,n=0,o=0;const a=[];for(const{key:h,data:r}of t)switch(h){case"M":a.push({key:"M",data:[...r]}),[e,s]=r,[n,o]=r;break;case"m":e+=r[0],s+=r[1],a.push({key:"M",data:[e,s]}),n=e,o=s;break;case"L":a.push({key:"L",data:[...r]}),[e,s]=r;break;case"l":e+=r[0],s+=r[1],a.push({key:"L",data:[e,s]});break;case"C":a.push({key:"C",data:[...r]}),e=r[4],s=r[5];break;case"c":{const t=r.map(((t,n)=>n%2?t+s:t+e));a.push({key:"C",data:t}),e=t[4],s=t[5];break}case"Q":a.push({key:"Q",data:[...r]}),e=r[2],s=r[3];break;case"q":{const t=r.map(((t,n)=>n%2?t+s:t+e));a.push({key:"Q",data:t}),e=t[2],s=t[3];break}case"A":a.push({key:"A",data:[...r]}),e=r[5],s=r[6];break;case"a":e+=r[5],s+=r[6],a.push({key:"A",data:[r[0],r[1],r[2],r[3],r[4],e,s]});break;case"H":a.push({key:"H",data:[...r]}),e=r[0];break;case"h":e+=r[0],a.push({key:"H",data:[e]});break;case"V":a.push({key:"V",data:[...r]}),s=r[0];break;case"v":s+=r[0],a.push({key:"V",data:[s]});break;case"S":a.push({key:"S",data:[...r]}),e=r[2],s=r[3];break;case"s":{const t=r.map(((t,n)=>n%2?t+s:t+e));a.push({key:"S",data:t}),e=t[2],s=t[3];break}case"T":a.push({key:"T",data:[...r]}),e=r[0],s=r[1];break;case"t":e+=r[0],s+=r[1],a.push({key:"T",data:[e,s]});break;case"Z":case"z":a.push({key:"Z",data:[]}),e=n,s=o}return a}function m(t){const e=[];let s="",n=0,o=0,a=0,h=0,r=0,i=0;for(const{key:c,data:l}of t){switch(c){case"M":e.push({key:"M",data:[...l]}),[n,o]=l,[a,h]=l;break;case"C":e.push({key:"C",data:[...l]}),n=l[4],o=l[5],r=l[2],i=l[3];break;case"L":e.push({key:"L",data:[...l]}),[n,o]=l;break;case"H":n=l[0],e.push({key:"L",data:[n,o]});break;case"V":o=l[0],e.push({key:"L",data:[n,o]});break;case"S":{let t=0,a=0;"C"===s||"S"===s?(t=n+(n-r),a=o+(o-i)):(t=n,a=o),e.push({key:"C",data:[t,a,...l]}),r=l[0],i=l[1],n=l[2],o=l[3];break}case"T":{const[t,a]=l;let h=0,c=0;"Q"===s||"T"===s?(h=n+(n-r),c=o+(o-i)):(h=n,c=o);const u=n+2*(h-n)/3,p=o+2*(c-o)/3,f=t+2*(h-t)/3,d=a+2*(c-a)/3;e.push({key:"C",data:[u,p,f,d,t,a]}),r=h,i=c,n=t,o=a;break}case"Q":{const[t,s,a,h]=l,c=n+2*(t-n)/3,u=o+2*(s-o)/3,p=a+2*(t-a)/3,f=h+2*(s-h)/3;e.push({key:"C",data:[c,u,p,f,a,h]}),r=t,i=s,n=a,o=h;break}case"A":{const t=Math.abs(l[0]),s=Math.abs(l[1]),a=l[2],h=l[3],r=l[4],i=l[5],c=l[6];if(0===t||0===s)e.push({key:"C",data:[n,o,i,c,i,c]}),n=i,o=c;else if(n!==i||o!==c){x(n,o,i,c,t,s,a,h,r).forEach((function(t){e.push({key:"C",data:t})})),n=i,o=c}break}case"Z":e.push({key:"Z",data:[]}),n=a,o=h}s=c}return e}function w(t,e,s){return[t*Math.cos(s)-e*Math.sin(s),t*Math.sin(s)+e*Math.cos(s)]}function x(t,e,s,n,o,a,h,r,i,c){const l=(u=h,Math.PI*u/180);var u;let p=[],f=0,d=0,g=0,M=0;if(c)[f,d,g,M]=c;else{[t,e]=w(t,e,-l),[s,n]=w(s,n,-l);const h=(t-s)/2,c=(e-n)/2;let u=h*h/(o*o)+c*c/(a*a);u>1&&(u=Math.sqrt(u),o*=u,a*=u);const p=o*o,k=a*a,b=p*k-p*c*c-k*h*h,y=p*c*c+k*h*h,m=(r===i?-1:1)*Math.sqrt(Math.abs(b/y));g=m*o*c/a+(t+s)/2,M=m*-a*h/o+(e+n)/2,f=Math.asin(parseFloat(((e-M)/a).toFixed(9))),d=Math.asin(parseFloat(((n-M)/a).toFixed(9))),t<g&&(f=Math.PI-f),s<g&&(d=Math.PI-d),f<0&&(f=2*Math.PI+f),d<0&&(d=2*Math.PI+d),i&&f>d&&(f-=2*Math.PI),!i&&d>f&&(d-=2*Math.PI)}let k=d-f;if(Math.abs(k)>120*Math.PI/180){const t=d,e=s,r=n;d=i&&d>f?f+120*Math.PI/180*1:f+120*Math.PI/180*-1,p=x(s=g+o*Math.cos(d),n=M+a*Math.sin(d),e,r,o,a,h,0,i,[d,t,g,M])}k=d-f;const b=Math.cos(f),y=Math.sin(f),m=Math.cos(d),P=Math.sin(d),v=Math.tan(k/4),S=4/3*o*v,O=4/3*a*v,L=[t,e],T=[t+S*y,e-O*b],D=[s+S*P,n-O*m],A=[s,n];if(T[0]=2*L[0]-T[0],T[1]=2*L[1]-T[1],c)return[T,D,A].concat(p);{p=[T,D,A].concat(p);const t=[];for(let e=0;e<p.length;e+=3){const s=w(p[e][0],p[e][1],l),n=w(p[e+1][0],p[e+1][1],l),o=w(p[e+2][0],p[e+2][1],l);t.push([s[0],s[1],n[0],n[1],o[0],o[1]])}return t}}const P={randOffset:function(t,e){return G(t,e)},randOffsetWithRange:function(t,e,s){return E(t,e,s)},ellipse:function(t,e,s,n,o){const a=T(s,n,o);return D(t,e,o,a).opset},doubleLineOps:function(t,e,s,n,o){return $(t,e,s,n,o,!0)}};function v(t,e,s,n,o){return{type:"path",ops:$(t,e,s,n,o)}}function S(t,e,s){const n=(t||[]).length;if(n>2){const o=[];for(let e=0;e<n-1;e++)o.push(...$(t[e][0],t[e][1],t[e+1][0],t[e+1][1],s));return e&&o.push(...$(t[n-1][0],t[n-1][1],t[0][0],t[0][1],s)),{type:"path",ops:o}}return 2===n?v(t[0][0],t[0][1],t[1][0],t[1][1],s):{type:"path",ops:[]}}function O(t,e,s,n,o){return function(t,e){return S(t,!0,e)}([[t,e],[t+s,e],[t+s,e+n],[t,e+n]],o)}function L(t,e){if(t.length){const s="number"==typeof t[0][0]?[t]:t,n=j(s[0],1*(1+.2*e.roughness),e),o=e.disableMultiStroke?[]:j(s[0],1.5*(1+.22*e.roughness),z(e));for(let t=1;t<s.length;t++){const a=s[t];if(a.length){const t=j(a,1*(1+.2*e.roughness),e),s=e.disableMultiStroke?[]:j(a,1.5*(1+.22*e.roughness),z(e));for(const e of t)"move"!==e.op&&n.push(e);for(const t of s)"move"!==t.op&&o.push(t)}}return{type:"path",ops:n.concat(o)}}return{type:"path",ops:[]}}function T(t,e,s){const n=Math.sqrt(2*Math.PI*Math.sqrt((Math.pow(t/2,2)+Math.pow(e/2,2))/2)),o=Math.ceil(Math.max(s.curveStepCount,s.curveStepCount/Math.sqrt(200)*n)),a=2*Math.PI/o;let h=Math.abs(t/2),r=Math.abs(e/2);const i=1-s.curveFitting;return h+=G(h*i,s),r+=G(r*i,s),{increment:a,rx:h,ry:r}}function D(t,e,s,n){const[o,a]=F(n.increment,t,e,n.rx,n.ry,1,n.increment*E(.1,E(.4,1,s),s),s);let h=q(o,null,s);if(!s.disableMultiStroke&&0!==s.roughness){const[o]=F(n.increment,t,e,n.rx,n.ry,1.5,0,s),a=q(o,null,s);h=h.concat(a)}return{estimatedPoints:a,opset:{type:"path",ops:h}}}function A(t,e,s,n,o,a,h,r,i){const c=t,l=e;let u=Math.abs(s/2),p=Math.abs(n/2);u+=G(.01*u,i),p+=G(.01*p,i);let f=o,d=a;for(;f<0;)f+=2*Math.PI,d+=2*Math.PI;d-f>2*Math.PI&&(f=0,d=2*Math.PI);const g=2*Math.PI/i.curveStepCount,M=Math.min(g/2,(d-f)/2),k=V(M,c,l,u,p,f,d,1,i);if(!i.disableMultiStroke){const t=V(M,c,l,u,p,f,d,1.5,i);k.push(...t)}return h&&(r?k.push(...$(c,l,c+u*Math.cos(f),l+p*Math.sin(f),i),...$(c,l,c+u*Math.cos(d),l+p*Math.sin(d),i)):k.push({op:"lineTo",data:[c,l]},{op:"lineTo",data:[c+u*Math.cos(f),l+p*Math.sin(f)]})),{type:"path",ops:k}}function _(t,e){const s=m(y(b(t))),n=[];let o=[0,0],a=[0,0];for(const{key:t,data:h}of s)switch(t){case"M":a=[h[0],h[1]],o=[h[0],h[1]];break;case"L":n.push(...$(a[0],a[1],h[0],h[1],e)),a=[h[0],h[1]];break;case"C":{const[t,s,o,r,i,c]=h;n.push(...Z(t,s,o,r,i,c,a,e)),a=[i,c];break}case"Z":n.push(...$(a[0],a[1],o[0],o[1],e)),a=[o[0],o[1]]}return{type:"path",ops:n}}function I(t,e){const s=[];for(const n of t)if(n.length){const t=e.maxRandomnessOffset||0,o=n.length;if(o>2){s.push({op:"move",data:[n[0][0]+G(t,e),n[0][1]+G(t,e)]});for(let a=1;a<o;a++)s.push({op:"lineTo",data:[n[a][0]+G(t,e),n[a][1]+G(t,e)]})}}return{type:"fillPath",ops:s}}function C(t,e){return function(t,e){let s=t.fillStyle||"hachure";if(!u[s])switch(s){case"zigzag":u[s]||(u[s]=new h(e));break;case"cross-hatch":u[s]||(u[s]=new r(e));break;case"dots":u[s]||(u[s]=new i(e));break;case"dashed":u[s]||(u[s]=new c(e));break;case"zigzag-line":u[s]||(u[s]=new l(e));break;default:s="hachure",u[s]||(u[s]=new o(e))}return u[s]}(e,P).fillPolygons(t,e)}function z(t){const e=Object.assign({},t);return e.randomizer=void 0,t.seed&&(e.seed=t.seed+1),e}function W(t){return t.randomizer||(t.randomizer=new p(t.seed||0)),t.randomizer.next()}function E(t,e,s,n=1){return s.roughness*n*(W(s)*(e-t)+t)}function G(t,e,s=1){return E(-t,t,e,s)}function $(t,e,s,n,o,a=!1){const h=a?o.disableMultiStrokeFill:o.disableMultiStroke,r=R(t,e,s,n,o,!0,!1);if(h)return r;const i=R(t,e,s,n,o,!0,!0);return r.concat(i)}function R(t,e,s,n,o,a,h){const r=Math.pow(t-s,2)+Math.pow(e-n,2),i=Math.sqrt(r);let c=1;c=i<200?1:i>500?.4:-.0016668*i+1.233334;let l=o.maxRandomnessOffset||0;l*l*100>r&&(l=i/10);const u=l/2,p=.2+.2*W(o);let f=o.bowing*o.maxRandomnessOffset*(n-e)/200,d=o.bowing*o.maxRandomnessOffset*(t-s)/200;f=G(f,o,c),d=G(d,o,c);const g=[],M=()=>G(u,o,c),k=()=>G(l,o,c),b=o.preserveVertices;return a&&(h?g.push({op:"move",data:[t+(b?0:M()),e+(b?0:M())]}):g.push({op:"move",data:[t+(b?0:G(l,o,c)),e+(b?0:G(l,o,c))]})),h?g.push({op:"bcurveTo",data:[f+t+(s-t)*p+M(),d+e+(n-e)*p+M(),f+t+2*(s-t)*p+M(),d+e+2*(n-e)*p+M(),s+(b?0:M()),n+(b?0:M())]}):g.push({op:"bcurveTo",data:[f+t+(s-t)*p+k(),d+e+(n-e)*p+k(),f+t+2*(s-t)*p+k(),d+e+2*(n-e)*p+k(),s+(b?0:k()),n+(b?0:k())]}),g}function j(t,e,s){if(!t.length)return[];const n=[];n.push([t[0][0]+G(e,s),t[0][1]+G(e,s)]),n.push([t[0][0]+G(e,s),t[0][1]+G(e,s)]);for(let o=1;o<t.length;o++)n.push([t[o][0]+G(e,s),t[o][1]+G(e,s)]),o===t.length-1&&n.push([t[o][0]+G(e,s),t[o][1]+G(e,s)]);return q(n,null,s)}function q(t,e,s){const n=t.length,o=[];if(n>3){const a=[],h=1-s.curveTightness;o.push({op:"move",data:[t[1][0],t[1][1]]});for(let e=1;e+2<n;e++){const s=t[e];a[0]=[s[0],s[1]],a[1]=[s[0]+(h*t[e+1][0]-h*t[e-1][0])/6,s[1]+(h*t[e+1][1]-h*t[e-1][1])/6],a[2]=[t[e+1][0]+(h*t[e][0]-h*t[e+2][0])/6,t[e+1][1]+(h*t[e][1]-h*t[e+2][1])/6],a[3]=[t[e+1][0],t[e+1][1]],o.push({op:"bcurveTo",data:[a[1][0],a[1][1],a[2][0],a[2][1],a[3][0],a[3][1]]})}if(e&&2===e.length){const t=s.maxRandomnessOffset;o.push({op:"lineTo",data:[e[0]+G(t,s),e[1]+G(t,s)]})}}else 3===n?(o.push({op:"move",data:[t[1][0],t[1][1]]}),o.push({op:"bcurveTo",data:[t[1][0],t[1][1],t[2][0],t[2][1],t[2][0],t[2][1]]})):2===n&&o.push(...R(t[0][0],t[0][1],t[1][0],t[1][1],s,!0,!0));return o}function F(t,e,s,n,o,a,h,r){const i=[],c=[];if(0===r.roughness){t/=4,c.push([e+n*Math.cos(-t),s+o*Math.sin(-t)]);for(let a=0;a<=2*Math.PI;a+=t){const t=[e+n*Math.cos(a),s+o*Math.sin(a)];i.push(t),c.push(t)}c.push([e+n*Math.cos(0),s+o*Math.sin(0)]),c.push([e+n*Math.cos(t),s+o*Math.sin(t)])}else{const l=G(.5,r)-Math.PI/2;c.push([G(a,r)+e+.9*n*Math.cos(l-t),G(a,r)+s+.9*o*Math.sin(l-t)]);const u=2*Math.PI+l-.01;for(let h=l;h<u;h+=t){const t=[G(a,r)+e+n*Math.cos(h),G(a,r)+s+o*Math.sin(h)];i.push(t),c.push(t)}c.push([G(a,r)+e+n*Math.cos(l+2*Math.PI+.5*h),G(a,r)+s+o*Math.sin(l+2*Math.PI+.5*h)]),c.push([G(a,r)+e+.98*n*Math.cos(l+h),G(a,r)+s+.98*o*Math.sin(l+h)]),c.push([G(a,r)+e+.9*n*Math.cos(l+.5*h),G(a,r)+s+.9*o*Math.sin(l+.5*h)])}return[c,i]}function V(t,e,s,n,o,a,h,r,i){const c=a+G(.1,i),l=[];l.push([G(r,i)+e+.9*n*Math.cos(c-t),G(r,i)+s+.9*o*Math.sin(c-t)]);for(let a=c;a<=h;a+=t)l.push([G(r,i)+e+n*Math.cos(a),G(r,i)+s+o*Math.sin(a)]);return l.push([e+n*Math.cos(h),s+o*Math.sin(h)]),l.push([e+n*Math.cos(h),s+o*Math.sin(h)]),q(l,null,i)}function Z(t,e,s,n,o,a,h,r){const i=[],c=[r.maxRandomnessOffset||1,(r.maxRandomnessOffset||1)+.3];let l=[0,0];const u=r.disableMultiStroke?1:2,p=r.preserveVertices;for(let f=0;f<u;f++)0===f?i.push({op:"move",data:[h[0],h[1]]}):i.push({op:"move",data:[h[0]+(p?0:G(c[0],r)),h[1]+(p?0:G(c[0],r))]}),l=p?[o,a]:[o+G(c[f],r),a+G(c[f],r)],i.push({op:"bcurveTo",data:[t+G(c[f],r),e+G(c[f],r),s+G(c[f],r),n+G(c[f],r),l[0],l[1]]});return i}function Q(t){return[...t]}function H(t,e=0){const s=t.length;if(s<3)throw new Error("A curve must have at least three points.");const n=[];if(3===s)n.push(Q(t[0]),Q(t[1]),Q(t[2]),Q(t[2]));else{const s=[];s.push(t[0],t[0]);for(let e=1;e<t.length;e++)s.push(t[e]),e===t.length-1&&s.push(t[e]);const o=[],a=1-e;n.push(Q(s[0]));for(let t=1;t+2<s.length;t++){const e=s[t];o[0]=[e[0],e[1]],o[1]=[e[0]+(a*s[t+1][0]-a*s[t-1][0])/6,e[1]+(a*s[t+1][1]-a*s[t-1][1])/6],o[2]=[s[t+1][0]+(a*s[t][0]-a*s[t+2][0])/6,s[t+1][1]+(a*s[t][1]-a*s[t+2][1])/6],o[3]=[s[t+1][0],s[t+1][1]],n.push(o[1],o[2],o[3])}}return n}function N(t,e){return Math.pow(t[0]-e[0],2)+Math.pow(t[1]-e[1],2)}function B(t,e,s){const n=N(e,s);if(0===n)return N(t,e);let o=((t[0]-e[0])*(s[0]-e[0])+(t[1]-e[1])*(s[1]-e[1]))/n;return o=Math.max(0,Math.min(1,o)),N(t,J(e,s,o))}function J(t,e,s){return[t[0]+(e[0]-t[0])*s,t[1]+(e[1]-t[1])*s]}function K(t,e,s,n){const o=n||[];if(function(t,e){const s=t[e+0],n=t[e+1],o=t[e+2],a=t[e+3];let h=3*n[0]-2*s[0]-a[0];h*=h;let r=3*n[1]-2*s[1]-a[1];r*=r;let i=3*o[0]-2*a[0]-s[0];i*=i;let c=3*o[1]-2*a[1]-s[1];return c*=c,h<i&&(h=i),r<c&&(r=c),h+r}(t,e)<s){const s=t[e+0];if(o.length){(a=o[o.length-1],h=s,Math.sqrt(N(a,h)))>1&&o.push(s)}else o.push(s);o.push(t[e+3])}else{const n=.5,a=t[e+0],h=t[e+1],r=t[e+2],i=t[e+3],c=J(a,h,n),l=J(h,r,n),u=J(r,i,n),p=J(c,l,n),f=J(l,u,n),d=J(p,f,n);K([a,c,p,d],0,s,o),K([d,f,u,i],0,s,o)}var a,h;return o}function U(t,e){return X(t,0,t.length,e)}function X(t,e,s,n,o){const a=o||[],h=t[e],r=t[s-1];let i=0,c=1;for(let n=e+1;n<s-1;++n){const e=B(t[n],h,r);e>i&&(i=e,c=n)}return Math.sqrt(i)>n?(X(t,e,c+1,n,a),X(t,c,s,n,a)):(a.length||a.push(h),a.push(r)),a}function Y(t,e=.15,s){const n=[],o=(t.length-1)/3;for(let s=0;s<o;s++){K(t,3*s,e,n)}return s&&s>0?X(n,0,n.length,s):n}const tt="none";class et{constructor(t){this.defaultOptions={maxRandomnessOffset:2,roughness:1,bowing:1,stroke:"#000",strokeWidth:1,curveTightness:0,curveFitting:.95,curveStepCount:9,fillStyle:"hachure",fillWeight:-1,hachureAngle:-41,hachureGap:-1,dashOffset:-1,dashGap:-1,zigzagOffset:-1,seed:0,disableMultiStroke:!1,disableMultiStrokeFill:!1,preserveVertices:!1,fillShapeRoughnessGain:.8},this.config=t||{},this.config.options&&(this.defaultOptions=this._o(this.config.options))}static newSeed(){return Math.floor(Math.random()*2**31)}_o(t){return t?Object.assign({},this.defaultOptions,t):this.defaultOptions}_d(t,e,s){return{shape:t,sets:e||[],options:s||this.defaultOptions}}line(t,e,s,n,o){const a=this._o(o);return this._d("line",[v(t,e,s,n,a)],a)}rectangle(t,e,s,n,o){const a=this._o(o),h=[],r=O(t,e,s,n,a);if(a.fill){const o=[[t,e],[t+s,e],[t+s,e+n],[t,e+n]];"solid"===a.fillStyle?h.push(I([o],a)):h.push(C([o],a))}return a.stroke!==tt&&h.push(r),this._d("rectangle",h,a)}ellipse(t,e,s,n,o){const a=this._o(o),h=[],r=T(s,n,a),i=D(t,e,a,r);if(a.fill)if("solid"===a.fillStyle){const s=D(t,e,a,r).opset;s.type="fillPath",h.push(s)}else h.push(C([i.estimatedPoints],a));return a.stroke!==tt&&h.push(i.opset),this._d("ellipse",h,a)}circle(t,e,s,n){const o=this.ellipse(t,e,s,s,n);return o.shape="circle",o}linearPath(t,e){const s=this._o(e);return this._d("linearPath",[S(t,!1,s)],s)}arc(t,e,s,n,o,a,h=!1,r){const i=this._o(r),c=[],l=A(t,e,s,n,o,a,h,!0,i);if(h&&i.fill)if("solid"===i.fillStyle){const h=Object.assign({},i);h.disableMultiStroke=!0;const r=A(t,e,s,n,o,a,!0,!1,h);r.type="fillPath",c.push(r)}else c.push(function(t,e,s,n,o,a,h){const r=t,i=e;let c=Math.abs(s/2),l=Math.abs(n/2);c+=G(.01*c,h),l+=G(.01*l,h);let u=o,p=a;for(;u<0;)u+=2*Math.PI,p+=2*Math.PI;p-u>2*Math.PI&&(u=0,p=2*Math.PI);const f=(p-u)/h.curveStepCount,d=[];for(let t=u;t<=p;t+=f)d.push([r+c*Math.cos(t),i+l*Math.sin(t)]);return d.push([r+c*Math.cos(p),i+l*Math.sin(p)]),d.push([r,i]),C([d],h)}(t,e,s,n,o,a,i));return i.stroke!==tt&&c.push(l),this._d("arc",c,i)}curve(t,e){const s=this._o(e),n=[],o=L(t,s);if(s.fill&&s.fill!==tt)if("solid"===s.fillStyle){const e=L(t,Object.assign(Object.assign({},s),{disableMultiStroke:!0,roughness:s.roughness?s.roughness+s.fillShapeRoughnessGain:0}));n.push({type:"fillPath",ops:this._mergedShape(e.ops)})}else{const e=[],o=t;if(o.length){const t="number"==typeof o[0][0]?[o]:o;for(const n of t)n.length<3?e.push(...n):3===n.length?e.push(...Y(H([n[0],n[0],n[1],n[2]]),10,(1+s.roughness)/2)):e.push(...Y(H(n),10,(1+s.roughness)/2))}e.length&&n.push(C([e],s))}return s.stroke!==tt&&n.push(o),this._d("curve",n,s)}polygon(t,e){const s=this._o(e),n=[],o=S(t,!0,s);return s.fill&&("solid"===s.fillStyle?n.push(I([t],s)):n.push(C([t],s))),s.stroke!==tt&&n.push(o),this._d("polygon",n,s)}path(t,e){const s=this._o(e),n=[];if(!t)return this._d("path",n,s);t=(t||"").replace(/\n/g," ").replace(/(-\s)/g,"-").replace("/(ss)/g"," ");const o=s.fill&&"transparent"!==s.fill&&s.fill!==tt,a=s.stroke!==tt,h=!!(s.simplification&&s.simplification<1),r=function(t,e,s){const n=m(y(b(t))),o=[];let a=[],h=[0,0],r=[];const i=()=>{r.length>=4&&a.push(...Y(r,e)),r=[]},c=()=>{i(),a.length&&(o.push(a),a=[])};for(const{key:t,data:e}of n)switch(t){case"M":c(),h=[e[0],e[1]],a.push(h);break;case"L":i(),a.push([e[0],e[1]]);break;case"C":if(!r.length){const t=a.length?a[a.length-1]:h;r.push([t[0],t[1]])}r.push([e[0],e[1]]),r.push([e[2],e[3]]),r.push([e[4],e[5]]);break;case"Z":i(),a.push([h[0],h[1]])}if(c(),!s)return o;const l=[];for(const t of o){const e=U(t,s);e.length&&l.push(e)}return l}(t,1,h?4-4*(s.simplification||1):(1+s.roughness)/2),i=_(t,s);if(o)if("solid"===s.fillStyle)if(1===r.length){const e=_(t,Object.assign(Object.assign({},s),{disableMultiStroke:!0,roughness:s.roughness?s.roughness+s.fillShapeRoughnessGain:0}));n.push({type:"fillPath",ops:this._mergedShape(e.ops)})}else n.push(I(r,s));else n.push(C(r,s));return a&&(h?r.forEach((t=>{n.push(S(t,!1,s))})):n.push(i)),this._d("path",n,s)}opsToPath(t,e){let s="";for(const n of t.ops){const t="number"==typeof e&&e>=0?n.data.map((t=>+t.toFixed(e))):n.data;switch(n.op){case"move":s+=`M${t[0]} ${t[1]} `;break;case"bcurveTo":s+=`C${t[0]} ${t[1]}, ${t[2]} ${t[3]}, ${t[4]} ${t[5]} `;break;case"lineTo":s+=`L${t[0]} ${t[1]} `}}return s.trim()}toPaths(t){const e=t.sets||[],s=t.options||this.defaultOptions,n=[];for(const t of e){let e=null;switch(t.type){case"path":e={d:this.opsToPath(t),stroke:s.stroke,strokeWidth:s.strokeWidth,fill:tt};break;case"fillPath":e={d:this.opsToPath(t),stroke:tt,strokeWidth:0,fill:s.fill||tt};break;case"fillSketch":e=this.fillSketch(t,s)}e&&n.push(e)}return n}fillSketch(t,e){let s=e.fillWeight;return s<0&&(s=e.strokeWidth/2),{d:this.opsToPath(t),stroke:e.fill||tt,strokeWidth:s,fill:tt}}_mergedShape(t){return t.filter(((t,e)=>0===e||"move"!==t.op))}}class st{constructor(t,e){this.canvas=t,this.ctx=this.canvas.getContext("2d"),this.gen=new et(e)}draw(t){const e=t.sets||[],s=t.options||this.getDefaultOptions(),n=this.ctx,o=t.options.fixedDecimalPlaceDigits;for(const a of e)switch(a.type){case"path":n.save(),n.strokeStyle="none"===s.stroke?"transparent":s.stroke,n.lineWidth=s.strokeWidth,s.strokeLineDash&&n.setLineDash(s.strokeLineDash),s.strokeLineDashOffset&&(n.lineDashOffset=s.strokeLineDashOffset),this._drawToContext(n,a,o),n.restore();break;case"fillPath":{n.save(),n.fillStyle=s.fill||"";const e="curve"===t.shape||"polygon"===t.shape||"path"===t.shape?"evenodd":"nonzero";this._drawToContext(n,a,o,e),n.restore();break}case"fillSketch":this.fillSketch(n,a,s)}}fillSketch(t,e,s){let n=s.fillWeight;n<0&&(n=s.strokeWidth/2),t.save(),s.fillLineDash&&t.setLineDash(s.fillLineDash),s.fillLineDashOffset&&(t.lineDashOffset=s.fillLineDashOffset),t.strokeStyle=s.fill||"",t.lineWidth=n,this._drawToContext(t,e,s.fixedDecimalPlaceDigits),t.restore()}_drawToContext(t,e,s,n="nonzero"){t.beginPath();for(const n of e.ops){const e="number"==typeof s&&s>=0?n.data.map((t=>+t.toFixed(s))):n.data;switch(n.op){case"move":t.moveTo(e[0],e[1]);break;case"bcurveTo":t.bezierCurveTo(e[0],e[1],e[2],e[3],e[4],e[5]);break;case"lineTo":t.lineTo(e[0],e[1])}}"fillPath"===e.type?t.fill(n):t.stroke()}get generator(){return this.gen}getDefaultOptions(){return this.gen.defaultOptions}line(t,e,s,n,o){const a=this.gen.line(t,e,s,n,o);return this.draw(a),a}rectangle(t,e,s,n,o){const a=this.gen.rectangle(t,e,s,n,o);return this.draw(a),a}ellipse(t,e,s,n,o){const a=this.gen.ellipse(t,e,s,n,o);return this.draw(a),a}circle(t,e,s,n){const o=this.gen.circle(t,e,s,n);return this.draw(o),o}linearPath(t,e){const s=this.gen.linearPath(t,e);return this.draw(s),s}polygon(t,e){const s=this.gen.polygon(t,e);return this.draw(s),s}arc(t,e,s,n,o,a,h=!1,r){const i=this.gen.arc(t,e,s,n,o,a,h,r);return this.draw(i),i}curve(t,e){const s=this.gen.curve(t,e);return this.draw(s),s}path(t,e){const s=this.gen.path(t,e);return this.draw(s),s}}const nt="http://www.w3.org/2000/svg";class ot{constructor(t,e){this.svg=t,this.gen=new et(e)}draw(t){const e=t.sets||[],s=t.options||this.getDefaultOptions(),n=this.svg.ownerDocument||window.document,o=n.createElementNS(nt,"g"),a=t.options.fixedDecimalPlaceDigits;for(const h of e){let e=null;switch(h.type){case"path":e=n.createElementNS(nt,"path"),e.setAttribute("d",this.opsToPath(h,a)),e.setAttribute("stroke",s.stroke),e.setAttribute("stroke-width",s.strokeWidth+""),e.setAttribute("fill","none"),s.strokeLineDash&&e.setAttribute("stroke-dasharray",s.strokeLineDash.join(" ").trim()),s.strokeLineDashOffset&&e.setAttribute("stroke-dashoffset",`${s.strokeLineDashOffset}`);break;case"fillPath":e=n.createElementNS(nt,"path"),e.setAttribute("d",this.opsToPath(h,a)),e.setAttribute("stroke","none"),e.setAttribute("stroke-width","0"),e.setAttribute("fill",s.fill||""),"curve"!==t.shape&&"polygon"!==t.shape||e.setAttribute("fill-rule","evenodd");break;case"fillSketch":e=this.fillSketch(n,h,s)}e&&o.appendChild(e)}return o}fillSketch(t,e,s){let n=s.fillWeight;n<0&&(n=s.strokeWidth/2);const o=t.createElementNS(nt,"path");return o.setAttribute("d",this.opsToPath(e,s.fixedDecimalPlaceDigits)),o.setAttribute("stroke",s.fill||""),o.setAttribute("stroke-width",n+""),o.setAttribute("fill","none"),s.fillLineDash&&o.setAttribute("stroke-dasharray",s.fillLineDash.join(" ").trim()),s.fillLineDashOffset&&o.setAttribute("stroke-dashoffset",`${s.fillLineDashOffset}`),o}get generator(){return this.gen}getDefaultOptions(){return this.gen.defaultOptions}opsToPath(t,e){return this.gen.opsToPath(t,e)}line(t,e,s,n,o){const a=this.gen.line(t,e,s,n,o);return this.draw(a)}rectangle(t,e,s,n,o){const a=this.gen.rectangle(t,e,s,n,o);return this.draw(a)}ellipse(t,e,s,n,o){const a=this.gen.ellipse(t,e,s,n,o);return this.draw(a)}circle(t,e,s,n){const o=this.gen.circle(t,e,s,n);return this.draw(o)}linearPath(t,e){const s=this.gen.linearPath(t,e);return this.draw(s)}polygon(t,e){const s=this.gen.polygon(t,e);return this.draw(s)}arc(t,e,s,n,o,a,h=!1,r){const i=this.gen.arc(t,e,s,n,o,a,h,r);return this.draw(i)}curve(t,e){const s=this.gen.curve(t,e);return this.draw(s)}path(t,e){const s=this.gen.path(t,e);return this.draw(s)}}return{canvas:(t,e)=>new st(t,e),svg:(t,e)=>new ot(t,e),generator:t=>new et(t),newSeed:()=>et.newSeed()}}();
+
+</script>
+<script>
+/* ═══ çizim motoru — Excalidraw'ın kendi kullandığı rough.js ═══ */
+const NS="http://www.w3.org/2000/svg";
+let SEED=7; const sd=()=>((SEED=(SEED*1103515245+12345)&0x7fffffff)%9973);
+function pal(){const s=getComputedStyle(document.documentElement),g=n=>s.getPropertyValue(n).trim();
+  return {fg:g('--fg'),dim:g('--dim'),amber:g('--amber'),green:g('--green'),
+          red:g('--red'),blue:g('--blue'),line:g('--line'),bg2:g('--bg2')};}
+
+function P(svg){
+  const rc=rough.svg(svg), K=pal();
+  const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+  const c=x=>K[x]||x||K.fg, add=n=>svg.appendChild(n);
+  const A={
+    txt(x,y,s,o){o=o||{};const L=String(s).split('\n'),sz=o.size||14.5,lh=o.lh||sz*1.32;
+      const t=el('text',{x:x,'text-anchor':o.a||'start',fill:c(o.c),'font-size':sz,
+        'font-weight':o.w||'400',
+        'font-family':o.mono?"'JetBrains Mono',ui-monospace,monospace":"'Architects Daughter','Segoe Print',cursive",
+        y:(o.mid? y-(L.length-1)*lh/2+sz*0.34 : y)});
+      L.forEach((ln,k)=>{const p=el('tspan',{x:x,dy:k?lh:0});p.textContent=ln;t.appendChild(p);});
+      add(t);return A;},
+    box(x,y,w,h,label,o){o=o||{};
+      add(rc.rectangle(x,y,w,h,{stroke:c(o.c||'fg'),strokeWidth:o.sw||1.7,roughness:1.15,bowing:1.4,
+        seed:sd(),strokeLineDash:o.dash?[7,6]:undefined,
+        fill:o.fill?c(o.fill):undefined,fillStyle:o.fs||'hachure',fillWeight:.7,hachureGap:7}));
+      if(label)A.txt(x+w/2,y+h/2,label,{a:'middle',mid:1,c:o.tc||o.c,size:o.size,mono:o.mono,lh:o.lh});
+      return A;},
+    arr(x1,y1,x2,y2,o){o=o||{};const k=c(o.c||'dim');
+      add(rc.line(x1,y1,x2,y2,{stroke:k,strokeWidth:o.sw||1.7,roughness:.9,seed:sd(),
+        strokeLineDash:o.dash?[6,5]:undefined}));
+      const a=Math.atan2(y2-y1,x2-x1),L=o.head||10,g=.42;
+      add(rc.line(x2,y2,x2-L*Math.cos(a-g),y2-L*Math.sin(a-g),{stroke:k,strokeWidth:1.7,roughness:.6,seed:sd()}));
+      add(rc.line(x2,y2,x2-L*Math.cos(a+g),y2-L*Math.sin(a+g),{stroke:k,strokeWidth:1.7,roughness:.6,seed:sd()}));
+      if(o.label)A.txt(o.lx!=null?o.lx:(x1+x2)/2,o.ly!=null?o.ly:(y1+y2)/2-7,o.label,
+        {a:o.la||'middle',c:o.lc||'dim',size:o.ls||12,mono:o.lm,lh:o.llh});
+      return A;},
+    line(x1,y1,x2,y2,o){o=o||{};
+      add(rc.line(x1,y1,x2,y2,{stroke:c(o.c||'line'),strokeWidth:o.sw||1.5,roughness:.9,seed:sd(),
+        strokeLineDash:o.dash?[6,5]:undefined}));return A;},
+    cyl(x,y,w,h,label,o){o=o||{};const k=c(o.c||'fg'),ry=Math.min(12,h*.16);
+      add(rc.ellipse(x+w/2,y+ry,w,ry*2,{stroke:k,strokeWidth:1.7,roughness:1,seed:sd()}));
+      add(rc.line(x,y+ry,x,y+h-ry,{stroke:k,strokeWidth:1.7,roughness:.9,seed:sd()}));
+      add(rc.line(x+w,y+ry,x+w,y+h-ry,{stroke:k,strokeWidth:1.7,roughness:.9,seed:sd()}));
+      add(rc.ellipse(x+w/2,y+h-ry,w,ry*2,{stroke:k,strokeWidth:1.7,roughness:1,seed:sd()}));
+      if(label)A.txt(x+w/2,y+h/2,label,{a:'middle',mid:1,c:o.tc||o.c,size:o.size||13.5,lh:o.lh});
+      return A;},
+    dia(x,y,w,h,label,o){o=o||{};const k=c(o.c||'amber');
+      add(rc.polygon([[x+w/2,y],[x+w,y+h/2],[x+w/2,y+h],[x,y+h/2]],
+        {stroke:k,strokeWidth:1.7,roughness:1,seed:sd()}));
+      if(label)A.txt(x+w/2,y+h/2,label,{a:'middle',mid:1,c:o.tc||k,size:o.size||12.5,lh:o.lh});
+      return A;},
+    x(x,y,s,o){o=o||{};s=s||9;const k=c((o||{}).c||'red');
+      add(rc.line(x-s,y-s,x+s,y+s,{stroke:k,strokeWidth:2.2,roughness:.9,seed:sd()}));
+      add(rc.line(x+s,y-s,x-s,y+s,{stroke:k,strokeWidth:2.2,roughness:.9,seed:sd()}));return A;}
+  };
+  return A;
+}
+
+/* ═══ diyagramlar ═══ */
+const DIA={};
+
+DIA['olcum']=g=>{
+  g.box(14,8,152,62,"5 ARIZA\nkeyerror · buyuk · ag\nsyntax · sonucsuz",
+        {c:'red',size:10.5,lh:14});
+  g.arr(170,39,206,39,{c:'dim'});
+  g.box(206,8,170,62,"AYNI HAM MALZEME\nexception · stdout\nçıkış kodu · süre",
+        {c:'dim',size:10.5,lh:14});
+  g.arr(380,39,416,39,{c:'dim'});
+  g.box(416,8,132,62,"10 BİÇİM",{c:'amber',size:14});
+  g.arr(552,39,586,39,{c:'dim'});
+  g.box(586,8,108,62,"7 ÖLÇÜT\n→ /35",{c:'green',size:12,lh:16});
+};
+
+DIA['sorun']=g=>{
+  g.box(40,42,240,116,"SANDBOX\n~4 saniye",{c:'red',dash:1,size:17,lh:24});
+  g.arr(288,100,452,100,{c:'amber',label:'rapor.pdf',ly:88,ls:13,lm:1});
+  g.cyl(464,48,168,112,"DEPO",{c:'green',size:17});
+  g.txt(160,196,"✕  ölür",{a:'middle',c:'red',size:15});
+  g.txt(548,196,"✓  kalır",{a:'middle',c:'green',size:15});
+};
+
+DIA['aile-a']=g=>{
+  g.box(18,22,132,44,"kod",{c:'red',size:15});
+  g.arr(84,66,84,106,{c:'red',label:'FUSE',lx:94,ly:90,la:'start',ls:12.5,lm:1});
+  g.cyl(24,110,120,62,"bucket",{c:'red',size:13.5});
+  g.txt(180,78,"araya\ngirecek\nyer YOK",{c:'red',size:14.5,lh:20});
+  g.txt(170,200,"→ künye tutulamaz",{a:'middle',c:'red',size:13});
+};
+
+DIA['aile-b']=g=>{
+  g.txt(16,16,"main container",{c:'amber',size:12,mono:1});
+  g.box(12,22,202,108,null,{c:'amber'});
+  g.box(24,34,178,32,"launcher · anahtar",{c:'amber',size:12.5});
+  g.box(24,80,178,32,"kullanıcı kodu",{c:'fg',size:12.5});
+  g.cyl(240,58,84,72,"bucket",{c:'dim',size:12.5});
+  g.arr(204,48,238,78,{c:'amber'});
+  g.arr(204,96,238,108,{c:'red',dash:1});
+  g.txt(170,164,"kod launcher'ı ATLAYABİLİR",{a:'middle',c:'red',size:13.5});
+  g.txt(170,190,"anahtar kodun yanında",{a:'middle',c:'dim',size:12.5});
+};
+
+DIA['aile-c']=g=>{
+  g.box(12,20,120,34,"kullanıcı kodu",{c:'fg',size:12.5});
+  g.arr(72,54,72,80,{c:'dim'});
+  g.box(12,80,120,30,"/output",{c:'dim',size:12.5,mono:1});
+  g.arr(134,95,172,95,{c:'green'});
+  g.box(174,64,152,58,"AYRI CONTAINER\nanahtar burada",{c:'green',size:12.5,lh:17});
+  g.arr(250,122,250,150,{c:'green'});
+  g.cyl(210,153,80,48,"depo",{c:'green',size:12.5});
+  g.txt(72,136,"kod anahtarı\nGÖREMEZ",{a:'middle',c:'green',size:13.5,lh:18});
+};
+
+DIA['aile-d']=g=>{
+  g.box(88,14,168,34,"/Volumes/…",{c:'blue',size:13,mono:1});
+  g.arr(172,48,172,72,{c:'blue'});
+  g.dia(102,72,178,62,"Unity Catalog\nizin var mı?",{c:'blue',size:12,lh:16});
+  g.arr(172,134,172,158,{c:'blue'});
+  g.cyl(132,158,80,50,"volume",{c:'blue',size:12.5});
+  g.txt(14,96,"mount VAR,\nama\nsürücü\nSORUYOR",{c:'blue',size:12.5,lh:16});
+};
+
+DIA['anthropic']=g=>{
+  g.box(8,40,142,98,null,{c:'red',dash:1});
+  g.txt(79,152,"container ölür",{a:'middle',c:'red',size:13});
+  g.box(20,62,118,52,"kod\n$OUTPUT_DIR",{c:'fg',size:12.5,lh:17});
+  g.arr(154,88,186,88,{c:'dim'});
+  g.box(186,56,148,64,"PLATFORM\ndizine BAKAR",{c:'blue',size:13.5,lh:18});
+  g.arr(336,88,392,88,{c:'blue',label:'kaydet',ly:76,ls:12});
+  g.cyl(396,50,124,76,"Files API",{c:'green',size:13.5});
+  g.arr(458,128,458,162,{c:'green'});
+  g.box(378,164,164,40,"file_abc123",{c:'green',size:13,mono:1});
+  g.txt(458,220,"konuşmaya dönen FİŞ",{a:'middle',c:'green',size:13});
+  g.txt(556,58,"model fişi görür,\nister →\nplatform dosyayı\nGERİ KOYAR",{c:'dim',size:13,lh:18});
+};
+
+DIA['openai']=g=>{
+  g.box(20,48,152,54,"container\n/mnt/data",{c:'blue',size:13,lh:17});
+  g.arr(172,75,244,75,{c:'dim',label:'yükle / indir',ly:63,ls:12});
+  g.box(244,48,156,54,"kod okur / yazar",{c:'fg',size:13});
+  g.arr(420,88,566,88,{c:'red'});
+  g.txt(492,72,"20 dk hareketsizlik",{a:'middle',c:'red',size:13.5});
+  g.x(602,88,10,{c:'red'});
+  g.txt(602,124,"container gider",{a:'middle',c:'red',size:13});
+  g.txt(210,148,"kalıcı durum YOK — kayıt defteri de yok",{a:'middle',c:'dim',size:13});
+};
+
+DIA['cloudflare']=g=>{
+  g.box(20,44,190,44,'write("/bucket/x")',{c:'fg',size:12,mono:1});
+  g.arr(212,66,300,66,{c:'red',label:'FUSE',ly:54,ls:12.5,lm:1});
+  g.cyl(310,26,150,88,"R2 bucket",{c:'red',size:14});
+  g.txt(488,58,"arada katman YOK",{c:'red',size:14.5});
+  g.txt(488,84,"→ künye tutulamaz",{c:'red',size:13});
+  g.txt(240,146,"tool çağrısı yok — kod çağırıyor",{a:'middle',c:'dim',size:12.5});
+};
+
+DIA['adk']=g=>{
+  g.box(14,30,200,52,"SİSTEM TALİMATLARI\nsatis.parquet · rapor.pdf",{c:'green',size:11.5,lh:16});
+  g.txt(114,104,"her turda",{a:'middle',c:'green',size:12});
+  g.arr(216,56,246,56,{c:'dim'});
+  g.box(246,30,190,52,"load_artifacts(...)",{c:'amber',size:12,mono:1});
+  g.txt(341,104,"isteyince",{a:'middle',c:'amber',size:12});
+  g.arr(438,56,468,56,{c:'dim'});
+  g.box(468,30,204,52,"içerik O İSTEĞE\neklenir",{c:'fg',size:12,lh:16});
+  g.txt(570,104,"o isteğe özel",{a:'middle',c:'dim',size:12});
+  g.txt(350,144,"sonraki turda context'te YOK — içerik geçmişe yazılmaz",
+        {a:'middle',c:'red',size:13});
+};
+
+DIA['kfp']=g=>{
+  g.txt(20,18,"POD",{c:'dim',size:13,mono:1});
+  g.box(14,24,480,300,null,{c:'dim',dash:1});
+  /* init */
+  g.box(30,44,448,92,null,{c:'amber'});
+  g.txt(44,66,"kfp-driver",{c:'amber',size:16});
+  g.txt(464,66,"init container",{a:'end',c:'dim',size:12,mono:1});
+  g.txt(44,90,"· girdi .uri'lerini MLMD'den ÇÖZER\n· cache: bu adım zaten çalıştı mı?\n· PodSpec'i yamalar",
+        {c:'fg',size:12.5,lh:16});
+  g.arr(254,140,254,164,{c:'dim',label:'biter',lx:266,ly:156,la:'start',ls:12});
+  /* main */
+  g.box(30,168,448,148,null,{c:'amber'});
+  g.txt(44,190,"kfp-launcher",{c:'amber',size:16});
+  g.txt(464,190,"main container · PID 1",{a:'end',c:'dim',size:12,mono:1});
+  g.txt(44,212,"① İNDİR   .uri → .path",{c:'green',size:12.5,mono:1});
+  g.box(44,222,420,52,"② KULLANICI KODU  ·  alt süreç\ndf.to_parquet(cikti.path)",{c:'fg',size:12.5,lh:17});
+  g.txt(44,296,"③ YÜKLE   .path → .uri        ④ MLMD'ye künye",{c:'green',size:12.5,mono:1});
+  /* sağ */
+  g.cyl(548,72,152,104,"S3\npipeline_root",{c:'blue',size:13.5,lh:18});
+  g.box(548,232,152,58,"MLMD",{c:'green',size:15});
+  g.arr(544,146,494,192,{c:'blue',label:'① indir',lx:552,ly:198,la:'start',ls:11.5});
+  g.arr(498,236,546,192,{c:'blue',label:'③ yükle',lx:556,ly:222,la:'start',ls:11.5});
+  g.arr(500,300,546,274,{c:'green',label:'④ künye',lx:498,ly:322,la:'start',ls:11.5});
+};
+
+DIA['kfp-vs-biz']=g=>{
+  g.txt(18,18,"KFP / Red Hat",{c:'amber',size:14.5});
+  g.box(14,26,306,116,null,{c:'amber'});
+  g.txt(28,44,"main container",{c:'dim',size:11.5,mono:1});
+  g.box(28,54,278,34,"kfp-launcher · anahtar",{c:'amber',size:12.5});
+  g.box(28,98,278,34,"kullanıcı kodu",{c:'fg',size:12.5});
+  g.arr(308,116,344,116,{c:'red',dash:1});
+  g.txt(167,178,"kod anahtara ERİŞİR → SARMALAYICI",{a:'middle',c:'red',size:13.5});
+  g.txt(167,206,"kodu İNSAN yazdı, gözden geçirildi",{a:'middle',c:'dim',size:12.5});
+  g.txt(167,230,"→ orada doğru karar",{a:'middle',c:'dim',size:12.5});
+
+  g.txt(404,18,"BİZ",{c:'green',size:14.5});
+  g.box(400,26,346,116,null,{c:'green',dash:1});
+  g.txt(414,44,"pod",{c:'dim',size:11.5,mono:1});
+  g.box(414,54,146,78,"artifact-\nsidecar\nanahtar",{c:'green',size:12,lh:16});
+  g.box(586,54,146,78,"sandbox\nLLM kodu\nsır YOK",{c:'fg',size:12,lh:16});
+  g.line(573,48,573,138,{c:'green',sw:3.4});
+  g.txt(573,158,"ayrı container",{a:'middle',c:'green',size:12});
+  g.txt(573,182,"kod anahtarı GÖREMEZ → SINIR",{a:'middle',c:'green',size:13.5});
+  g.txt(573,208,"kodu LLM yazdı, güvenilmez",{a:'middle',c:'dim',size:12.5});
+  g.txt(573,232,"→ sınır şart",{a:'middle',c:'dim',size:12.5});
+};
+
+DIA['tekton']=g=>{
+  g.box(16,28,150,50,"step A",{c:'green',size:13.5});
+  g.box(16,120,150,50,"step B",{c:'green',size:13.5});
+  g.cyl(212,58,120,88,"workspace\nPVC (RWX)",{c:'dim',size:12,lh:16});
+  g.arr(168,54,210,90,{c:'dim'});
+  g.arr(210,126,170,146,{c:'dim'});
+  g.box(370,26,178,64,'{"uri": …,\n "digest": sha256}',{c:'blue',size:11.5,mono:1,lh:16});
+  g.arr(336,94,368,80,{c:'blue'});
+  g.arr(459,92,459,124,{c:'green'});
+  g.box(370,126,178,54,"Tekton Chains\nİMZALI ATTESTATION",{c:'green',size:12,lh:16});
+  g.txt(570,92,"bayt SAKLANMAZ —\nyalnızca künye\n+ imza",{c:'amber',size:12.5,lh:17});
+};
+
+DIA['argo']=g=>{
+  g.txt(350,22,"v3.4'te dört yerleşim kaldırıldı · docker: “breaks security completely”",
+        {a:'middle',c:'red',size:12});
+  g.box(16,66,158,56,"init container\ngirdileri indirir",{c:'green',size:12,lh:16});
+  g.arr(176,94,220,94,{c:'dim'});
+  g.box(220,66,186,56,"kullanıcı kodu\ndüz dosya oku / yaz",{c:'fg',size:12,lh:16});
+  g.arr(408,94,452,94,{c:'dim'});
+  g.box(452,66,168,56,"wait sidecar\nçıktıları yükler",{c:'green',size:12,lh:16});
+  g.txt(95,146,"anahtar burada",{a:'middle',c:'green',size:12});
+  g.txt(536,146,"anahtar burada",{a:'middle',c:'green',size:12});
+  g.txt(313,146,"anahtar YOK",{a:'middle',c:'red',size:12});
+  g.txt(350,182,"argoexec = AYRI İMAJ — kod ona erişemez",{a:'middle',c:'green',size:13.5});
+};
+
+DIA['databricks']=g=>{
+  g.box(16,52,214,40,"/Volumes/<katalog>/…",{c:'blue',size:11.5,mono:1});
+  g.arr(232,72,266,72,{c:'blue'});
+  g.dia(266,36,204,72,"Unity Catalog\nizin var mı?",{c:'blue',size:12,lh:16});
+  g.arr(472,72,506,72,{c:'blue'});
+  g.cyl(510,36,120,72,"volume",{c:'blue',size:13});
+  g.txt(350,150,"mount VAR — ama sürücü her erişimde SORUYOR · künye UC + MLflow'da",
+        {a:'middle',c:'green',size:12.5});
+};
+
+DIA['devin']=g=>{
+  g.box(30,38,186,56,"microVM snapshot\nRAM + süreç + disk",{c:'amber',size:12.5,lh:17});
+  g.arr(220,66,282,66,{c:'amber',label:'iş biter',ly:54,ls:12});
+  g.box(290,38,158,56,"git commit",{c:'green',size:13,mono:1});
+  g.txt(474,60,"artifact = PR",{c:'green',size:15});
+  g.txt(474,86,"sandbox HİÇ ölmüyor",{c:'dim',size:12.5});
+  g.txt(350,140,"kalıcılık sorusu doğmuyor — bedeli süresiz yaşayan bir makine",
+        {a:'middle',c:'dim',size:12.5});
+};
+
+DIA['omur']=g=>{
+  g.box(20,18,196,44,"sandbox YAŞIYOR",{c:'green',size:13.5});
+  g.arr(220,40,296,40,{c:'green'});
+  g.txt(306,46,"ls  yeter — keşif bedava",{c:'green',size:13.5});
+  g.txt(306,68,"30 gün · 14 gün · 20 dk · mount",{c:'dim',size:12});
+  g.box(20,84,196,44,"sandbox 4 sn ÖLÜYOR",{c:'red',size:13.5});
+  g.arr(220,106,296,106,{c:'red'});
+  g.txt(306,112,"kanal gerek — manifest · arama · listdir",{c:'red',size:13.5});
+};
+
+DIA['beyan']=g=>{
+  g.box(20,14,262,42,'inputs=["ozet.json"]',{c:'green',size:13,mono:1});
+  g.txt(300,32,"kod BAŞLAMADAN",{c:'green',size:13.5});
+  g.txt(300,52,"yerine konur",{c:'green',size:13.5});
+  const R=[[80,"ozet.json","/output/ozet.json","kendi",'dim'],
+           [124,"wf-abc123/ozet.json","/artifacts/wf-abc123/…","ÇAPRAZ",'amber'],
+           [168,"rapor.pdf@onaylanmis","/artifacts/_alias/rapor.pdf","SABİT",'blue']];
+  R.forEach(r=>{const y=r[0];
+    g.box(20,y,236,34,r[1],{c:'dim',size:11.5,mono:1,tc:'fg'});
+    g.arr(260,y+17,322,y+17,{c:r[4]});
+    g.txt(332,y+22,r[2],{c:'fg',size:11.5,mono:1});
+    g.txt(614,y+22,r[3],{c:r[4],size:12.5});});
+};
+
+DIA['bizim-pod']=g=>{
+  g.txt(20,18,"POD · ~4 saniye",{c:'dim',size:13,mono:1});
+  g.box(14,26,472,180,null,{c:'dim',dash:1});
+  g.box(30,50,200,80,"artifact-sidecar\nS3 anahtarı + jeton",{c:'green',size:12.5,lh:17});
+  g.box(270,50,200,80,"sandbox\nLLM'in kodu\nhiçbir sır yok",{c:'fg',size:12.5,lh:17});
+  g.line(250,42,250,140,{c:'green',sw:3.4});
+  g.txt(250,158,"ayrı container",{a:'middle',c:'green',size:11.5});
+  g.box(120,166,250,32,"/output   (emptyDir)",{c:'amber',size:12,mono:1});
+  g.arr(160,132,180,162,{c:'green',label:'③ koy',lx:118,ly:152,la:'start',ls:11});
+  g.arr(330,162,310,134,{c:'fg',label:'⑥ yaz',lx:344,ly:154,la:'start',ls:11});
+  g.cyl(546,58,150,96,"MinIO + SQLite",{c:'green',size:12.5});
+  g.arr(492,112,542,108,{c:'green',label:'⑦ süpür',lx:497,ly:98,la:'start',ls:11});
+  g.txt(250,230,"container'lar ortam paylaşmıyor — sandbox'ın ağ çağrısı: 0",
+        {a:'middle',c:'green',size:13.5});
+};
+
+DIA['uc-kanal']=g=>{
+  const C=[[14,"MANİFEST\nher turda, sormadan\n40 isim · bayt yok","Google ADK deseni"],
+           [254,"artifact_ara\nmodel isteyince\nsüzgeçli sorgu","MLMD filter_query"],
+           [494,"os.listdir\n/output kod başlamadan\nDOLU","dosya sistemi gerçeği"]];
+  C.forEach(c=>{g.box(c[0],26,212,66,c[1],{c:'amber',size:12,lh:16});
+    g.txt(c[0]+106,112,c[2],{a:'middle',c:'dim',size:11.5});});
+  g.box(258,158,204,44,"MODEL",{c:'fg',size:15});
+  g.arr(120,122,300,154,{c:'dim'});
+  g.arr(360,122,360,154,{c:'dim'});
+  g.arr(600,122,420,154,{c:'dim'});
+};
+
+DIA['hata-akis']=g=>{
+  g.box(16,50,140,52,"kod patlar",{c:'red',size:13.5});
+  g.arr(158,76,208,76,{c:'dim'});
+  g.box(208,24,214,102,"çıkış kodu\ntam traceback\nKORUNAN stdout",{c:'green',size:13,lh:19});
+  g.arr(424,76,478,76,{c:'green'});
+  g.box(478,50,200,52,"model DÜZELTİR",{c:'amber',size:13.5});
+  g.txt(350,150,"kırpılırsa: NE KADAR kırpıldığı + NE YAPILACAĞI söylenir   (SWE-agent)",
+        {a:'middle',c:'dim',size:12});
+};
+
+function paint(){
+  SEED=7;
+  document.querySelectorAll("svg.cz").forEach(s=>{
+    const f=DIA[s.dataset.d]; if(!f)return;
+    while(s.firstChild)s.removeChild(s.firstChild);
+    const vb=s.getAttribute("viewBox").split(/\s+/).map(Number);
+    s.style.maxWidth=vb[2]+"px";
+    try{f(P(s),vb[2],vb[3])}catch(e){}
+  });
+}
+</script>
+<script>
+const S=[...document.querySelectorAll(".s")],bar=document.getElementById("bar"),
+      c=document.getElementById("c"),ov=document.getElementById("ov");
+let i=0;
+function go(n){
+  i=Math.max(0,Math.min(S.length-1,n));
+  S.forEach((s,k)=>s.classList.toggle("on",k===i));
+  bar.style.width=((i+1)/S.length*100)+"%";
+  c.textContent=(i+1)+" / "+S.length;
+  S[i].scrollTop=0;
+  try{localStorage.setItem("fsk",i)}catch(e){}
+}
+function ovc(a){
+  if(a&&!ov.childElementCount){
+    ov.innerHTML=S.map((s,k)=>
+      `<button class="oc" data-k="${k}"><small>${String(k+1).padStart(2,"0")}</small>${s.dataset.t}</button>`).join("");
+    ov.querySelectorAll(".oc").forEach(b=>b.onclick=()=>{go(+b.dataset.k);ovc(false)});
+  }
+  ov.hidden=!a;
+}
+document.getElementById("x").onclick=()=>go(i+1);
+document.getElementById("p").onclick=()=>go(i-1);
+c.onclick=()=>ovc(ov.hidden);
+addEventListener("keydown",e=>{
+  if(e.key==="Escape")return ovc(false);
+  if(e.key==="o"||e.key==="O")return ovc(ov.hidden);
+  if(!ov.hidden)return;
+  if(["ArrowRight","PageDown"," "].includes(e.key)){e.preventDefault();go(i+1)}
+  if(["ArrowLeft","PageUp"].includes(e.key)){e.preventDefault();go(i-1)}
+  if(e.key==="Home")go(0); if(e.key==="End")go(S.length-1);
+});
+let x0=null,y0=null;
+addEventListener("touchstart",e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+addEventListener("touchend",e=>{
+  if(x0===null)return;
+  const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;
+  if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.6)go(i+(dx<0?1:-1));
+  x0=y0=null;
+},{passive:true});
+let k0=0; try{k0=+localStorage.getItem("fsk")||0}catch(e){}
+go(k0);
+
+/* çizimleri bas — tema değişince yeniden */
+if(window.rough)paint();
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paint)}catch(e){}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{});
+</script>
+
+</body></html>

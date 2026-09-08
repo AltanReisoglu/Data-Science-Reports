@@ -28,7 +28,7 @@ yazıldı.
 | **§9.6** | **Aracı nerede duruyor** — baytı kim taşıyor, sarmalayıcı mı sınır mı |
 | **§10** | Karşılaştırma tabloları (izolasyon, ömür, erişim, kayıt defteri, ağ) |
 | **§11** | **Bizim mimarimiz, en baştan en sona** (§11.10 açıklar, §11.11–§11.15 ne değişti) |
-| §11.13–16 | Yerleştirme · beyan/süzgeç/alias · geçmeme kararı · **HTTP vekili neden** |
+| §11.13–18 | Yerleştirme · beyan/süzgeç/alias · HTTP vekili · bayt yolu · **sandbox'ta sıfır ağ** |
 | **§12** | Biz neredeyiz — boyut boyut kiminle örtüştüğümüz |
 | **§13** | Ekipten gelecek soruların hazır cevapları |
 | **§14** | Doğrulanamayanlar |
@@ -2398,7 +2398,7 @@ assignments can be updated independently of your production code."*
 Alias atanmış bir artifact manifestte adresiyle görünüyor:
 
 ```
-  load_artifact(None, "rapor.pdf@onaylanmis")  (Artifact, 8170 bayt, alias)
+  inputs=["rapor.pdf@onaylanmis"]  (Artifact, 8170 bayt, alias)
 ```
 
 ### Doğrulama
@@ -2587,6 +2587,222 @@ LLM'in yazdığı kodun `os.environ`'unda olurdu.
 **Sonuç:** OpenShift'in varsayılanı Model 1; biz Model 2'deyiz. Seçimi zorlayan
 tek şey **kodu LLM'in yazıyor olması** — ve Model 2 de birinci sınıf,
 belgelenmiş, varsayılan-açık bir desen.
+
+---
+
+## §11.17 — 2026-09-07: bayt yolu artık SEÇİLEBİLİR (KFP'nin iki kanalı)
+
+§11.16 "HTTP vekili OpenShift'in varsayılanı değil ama icat da değil" demişti.
+Bu bölüm ikinci yolu da uygulanabilir hâle getiriyor.
+
+### İki kip
+
+```
+proxy   sidecar → HTTP → Artifact Service → depo        (varsayılan)
+direct  sidecar → depo doğrudan;  servise yalnızca KÜNYE  (KFP'nin ayrımı)
+```
+
+`PTC_ARTIFACT_TRANSFER` ile seçiliyor. İkisi de destekleniyor çünkü aralarındaki
+fark bir **tercih**, bir hata değil.
+
+### `direct` protokolü — üç çağrı
+
+Servis bayt yolundan çıkınca `artifact_id` ve anahtar yolunu kimin üreteceği
+sorusu doğuyor. Cevap: yine servis, ama yüklemeden önce.
+
+```
+① GET  /artifacts/by-hash/<sha256>   bu içerik zaten var mı  → varsa yükleme YOK
+② POST /artifacts/allocate           artifact_id + anahtar   (durum tutmaz)
+   PUT  <depo>/<anahtar>             sidecar doğrudan yükler
+③ POST /artifacts/register           nesneyi DOĞRULA, satırı aç
+```
+
+**`register`'ın doğrulaması kritik.** Servis baytları görmüyor; doğrulamasa
+kayıt defteri var olmayan bir nesneye işaret edebilirdi. `stat_object` ile
+nesnenin orada ve **beyan edilen boyutta** olduğu kontrol ediliyor. Boyut
+tutmazsa `409` — "çok büyük" (413) değil, çünkü yapılacak şey veriyi küçültmek
+değil yüklemeyi tekrarlamak.
+
+`allocate` durum tutmuyor: yükleme yarıda kalırsa geriye yalnızca yetim bir
+nesne kalıyor, kayıt defterinde satır olmuyor.
+
+### İki kontrol sidecar'a taşındı
+
+`proxy` kipinde pickle reddi ve boyut sınırı servisin akış yolundaydı. `direct`
+kipinde servis baytı görmediği için ikisi de sidecar'da yapılıyor —
+**hâlâ sandbox'ın DIŞINDA**, yani garanti bozulmuyor, yeri değişiyor.
+
+### Sidecar artık AYRI İMAJ
+
+`direct` kipi `minio` paketini gerektiriyor. Aynı imajı paylaşsalardı LLM'in
+kodu `import minio` yapabilirdi. Argo'nun çözümü aynı: `argoexec` kullanıcının
+imajından ayrı bir imaj. Bizde `Dockerfile.sidecar` → `ptc-sidecar:local`.
+
+Ölçüldü — sandbox imajı temiz kaldı:
+
+```
+minio_sdk : False        ← sandbox'ta paket YOK
+s3_kimlik : []           ← anahtar YOK (ortam değişkenleri container başına)
+```
+
+### BEDEL — ölçülmüş, gizlenmiyor
+
+**NetworkPolicy POD seçer, container değil.** Bir pod'un bütün container'ları
+aynı ağ isim uzayını paylaşıyor. Sidecar'a depoya rota vermek, sandbox'a da
+vermek demek:
+
+| | proxy | direct |
+|---|---|---|
+| `sandbox → minio` | **TimeoutError** | **ULASTI** |
+| `sandbox` S3 anahtarı | yok | yok |
+| `sandbox` imajında `minio` | yok | yok |
+
+Bu **ağ katmanındaki** izolasyon. Anahtar hâlâ yok, ama bucket'ta anonim
+okumaya açık bir yanlış yapılandırma `proxy` kipinde ulaşılamadığı için
+sömürülemezken `direct` kipinde sömürülebilir hâle geliyor.
+
+### Rotayı açan şey KİP DEĞİL, POLİTİKA
+
+İlk uygulamada MinIO kuralını temel politikanın içine koymuştum. Kabul testi
+`proxy` kipinde **düştü**: rota açıktı. Doğru olan ayırmak —
+
+```
+k8s/policies/sandbox-egress.ciliumnetworkpolicy.yaml          rota YOK
+k8s/policies/sandbox-egress-direct.ciliumnetworkpolicy.yaml   rotayı açar
+```
+
+Rotayı açmak, kip anahtarını çevirmenin **yan etkisi** değil, ayrıca verilmiş
+bir karar olmalı. Kabul testi de artık kipe duyarlı: `direct`'te rotanın açık
+olduğunu **doğrulayarak** geçiyor, sessizce atlamıyor.
+
+### Bir de DNS
+
+`direct` kipi ilk denemede sessizce boş döndü: sidecar depoyu `http://minio:9000`
+diye çağırdı, sandbox pod'unun kube-dns'e egress'i olmadığı için çözüm askıda
+kaldı, grace period doldu, SIGKILL geldi, **süpürme hiç çalışmadı**.
+Çalıştırma "success" görünüyordu ama artifact yoktu.
+
+Çözüm, artifact servisinde zaten kullanılan yol: adres **ClusterIP** olarak
+veriliyor, isimle değil. `PTC_S3_ENDPOINT` dışarıdan verilmişse ona dokunulmuyor
+(OpenShift'te ODF/harici S3).
+
+### Doğrulama
+
+```
+proxy   52/52 canlı kabul kontrolü   ·  sandbox → minio  TimeoutError
+direct  53/53 canlı kabul kontrolü   ·  sandbox → minio  ULASILDI (beklenen)
+        baytlar MinIO'da: ptc/<wf>/_/<run>/art_….txt
+212 birim/entegrasyon testi
+```
+
+### Hangisi ne zaman
+
+| Artifact | Kip | Neden |
+|---|---|---|
+| < ~50 MB | **proxy** | bant genişliği sorun değil; kontroller ve kayıt defteri tek yerde |
+| > ~50 MB | **direct** | GB'ları tek bir Python servisinden akıtmak israf |
+
+MLflow'un sunduğu seçimin aynısı (`--serve-artifacts` var/yok).
+
+---
+
+## §11.18 — 2026-09-07: sandbox artifact için HİÇBİR ağ çağrısı yapmıyor
+
+§11.17 bayt yolunu seçilebilir yaptı ama sandbox'ta hâlâ bir HTTP vardı:
+`load_artifact(...)` → localhost proxy. Bu bölüm onu da kaldırıyor.
+
+### Neyi kaldırdık
+
+| Gitti | Yerine |
+|---|---|
+| `load_artifact(wf, ad)` — sandbox'taki tek artifact fonksiyonu | `inputs=["<wf>/<ad>"]` BEYANI |
+| `127.0.0.1:8099` — `/healthz`, `/manifest`, `/fetch` | `/scratch/.ptc-girdiler-hazir` dosyası |
+| `ProxyClient`, `_tari_ac`, `_load_artifact_uret` (entrypoint) | — |
+| `ARTIFACT_SERVICE_ENDPOINT` (sandbox container'ında) | — |
+| Kubernetes'in enjekte ettiği 9 `*_SERVICE_*` değişkeni | `enableServiceLinks: false` |
+
+### Beyanın üç biçimi
+
+```
+ad                  bu çalıştırmanın çıktısı   → /output/<ad>
+<workflow_id>/ad    başka çalıştırmanınki      → /artifacts/<wf>/<ad>
+ad@alias            sabitlenmiş sürüm          → /artifacts/_alias/<ad>
+```
+
+Üçü de KFP'de `.uri` beyanına denk: launcher hepsini `.path`'e indirir,
+kullanıcı kodu hiçbir çağrı yapmaz. Bizde de artık öyle.
+
+Dizin artifact'i için ajan `model.v1` yazabiliyor; depoda ad `model.v1.tar`,
+yerleştirme `.tar`a düşüp açıyor.
+
+### PL-B'de driver/launcher ayrımı LİTERAL oldu
+
+```
+adım 1 (query)    kayıt defterine sorar, workflow_id'yi bulur   ← KFP'nin driver'ı
+adım 2 (sandbox)  inputs=["<o wf>/processed-result.json"]       ← KFP'nin launcher'ı
+                  kod: open("/artifacts/<wf>/processed-result.json")
+```
+
+Beyan çalışma anında kuruluyor; kimlik hiçbir yere gömülü değil. Canlı:
+
+```
+adım 1  çözüldü art_dd422fd3e66b (78 bayt)
+adım 2  beyan edilen girdiler: ['119d1f91-…/processed-result.json']
+        ÜRETİLDİ analysis-input.json  parents=['art_dd422fd3e66b']
+```
+
+### El sıkışma neden dosya
+
+Kubernetes'in yerleşik sidecar'ı ana container'ı sidecar **başlayınca**
+başlatıyor, **bitince** değil — "girdiler hazır" sinyalini biz kurmak
+zorundayız. Önce bir HTTP sunucusu vardı; sandbox'ın başka çağrısı kalmayınca
+yalnızca el sıkışma uğruna sunucu ayakta tutmanın anlamı kalmadı. Argo da 1.29
+öncesinde sonlandırma sinyalini paylaşılan volume'deki bir dosyayla veriyordu.
+
+Dosya `/scratch`te, `/output`ta değil: oraya koysaydık süpürme onu artifact
+sanardı.
+
+### Ölçüm — sandbox'ın içinden
+
+```
+artifact_fonksiyonlari : []                ← hiçbiri yok
+proxy_env              : []                ← adres yok
+localhost_proxy        : URLError          ← sunucu yok
+servis                 : URLError
+minio                  : gaierror          ← DNS'te bile yok
+s3_kimlik              : []
+```
+
+Öncesinde `proxy_env` 9 değişken taşıyordu ve `ARTIFACT_SERVICE_ENDPOINT`
+sandbox'ın ortamındaydı — kullanılmıyordu ama duruyordu.
+
+### Bir hata: dilim fazla genişti
+
+`yerlestir()`i yeniden yazarken aldığım dilim `_tari_ac`, `supur` ve
+`_ad_duzelt`'i de sildi — yani **süpürme gitti**. Birim testleri yakaladı
+(`AttributeError: module 'sidecar' has no attribute 'supur'`), git'ten geri
+alındı. Testler olmasa çalıştırmalar sessizce çıktısız dönerdi.
+
+### Doğrulama
+
+```
+209 birim/entegrasyon testi  ·  52/52 (proxy) + 53/53 (direct) canlı kabul kontrolü
+çapraz workflow: /artifacts/<wf>/ozet.json + /artifacts/<wf>/model.v1/w.json
+                 turev.json parents=[iki girdi de]
+PL-A 5 artifact · PL-B çapraz sınır, beyanla
+```
+
+### Geriye kalan HTTP
+
+Sidecar hâlâ iki yere konuşuyor — ve KFP'de de tam olarak bu ikisi var:
+
+```
+sidecar → nesne deposu   baytlar   (S3 API; KFP'de de aynı)
+sidecar → artifact servisi  künye  (KFP'de MLMD)
+```
+
+Kalkan şey **sandbox'ın** ağ yüzeyiydi. Kayıt defteri kanalı kalkamaz: onun
+adı KFP'de MLMD.
 
 ---
 

@@ -13,6 +13,10 @@ __pycache__/
 # Faz 1 — önceden hesaplanmış embedding index'leri (üretilmiş artifact)
 indices/
 
+# Konsoldan kurulan hatlar — çalışma zamanı durumu, kişiye özel (SQLite gibi).
+# Yerleşik dört hat koda gömülü; burası yalnızca kullanıcının kurdukları.
+var/
+
 # Faz 4 — ham kaynak PDF (39MB); içeriği sample_docs/wiki/*.md'ye çıkarıldı,
 # ham dosyanın kendisi hiçbir yerde okunmuyor (Altan'ın kararı, 2026-08-28).
 sample_docs/kkbfaaliyetraporu2024.pdf

@@ -17,7 +17,7 @@ import queue
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -108,6 +108,31 @@ async def api_pipelines() -> dict:
     return {"pipelines": konsol_modulu.pipelines()}
 
 
+@app.post("/api/pipelines", status_code=201)
+async def api_pipeline_kaydet(hat: dict = Body(...)) -> dict:  # noqa: B008
+    """Konsoldan kurulmuş bir hattı kaydeder (aynı `key` varsa günceller).
+
+    Kod alanı serbest bırakılıyor: sandbox'ta zaten güvenilmeyen kod
+    çalışıyor ve kısıtlama oraya ait (izolasyon, ağ politikası, süpürme).
+    Burada denetlenen şey tanımın BİÇİMİ.
+    """
+    try:
+        return await asyncio.to_thread(konsol_modulu.hat_kaydet, hat)
+    except konsol_modulu.HatGecersiz as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/pipelines/{key}")
+async def api_pipeline_sil(key: str) -> dict:
+    try:
+        silindi = await asyncio.to_thread(konsol_modulu.hat_sil, key)
+    except konsol_modulu.HatGecersiz as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not silindi:
+        raise HTTPException(404, f"'{key}' diye bir hat yok.")
+    return {"silindi": key}
+
+
 @app.get("/api/depo")
 async def api_depo(name: str | None = None, type: str | None = None,  # noqa: A002
                    workflow: str | None = None, q: str | None = None,
@@ -125,6 +150,26 @@ async def api_depo_soy(artifact_id: str) -> dict:
     from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
 
     return await asyncio.to_thread(konsol_modulu.soy, _kapsam_jetonu, artifact_id)
+
+
+@app.delete("/api/depo/{artifact_id}")
+async def api_depo_sil(artifact_id: str) -> dict:
+    """Tek artifact siler. Panelden, yani insan tarafından — sandbox'ın yolu yok."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(konsol_modulu.sil, _kapsam_jetonu, artifact_id)
+
+
+@app.post("/api/depo/topluca-sil")
+async def api_depo_topluca_sil(name: str | None = None, type: str | None = None,  # noqa: A002
+                               workflow: str | None = None, q: str | None = None) -> dict:
+    """SÜZGEÇLE eşleşenleri siler. Süzgeç yoksa tenant'ın tamamı — panelde
+    ekranda ne görünüyorsa o gider, kör bir "hepsini sil" değil."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(
+        konsol_modulu.topluca_sil, _kapsam_jetonu,
+        name=name, type=type, workflow=workflow, q=q, limit=1000)
 
 
 @app.put("/api/depo/{artifact_id}/alias")

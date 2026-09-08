@@ -80,7 +80,7 @@ def test_uzun_liste_kirpiliyor():
 # -- çağrılabilirlik: modelin workflow_id'yi öğrenebileceği TEK yer ---------
 
 
-def test_baskasinin_satiri_CAGRILABILIR():
+def test_baskasinin_satiri_BEYAN_EDILEBILIR():
     """ASIL REGRESYON (2026-09-07, kullanıcı sordu: "LLM o adresi nereden bilecek?").
 
     2026-09-07'de okuma yolu `load_artifact(workflow_id, ad)`'a çevrildi.
@@ -94,10 +94,12 @@ def test_baskasinin_satiri_CAGRILABILIR():
     metin = manifest_metni(KARISIK, "wf_ben")
     _, ikinci = metin.split("BAŞKA ÇALIŞTIRMALARDAN")
 
-    assert 'load_artifact("wf_baska", "baskasinin.parquet")' in ikinci
-    # kendi çıktısı için çağrı YOK — o zaten /output'ta
+    # 2026-09-07 (ikinci tur): satır artık bir ÇAĞRI değil, bir BEYAN —
+    # çapraz-workflow okuma da `inputs`a taşındı, sandbox hiçbir çağrı yapmıyor.
+    assert 'inputs=["wf_baska/baskasinin.parquet"]' in ikinci
+    # kendi çıktısı için beyan satırı YOK — o zaten /output'ta
     ilk = metin.split("BAŞKA ÇALIŞTIRMALARDAN")[0]
-    assert "load_artifact" not in ilk
+    assert "inputs=[" not in ilk
     assert "/output/benim.parquet" in ilk
 
 
