@@ -207,7 +207,14 @@ def _make_ptc_tool(
         # SEBEP-FARKINDA KAPI (2026-09-08). Sınıra ulaşılınca YENİ bir pod hiç
         # yaratılmadan (run_sandbox çağrılmadan) reddediliyor.
         toplam = trace.sandbox_run_count()
-        engellenen = trace.sandbox_run_count(("denied_action",))
+        # `denied_action` 2026-09-03'ten beri ÜRETİLMİYOR (Hubble bağımlılığı
+        # kalktı, bkz. `sandbox_runner` başlığı): ağa çıkma denemesi sıradan
+        # bir `error` olarak dönüyor — DNS kapalı olduğu için `gaierror`.
+        # Yani yalnızca `denied_action`a bakan bir sayaç ağ denemesini hiç
+        # göremez ve 2026-09-01'deki dar sınır fiilen devre dışı kalırdı
+        # (2026-09-08'de bulundu). Ayrım metinden kuruluyor —
+        # `models.ag_engeli_gibi`, Codex `is_likely_sandbox_denied()` deseni.
+        engellenen = trace.sandbox_run_count(("denied_action", "error:ag"))
         if engellenen and toplam >= MAX_SANDBOX_RUNS_PER_TURN:
             # Ağ engeli görüldüyse ESKİ dar sınır aynen geçerli.
             return (

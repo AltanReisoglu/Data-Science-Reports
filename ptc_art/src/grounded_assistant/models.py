@@ -48,6 +48,45 @@ class SandboxRunStatus(str, Enum):
     DENIED_ACTION = "denied_action"
 
 
+#: Ağ engelinin sandbox'ta bıraktığı izler.
+#:
+#: `DENIED_ACTION` durumu 2026-09-03'ten beri HİÇ üretilmiyor: o sinyal
+#: Hubble'ın DROPPED akış sorgusundan geliyordu ve egress case'i kapanınca
+#: kaldırıldı (`sandbox_runner` başlığındaki not). Yani ağa çıkma denemesi
+#: sıradan bir `ERROR` olarak dönüyor — DNS çözülmediği için `gaierror`,
+#: rota kapalı olduğu için `ConnectionError`.
+#:
+#: Sonuç: sebep-farkında sayaç ağ denemelerini kod hatasından ayıramıyordu ve
+#: hepsi geniş bütçeden yiyordu (2026-09-08'de bulundu). Ayrımı metinden
+#: kuruyoruz — Codex'in `is_likely_sandbox_denied()`'i de tam olarak bunu
+#: yapıyor ve kaynak yorumunda "kesin bir yol yok, ihtiyatlı davranıyoruz"
+#: diye kabul ediyor.
+_AG_IZLERI = (
+    "temporary failure in name resolution",
+    "name or service not known",
+    "gaierror",
+    "connection refused",
+    "connectionerror",
+    "connect timeout",
+    "max retries exceeded",
+    "network is unreachable",
+    "no route to host",
+)
+
+
+def ag_engeli_gibi(hata_metni: str | None) -> bool:
+    """Hata metni bir AĞ engeline mi benziyor?
+
+    Sezgisel ve bilerek ihtiyatlı: yanlış pozitif, kod hatasına dar bütçe
+    verir (kötü); yanlış negatif, ağ denemesine geniş bütçe verir (daha kötü).
+    Bu yüzden liste ağ tarafına eğilimli tutuluyor.
+    """
+    if not hata_metni:
+        return False
+    kucuk = hata_metni.lower()
+    return any(iz in kucuk for iz in _AG_IZLERI)
+
+
 @dataclass(frozen=True)
 class Query:
     text: str

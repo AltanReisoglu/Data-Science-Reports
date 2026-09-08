@@ -16,8 +16,10 @@ from grounded_assistant.models import (
     KnowledgeBaseSource,
     LiveToolCall,
     SandboxRun,
+    SandboxRunStatus,
     SourceStatus,
     ToolCallStatus,
+    ag_engeli_gibi,
 )
 
 _SUCCESS_STATUSES = {SourceStatus.OK.value, ToolCallStatus.SUCCESS.value}
@@ -66,16 +68,21 @@ class Trace:
         `error_code` ile, Codex `is_likely_sandbox_denied` ile aynı ayrımı
         yapıyor.
 
-        `record_sandbox_run` `detail` alanına `run.status.value` yazıyor;
-        `denied:` önekli girdiler ise `record_denied_action`'dan geliyor ve
-        bir ÇALIŞTIRMA değil, bir erişim girişimi — o yüzden hep eleniyor.
+        DİKKAT — alan sırası: `TraceEntry(access_path, detail, status, ts)`.
+        `record_sandbox_run` çalıştırma kimliğini `detail`'e, durumu `status`'e
+        yazıyor. Süzgeç bu yüzden `status`'e bakıyor; `detail`'e bakmak
+        2026-09-08'de yapılıp aynı gün yakalanan bir hataydı (sayaç hep 0
+        dönüyordu, yani dar sınır hiç uygulanmıyordu).
+
+        `denied:` önekli girdiler `record_denied_action`'dan geliyor ve bir
+        ÇALIŞTIRMA değil, bir erişim girişimi — o yüzden hep eleniyor.
         """
         return sum(
             1
             for entry in self._entries[self._turn_start :]
             if entry.access_path is AccessPath.PTC_SANDBOX
             and not entry.detail.startswith("denied:")
-            and (durumlar is None or entry.detail in durumlar)
+            and (durumlar is None or entry.status in durumlar)
         )
 
     def since(self, mark: int) -> "Trace":
@@ -100,11 +107,17 @@ class Trace:
         denied_action) izlenebilirlik kaydında görünür — `run.tool_calls`
         zaten `record_tool_call` ile ayrıca kaydedilir (T015); bu, ÇALIŞTIRMANIN
         KENDİSİNİ de görünür kılar (ör. hiç tool çağrısı yapmadan timeout olması)."""
+        # `error:ag` ayrı bir detay: sebep-farkında sayaç ağ denemesini kod
+        # hatasından böyle ayırıyor (bkz. `ag_engeli_gibi`). Sıradan bir kod
+        # hatası `error` olarak kalıyor.
+        durum = run.status.value
+        if run.status is SandboxRunStatus.ERROR and ag_engeli_gibi(run.error_message):
+            durum = "error:ag"
         self._entries.append(
             TraceEntry(
                 AccessPath.PTC_SANDBOX,
-                run.run_id,
-                run.status.value,
+                run.run_id,   # detail = çalıştırma kimliği
+                durum,        # status = success / error / error:ag / timeout
                 run.finished_at or run.started_at,
             )
         )

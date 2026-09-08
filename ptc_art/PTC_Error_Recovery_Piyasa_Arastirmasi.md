@@ -618,6 +618,22 @@ hatayı üç kez almak** bir tıkanma işareti. Bu bir *retry sınırı* değil,
 | 3 | Hataya kadarki **stdout**'u kaybetme | smolagents `test_error_saves_previous_print_outputs` | **✓ 2026-09-08** |
 | 4 | Metni "tekrar dene + aynısını tekrarlama"ya çevir | smolagents + OpenHands, iki bağımsız emsal | **✓ 2026-09-08** |
 | 5 | Sayacı **sebep-farkında** yap (`ERROR` / `DENIED_ACTION` / `TIMEOUT`) | Anthropic `error_code`, AutoGen 124 | **✓ 2026-09-08** — ağ 2, kod 5 |
+
+> **Uygulamada çıkan tuzak (aynı gün yakalandı).** `DENIED_ACTION` durumu
+> 2026-09-03'ten beri HİÇ üretilmiyor: o sinyal Hubble'ın DROPPED akış
+> sorgusundan geliyordu ve egress case'i kapanınca kaldırıldı. Yani ağa çıkma
+> denemesi sıradan bir `ERROR` olarak dönüyor (`gaierror` — DNS kapalı).
+> Yalnızca `denied_action`a bakan bir sayaç onu hiç göremez ve 2026-09-01'deki
+> dar sınır fiilen devre dışı kalır. Ayrım artık METİNDEN kuruluyor
+> (`models.ag_engeli_gibi`) — Codex'in `is_likely_sandbox_denied()`'i de tam
+> olarak bunu yapıyor. Codex "kesin bir yol yok, ihtiyatlı davranıyoruz"
+> diyor; bizimki de sezgisel ve ağ tarafına eğilimli, çünkü yanlış negatif
+> (ağ denemesine geniş bütçe) yanlış pozitiften daha kötü.
+>
+> İkinci tuzak: `TraceEntry(access_path, **detail**, **status**, ts)` —
+> durum `status`'te, `detail`'de çalıştırma kimliği duruyor. Sayacın ilk hâli
+> `detail`'e bakıyordu ve **hep 0 dönüyordu**; hiçbir test görmüyordu.
+> `tests/unit/test_sebep_farkinda_sayac.py` bunu koruyor (16 test).
 | 6 | **Aynı hata tekrarı** tespiti (eşik 3) | OpenHands `action_error = 3` | açık |
 | 7 | Traceback'i **alıntılanmış veri** olarak çerçevele | OWASP: araç çıktısı güvenilmeyen veridir | açık |
 | 8 | Kırpma sınırı koy (baş yarı + son yarı) | smolagents + SWE-agent, aynı yöntem | **✓ 2026-09-08** — 20 000 |
