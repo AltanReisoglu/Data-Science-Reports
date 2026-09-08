@@ -142,6 +142,54 @@ def alias_ata(jeton_uret, artifact_id: str, alias: str | None) -> dict:
         return {"error": str(exc)}
 
 
+def sil(jeton_uret, artifact_id: str) -> dict:
+    """Tek bir artifact'i siler — panelden, yani İNSAN tarafından.
+
+    Sandbox'ın istemcisinde bu çağrının karşılığı YOK; silme yetkisi bilerek
+    yalnızca panelde ve reaper'da. Servis sırayı doğru işletiyor: önce bayt,
+    sonra künye — ters sıra yetim blob bırakırdı. Dedup nedeniyle aynı baytı
+    başka künyeler de gösteriyorsa bayt DURUYOR, yalnızca bu kaydın referansı
+    düşüyor.
+    """
+    adres, basliklar = _adres(), _baslik(jeton_uret)
+    if not adres or not basliklar:
+        return {"error": "Artifact Service yapılandırılmamış"}
+    try:
+        yanit = requests.delete(f"{adres}/artifacts/{artifact_id}",
+                                headers=basliklar, timeout=_ZAMAN_ASIMI)
+        if yanit.status_code >= 400:
+            return {"error": yanit.text[:160], "status": yanit.status_code}
+        return yanit.json()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+
+
+def topluca_sil(jeton_uret, **suzgec) -> dict:
+    """SÜZGEÇLE eşleşenleri siler — "hepsini sil" değil, "görünenleri sil".
+
+    Kasıtlı: kör bir "her şeyi sil" düğmesi, panelde yanlışlıkla basılabilecek
+    tek yıkıcı şey olurdu. Süzgeç neyse o siliniyor; süzgeç boşsa gerçekten
+    hepsi, ama o zaman da kullanıcı bunu ekranda görmüş oluyor.
+
+    Tek tek `sil()` çağırıyor — servisin toplu silme uç noktası yok ve
+    olmamalı: her silme kendi yetki kontrolünden ve doğru bayt/künye
+    sırasından geçmeli.
+    """
+    sonuc = depo(jeton_uret, **suzgec)
+    if sonuc.get("error"):
+        return sonuc
+    kayitlar = sonuc.get("kayitlar") or []
+    silinen, hata = 0, []
+    for k in kayitlar:
+        c = sil(jeton_uret, k["artifact_id"])
+        if c.get("error"):
+            hata.append(f"{k['name']}: {c['error'][:60]}")
+        elif c.get("deleted"):
+            silinen += 1
+    return {"istenen": len(kayitlar), "silinen": silinen,
+            "hata": hata[:5], "hata_sayisi": len(hata)}
+
+
 # ── pipeline tanımları — kod GERÇEKTEN sandbox'ta çalışıyor ───────────────
 
 _KOD_TOPLA = '''

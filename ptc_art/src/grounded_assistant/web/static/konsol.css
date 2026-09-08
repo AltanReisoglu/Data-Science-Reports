@@ -637,3 +637,14 @@ body.konsol .ptc-panel { z-index: 50; }
   .ara-satir { flex-wrap: wrap; }
   .ara-satir select.k-input { flex: 1 1 auto !important; }
 }
+
+/* ── yıkıcı eylem düğmesi ─────────────────────────────────────────── */
+/* Sessizce diğerleri gibi görünmemeli: silme geri alınamıyor. Ama sürekli
+   kırmızı da yanıp sönmesin diye varsayılan hâli SAKIN, vurgu hover'da. */
+.k-btn.tehlike {
+  background: var(--card-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-text);
+}
+.k-btn.tehlike:hover:not(:disabled) { background: var(--danger-bg); }
+.k-btn.tehlike:disabled { opacity: 0.5; }

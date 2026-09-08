@@ -152,6 +152,26 @@ async def api_depo_soy(artifact_id: str) -> dict:
     return await asyncio.to_thread(konsol_modulu.soy, _kapsam_jetonu, artifact_id)
 
 
+@app.delete("/api/depo/{artifact_id}")
+async def api_depo_sil(artifact_id: str) -> dict:
+    """Tek artifact siler. Panelden, yani insan tarafından — sandbox'ın yolu yok."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(konsol_modulu.sil, _kapsam_jetonu, artifact_id)
+
+
+@app.post("/api/depo/topluca-sil")
+async def api_depo_topluca_sil(name: str | None = None, type: str | None = None,  # noqa: A002
+                               workflow: str | None = None, q: str | None = None) -> dict:
+    """SÜZGEÇLE eşleşenleri siler. Süzgeç yoksa tenant'ın tamamı — panelde
+    ekranda ne görünüyorsa o gider, kör bir "hepsini sil" değil."""
+    from grounded_assistant.agent.graph import _kapsam_jetonu  # noqa: PLC0415
+
+    return await asyncio.to_thread(
+        konsol_modulu.topluca_sil, _kapsam_jetonu,
+        name=name, type=type, workflow=workflow, q=q, limit=1000)
+
+
 @app.put("/api/depo/{artifact_id}/alias")
 async def api_depo_alias(artifact_id: str, alias: str | None = None) -> dict:
     """Sürümü isimle sabitler — MLflow'un alias'ı. İnsan/CI tarafı."""

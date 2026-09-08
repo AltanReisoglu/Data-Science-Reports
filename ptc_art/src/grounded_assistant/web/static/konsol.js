@@ -715,13 +715,28 @@ async function ciz_artDetay() {
 
     <div style="display:flex;gap:.5rem;margin-bottom:1rem">
       <button class="k-btn ikincil" id="soyBtn">Soy ağacını aç</button>
+      <button class="k-btn tehlike" id="silBtn">Sil</button>
     </div>
+    <div id="silSonuc"></div>
 
     <div class="muted" style="margin-bottom:.35rem">Önizleme</div>
     <div id="onizleme"><p class="bos">Yükleniyor…</p></div>`;
 
   $$("[data-art]", kutu).forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); });
   $("#soyBtn", kutu).onclick = () => { S.soyId = a.artifact_id; git("soy"); };
+  $("#silBtn", kutu).onclick = async () => {
+    if (!confirm(`"${a.name}" silinsin mi?\n\n${a.artifact_id} · ${kb(a.size_bytes)}\n`
+        + "Bu işlem geri alınamaz. Aynı baytı başka künyeler de gösteriyorsa "
+        + "bayt durur, yalnızca bu kayıt düşer.")) return;
+    const out = $("#silSonuc");
+    out.innerHTML = `<p class="bos">Siliniyor…</p>`;
+    try {
+      const r = await getJSON(`/api/depo/${a.artifact_id}`, { method: "DELETE" });
+      if (r.error) { out.innerHTML = uyari(r.error); return; }
+      S.art = null;
+      await ciz_depo(); yenileSayac();
+    } catch (e) { out.innerHTML = uyari(e.message); }
+  };
   $("#aliasBtn", kutu).onclick = async () => {
     const v = $("#aliasIn").value.trim(), out = $("#aliasSonuc");
     out.innerHTML = `<p class="bos">Gönderiliyor…</p>`;
@@ -915,6 +930,36 @@ $("#depoAra").oninput = e => {
 };
 $("#depoSirala").onchange = e => { S.sirala = e.target.value; S.acik = {}; ciz_depo(); };
 $("#depoYenile").onclick = () => { S.acik = {}; ciz_depo(); yenileSayac(); };
+
+/* GÖRÜNENLERİ SİL — "hepsini sil" değil.
+ *
+ * Kör bir "her şeyi sil" düğmesi, panelde yanlışlıkla basılabilecek tek
+ * yıkıcı şey olurdu. Bu düğme EKRANDA NE VARSA onu siliyor: arama kutusu ve
+ * tip süzgeci neyse o. Süzgeç boşsa gerçekten hepsi — ama o zaman da
+ * kullanıcı listeyi görmüş oluyor ve onay kutusunda sayıyı okuyor. */
+$("#depoTopluSil").onclick = async () => {
+  const q = S.ara.trim();
+  const tip = S.filtre.startsWith("t:") ? S.filtre.slice(2) : null;
+  const gorunen = S.kayitlar.length;
+  const ne = [q && `arama "${q}"`, tip && `tip ${tip}`].filter(Boolean).join(" · ")
+             || "SÜZGEÇ YOK — tenant'taki her şey";
+  if (!confirm(`${gorunen} artifact silinecek.\n\n${ne}\n\n`
+      + "Bu işlem geri alınamaz. Devam edilsin mi?")) return;
+  const btn = $("#depoTopluSil");
+  btn.disabled = true; btn.textContent = "siliniyor…";
+  try {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (tip) p.set("type", tip);
+    const r = await getJSON(`/api/depo/topluca-sil?${p}`, { method: "POST" });
+    alert(r.error ? r.error
+      : `${r.silinen} / ${r.istenen} silindi.`
+        + (r.hata_sayisi ? `\n${r.hata_sayisi} hata:\n` + r.hata.join("\n") : ""));
+    S.art = null; S.acik = {};
+    await ciz_depo(); yenileSayac();
+  } catch (e) { alert("Silinemedi: " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "Görünenleri sil"; }
+};
 $("#btnTemizle").onclick = () => { if (!S.calisiyor) { S.durum = {}; S.adim = null; ciz_calistir(); } };
 
 (async () => {
