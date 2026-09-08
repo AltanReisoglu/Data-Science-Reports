@@ -64,12 +64,20 @@ _SYSTEM_PROMPT = (
     "bir ayrıntı biliyorsan bile bunu tool'dan gelmiş gibi sunma — açıkça "
     "'yalnızca bir arama snippet'i görebiliyorum, sayfanın tam içeriğine "
     "erişimim yok' de.\n\n"
-    f"Önemli bir sınır: bir soruda en fazla {MAX_SANDBOX_RUNS_PER_TURN} kez "
-    "run_ptc_code çalıştırabilirsin. Bir hedef ağ seviyesinde engellendiyse "
-    "(denied_action / 'Sandbox ... engellendi' mesajı), bu KESİN bir karar — "
-    "farklı bir URL/domain/şema (http yerine https gibi) deneyerek bunu "
-    "AŞMAYA ÇALIŞMA, bu sadece yeni bir engellemeye yol açar. Sınıra "
-    "ulaştığında elindeki bilgiyle yanıt ver, tahmini değer üretme."
+    "Saklı artifact'leri aramak için artifact_ara aracın var. Sistem "
+    "mesajındaki liste yalnızca EN YENİ birkaçını gösteriyor; depoda çok daha "
+    "fazlası olabilir. Kullanıcı 'geçen sefer', 'daha önce', 'eski' gibi bir "
+    "şeye atıf yapıyorsa ve dosya listede yoksa, YENİDEN ÜRETMEDEN ÖNCE "
+    "artifact_ara ile ara. Arama yalnızca isim/tip/boyut döner; dosyayı "
+    "gerçekten okumak için dönen satırı run_ptc_code'un inputs'una koy.\n\n"
+    f"Sınırlar: bir soruda en fazla {MAX_KOD_HATASI_CALISTIRMA} kez "
+    "run_ptc_code çalıştırabilirsin. Kod hatası alırsan DÜZELTİP TEKRAR DENE — "
+    "hata mesajı sana tipi, satırı ve o ana kadarki çıktıyı veriyor. Ama aynı "
+    "kodu aynen tekrar gönderme; aynı hatayı iki kez aldıysan farklı bir "
+    f"yaklaşım dene. Bir hedef ağ seviyesinde engellendiyse sınır "
+    f"{MAX_SANDBOX_RUNS_PER_TURN}'ye düşer ve bu KESİN bir karardır — farklı "
+    "bir URL/domain/şema (http yerine https gibi) deneyerek AŞMAYA ÇALIŞMA. "
+    "Sınıra ulaştığında elindeki bilgiyle yanıt ver, tahmini değer üretme."
 )
 
 
@@ -268,6 +276,41 @@ def _make_ptc_tool(
     return run_ptc_code
 
 
+def _make_artifact_ara_tool(workflow_id: str | None):
+    """Kayıt defterinde arama — MLMD `filter_query`'nin ajana açılmış hâli.
+
+    Manifest (`ArtifactContextMiddleware`) her turda en yeni 40 ismi context'e
+    koyuyor; depoda yüzlercesi varken gerisi modele GÖRÜNMEZ kalıyordu.
+    Manifesti büyütmek yanlış çözüm — o liste her çağrıda taşınıyor. Doğrusu
+    aramayı modelin isteğine bırakmak (2026-09-08).
+    """
+    @tool
+    def artifact_ara(ad: str | None = None, tip: str | None = None,
+                     metin: str | None = None) -> str:
+        """Saklı artifact'leri ADI, TİPİ ya da ad içindeki bir METİNLE arar.
+
+        Sistem mesajındaki liste yalnızca EN YENİ birkaç artifact'i gösteriyor.
+        Aradığın dosya orada yoksa ama var olabileceğini düşünüyorsan (kullanıcı
+        "geçen sefer", "daha önce", "eski raporu" gibi bir şey diyorsa) BU
+        ARACI ÇAĞIR — listede yok diye yeniden üretmeye kalkma.
+
+        En az bir süzgeç ver:
+          ad    — tam dosya adı, ör. "rapor.pdf"
+          tip   — "system.Dataset" | "system.Artifact" | "system.Model"
+          metin — ad içinde geçen bir parça, ör. "ticket" (en kullanışlısı)
+
+        Yalnızca İSİM/TİP/BOYUT döner, içerik DÖNMEZ. Dosyayı gerçekten
+        okumak için dönen satırı `run_ptc_code`'un `inputs`'una koy.
+        """
+        jeton = _kapsam_jetonu(workflow_id)
+        if not workflow_id or not jeton:
+            return "Artifact kapsamı yok — arama yapılamadı."
+        return artifact_context.ara(workflow_id, jeton,
+                                    ad=ad, tip=tip, metin=metin)
+
+    return artifact_ara
+
+
 def _build_tools(
     trace: Trace,
     on_ptc_event: Callable[[dict], None] | None = None,
@@ -282,8 +325,14 @@ def _build_tools(
     doğrudan değil, her zaman `run_ptc_code` içinden yazdığı kodla ulaşıyor.
     Sonuç: her etkileşim PTC panelinde (configmap/job/tool_call/final) görünür
     oluyor; bedeli, basit sorularda bile bir K8s Job'unun ayağa kalkması kadar
-    gecikme (demo/gözlemlenebilirlik için kabul edilen takas)."""
-    return [_make_ptc_tool(trace, on_ptc_event, workflow_id)]
+    gecikme (demo/gözlemlenebilirlik için kabul edilen takas).
+
+    2026-09-08: yanına `artifact_ara` eklendi. Bu bir istisna DEĞİL, aynı
+    kuralın devamı: sandbox'ın hâlâ listeleme yolu yok — arama HOST tarafında,
+    tıpkı manifest gibi. Model neyin var olduğunu öğreniyor, baytları değil.
+    (§10.6 desen 6: kayıt defterine sorgu — MLMD `filter_query`.)"""
+    return [_make_ptc_tool(trace, on_ptc_event, workflow_id),
+            _make_artifact_ara_tool(workflow_id)]
 
 
 def build_checkpointer():
