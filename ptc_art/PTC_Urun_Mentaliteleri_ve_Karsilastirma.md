@@ -566,6 +566,96 @@ Kısıt gibi duruyor; üç şey kazandırıyor:
 KFP ve Argo tam olarak böyle yapıyor. Tek fark: onlarda beyanı **insan**
 yazıyor (YAML'da), bizde **model** yazıyor.
 
+## 3.7 · Ölçek: aynı workflow'da 100 dosya üretirsek ne olur
+
+Üç soru birden: hepsi `/output`'a mı iniyor, hepsinin adı context'e mi
+basılıyor, ve çapraz workflow bunun neresinde. Üçü de **canlı ölçüldü**
+(2026-09-08, 100 dosyalık gerçek bir çalıştırma).
+
+### Hepsi `/output`'a mı geliyor — beyana bağlı
+
+| Kip | `/output`'ta | Süre | `consumed` olayı |
+|---|---|---|---|
+| **Beyansız** (`inputs=None` → `PTC_INPUTS="*"`) | **100 dosya** | 3,9 sn | **100** |
+| **Beyanlı** (`inputs=["veri_000.json","veri_042.json"]`) | **2 dosya** | 3,9 sn | 2 |
+
+Beyansız yol bir **uyumluluk yolu**: model `inputs` vermezse "bu çalıştırmanın
+her çıktısı" varsayılıyor.
+
+### Asıl bedel indirme değil, SOY AĞACI
+
+Süre neredeyse aynı (dosyalar küçük, aktarım cluster içi). Ama:
+
+```
+BEYANSIZ  →  üretilen ozet.json'un EBEVEYN sayısı:  100
+BEYANLI   →  üretilen ozet.json'un EBEVEYN sayısı:    1
+```
+
+Kod **tek dosya okudu**, ama beyansız yolda soy **100 ebeveyn** gösteriyor.
+Sebep §6.3'teki `DECLARED_INPUT` semantiği: beyan edilen her şey ebeveyn
+sayılıyor, kodun okuyup okumadığına bakılmıyor.
+
+Belgelerde "soy şişmesi" diye geçen arıza bu. **Beyan tam olarak bunun için
+var.**
+
+| Kullanım | Sonuç |
+|---|---|
+| `inputs` verilmez | 100 dosya iner, soy 100 ebeveyn — **kaçının** |
+| `inputs=[]` | Hiçbiri inmez — yalnızca üreten adımlar için |
+| `inputs=["a.json","b.json"]` | Yalnızca ikisi, soy 2 ebeveyn — **doğrusu bu** |
+
+Sistem mesajı modele *"HER ZAMAN beyan et"* diyor ve gerekçesini de veriyor:
+*"beyan etmezsen bu oturumun bütün çıktıları kopyalanır ve hepsi soy ağacında
+girdi sayılır — yani grafik yanlış olur."*
+
+### 100 adı context'e basıyor muyuz — hayır
+
+Ölçüldü:
+
+```
+depoda bu workflow'da   : 102 künye
+manifeste giren satır   :  41
+son satır               : "… ve 61 tane daha (os.listdir("/output") ile tamamı)"
+```
+
+Sınırın sebebi: manifest **her model çağrısında** context'e giriyor. 100 satır,
+ucuz olması gereken şeyi pahalı yapardı.
+
+**Kırpma sessiz değil** — model 61 tanenin gizlendiğini görüyor *ve nereye
+bakacağı söyleniyor*. Kalan 61'e üç yol var:
+
+| Yol | Nasıl |
+|---|---|
+| `os.listdir("/output")` | Beyansız yolda 100'ü de diskte — model gerçeği görür |
+| `artifact_ara` | Kayıt defterine süzgeçli sorgu |
+| Beyan | Adı biliyorsa doğrudan `inputs`'a koyar |
+
+**Manifest bir vitrin, envanter değil.**
+
+### Çapraz workflow bunun neresinde
+
+Aynı zincir; tek fark **beyanın biçimi**. Üçü de beyan, üçü de çağrı değil.
+
+```
+             ne yazıyor                  nereye düşüyor
+  ┌──────────────────────────┬─────────────────────────────────┐
+  │ veri_042.json            │ /output/veri_042.json           │  kendi
+  │ wf-abc123/veri_042.json  │ /artifacts/wf-abc123/veri_042…  │  çapraz
+  │ rapor.pdf@onaylanmis     │ /artifacts/_alias/rapor.pdf     │  sabit
+  └──────────────────────────┴─────────────────────────────────┘
+                      ↓
+        sidecar yerleştirir — kod BAŞLAMADAN
+                      ↓
+        kod:  open("/output/veri_042.json")    ← düz dosya
+```
+
+**Ham ad başka workflow'a düşmüyor.** Servis `strict=True` ile çözüyor;
+ölçüldü — taze bir workflow'da `/output` **boş** geliyor.
+
+**Modelin `wf-abc123`'ü nereden bildiği:** gömülü değil. Manifest ya da
+`artifact_ara` satırı **kopyalanabilir biçimde** veriyor
+(`inputs=["wf-abc123/rapor.pdf"]`), model olduğu gibi alıyor.
+
 ---
 
 # Bölüm 4 — Nicelik karşılaştırması
@@ -810,18 +900,93 @@ varsayıyor; sohbet platformlarında ise soy ve sürüm diye bir kavram yok.
 > Hataların hepsi bizim icat ettiğimiz yerlerde çıktı; kopyaladığımız hiçbir
 > parçadan çıkmadı.
 
-## 6.3 · MLMD'yi kullanıyor muyuz — hayır, desenini alıyoruz
+## 6.3 · MLMD nedir, ve biz ondan ne aldık
 
-Sık gelen soru. Ayrım net:
+Sık gelen soru, ve karıştırılması kolay. Önce MLMD'nin kendisi.
 
-| MLMD'den ALDIK | MLMD'den ALMADIK |
+### Ne yapıyor
+
+**Kubeflow'un kayıt defteri.** Baytları saklamıyor — **künyeleri** saklıyor.
+Baytlar nesne deposunda (`pipeline_root`), MLMD yalnızca *"ne var, kim üretti,
+neyden türedi"* diyor. Arka ucu MySQL/MariaDB, arayüzü gRPC.
+
+### Veri modeli — dört varlık
+
+```
+Artifact  ←── Event ──→  Execution
+   ↑                        ↑
+   │  Attribution           │  Association
+   └────── Context ─────────┘
+```
+
+| Varlık | Ne |
 |---|---|
-| `Event.DECLARED_INPUT` / `DECLARED_OUTPUT` soy semantiği | MLMD sunucusunun kendisi |
-| `ListOptions(filter_query=...)` süzgeci | gRPC API'si |
-| Tipli artifact (`system.Dataset` vb.) | Şeması |
-| `pipeline_root/<run-id>/` anahtar düzeni | — |
+| **Artifact** | Bir veri varlığı — dosya, tablo, model |
+| **Execution** | Bir hesaplama — bir pipeline adımının çalışması |
+| **Event** | Artifact ile Execution'ı **bağlar** ve rolünü söyler |
+| **Context** | Gruplama — pipeline, görev, oturum |
 
-Yerine SQLite ve kendi şemamız:
+Her birinin bir `Type`'ı var. `system.Dataset` / `system.Model` /
+`system.Metrics` tip sözlüğü buradan geliyor — **bizdeki tipler bunlar**.
+
+### Kalbi: `Event.Type` — ve neden bizim için belirleyici
+
+Soy ağacı buradan çıkıyor. Sekiz değeri var
+([`metadata_store.proto`](https://github.com/google/ml-metadata/blob/master/ml_metadata/proto/metadata_store.proto)):
+
+```
+UNKNOWN           = 0
+DECLARED_OUTPUT   = 1   "A declared output of the execution."
+DECLARED_INPUT    = 2   "A declared input of the execution."     ← BİZ BUNU ALDIK
+INPUT             = 3   "An input of the execution."
+OUTPUT            = 4   "An output of the execution."
+INTERNAL_INPUT    = 5
+INTERNAL_OUTPUT   = 6
+PENDING_OUTPUT    = 7
+```
+
+**Ayrımın kendisi bir tez.** `DECLARED_INPUT` ile `INPUT` ayrı şeyler:
+
+- `DECLARED_INPUT` — *"bu adımın girdisi olduğu **söylendi**"*
+- `INPUT` — *"girdi **oldu**"*
+
+Ve KFP soyu **`DECLARED_INPUT`**'tan çıkarıyor: beyan edilen girdi ebeveyn
+sayılıyor, kodun onu gerçekten okuyup okumadığına **bakılmıyor**.
+
+Bu bizim en önemli kopyamız. Bir ara `atime` ile "gerçekten okundu mu" ölçmeyi
+denemiştik; çalışıyordu ama sahada emsali yoktu, attık. MLMD'nin olay tipinin
+**adı** o tartışmayı bitirdi.
+
+### Sorgulama: `ListOptions`
+
+| Alan | Ne |
+|---|---|
+| `max_result_size` / `limit` | en fazla kaç kayıt |
+| `order_by_field` | `CREATE_TIME`, `LAST_UPDATE_TIME` ya da `ID` |
+| `next_page_token` | sayfalama |
+| `filter_query` | SQL-benzeri boolean ifade |
+
+`filter_query` bizim `?name= ?type= ?q=` süzgecimizin kaynağı.
+
+> **Ve burada OLMAYAN şey:** *ad başına en yeni* diye bir seçenek. Proto'da yok
+> ([kaynak](https://github.com/google/ml-metadata/blob/master/ml_metadata/proto/metadata_store.proto)).
+> **Neden yok:** KFP'de o soru doğmuyor — her çalıştırma
+> `pipeline_root/<run-id>/` altına yazıyor, çakışma **imkânsız**. Aynı ada 12
+> sürüm birikmesi bizim problemimiz, onların değil. Bizde doğmasının sebebi
+> **ajanın seçiyor olması**: `inputs=["rapor.pdf"]` diyen bir model hangi
+> sürümü aldığını bilmiyor. KFP'de böyle bir cümle kurulamıyor bile, çünkü
+> `.uri` tam adres.
+
+### Neyi aldık, neyi almadık
+
+| **ALDIK** | **ALMADIK** |
+|---|---|
+| `DECLARED_INPUT` soy semantiği | MLMD sunucusu |
+| `filter_query` süzgeci | gRPC API'si |
+| `system.*` tip sözlüğü | MySQL/MariaDB bağımlılığı |
+| `pipeline_root/<run-id>/` düzeni | Artifact/Execution/Context/Event şeması |
+
+Yerine SQLite ve **düz bir şema**:
 
 ```
 artifact_id · name · workflow_id · node_id · run_id
@@ -829,7 +994,14 @@ content_hash · content_type · size_bytes · storage_uri
 parents[] · owner · created_at · ttl_seconds · alias
 ```
 
-**Gerekçe uydurma değil, MLMD'nin sahibinin kendi hamlesi:**
+MLMD'nin dört varlığı yerine **tek tablo**. `Event` yok → `parents[]` var.
+`Execution` yok → `run_id` var. `Context` yok → `workflow_id` var.
+
+**Neden bu kadar sadeleşti:** bizde bir DAG yok. Adımlar önceden bilinmiyor,
+ajan o an karar veriyor. MLMD'nin modeli bir **pipeline** modelliyor; bizim
+modellediğimiz bir **dosya**.
+
+### Kurmama gerekçesi — MLMD'nin en büyük kullanıcısının hamlesi
 
 > *"Starting with OpenShift AI 2.23, the **ML Metadata (MLMD) server has been
 > removed from the model registry component**. The model registry now
@@ -840,12 +1012,39 @@ parents[] · owner · created_at · ttl_seconds · alias
 > database access."*
 > — [OpenShift AI 2.23 Release notes](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.23/html-single/release_notes/index)
 
-Yani MLMD'yi kurmamak, MLMD'yi en çok kullanan platformun gittiği yönle
-**aynı** yön. SQLite tercihi de öyle: Red Hat'in çizgisi PostgreSQL üretim /
-SQLite geliştirme. `open_postgres()` yazılı ve bekliyor; SQL taşınabilir
-yazıldı (yalnızca TEXT/BIGINT, ISO-8601 zaman, JSON `parents`).
+**Dikkat — kaçırılması kolay ayrım:** bu **Model Registry** bileşeni.
+**Data Science Pipelines (KFP) hâlâ MLMD kullanıyor.** İkisi ayrı ürün, ayrı
+soruları cevaplıyor.
 
-**Özet: MLMD'nin mentalitesi var, implementasyonu yok.**
+SQLite tercihi de Red Hat'in çizgisi: PostgreSQL üretim, SQLite geliştirme.
+`open_postgres()` yazılı ve bekliyor; SQL taşınabilir yazıldı (yalnızca
+TEXT/BIGINT, ISO-8601 zaman, JSON `parents`).
+
+**Tek cümlede: MLMD'nin mentalitesi var, implementasyonu yok.**
+
+### Bunun bizde bıraktığı açık
+
+Manifest, MLMD'de olmayan bir şeye ihtiyaç duyuyor: **ad başına en yeni**.
+Bugün bu istemcide yapılıyor ve zinciri şöyle:
+
+```
+depoda                 454 künye
+   ↓  SERVİS: varsayılan limit 200  (manifest limit HİÇ vermiyor)
+   ↓  İSTEMCİ: ad başına tek satır  →  143 ayrı ad
+   ↓  İSTEMCİ: kırpma 40 / (40 − min(benim,20))
+                                    →  ~41 satır
+```
+
+Ölçüldü: **176 addan 33'ü manifeste hiçbir koşulda giremiyor**, çünkü hiçbir
+künyesi en yeni 200'ün içinde değil. Kırpmayı büyütmek bunu çözmez.
+
+Kırpma **görünür** (`… ve 61 tane daha` diyor); bu sınır ise **sessiz**.
+`artifact_ara` kapıyı açıyor (o `limit=200` veriyor ve süzgeçli çalışıyor) ama
+manifest "çekilmeyenlerin var olduğunu" söylemiyor.
+
+Doğru çözümün emsali MLMD değil **Google ADK**: `list_artifact_keys()` ad
+listesi döndürüyor, `list_artifact_versions()` ayrı. İsimleri sürümlerden
+ayırmak — manifestin istemesi gereken de bu.
 
 ## 6.4 · "Agentic PTC için SOTA yaklaşım bu mu?"
 
