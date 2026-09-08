@@ -15,11 +15,18 @@ Burada tanımlı iki pipeline **gerçek** çalışıyor: her sandbox adımı ger
 Kubernetes Job açıyor, gerçek log basıyor, çıktısı gerçekten MinIO'ya iniyor
 ve kayıt defterine satır düşüyor. Simülasyon yok.
 
-## ÜÇ node TÜRÜ var ve fark gerçek
+## DÖRT node TÜRÜ var ve farklar gerçek
 
-    sandbox : gerçek PTC pod'u — kimlik bilgisi yok, ağı kapalı, süpürülüyor
+    sandbox : gerçek PTC pod'u — kod hat tanımında SABİT, insan yazdı
+    ajan    : gerçek PTC pod'u — kodu MODEL yazıyor, kaç pod açılacağı da ona bağlı
     query   : host tarafında kayıt defteri sorgusu — pod açılmıyor
     alias   : host tarafında sürüm sabitleme — pod açılmıyor
+
+`sandbox` ile `ajan` arasındaki fark, bu projenin asıl gerilimi: birinde
+adımlar ÖNCEDEN BELLİ (Argo/KFP dünyası), diğerinde model o an karar veriyor
+(ajan dünyası). Aynı hatta ikisi birden olabiliyor — ajan düğümü hattın
+`workflow_id`'sinde çalıştığı için ürettiği dosya sonraki `sandbox` düğümünde
+HAM ADLA okunuyor (2026-09-08'de canlı doğrulandı).
 
 Bu ayrım uydurma değil, mimarinin kendisi: **keşif de sabitleme de sandbox'ta
 olmuyor.** Sandbox'ın listeleme yolu hiç yok; hangi artifact'in var olduğunu
@@ -525,12 +532,13 @@ def hat_dogrula(ham: dict) -> dict:
         if not _AD_BICIMI.match(n_ad):
             raise HatGecersiz(f"{i}. adımın adı geçersiz.")
         tur = str(hn.get("tur") or "sandbox").strip()
-        if tur not in {"sandbox", "query", "alias"}:
-            raise HatGecersiz(f"{i}. adımın türü: sandbox | query | alias.")
+        if tur not in {"sandbox", "query", "alias", "ajan"}:
+            raise HatGecersiz(
+                f"{i}. adımın türü: sandbox | query | alias | ajan.")
 
         nd = {"n": i, "ad": n_ad, "tur": tur,
               "ikon": {"sandbox": "i-cpu", "query": "i-search",
-                       "alias": "i-pin"}[tur],
+                       "alias": "i-pin", "ajan": "i-spark"}[tur],
               "aciklama": str(hn.get("aciklama") or "").strip()[:400],
               "inputs": _liste(hn.get("inputs"), f"{i}. adımın inputs"),
               "bekleniyor": _liste(hn.get("bekleniyor"), f"{i}. adımın bekleniyor")}
@@ -541,7 +549,21 @@ def hat_dogrula(ham: dict) -> dict:
                     f"{i}. adımda geçersiz beyan: '{beyan}'. "
                     "Biçimler: ad · <workflow_id>/ad · ad@alias")
 
-        if tur == "sandbox":
+        if tur == "ajan":
+            # AJAN DÜĞÜMÜ (2026-09-08): kod yerine İSTEK yazılıyor; ne
+            # yapacağına model karar veriyor. Elinde `run_ptc_code` ve
+            # `artifact_ara` var, yani kendi kodunu yazıp kendi girdisini
+            # keşfedebiliyor.
+            #
+            # Hattın geri kalanıyla aynı `workflow_id`'de çalışıyor: ürettiği
+            # dosyalar sonraki düğümlerde HAM ADLA okunabiliyor.
+            istek = str(hn.get("istek") or "").strip()
+            if not istek:
+                raise HatGecersiz(f"{i}. adım (ajan) için istek metni gerekli.")
+            if len(istek) > _AZAMI_KOD:
+                raise HatGecersiz(f"{i}. adımın isteği çok uzun.")
+            nd["istek"] = istek
+        elif tur == "sandbox":
             kod = str(hn.get("kod") or "").strip()
             if not kod:
                 raise HatGecersiz(f"{i}. adımın kodu boş olamaz.")
@@ -621,6 +643,79 @@ def hat_bul(key: str) -> dict | None:
 
 def _damga() -> str:
     return time.strftime("%H:%M:%S")
+
+
+def _ajan_adimi(nd: dict, workflow_id: str, jeton_uret, yay, t0: float):
+    """Bir ajan turunu hattın içinde çalıştırır. Üretilenleri döner, hata varsa None.
+
+    ## Neden bu düğüm var
+
+    `sandbox` düğümünde kodu İNSAN yazıyor (hat tanımında sabit). Ajan
+    düğümünde ne yapılacağına MODEL karar veriyor: elinde `run_ptc_code` ve
+    `artifact_ara` var, yani kendi girdisini keşfedip kendi kodunu yazıyor.
+
+    Sohbet sekmesindeki turun aynısı — tek fark, sonucun bir hattın adımı
+    olarak akması ve `workflow_id`'nin HAT ile paylaşılması. Paylaşım kasıtlı:
+    ajanın ürettiği dosya, sonraki `sandbox` düğümünde ham adla okunabiliyor.
+
+    ## Neden `asyncio.run`
+
+    `invoke_and_resolve` async (MCP tool'ları yalnızca async çağrılabiliyor,
+    bkz. graph.py'deki not). `pipeline_calistir` ise `asyncio.to_thread` ile
+    ayrı bir thread'de dönüyor — orada çalışan bir loop yok, dolayısıyla
+    kendi loop'umuzu açabiliyoruz.
+    """
+    import asyncio  # noqa: PLC0415
+
+    from grounded_assistant.agent import graph  # noqa: PLC0415
+    from grounded_assistant.trace import Trace  # noqa: PLC0415
+
+    iz = Trace()
+    iz.mark()
+    uretilen: list[dict] = []
+
+    def _on_event(e: dict) -> None:
+        sahne = e.get("stage")
+        if sahne == "job_created":
+            yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                 "msg": f"ajan kod yazdı → Job ptc-sandbox-{e['run_id']}",
+                 "cls": ""})
+            yay({"type": "code", "n": nd["n"], "kod": (e.get("code") or "").strip()})
+        elif sahne == "pod_running":
+            yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                 "msg": f"pod çalışıyor · {e['job_name']}", "cls": "hi"})
+        elif sahne == "artifact":
+            yay({"type": "log", "n": nd["n"], "ts": _damga(),
+                 "msg": f"{e.get('op')} {e.get('name')} "
+                        f"({e.get('size_bytes') or 0} bayt)", "cls": "art"})
+            yay({"type": "artifact", "n": nd["n"], **e})
+            if e.get("op") == "produced":
+                uretilen.append({"artifact_id": e.get("artifact_id"),
+                                 "name": e.get("name"), "n": nd["n"]})
+
+    yay({"type": "log", "n": nd["n"], "ts": _damga(),
+         "msg": f"istek: {nd['istek'][:120]}", "cls": ""})
+    try:
+        ajan = graph.build_agent(iz, _on_event, workflow_id)
+        cevap = asyncio.run(graph.invoke_and_resolve(
+            ajan, nd["istek"], workflow_id))
+        metin = cevap["messages"][-1].content
+    except Exception as exc:  # noqa: BLE001 — hat kapanmasın, adım hata versin
+        mesaj = f"{type(exc).__name__}: {exc}"
+        yay({"type": "log", "n": nd["n"], "ts": _damga(), "msg": mesaj[:300],
+             "cls": "fail"})
+        yay({"type": "node_done", "n": nd["n"], "status": "error",
+             "dur": f"{time.monotonic()-t0:.1f}s", "sonuc": mesaj[:300]})
+        return None
+
+    yay({"type": "log", "n": nd["n"], "ts": _damga(),
+         "msg": f"ajan {iz.sandbox_run_count()} çalıştırma yaptı", "cls": "hi"})
+    yay({"type": "node_done", "n": nd["n"], "status": "success",
+         "dur": f"{time.monotonic()-t0:.1f}s",
+         "sonuc": {"cevap": metin[:600],
+                   "calistirma": iz.sandbox_run_count(),
+                   "uretilen": [u["name"] for u in uretilen]}})
+    return uretilen
 
 
 def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
@@ -781,6 +876,16 @@ def pipeline_calistir(key: str, kaynak_wf: str | None, jeton_uret, yay) -> dict:
                            "workflow_id": cozulen_wf,
                            "secim": nd.get("sec", "en_yeni"),
                            "aday": len(kayitlar)}})
+            continue
+
+        # ── ajan adımı: LLM karar veriyor, kendi kodunu yazıyor ──────────
+        if nd["tur"] == "ajan":
+            sonuc = _ajan_adimi(nd, workflow_id, jeton_uret, yay, t0)
+            if sonuc is None:
+                yay({"type": "pipeline_done", "workflow_id": workflow_id,
+                     "status": "error"})
+                return {"workflow_id": workflow_id, "status": "error"}
+            uretilen.extend(sonuc)
             continue
 
         # ── sandbox adımı: GERÇEK pod ────────────────────────────────────

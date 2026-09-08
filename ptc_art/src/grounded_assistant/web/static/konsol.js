@@ -162,7 +162,8 @@ async function hatlariYenile() {
 
 const BOS_NODE = () => ({ ad: "", tur: "sandbox", aciklama: "", kod: "",
                           inputs: "", bekleniyor: "", sorgu_ad: "",
-                          tercih_alias: "", alias: "", sec: "en_yeni" });
+                          tercih_alias: "", alias: "", sec: "en_yeni",
+                          istek: "" });
 
 function kurucuAc(hat) {
   S.kurucu = hat ? {
@@ -172,7 +173,7 @@ function kurucuAc(hat) {
       inputs: (n.inputs || []).join(", "),
       bekleniyor: (n.bekleniyor || []).join(", "),
       sorgu_ad: n.sorgu?.name || "", tercih_alias: n.sorgu?.alias || "",
-      alias: n.alias || "",
+      alias: n.alias || "", istek: n.istek || "",
       sec: n.sec || "en_yeni",
     })),
   } : { key: "", ad: "", aciklama: "", duzenleme: false, nodes: [BOS_NODE()] };
@@ -207,6 +208,7 @@ function kurucuYaz() {
           <option value="sandbox"${n.tur === "sandbox" ? " selected" : ""}>sandbox — pod açar</option>
           <option value="query"${n.tur === "query" ? " selected" : ""}>query — pod açmaz</option>
           <option value="alias"${n.tur === "alias" ? " selected" : ""}>alias — pod açmaz</option>
+          <option value="ajan"${n.tur === "ajan" ? " selected" : ""}>ajan — LLM karar verir</option>
         </select>
         <button class="node-yukari" title="Yukarı" ${i ? "" : "disabled"}>↑</button>
         <button class="node-asagi" title="Aşağı" ${i < k.nodes.length - 1 ? "" : "disabled"}>↓</button>
@@ -214,7 +216,14 @@ function kurucuYaz() {
       </div>
       <input class="n-aciklama" placeholder="Bu adım ne yapıyor? (panelde gösterilir)"
              maxlength="400" value="${esc(n.aciklama)}" />
-      ${n.tur === "sandbox" ? `
+      ${n.tur === "ajan" ? `
+        <textarea class="n-istek" rows="5" spellcheck="false"
+          placeholder="Ajana ne yapmasını söylüyorsun? Kodu O yazacak.&#10;Örn: Açık ticketları departmana göre say, bir grafik çiz ve /output'a kaydet.">${esc(n.istek)}</textarea>
+        <div class="not" style="margin-bottom:.7rem">
+          Ajan hattın <b>aynı workflow'unda</b> çalışır — ürettiği dosyalar sonraki
+          adımlarda ham adla okunabilir. Elinde <span class="mono">run_ptc_code</span> ve
+          <span class="mono">artifact_ara</span> var: kendi girdisini keşfeder, kendi kodunu yazar.
+        </div>` : n.tur === "sandbox" ? `
         <textarea class="n-kod" rows="7" spellcheck="false"
           placeholder="# Sandbox'ta çalışacak Python.&#10;# Girdiler kod başlamadan yerinde olur; çıktıyı /output'a yaz.&#10;open('/output/sonuc.json','w').write('{}')">${esc(n.kod)}</textarea>
         <div class="alan-satir">
@@ -262,7 +271,7 @@ function kurucuYaz() {
     bagla(".n-ad", "ad"); bagla(".n-aciklama", "aciklama"); bagla(".n-kod", "kod");
     bagla(".n-inputs", "inputs"); bagla(".n-bekleniyor", "bekleniyor");
     bagla(".n-sorgu", "sorgu_ad"); bagla(".n-alias", "alias");
-    bagla(".n-tercih", "tercih_alias");
+    bagla(".n-tercih", "tercih_alias"); bagla(".n-istek", "istek");
     const sec = kart.querySelector(".n-sec");
     if (sec) sec.onchange = () => { n.sec = sec.value; };
     kart.querySelector(".n-tur").onchange = e => { n.tur = e.target.value; kurucuYaz(); };
@@ -293,7 +302,8 @@ async function kurucuKaydet() {
     nodes: k.nodes.map(n => {
       const nd = { ad: n.ad, tur: n.tur, aciklama: n.aciklama,
                    inputs: virgul(n.inputs), bekleniyor: virgul(n.bekleniyor) };
-      if (n.tur === "sandbox") nd.kod = n.kod;
+      if (n.tur === "ajan") nd.istek = n.istek;
+      else if (n.tur === "sandbox") nd.kod = n.kod;
       else {
         nd.sorgu_ad = n.sorgu_ad;
         if (n.tur === "query") nd.tercih_alias = n.tercih_alias;
@@ -346,6 +356,7 @@ function ciz_calistir() {
     const bag = i ? `<div class="baglanti ${S.durum[h.nodes[i - 1].n]?.status === "success" ? "bitti" : ""}"></div>` : "";
     const sag = d.dur ? `<span class="badge">${esc(d.dur)}</span>`
               : n.tur === "sandbox" ? `<span class="badge">pod</span>`
+              : n.tur === "ajan" ? `<span class="badge">ajan</span>`
               : n.tur === "alias" ? `<span class="badge">alias</span>`
               : `<span class="badge">sorgu</span>`;
     const cikti = (d.artifacts || []).map(a => `<span class="badge art">${esc(a.name)}</span>`).join(" ");
@@ -389,7 +400,9 @@ function adimIci(n, d) {
   const tab = S.icTab || "genel";
   const sekmeler = [
     ["genel", "Genel"],
-    n.tur === "sandbox" ? ["kod", "Kod"] : ["sorgu", n.tur === "alias" ? "Alias" : "Sorgu"],
+    n.tur === "sandbox" ? ["kod", "Kod"]
+      : n.tur === "ajan" ? ["istek", "İstek"]
+      : ["sorgu", n.tur === "alias" ? "Alias" : "Sorgu"],
     ["log", `Log${(d.loglar || []).length ? " · " + d.loglar.length : ""}`],
     ["cikti", `Çıktı${(d.artifacts || []).length ? " · " + d.artifacts.length : ""}`],
   ];
@@ -403,6 +416,10 @@ function adimIci(n, d) {
         ? `<b>Gerçek pod.</b> Bu adım için ayrı bir Kubernetes Job açılıyor. Kapsam jetonu
            sidecar'da; sandbox container'ında S3 anahtarı yok ve ağı kapalı — baytları
            içeri/dışarı sidecar taşıyor.`
+        : n.tur === "ajan"
+        ? `<b>LLM karar veriyor.</b> Kodu bu adımda İNSAN yazmıyor — model
+           yazıyor. Kaç pod açılacağı da ona bağlı. Hattın aynı workflow'unda
+           çalışıyor, yani ürettiği dosyalar sonraki adımlarda ham adla okunur.`
         : n.tur === "alias"
         ? `<b>Pod açılmıyor.</b> Bu adım bir sürümü alias'la sabitliyor. Alias'ı insan ya da
            CI koyar — MLflow'da da öyle; sandbox'ın böyle bir yolu yok ve olmamalı.`
@@ -433,6 +450,21 @@ function adimIci(n, d) {
             ? " Bu, <b>gerçekten çalıştırılan</b> hâli: çapraz workflow kimliği yerine konmuş."
             : ""}</p>`
       : `<p class="bos">Bu adım kod çalıştırmıyor.</p>`;
+  }
+
+  else if (tab === "istek") {
+    // Ajan düğümünde iki metin var ve ikisi farklı: İSTEK insanın yazdığı
+    // (hat tanımında sabit), KOD modelin o an ürettiği. Kodu ayrı bir blokta
+    // gösteriyoruz ki "hangisini insan yazdı" karışmasın.
+    govde = `<pre class="kod">${esc((n.istek || "").trim())}</pre>
+      <p class="muted" style="margin:.6rem 0 0">Bu metni <b>insan</b> yazdı.
+      Ne yapılacağına, kaç pod açılacağına ve kodun ne olacağına <b>model</b> karar veriyor.</p>
+      ${d.kod ? `<div style="margin-top:.8rem">
+        <div class="muted" style="margin-bottom:.3rem">Modelin yazdığı kod</div>
+        <pre class="kod">${esc(d.kod.trim())}</pre></div>` : ""}
+      ${d.sonuc && typeof d.sonuc === "object" ? `<div style="margin-top:.7rem">
+        <div class="muted" style="margin-bottom:.3rem">Ajanın cevabı</div>
+        <pre class="kod">${esc(d.sonuc.cevap || "")}</pre></div>` : ""}`;
   }
 
   else if (tab === "sorgu") {
@@ -508,8 +540,10 @@ function calistir() {
       ptcYaz(`workflow ${m.workflow_id}`, "info");
     } else if (m.type === "node_start") {
       d(m.n).status = "running"; S.adim = m.n; S.icTab = "log";
-      ptcYaz(`${m.tur === "sandbox" ? "⬢" : m.tur === "alias" ? "📌" : "🔎"} [${m.n}] ${m.ad} — ${
-        m.tur === "sandbox" ? "sandbox pod'u açılıyor"
+      ptcYaz(`${m.tur === "sandbox" ? "⬢" : m.tur === "ajan" ? "✨"
+                : m.tur === "alias" ? "📌" : "🔎"} [${m.n}] ${m.ad} — ${
+        m.tur === "ajan" ? "ajan turu — kodu model yazacak"
+        : m.tur === "sandbox" ? "sandbox pod'u açılıyor"
         : m.tur === "alias" ? "sürüm sabitleniyor (pod yok)"
         : "kayıt defteri sorgusu (pod yok)"}`, "info");
       ciz_calistir();
