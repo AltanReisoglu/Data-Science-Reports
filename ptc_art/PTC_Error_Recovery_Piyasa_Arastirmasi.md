@@ -611,18 +611,59 @@ hatayı üç kez almak** bir tıkanma işareti. Bu bir *retry sınırı* değil,
 
 ### 5.6 — Yapılacaklar, önem sırasıyla
 
-| # | İş | Dayanağı |
-|---|---|---|
-| 1 | İstisna **tipini** hata mesajına ekle | SWE-agent: tip olmadan yanlış teşhis |
-| 2 | Hatalı **satır + kaynak metni** ekle (kullanıcı kareleri) | smolagents deseni |
-| 3 | Hataya kadarki **stdout**'u kaybetme | smolagents `test_error_saves_previous_print_outputs` |
-| 4 | Metni "tekrar dene + aynısını tekrarlama"ya çevir | smolagents + OpenHands, iki bağımsız emsal |
-| 5 | Sayacı **sebep-farkında** yap (`ERROR` / `DENIED_ACTION` / `TIMEOUT`) | Anthropic `error_code`, AutoGen 124 |
-| 6 | **Aynı hata tekrarı** tespiti (eşik 3) | OpenHands `action_error = 3` |
-| 7 | Traceback'i **alıntılanmış veri** olarak çerçevele | OWASP: araç çıktısı güvenilmeyen veridir |
-| 8 | Kırpma sınırı koy (baş yarı + son yarı) | smolagents + SWE-agent, aynı yöntem |
+| # | İş | Dayanağı | Durum |
+|---|---|---|---|
+| 1 | İstisna **tipini** hata mesajına ekle | SWE-agent: tip olmadan yanlış teşhis | **✓ 2026-09-08** |
+| 2 | Hatalı **satır + kaynak metni** ekle (kullanıcı kareleri) | smolagents deseni | **✓ 2026-09-08** |
+| 3 | Hataya kadarki **stdout**'u kaybetme | smolagents `test_error_saves_previous_print_outputs` | **✓ 2026-09-08** |
+| 4 | Metni "tekrar dene + aynısını tekrarlama"ya çevir | smolagents + OpenHands, iki bağımsız emsal | **✓ 2026-09-08** |
+| 5 | Sayacı **sebep-farkında** yap (`ERROR` / `DENIED_ACTION` / `TIMEOUT`) | Anthropic `error_code`, AutoGen 124 | **✓ 2026-09-08** — ağ 2, kod 5 |
+| 6 | **Aynı hata tekrarı** tespiti (eşik 3) | OpenHands `action_error = 3` | açık |
+| 7 | Traceback'i **alıntılanmış veri** olarak çerçevele | OWASP: araç çıktısı güvenilmeyen veridir | açık |
+| 8 | Kırpma sınırı koy (baş yarı + son yarı) | smolagents + SWE-agent, aynı yöntem | **✓ 2026-09-08** — 20 000 |
 
-1–4 arası küçük ve risksiz; 5–6 tasarım kararı; 7–8 ihmal edilmemeli.
+### Uygulananın canlı ölçümü (2026-09-08)
+
+Aynı hata, önce ve sonra:
+
+```
+ÖNCE   'yok'
+
+SONRA    File "/sandbox/code.py", line 8, in <module>
+             dis()
+           File "/sandbox/code.py", line 6, in ic
+             def ic(): return d["yok"]
+                              ~^^^^^^^
+         KeyError: 'yok'
+
+         Hata anına kadar yazılan çıktı:
+         adim 1: veri yuklendi
+         adim 2: 42 satir islendi
+
+         Hatayı düzeltip kodu TEKRAR çalıştır. Aynı kodu aynen tekrar
+         gönderme — aynı hatayı verir. …
+```
+
+Yalnızca `/sandbox/code.py` kareleri var: entrypoint'in kendi kareleri
+`_kullanici_izi()` ile eleniyor (§4.1'deki sızıntı notu).
+
+Kırpma ölçüldü: 60 000 karakterlik stdout → mesaj 20 521 karakter, ortada
+`...[stdout kırpıldı — 42000 karakter atıldı, sınır 20000]...`.
+
+**"Ne yapmalı" yönergesi bizim yüzeyimize uyarlandı.** SWE-agent
+"head/tail/grep kullan" diyor çünkü orada bir shell var; sandbox'ımızda yok.
+Bizim karşılığımız: *"çok çıktı basıyorsan basmak yerine `/output` altına
+dosya olarak yaz; dosyalar kalıcı, `print` çıktısı kırpılıyor"* — süpürme onu
+artifact yapıyor ve sonraki çalıştırmada `inputs` ile beyan edilebiliyor.
+
+Regresyon kontrolü: `tool_call` protokol satırları kullanıcı kodu çalışırken
+basılıyor; `redirect_stdout` onları da yutacaktı. `_protokol()` gerçek
+stdout'a yazarak bunu önlüyor — canlı doğrulandı (tool çağrısı + `print` +
+başarı aynı çalıştırmada). 209 test, 52/52 kabul kontrolü.
+
+Kalan üçü: **6** (aynı hata tekrarı) bir tasarım kararı — sayaç yerine
+ilerleme ölçmek; **7** (alıntılanmış veri çerçevesi) OWASP notu, ihmal
+edilmemeli; ikisi de açık.
 
 ---
 

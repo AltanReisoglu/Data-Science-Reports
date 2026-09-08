@@ -54,13 +54,28 @@ class Trace:
         self._turn_start = len(self._entries)
         return self._turn_start
 
-    def sandbox_run_count(self) -> int:
+    def sandbox_run_count(self, durumlar: tuple[str, ...] | None = None) -> int:
         """Bu TURDA (en son `mark()` çağrısından bu yana) kaç `SandboxRun`
-        kaydedildiğini döner — `run_ptc_code`'un retry sınırı için."""
+        kaydedildiğini döner — `run_ptc_code`'un retry sınırı için.
+
+        `durumlar` verilirse yalnızca o durumdakiler sayılır
+        (`success` / `error` / `timeout` / `denied_action`). Bu, sayacın
+        SEBEP-FARKINDA olmasını sağlıyor: ağ engeli ile kod hatası aynı
+        bütçeden yiyemez (2026-09-08). Gerekçesi
+        `PTC_Error_Recovery_Piyasa_Arastirmasi.md` §2.2 — Anthropic tipli
+        `error_code` ile, Codex `is_likely_sandbox_denied` ile aynı ayrımı
+        yapıyor.
+
+        `record_sandbox_run` `detail` alanına `run.status.value` yazıyor;
+        `denied:` önekli girdiler ise `record_denied_action`'dan geliyor ve
+        bir ÇALIŞTIRMA değil, bir erişim girişimi — o yüzden hep eleniyor.
+        """
         return sum(
             1
             for entry in self._entries[self._turn_start :]
-            if entry.access_path is AccessPath.PTC_SANDBOX and not entry.detail.startswith("denied:")
+            if entry.access_path is AccessPath.PTC_SANDBOX
+            and not entry.detail.startswith("denied:")
+            and (durumlar is None or entry.detail in durumlar)
         )
 
     def since(self, mark: int) -> "Trace":

@@ -27,7 +27,24 @@ from grounded_assistant.trace import Trace
 # çalıştırması). Bu, hem maliyeti hem PTC panelindeki gürültüyü katlıyor.
 # Bir turda (bir kullanıcı sorusunda) en fazla bu kadar sandbox çalıştırmasına
 # izin verilir; aşılırsa `run_ptc_code` YENİ bir pod yaratmadan reddeder.
+#: AĞ ENGELİ sonrası bütçe — bilerek dar (Altan, 2026-09-01): ajan engellenen
+#: bir hedefi farklı URL/şema ile tekrar tekrar deneyip her seferinde yeni bir
+#: pod açıyordu.
 MAX_SANDBOX_RUNS_PER_TURN = 2
+
+#: KOD HATASI için ayrı ve daha geniş bütçe (2026-09-08).
+#:
+#: Tek sayaç üç farklı başarısızlığı (kod hatası / ağ engeli / timeout) aynı
+#: kutuya koyuyordu ve self-repair'e pratikte 1 deneme kalıyordu. Ayrımın
+#: sahadaki emsali: Anthropic tipli `error_code`, Codex
+#: `is_likely_sandbox_denied()`. Bizde tahmine gerek yok — reddi biz
+#: ürettiğimiz için `DENIED_ACTION` zaten kesin bir sinyal.
+#:
+#: Sayının gerekçesi: Olausson (ICLR 2024) "derin onarım yerine geniş ilk
+#: deneme" diyor, yani sınırsız retry yanlış hedef; OpenHands aynı hatanın
+#: 3. tekrarını tıkanma sayıyor. Beş çalıştırma, birkaç düzeltme turuna yer
+#: bırakıp maliyeti sınırlıyor. (PTC_Error_Recovery_Piyasa_Arastirmasi.md §5.5)
+MAX_KOD_HATASI_CALISTIRMA = 5
 
 
 _SYSTEM_PROMPT = (
@@ -187,16 +204,25 @@ def _make_ptc_tool(
         sonraki çalıştırmada `/output/<dizin>/` olarak açılmış hâlde gelir.
         Panelde PNG ve PDF önizlemesi var, yani ürettiğin belge gerçekten
         görüntülenebilir."""
-        if trace.sandbox_run_count() >= MAX_SANDBOX_RUNS_PER_TURN:
-            # Altan'ın kararı (2026-09-01): agent, engellenen bir hedefi farklı
-            # bir URL/şema ile tekrar tekrar deneyip her seferinde yeni bir
-            # ConfigMap+Job+Pod (~7sn) yaratabiliyordu. Sınıra ulaşılınca YENİ
-            # bir pod hiç yaratılmadan (run_sandbox çağrılmadan) reddedilir.
+        # SEBEP-FARKINDA KAPI (2026-09-08). Sınıra ulaşılınca YENİ bir pod hiç
+        # yaratılmadan (run_sandbox çağrılmadan) reddediliyor.
+        toplam = trace.sandbox_run_count()
+        engellenen = trace.sandbox_run_count(("denied_action",))
+        if engellenen and toplam >= MAX_SANDBOX_RUNS_PER_TURN:
+            # Ağ engeli görüldüyse ESKİ dar sınır aynen geçerli.
             return (
                 f"Bu soruda zaten {MAX_SANDBOX_RUNS_PER_TURN} kez run_ptc_code "
-                "çalıştırıldı — sınıra ulaşıldı, YENİ bir sandbox çalıştırılmadı. "
-                "Farklı bir URL/domain/şema deneyerek tekrar çağırma; elindeki "
-                "bilgiyle yanıt ver, tahmini değer üretme."
+                "çalıştırıldı ve bir erişim ağ seviyesinde engellendi — sınıra "
+                "ulaşıldı, YENİ bir sandbox çalıştırılmadı. Farklı bir "
+                "URL/domain/şema deneyerek tekrar çağırma; elindeki bilgiyle "
+                "yanıt ver, tahmini değer üretme."
+            )
+        if toplam >= MAX_KOD_HATASI_CALISTIRMA:
+            return (
+                f"Bu soruda {MAX_KOD_HATASI_CALISTIRMA} kez run_ptc_code "
+                "çalıştırıldı — sınıra ulaşıldı, YENİ bir sandbox "
+                "çalıştırılmadı. Elindeki bilgiyle yanıt ver; neyi "
+                "başaramadığını açıkça söyle ve tahmini değer üretme."
             )
         run = run_sandbox(code, on_event=on_ptc_event, workflow_id=workflow_id,
                           inputs=inputs)
@@ -217,8 +243,20 @@ def _make_ptc_tool(
                 "Sandbox, onaylı Tool Gateway dışında bir hedefe erişmeye çalıştı; "
                 "bu ağ seviyesinde (Cilium) engellendi. Tahmini bir değer üretme."
             )
-        detail = f" Hata: {run.error_message}" if run.error_message else ""
-        return f"Sandbox çalıştırması başarısız oldu.{detail} Tahmini bir değer üretme."
+        # 2026-09-08: bu metin eskiden yalnızca "Tahmini bir değer üretme"
+        # diyordu — yani modeli DURMAYA teşvik ediyordu, düzeltmeye değil.
+        # Yasak yerinde ve kalıyor (uydurma cevabı engelliyor) ama tek başına
+        # kaldığında self-repair'i de kesiyordu. Sahadaki iki bağımsız emsal
+        # (smolagents `memory.py`, OpenHands `get_action_error_nudge`) iki
+        # şeyi BİRLİKTE söylüyor: tekrar dene VE aynısını tekrarlama.
+        #
+        # "Ne yapmalı" yönergesinin kendisi `entrypoint.py`'nin ürettiği
+        # `error_message` içinde geliyor (hata tipi + kullanıcı karelerinin
+        # izi + hata anına kadarki stdout ile birlikte).
+        detail = f"\n{run.error_message}" if run.error_message else ""
+        kalan = MAX_KOD_HATASI_CALISTIRMA - trace.sandbox_run_count()
+        return (f"Sandbox çalıştırması başarısız oldu.{detail}\n\n"
+                f"(Bu turda kalan çalıştırma hakkı: {max(kalan, 0)})")
 
     return run_ptc_code
 

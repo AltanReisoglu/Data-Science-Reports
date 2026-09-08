@@ -1,6 +1,6 @@
 # PTC Artifact Persistence — Sunum
 
-**12 sayfa. Anlatılacak tek hikâye var: sandbox ölür, ürettiği kalır — ve
+**13 sayfa. Anlatılacak tek hikâye var: sandbox ölür, ürettiği kalır — ve
 bunu yaparken hiçbir şey icat etmedik.**
 
 Tarih: 2026-09-07 · Slaytlar: `node scripts/sunum_uret.js` · Diyagramlar: `python scripts/diyagram_uret.py`
@@ -176,7 +176,43 @@ parçadan çıkmadı.**
 
 ---
 
-## Sayfa 10 — Biz neredeyiz
+## Sayfa 10 — Hata kurtarma: sinyali zenginleştirdik
+
+**Sandbox patlayınca modele giden metin. Önce ve sonra:**
+
+```
+ÖNCE   Hata: 'yok'          ← tip yok, satır yok, stdout yok
+       Tahmini bir değer üretme.        ← modele DUR diyor
+
+SONRA  File "/sandbox/code.py", line 6, in ic
+           def ic(): return d["yok"]
+                            ~^^^^^^^
+       KeyError: 'yok'                  ← tip + satır + ifade
+       Hata anına kadar yazılan çıktı:
+       adim 1: veri yuklendi            ← print'ler korunuyor
+       Hatayı düzeltip TEKRAR çalıştır. Aynı kodu aynen gönderme…
+```
+
+| Parça | Kimden kopya |
+|---|---|
+| Yalnızca **kullanıcı kodunun** kareleri | **SWE-agent** — "tip olmadan model yanlış teşhis koyuyor" |
+| Hata anına kadarki **stdout** | **smolagents** — bunun için ayrı testi var |
+| **20 000 karakterde ortadan** kırpma | **smolagents · Codex** |
+| Kırpıldığını **söyle** + ne yapacağını **öğret** | **SWE-agent** |
+| "tekrar dene" **ve** "aynısını tekrarlama" | **smolagents + OpenHands** |
+| **Sebep-farkında** sayaç | **Anthropic `error_code` · Codex `is_likely_sandbox_denied`** |
+
+**Sayaç neden bölündü:** tek sayaç kod hatasını, ağ engelini ve timeout'u aynı
+kutuya koyuyordu. Sınır ağ engeli için konmuştu; kod hatası da aynı bütçeden
+yediği için self-repair'e **1 deneme** kalıyordu. Artık ağ engeli **2**, kod
+hatası **5**.
+
+> **Bütçeyi büyütmek tek başına çözüm değil.** Olausson (ICLR 2024):
+> self-repair kazancı *"mütevazı, bazen hiç yok"*; darboğaz deneme sayısı
+> değil **geri bildirim kalitesi** — aynı koda insan geri bildirimi verilince
+> başarı **%33 → %52**. Sıra: önce sinyal, en son bütçe.
+
+## Sayfa 11 — Biz neredeyiz
 
 | Parça | Kimden |
 |---|---|
@@ -189,13 +225,15 @@ parçadan çıkmadı.**
 | bayt yolu · `proxy` | **MLflow** proxied artifact access |
 | bayt yolu · `direct` | **KFP / Argo** — bayt depoya, künye kayıt defterine |
 | **sandbox'ta sıfır ağ çağrısı** | **KFP** — kullanıcı bileşeni hiçbir şey çağırmaz |
+| hata sinyali · kırpma · "ne yapmalı" | **SWE-agent · smolagents · Codex** |
+| sebep-farkında retry sayacı | **Anthropic `error_code` · Codex `is_likely_sandbox_denied`** |
 | **İzolasyon** | **Kimse — bizimki daha zayıf (düz container)** |
 
 **Emsalsiz desen kalmadı.**
 
 ---
 
-## Sayfa 11 — Canlı konsol + açıklar
+## Sayfa 12 — Canlı konsol + açıklar
 
 **`/konsol` — beş sekme, sahte veri yok:** Sohbet · Hatlar · Çalıştırma
 (gerçek Kubernetes Job'ları) · Depo · Soy ağacı.
@@ -213,7 +251,7 @@ parçadan çıkmadı.**
 
 ---
 
-## Sayfa 12 — Ekibe dört soru
+## Sayfa 13 — Ekibe dört soru
 
 | # | Soru | Neden önemli |
 |---|---|---|

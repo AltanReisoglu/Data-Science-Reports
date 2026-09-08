@@ -35,16 +35,29 @@ Kontrat: contracts/sandbox_job_contract.md
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import json
 import os
 import re
 import sys
+import traceback
 from datetime import UTC, datetime
 
 from fastmcp import Client
 
 TOOL_GATEWAY_ENDPOINT = os.environ["TOOL_GATEWAY_ENDPOINT"]
 CODE_PATH = "/sandbox/code.py"
+
+#: Kullanıcı kodunun `print`'leri yakalanırken protokol satırları BURAYA
+#: yazılıyor. `redirect_stdout` global; bu kaçış olmadan `tool_call` satırları
+#: da yakalanır ve runner onları hiç görmezdi.
+_GERCEK_STDOUT = sys.stdout
+
+#: Hata yükünün her parçası için üst sınır. smolagents'ın
+#: `MAX_LENGTH_TRUNCATE_CONTENT`'i ile aynı sayı — sahada denenmiş bir değer.
+#: (PTC_Error_Recovery_Piyasa_Arastirmasi.md §1.1)
+_AZAMI_PARCA = 20_000
 
 # Faz 1'in tool_policy.ALLOWED_TOOLS + LOCAL_TOOLS ile birebir aynı olmalı
 # (CapabilityGrant.allowed_tools, data-model.md). Faz 4'te 4 yeni tool eklendi.
@@ -94,6 +107,92 @@ def _log_icin(kwargs: dict) -> dict:
     return {k: "<gizli>" if k in _LOGA_YAZILMAZ else v for k, v in kwargs.items()}
 
 
+def _protokol(nesne: dict) -> None:
+    """Runner'ın ayrıştırdığı JSON satırı — DAİMA gerçek stdout'a.
+
+    Kullanıcı kodu çalışırken stdout yakalanıyor (bkz. `_kod_calistir`). Bu
+    fonksiyon o yakalamanın dışında kalıyor, yoksa `tool_call` satırları
+    kullanıcının `print` çıktısının içine düşer ve runner olayları kaybederdi.
+    """
+    print(json.dumps(nesne), file=_GERCEK_STDOUT, flush=True)
+
+
+def _kirp(metin: str, ne: str, azami: int = _AZAMI_PARCA) -> str:
+    """Uzun metni ORTADAN keser ve kesildiğini SÖYLER.
+
+    Ortadan kesmenin gerekçesi traceback'in şeklinde: baş "nereden başladı",
+    son "asıl hata" — değerli olan iki uç, gürültü ortada. smolagents ve
+    Codex de tam olarak bunu yapıyor (`truncate_content`,
+    `truncate_middle_chars`).
+
+    Sessiz kırpma YAPILMIYOR: model eksik veriyi tam sanmamalı. SWE-agent'ın
+    `<response clipped>` + "{n} characters were elided" deseni.
+    """
+    if len(metin) <= azami:
+        return metin
+    atilan = len(metin) - azami
+    return (metin[: azami // 2]
+            + f"\n...[{ne} kırpıldı — {atilan} karakter atıldı, sınır {azami}]...\n"
+            + metin[-azami // 2:])
+
+
+def _kullanici_izi(exc: BaseException) -> str:
+    """Traceback'in YALNIZCA kullanıcı kodundan gelen karelerini biçimler.
+
+    `exec(compile(code, CODE_PATH, "exec"))` sayesinde kullanıcı karelerinin
+    `filename`'i `CODE_PATH`; entrypoint'in kendi kareleri ayıklanabiliyor.
+    İkisi de gitseydi model bizim iç yapımızı okurdu — hem faydasız hem de
+    §4.1'deki sızıntı notuna aykırı.
+
+    SWE-agent'ın ölçümü bu ayrıntıyı doğruluyor: hata tipi olmadan model
+    yanlış teşhis koyuyor, fazla bağlam ise puan kaybettiriyor
+    (Tablo 3: tüm geçmiş → -3,0 puan).
+    """
+    kareler = [k for k in traceback.extract_tb(exc.__traceback__)
+               if k.filename == CODE_PATH]
+    # Kullanıcı karesi yoksa (ör. derleme hatası) en azından tipi + mesajı ver.
+    govde = "".join(traceback.format_list(kareler)) if kareler else ""
+    return govde + "".join(traceback.format_exception_only(type(exc), exc))
+
+
+#: Hata metninin kapanışı. İki şeyi BİRLİKTE söylüyor — sahadaki iki bağımsız
+#: emsalin ortak deseni (smolagents `memory.py`, OpenHands `get_action_error_nudge`):
+#: *tekrar dene* VE *aynısını tekrarlama*.
+#:
+#: Üçüncü cümle SWE-agent'ın katkısı: kesmekle yetinme, NE YAPACAĞINI ÖĞRET.
+#: SWE-agent "head/tail/grep kullan" diyor çünkü orada bir shell var; bizde
+#: yok, o yüzden tavsiye bizim yüzeyimize uyarlandı — büyük çıktıyı basmak
+#: yerine `/output`'a dosya olarak yaz; süpürme onu saklıyor ve bir sonraki
+#: çalıştırmada `inputs` ile beyan edilebiliyor.
+_NE_YAPMALI = (
+    "Hatayı düzeltip kodu TEKRAR çalıştır. Aynı kodu aynen tekrar gönderme — "
+    "aynı hatayı verir. Aynı hatayı iki kez aldıysan farklı bir yaklaşım dene. "
+    "Çok çıktı basıyorsan basmak yerine `/output` altına dosya olarak yaz; "
+    "dosyalar kalıcı, `print` çıktısı kırpılıyor. "
+    "Verileri UYDURMA — sonucu ancak kod gerçekten çalışınca bildir."
+)
+
+
+def _hata_metni(exc: BaseException | None, ciktilar: str,
+                onsoz: str | None = None) -> str:
+    """Modele gidecek hata metnini kurar.
+
+    Sırası bilinçli: önce NE oldu (tip + iz), sonra kod oraya kadar NE yaptı
+    (stdout), sonra ŞİMDİ NE YAPMALI. Üç parçanın da ayrı ayrı denendiği ve
+    üçünün de gerektiği SWE-agent makalesinde ölçülmüş (Ek A, Şekil 11).
+    """
+    parcalar = []
+    if onsoz:
+        parcalar.append(onsoz)
+    if exc is not None:
+        parcalar.append(_kirp(_kullanici_izi(exc), "traceback").rstrip())
+    if ciktilar.strip():
+        parcalar.append("Hata anına kadar yazılan çıktı:\n"
+                        + _kirp(ciktilar, "stdout").rstrip())
+    parcalar.append(_NE_YAPMALI)
+    return "\n\n".join(parcalar)
+
+
 def _make_sync_tool(tool_name: str):
     """Sandbox kodunun senkron çağırabileceği bir tool-proxy fonksiyonu üretir.
     Gerçek iş fastmcp.Client ile Tool Gateway'e (Cilium'un izin verdiği TEK
@@ -118,29 +217,21 @@ def _make_sync_tool(tool_name: str):
         try:
             value = asyncio.run(_do())
         except Exception:
-            print(
-                json.dumps(
-                    {
-                        "type": "tool_call",
-                        "tool": tool_name,
-                        "args": _log_icin(kwargs),
-                        "status": "error",
-                        "timestamp": timestamp,
-                    }
-                )
-            )
+            _protokol({
+                "type": "tool_call",
+                "tool": tool_name,
+                "args": _log_icin(kwargs),
+                "status": "error",
+                "timestamp": timestamp,
+            })
             raise
-        print(
-            json.dumps(
-                {
-                    "type": "tool_call",
-                    "tool": tool_name,
-                    "args": _log_icin(kwargs),
-                    "status": "success",
-                    "timestamp": timestamp,
-                }
-            )
-        )
+        _protokol({
+            "type": "tool_call",
+            "tool": tool_name,
+            "args": _log_icin(kwargs),
+            "status": "success",
+            "timestamp": timestamp,
+        })
         return value
 
     return _call
@@ -282,16 +373,42 @@ def main() -> None:
     # container bittikten sonra kubelet ona SIGTERM gönderiyor ve süpürme o
     # anda çalışıyor. Hata yolunda da öyle — bu container nasıl bitmiş olursa
     # olsun, çıktılar kurtarılıyor.
+    # KULLANICININ `print`'LERİ YAKALANIYOR.
+    #
+    # 2026-09-08'e kadar `print` çıktısı pod log'una gidiyor ve modele HİÇ
+    # ulaşmıyordu; hata anında kodun oraya kadar ne yaptığı kayboluyordu.
+    # smolagents bunu kaybetmemek için ayrı kod yazmış ve ayrı bir test
+    # tutuyor (`test_error_saves_previous_print_outputs`) — yani bilinçli bir
+    # karar, kaza değil.
+    #
+    # `_protokol` bu yakalamanın DIŞINDA kalıyor: tool_call satırları gerçek
+    # stdout'a gidiyor, runner onları görmeye devam ediyor.
+    yakalanan = io.StringIO()
     try:
-        exec(compile(code, CODE_PATH, "exec"), sandbox_globals)  # noqa: S102
+        with contextlib.redirect_stdout(yakalanan):
+            exec(compile(code, CODE_PATH, "exec"), sandbox_globals)  # noqa: S102
     except Exception as exc:  # noqa: BLE001 - sandbox kodunun hatası, çökmeden bildirilmeli
-        print(json.dumps({"status": "error", "message": str(exc)}))
+        _protokol({
+            "status": "error",
+            # `message` runner'ın `error_message`'ına, oradan da doğrudan
+            # modele gidiyor — zenginleştirilecek yer burası.
+            "message": _hata_metni(exc, yakalanan.getvalue()),
+            "error_type": type(exc).__name__,
+        })
         sys.exit(0)
 
+    ciktilar = yakalanan.getvalue()
     if "value" in result_holder:
-        print(json.dumps({"status": "success", "result": result_holder["value"]}))
+        _protokol({"status": "success", "result": result_holder["value"],
+                   **({"stdout": _kirp(ciktilar, "stdout")} if ciktilar else {})})
     else:
-        print(json.dumps({"status": "error", "message": "kod set_result() çağırmadı"}))
+        _protokol({
+            "status": "error",
+            "message": _hata_metni(None, ciktilar,
+                                   "Kod `set_result(...)` çağırmadı — nihai değer "
+                                   "bu fonksiyonla bildirilir."),
+            "error_type": "SonucYok",
+        })
 
 
 if __name__ == "__main__":
