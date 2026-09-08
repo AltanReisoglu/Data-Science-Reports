@@ -288,9 +288,289 @@ gerçek dosyalar içeriyor, `os.listdir` doğruyu söylüyor.
 
 ---
 
-# Bölüm 2 — Nicelik karşılaştırması
+# Bölüm 2 — Keşif: ajan neyin var olduğunu nasıl öğreniyor
 
-## 2.1 · Sandbox ne kadar yaşıyor
+Bölüm 1 "bayt nereye gidiyor" sorusunu anlattı. Bu bölüm daha zor olanı:
+**ajan, depoda ne olduğunu nasıl biliyor?**
+
+Pipeline dünyasında bu soru hiç sorulmuyor — DAG'ı insan yazıyor. Ajan
+dünyasında sorulmak zorunda, çünkü ajan da o an karar veriyor.
+
+Yedi cevap var.
+
+## 2.1 · Desen 1 — Sadece tool tarifi
+
+Modele bir `list_artifacts()` tool'u verirsiniz; tarifini okur, **çağırmayı
+seçmesi** gerekir.
+
+**Sorun: yumuşak garanti.** Model çağırmayı unutursa depodaki veriyi yeniden
+üretir — ve bunu sessizce yapar. 2026-09-06'ya kadar bizdeki hâl buydu; 40
+saniyelik iş boşuna tekrarlanıyordu.
+
+## 2.2 · Desen 2 — Referans context'e kendiliğinden düşer · **Anthropic**
+
+Model bir dosya ürettiğinde `file_id` **tool sonucunun içinde** dönüyor ve
+konuşmada kalıyor.
+
+```
+model kod yazar → dosya üretir
+platform dizine bakar, Files API'ye kaydeder
+tool sonucu:  {"file_id": "file_abc123", "filename": "rapor.pdf"}
+                    ↓
+        bu satır artık KONUŞMANIN içinde
+```
+
+Aramaya gerek yok — kimlik zaten orada.
+
+**Sınırı:** yalnızca **bu konuşmada** üretilenler için geçerli. Üç ay önceki
+başka bir konuşmadaki dosyayı bulmanın yolu yok; o `file_id` bu konuşmada hiç
+geçmedi.
+
+## 2.3 · Desen 3 — Dosya sistemi + `ls` · **Anthropic, OpenAI, Cloudflare, Google**
+
+Sandbox yaşıyorsa model diske bakar: `os.listdir("/mnt/data")`.
+
+Bu desenin çalışması **tek bir şarta** bağlı: sandbox'ın yaşaması.
+
+| Ürün | Pencere |
+|---|---|
+| Anthropic | 30 gün |
+| Google Agent Engine | 14 gün |
+| OpenAI | **20 dakika** |
+| Cloudflare | mount edilmiş bucket — süresiz |
+| **BİZ** | **~4 saniye** |
+
+**Bizde tek başına yetmez.** Sandbox'ımız 4 saniye yaşıyor ve `/output` her
+seferinde boş doğuyor — ölçüldü. Bu bir eksiklik değil bilinçli tercih, ama
+bedeli keşfi başka bir yerden çözmek zorunda olmamız.
+
+## 2.4 · Desen 4 — İsimler prompt'a enjekte · **Google ADK**
+
+Listedeki **birinci sınıf** cevap. `LoadArtifactsTool` iki iş birden yapıyor:
+
+> "LoadArtifactsTool **lists available artifacts in the model instructions**.
+> When the model calls the load_artifacts tool, ADK **temporarily appends** the
+> selected artifact contents to that request."
+
+Üç kuralı var:
+
+1. **İsimler HER ZAMAN talimatlarda** — ucuz, model unutamaz
+2. **İçerik TALEP ÜZERİNE** — model isteyince
+3. **İçerik geçmişe KALICI yazılmaz** — sonraki turda tekrar istemeli
+
+Birinci kural, desen 1'in yumuşak garantisini **sert garantiye** çeviriyor:
+model artık "çağırmayı seçmek" zorunda değil, isimler zaten gözünün önünde.
+
+Üçüncüsü ince: bir kez yüklenen 50 MB'lık tablo sonraki her turda context'te
+taşınmıyor.
+
+**Bizim manifestimiz birebir bu.**
+
+Bir incelik daha: ADK'da `list_artifact_keys()` gibi metodlar **LLM'e tool
+olarak sunulmuyor.**
+
+> "The primary way you interact with artifacts... is through methods provided
+> by the `CallbackContext` and `ToolContext` objects."
+
+Yani geliştirici API'si; model çağıramıyor.
+
+## 2.5 · Desen 5 — Semantik arama · **Llama Stack** *(ama başka bir şeyin araması)*
+
+`file_search` tool'u vector store üzerinde çalışıyor:
+
+> "…particularly useful for retrieval-augmented generation (RAG) workflows."
+
+Files API'nin kendi tarifi: *"manages file uploads for use in embedding and
+retrieval workflows."*
+
+Yani **ingest edilmiş belgeler** üzerinde anlam araması. "Ajanın ürettiği ve
+sonra geri aldığı artifact" diye bir kavram dokümanda hiç geçmiyor. Tabloda
+duruyor çünkü bir arama mekanizması — ama farklı bir problemi çözüyor.
+
+## 2.6 · Desen 6 — Kayıt defterine sorgu · **MLMD** *(ve 2026-09-08'den beri biz)*
+
+```
+MLMD:  ListOptions(filter_query="name = 'rapor.pdf' AND type = 'system.Dataset'")
+BİZ:   ?name=rapor.pdf&type=system.Dataset&q=rapor
+```
+
+Süzülmüş **künye** listesi; bayt yok.
+
+**Neden eklendi — ölçüldü:** manifest her model çağrısında context'e girdiği
+için 40 satırla kırpılmak zorunda. Depoda **57 ayrı ad** var → **17'si modele
+tamamen görünmez.** "Geçen ay ürettiğim raporu bul" isteği, dosya pencerenin
+dışında kaldıysa karşılıksız kalıyordu.
+
+Manifesti büyütmek yanlış çözüm: ucuz olması gereken şey pahalılaşırdı.
+
+**Canlı kanıt** (taze oturum, manifest penceresinin dışından):
+
+```
+model:  "listede 'kopya' geçen 4 dosya gördüm,
+         kesin sayı için artifact_ara kullanacağım"
+arama:  24 eşleşme
+sonra:  birini beyanla okuyup içeriğini getirdi
+```
+
+## 2.7 · Desen — · Keşif YOK · **KFP, Argo, Airflow, Tekton**
+
+Soru hiç sorulmuyor:
+
+```
+DAG'ı insan önceden yazar
+     ↓
+5. adımın girdisi BAĞLANMIŞ
+     ↓
+driver .uri'yi çözer, launcher .path'e indirir
+     ↓
+container doğduğunda dosya ZATEN ORADA
+```
+
+Keşif yerine **statik bağlama**. Karar veren bir ajan olmadığı için keşfe
+ihtiyaç da yok.
+
+## 2.8 · Dört büyük ürünün yeri — asıl mesele
+
+Anthropic, OpenAI, Cloudflare ve Google **aynı kutuda değiller.**
+
+| Ürün | Deseni | Tezi | Kayıt defteri |
+|---|---|---|---|
+| **Anthropic** | **2 + 3** | *container'ı sakla* — 30 gün, 5 dk'da checkpoint | `file_id`; soy/alias/arama **yok** |
+| **OpenAI** | **3** | *çalışma alanı ≠ kalıcı durum* | dosya kimlikleri; kayıt defteri **yok** |
+| **Cloudflare** | **3** | *kod yaz, tool çağırma* | **yok ve olamaz** — mount, araya girecek yer yok |
+| **Google ADK** | **4** | *isim ucuz, içerik pahalı* | ad + sürüm |
+
+Üç ayrıntı bu tabloyu okumayı değiştiriyor:
+
+**Anthropic iki kanalı birden kullanıyor.** `file_id` konuşmada kalıyor
+(desen 2) *ve* container 30 gün yaşadığı için `ls` de çalışıyor (desen 3).
+
+**OpenAI'de pencere üç büyüklük mertebesi dar.** Desen 3 sandbox'ın yaşamasına
+bağlı; 20 dakika hareketsizlikte container gidiyor. Anthropic'in 30 günüyle
+kıyaslanamaz.
+
+**Cloudflare'de dosya sistemi container'ın diski DEĞİL.** Doğrudan R2 bucket'ı,
+mount edilmiş. Sonucu: kayıt defteri yok *ve olamaz* — `write()` ile bucket
+arasında hiçbir katman yok.
+
+**Google'ı tek satıra sıkıştırmak hata:** Agent Engine keşfi *atlıyor*
+(sandbox 14 gün yaşıyor), GKE Agent Sandbox artifact kavramını hiç tanımıyor,
+ADK ise problemi *çözen* tek birinci sınıf mekanizma.
+
+## 2.9 · Yedi desen tek tabloda
+
+| # | Desen | Nasıl | Kim |
+|---|---|---|---|
+| 1 | Sadece tool tarifi | Model çağırmayı *seçmek* zorunda | *(2026-09-06'ya kadar biz)* |
+| 2 | Referans context'e düşer | `file_id` tool sonucunda döner | **Anthropic** |
+| 3 | Dosya sistemi + `ls` | Sandbox yaşıyorsa model bakar | Anthropic, OpenAI, Cloudflare, Google |
+| 4 | **İsimler prompt'a enjekte** | İsimler talimatlarda, içerik talep üzerine | **Google ADK** |
+| 5 | Semantik arama | Vector store'da `file_search` | Llama Stack *(RAG)* |
+| 6 | **Kayıt defterine sorgu** | `filter_query` ile süzülmüş liste | **MLMD** |
+| — | **Keşif YOK** | DAG statik, girdi bağlanmış | **KFP, Argo, Airflow, Tekton** |
+| **3+4+6** | **Üçü birden** | manifest promptta · `/output` kod başlamadan dolu · `?name= ?type= ?q=` | **BİZ** |
+
+**Üçünü birden yapan tek yer biziz** — ama bu bir övünme değil, zorunluluk:
+
+- **Desen 3** çalışıyor çünkü sidecar `/output`'u kod başlamadan dolduruyor
+- **Desen 4** gerekli çünkü sandbox 4 saniye yaşıyor; `ls` tek başına yetmez
+- **Desen 6** gerekli çünkü 57 ad var, manifest 40 alıyor
+
+Diğerlerinin birer desenle idare etmesinin sebebi sandbox'larının yaşaması.
+Bizimki ölüyor — o yüzden üç kanal gerekiyor.
+
+---
+
+# Bölüm 3 — Neyi alacağımızı nasıl belirliyoruz
+
+Tek bir zincir; üç soru, sırayla.
+
+## 3.1 · Soru 1 — Ne var? *(keşif)*
+
+**A · Manifest — her turda, sormadan.** Sistem mesajının içine otomatik
+yazılıyor:
+
+```
+BU OTURUMDA ÜRETİLENLER
+  /output/ozet.json          (Dataset, 5723 bayt)
+  /output/dagilim.png        (Artifact, 32888 bayt)
+
+BAŞKA ÇALIŞTIRMALARDAN — bu oturumun işi DEĞİL
+  inputs=["wf-abc123/rapor.pdf"]   (Artifact, 8170 bayt)
+```
+
+**Sadece isimler. Bayt yok.**
+
+İki grup bilerek ayrı. Sebebi bir arıza: 2026-09-06'da liste düzdü ve ajan
+başka bir çalıştırmanın aynı adlı dosyasını kendi işi sanıp yanlış sayı verdi.
+Cevap **sessizce** yanlıştı; hiçbir yerde hata yoktu.
+
+**B · Arama — model isteyince.** Manifest en yeni 40 ismi alıyor; depoda 57 ad
+varsa 17'si görünmüyor. Model eksik olduğunu anlarsa `artifact_ara` çağırıyor.
+
+## 3.2 · Soru 2 — Hangisini istiyorum? *(beyan)*
+
+```python
+run_ptc_code(kod, inputs=["ozet.json"])
+```
+
+**Bu bir çağrı değil.** Hiçbir şey indirilmiyor, hiçbir yere bağlanılmıyor —
+sadece bir liste. Kod henüz çalışmadı bile.
+
+## 3.3 · Soru 3 — Nereye düşecek? *(yerleştirme)*
+
+Beyanın **yazılış biçimi** dosyanın nereye konacağını belirliyor:
+
+| Beyan | Düştüğü yer | Anlamı |
+|---|---|---|
+| `ozet.json` | `/output/ozet.json` | bu çalıştırmanın kendi çıktısı |
+| `wf-abc123/ozet.json` | `/artifacts/wf-abc123/ozet.json` | **başka** bir çalıştırmanın |
+| `rapor.pdf@onaylanmis` | `/artifacts/_alias/rapor.pdf` | sabitlenmiş sürüm |
+
+Manifest zaten kopyalanacak biçimde yazıyor; model satırı olduğu gibi alıyor.
+
+## 3.4 · Sonra ne oluyor
+
+```
+1  sidecar beyanı okur
+2  dosyaları MinIO'dan indirip yerine koyar
+3  "hazırım" der (paylaşılan diskte bir işaret dosyası)
+4  sandbox başlar
+5  kod açar:  json.load(open("/output/ozet.json"))
+```
+
+Kod açısından bu **sıradan bir dosya okuması**. Artifact diye bir kavramdan
+haberi yok.
+
+## 3.5 · `/output` ile depo aynı şey değil
+
+| Boyut | `/output` | Artifact deposu |
+|---|---|---|
+| Nedir | Pod'un içindeki **boş disk** (emptyDir) | MinIO + kayıt defteri |
+| Ömrü | Pod'la ölür (~4 sn) | Kalıcı (TTL'e kadar) |
+| İçinde ne var | Sidecar'ın **koyduğu** + kodun **yazdığı** | Her şey |
+
+`/output` bir **kopya alanı**, depo değil. Taze bir oturumda **boş** — ölçüldü.
+
+## 3.6 · Kritik nokta
+
+**Seçimi model yapıyor, ama seçim kod çalışmadan önce bitiyor.** Kod çalışırken
+"şunu da getir" diyemiyor.
+
+Kısıt gibi duruyor; üç şey kazandırıyor:
+
+- Sandbox'ın **hiçbir ağ çağrısı yok** — anahtar da adres de orada değil
+- **Soy ağacı** kuruluyor: beyan edilen girdi = ebeveyn
+- Kod basitleşiyor: özel API yok, düz `open()`
+
+KFP ve Argo tam olarak böyle yapıyor. Tek fark: onlarda beyanı **insan**
+yazıyor (YAML'da), bizde **model** yazıyor.
+
+---
+
+# Bölüm 4 — Nicelik karşılaştırması
+
+## 4.1 · Sandbox ne kadar yaşıyor
 
 | Model | Kim | Süre |
 |---|---|---|
@@ -309,7 +589,7 @@ gerçek dosyalar içeriyor, `os.listdir` doğruyu söylüyor.
 *artifact'i*. Bizim 4,1 saniyemiz bir eksiklik değil, tercih: kalıcılığı
 container'dan aldık, depoya koyduk.
 
-## 2.2 · Baytlar nerede, ne kadar yaşıyor
+## 4.2 · Baytlar nerede, ne kadar yaşıyor
 
 | Ürün | Depo ürünü | Sandbox'taki yol | Baytların ömrü |
 |---|---|---|---|
@@ -326,7 +606,7 @@ container'dan aldık, depoya koyduk.
 | **Fly.io** | S3-uyumlu | kök FS (100 GB) | Sprite'ın ömrü |
 | **BİZ** | MinIO / ODF / harici S3 | `/output` + `/artifacts/<wf>` | **TTL + reaper** |
 
-## 2.3 · Kaynak sınırları
+## 4.3 · Kaynak sınırları
 
 | Ürün | Bellek | Disk | CPU | Süre sınırı |
 |---|---|---|---|---|
@@ -340,7 +620,7 @@ container'dan aldık, depoya koyduk.
 Bizim 1 GiB'ımız Anthropic'in 5 GiB'ının beşte biri. Bu, gerçek bir kısıt:
 büyük bir veri seti sığmaz.
 
-## 2.4 · Kayıt defteri — var mı, ne tutuyor
+## 4.4 · Kayıt defteri — var mı, ne tutuyor
 
 | VAR | Ne tutuyor | YOK |
 |---|---|---|
@@ -356,7 +636,7 @@ Dokümanları "persistent data access" diyor; hiçbiri **"artifact"** demiyor.
 Fark önemli: bir S3 anahtarı bir dosyayı bulur, ama o dosyanın neyden
 türediğini, hangi sürümün onaylı olduğunu, ne zaman sileceğinizi söylemez.
 
-## 2.5 · Bizim ölçülmüş sayılarımız
+## 4.5 · Bizim ölçülmüş sayılarımız
 
 | Ölçüm | Değer |
 |---|---|
@@ -370,9 +650,9 @@ türediğini, hangi sürümün onaylı olduğunu, ne zaman sileceğinizi söylem
 
 ---
 
-# Bölüm 3 — Güvenlik karşılaştırması
+# Bölüm 5 — Güvenlik karşılaştırması
 
-## 3.1 · İzolasyon — kod nerede çalışıyor
+## 5.1 · İzolasyon — kod nerede çalışıyor
 
 | Yöntem | Ne demek | Kim | Güç |
 |---|---|---|---|
@@ -387,7 +667,7 @@ türediğini, hangi sürümün onaylı olduğunu, ne zaman sileceğinizi söylem
 öneriyor. İyi haber: kod değişikliği gerektirmiyor, node seviyesinde bir
 önkoşul.
 
-## 3.2 · Anahtar kimde — asıl soru bu
+## 5.2 · Anahtar kimde — asıl soru bu
 
 Kod ele geçerse ne kaybedersiniz? Cevap, anahtarın nerede durduğuna bağlı.
 
@@ -412,7 +692,7 @@ sandbox'tan bakıldığında:
   internet              ConnectionError
 ```
 
-## 3.3 · Baytı kim taşıyor — dört aile
+## 5.3 · Baytı kim taşıyor — dört aile
 
 Bu, "araya denetim koyabilir misin" sorusunun cevabı.
 
@@ -438,7 +718,7 @@ Bu, "araya denetim koyabilir misin" sorusunun cevabı.
 atlayıp doğrudan S3'e gidebilir. KFP için kabul edilebilir çünkü orada kodu
 insan yazıyor. Bizde LLM yazıyor — bu yüzden C ailesini seçtik.
 
-## 3.4 · Ağ duruşu
+## 5.4 · Ağ duruşu
 
 | Duruş | Kim |
 |---|---|
@@ -457,7 +737,7 @@ Artifact Service  →  depoya çıkar,     internete çıkamaz
 
 Birinin ele geçirilmesi ikisini birden vermiyor.
 
-## 3.5 · Kritik ayrım: kim güvenilmeyen kod varsayıyor
+## 5.5 · Kritik ayrım: kim güvenilmeyen kod varsayıyor
 
 Bu tablo, ürünlerin **kendi dokümanlarının ne dediğine** dayanıyor.
 
@@ -475,7 +755,7 @@ Buradaki asıl gözlem şu: **güvenilmeyen kod varsayan ürünler, kayıt defte
 de koruyabilenler.** İkisi aynı mimari kararın sonucu — yazma yolunu bir
 bileşenden geçirmek.
 
-## 3.6 · Bizim açıklarımız — dürüst liste
+## 5.6 · Bizim açıklarımız — dürüst liste
 
 | Açık | Durum | Etki |
 |---|---|---|
@@ -491,9 +771,9 @@ bileşenden geçirmek.
 
 ---
 
-# Bölüm 4 — Sonuç
+# Bölüm 6 — Sonuç
 
-## 4.1 · Üç aile, üç farklı problem
+## 6.1 · Üç aile, üç farklı problem
 
 Karşılaştırma yaparken en sık yapılan hata, bu üçünü aynı kefeye koymak:
 
@@ -509,7 +789,7 @@ değil LLM yazıyor.
 Bu birleşim listede başka kimsede yok. Pipeline sistemleri kodu güvenilir
 varsayıyor; sohbet platformlarında ise soy ve sürüm diye bir kavram yok.
 
-## 4.2 · Ne alıp nereden aldık
+## 6.2 · Ne alıp nereden aldık
 
 | Parça | Kimden |
 |---|---|
@@ -530,7 +810,94 @@ varsayıyor; sohbet platformlarında ise soy ve sürüm diye bir kavram yok.
 > Hataların hepsi bizim icat ettiğimiz yerlerde çıktı; kopyaladığımız hiçbir
 > parçadan çıkmadı.
 
-## 4.3 · Tek cümlelik karşılaştırma
+## 6.3 · MLMD'yi kullanıyor muyuz — hayır, desenini alıyoruz
+
+Sık gelen soru. Ayrım net:
+
+| MLMD'den ALDIK | MLMD'den ALMADIK |
+|---|---|
+| `Event.DECLARED_INPUT` / `DECLARED_OUTPUT` soy semantiği | MLMD sunucusunun kendisi |
+| `ListOptions(filter_query=...)` süzgeci | gRPC API'si |
+| Tipli artifact (`system.Dataset` vb.) | Şeması |
+| `pipeline_root/<run-id>/` anahtar düzeni | — |
+
+Yerine SQLite ve kendi şemamız:
+
+```
+artifact_id · name · workflow_id · node_id · run_id
+content_hash · content_type · size_bytes · storage_uri
+parents[] · owner · created_at · ttl_seconds · alias
+```
+
+**Gerekçe uydurma değil, MLMD'nin sahibinin kendi hamlesi:**
+
+> Red Hat, **OpenShift AI 2.23'te Model Registry'den MLMD sunucusunu kaldırıp
+> kendi şemasına geçti** — gerekçe *"mimariyi basitleştirmek, uzun vadeli
+> sürdürülebilirlik."*
+
+Yani MLMD'yi kurmamak, MLMD'yi en çok kullanan platformun gittiği yönle
+**aynı** yön. SQLite tercihi de öyle: Red Hat'in çizgisi PostgreSQL üretim /
+SQLite geliştirme. `open_postgres()` yazılı ve bekliyor; SQL taşınabilir
+yazıldı (yalnızca TEXT/BIGINT, ISO-8601 zaman, JSON `parents`).
+
+**Özet: MLMD'nin mentalitesi var, implementasyonu yok.**
+
+## 6.4 · "Agentic PTC için SOTA yaklaşım bu mu?"
+
+**Hayır — çünkü ortada bir SOTA yok.**
+
+Sebep yapısal: bu birleşim piyasada mevcut değil.
+
+```
+PIPELINE SİSTEMLERİ              AJAN PLATFORMLARI
+(KFP, Argo, MLMD)                (Anthropic, OpenAI)
+
+artifact + soy + tip    ✓        artifact + soy + tip    ✗
+karar veren ajan        ✗        karar veren ajan        ✓
+keşif                   ✗        keşif                   ✓
+   (DAG'ı insan yazar)              (ama soy yok)
+```
+
+Pipeline sistemlerinde keşif **yok** çünkü gerek yok — karar veren bir ajan
+yok. Ajan platformlarında soy **yok** çünkü problemleri o değil: *"sohbet
+devam etsin"* diyorlar, *"bu dosya neyden türedi"* demiyorlar.
+
+Databricks en yakını, ama kendi dokümanı *"Customers are responsible for
+running only trusted code"* diyor — yani bizim girdimiz için tasarlanmamış.
+
+### İddia edebileceğimiz şey
+
+SOTA değil, ama şu doğru: **her parçanın tek tek emsali var ve emsalsiz olan
+hiçbir parça kalmadı.** §6.2'deki tablo bunun listesi.
+
+Dört şey icat ettik, dördünü de attık. Ölçülmüş sonucu:
+
+> Hataların hepsi bizim icat ettiğimiz yerlerde çıktı; kopyaladığımız hiçbir
+> parçadan çıkmadı.
+
+### SOTA iddiasını zayıflatan üç şey — dürüstçe
+
+| # | Zayıflık | Durum |
+|---|---|---|
+| 1 | **İzolasyon listedeki en zayıfı** | Düz container, Kata yok. Red Hat AI-üretimi kod için açıkça Kata öneriyor. Mimari kusur değil, kurulum eksiği — ama duruyor |
+| 2 | **Arama tool'unun emsali zayıf** | ADK `list_artifact_keys()`'i modele **açmıyor**; Llama Stack'in `file_search`'ü RAG. Sorgu MLMD'nin, kural ADK'nın, ama *"modelin çağırabileceği artifact araması"* kombinasyonu bize ait |
+| 3 | **Ölçek denenmedi** | 313 artifact, tek node, SQLite tek replika. 100 bin artifact'te ne olacağını bilmiyoruz |
+
+İkincisinin savunması var ama emsali yok: manifest **sert** kanal (her turda,
+model unutamaz), arama **yumuşak** ikinci kanal (yalnızca pencerenin dışı
+için). ADK yalnızca birincisini yapıyor — ve haklı bir sebeple: yumuşak kanal
+tek başına 2026-09-06'daki arızayı üretir. Bizim eklememizin savunması, onun
+tek kanal **olmaması**.
+
+### Kısa cevap
+
+> **SOTA bir yaklaşım değil — SOTA'sı olmayan bir boşlukta, kanıtlanmış
+> parçalardan kurulmuş bir birleşim.**
+
+Bu, "en iyisini yaptık" demekten daha savunulabilir bir iddia: her parçayı
+çalıştığı kanıtlanmış bir yerden aldık, ve neyi nereden aldığımız yazılı.
+
+## 6.5 · Tek cümlelik karşılaştırma
 
 > **Onlar container'ı saklıyor, biz artifact'i.**
 >
