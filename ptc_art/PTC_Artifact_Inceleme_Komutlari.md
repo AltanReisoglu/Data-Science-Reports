@@ -53,7 +53,63 @@ imzalıyor. Jetonsuz her istek 401.
 
 ---
 
-## 1 · Kayıt defteri — asıl bakılacak yer
+## 1 · İçini görmek — en kısa yol
+
+Depodaki baytların çoğu ikili: parquet, pdf, png, tar. `curl | json.tool`
+çalışmıyor, `cat` ekranı bozuyor. Bu betik içerik tipine bakıp doğru biçimde
+açıyor:
+
+```bash
+PY=/home/altan/Desktop/Data-Science-Reports/ptc_sec/.venv/bin/python
+
+$PY scripts/artifact_bak.py --liste                     # depoda ne var
+$PY scripts/artifact_bak.py departman_ozet.parquet      # ada göre
+$PY scripts/artifact_bak.py art_79f0                    # kısaltılmış id yeter
+$PY scripts/artifact_bak.py rapor.pdf@onaylanmis        # alias'la sabit sürüm
+$PY scripts/artifact_bak.py art_79f0 --kunye            # yalnızca künye
+$PY scripts/artifact_bak.py art_79f0 --kaydet /tmp/x    # ham baytlar
+```
+
+Örnek çıktı:
+
+```
+── KÜNYE ────────────────────────────────────────────────────
+artifact_id    art_79f039144ecc
+name           departman_ozet.parquet
+type           system.Dataset
+content_type   application/vnd.apache.parquet
+size_bytes     2343
+content_hash   sha256:d0d3cf4251d3ed23ec4...
+workflow_id    fcc91447-8828-41c9-8025-ac7a1ae9bb0a
+soy            0 ebeveyn
+
+── İÇERİK ───────────────────────────────────────────────────
+satır 5 · sütun ['departman', 'ortalama_cozum_saati']
+
+   departman  ortalama_cozum_saati
+0     Finans             41.432895
+1         IK             40.785500
+...
+```
+
+Tipe göre ne yapıyor:
+
+| İçerik | Ne gösteriyor |
+|---|---|
+| `.parquet` | pandas tablosu, ilk 30 satır + sütun listesi |
+| `.json` | girintili JSON |
+| `.csv` · `.md` · `.txt` | ilk 30 satır |
+| `.tar` *(dizin artifact'i)* | içindeki dosyalar + boyutları |
+| `.pdf` · `.png` *(ikili)* | `/tmp`'ye kaydeder, `xdg-open` komutunu yazar |
+
+Tek ön koşul: `kubectl port-forward svc/artifact-service 8080:8080`.
+Jetonu betik kendisi üretiyor.
+
+> Elle uğraşmak istersen aşağıdaki bölümler ham uçları anlatıyor.
+
+---
+
+## 2 · Kayıt defteri — asıl bakılacak yer
 
 ### Son 20 artifact, tek satır tek kayıt
 
@@ -143,7 +199,7 @@ Alias biçimi: `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` — uymayan 400 alıyor.
 
 ---
 
-## 2 · MinIO — baytlar gerçekten orada mı
+## 3 · MinIO — baytlar gerçekten orada mı
 
 MinIO container'ı minimal; içinde `find`, `mc` gibi araç **yok**. S3 API'sinden
 bakılıyor:
@@ -176,7 +232,7 @@ ptc/<workflow_id>/<node_id>/<run_id>/<artifact_id>.<uzantı>
 
 ---
 
-## 3 · SQLite — defterin kendisi
+## 4 · SQLite — defterin kendisi
 
 Container'da `sqlite3` CLI yok, dosya dışarı kopyalanıyor:
 
@@ -219,7 +275,7 @@ for w,n in c.execute('''SELECT workflow_id, COUNT(*) c FROM artifacts
 
 ---
 
-## 4 · Cluster durumu
+## 5 · Cluster durumu
 
 ```bash
 kubectl get pods                       # servisler + biten sandbox job'ları
@@ -238,7 +294,7 @@ kubectl logs <pod-adı> -c artifact-sidecar     # yerleştirme + süpürme
 
 ---
 
-## 5 · Konsol — görsel
+## 6 · Konsol — görsel
 
 ```bash
 $PY -m uvicorn grounded_assistant.web.app:app --port 8123
@@ -303,7 +359,7 @@ Boş bırakılırsa en yeni kazanır ve log, istenmemiş sabit sürümleri söyl
 
 ---
 
-## 6 · Ürünü baştan sona sınamak
+## 7 · Ürünü baştan sona sınamak
 
 ```bash
 # Ön koşul: port-forward 8080 + panel 8123 ayakta olmalı
@@ -331,7 +387,7 @@ kipinde aynı sonda `TimeoutError` bekliyor.
 
 ---
 
-## 7 · Sunum ve diyagramları yeniden üretmek
+## 8 · Sunum ve diyagramları yeniden üretmek
 
 ```bash
 $PY scripts/diyagram_uret.py       # docs/diyagram/*.png
