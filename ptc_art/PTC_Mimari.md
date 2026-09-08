@@ -199,9 +199,14 @@ content_hash · content_type · size_bytes · storage_uri
 parents[] · owner · created_at · ttl_seconds
 ```
 
-**Neden MLMD değil:** Red Hat, OpenShift AI 2.23'te Model Registry'den MLMD
-sunucusunu kaldırıp kendi şemasına geçti; gerekçe "mimariyi basitleştirmek,
-uzun vadeli sürdürülebilirlik". Aynı yönü izliyoruz.
+**Neden MLMD değil:** Red Hat, OpenShift AI 2.23'te **Model Registry
+bileşeninden** MLMD sunucusunu kaldırıp kendi şemasına geçti — *"simplifies
+the overall architecture and ensures the long-term maintainability"*
+([2.23 release notes](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.23/html-single/release_notes/index)). Aynı yönü izliyoruz.
+
+Dikkat: bu **Model Registry** bileşeni; Data Science Pipelines (KFP) hâlâ
+MLMD kullanıyor. İkisi ayrı bileşen, ayrı soruları cevaplıyor (bkz.
+PTC_Piyasa_Mentaliteleri §8.6).
 
 **Neden SQLite:** yine Red Hat'in çizgisi — PostgreSQL üretim için, SQLite
 geliştirme/test için. `open_postgres()` yazılı ve bekliyor. SQL taşınabilir

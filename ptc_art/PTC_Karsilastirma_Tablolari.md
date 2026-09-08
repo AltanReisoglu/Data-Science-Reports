@@ -747,6 +747,7 @@ bölümünde. §17'nin kaynakları:
 - [OpenLineage — Spark column lineage](https://openlineage.io/docs/integrations/spark/spark_column_lineage/) — `SparkListener` ile execution plan
 - [MLflow — Model Registry](https://mlflow.org/docs/latest/ml/model-registry/) — alias, `models:/<ad>@<alias>`
 - [OpenShift AI — model registries](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25/html/enabling_the_model_registry_component/overview-of-model-registries_model-registry-config)
+- [OpenShift AI 2.23 — release notes](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.23/html-single/release_notes/index) — MLMD sunucusunun Model Registry'den kaldırılması
 - [KFP v2beta1 API](https://www.kubeflow.org/docs/components/pipelines/reference/api/kubeflow-pipeline-api-spec/)
 
 §20'nin kaynakları (2026-09-07):

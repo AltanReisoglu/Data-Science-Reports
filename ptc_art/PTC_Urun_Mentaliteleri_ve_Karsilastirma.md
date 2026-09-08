@@ -831,9 +831,14 @@ parents[] · owner · created_at · ttl_seconds · alias
 
 **Gerekçe uydurma değil, MLMD'nin sahibinin kendi hamlesi:**
 
-> Red Hat, **OpenShift AI 2.23'te Model Registry'den MLMD sunucusunu kaldırıp
-> kendi şemasına geçti** — gerekçe *"mimariyi basitleştirmek, uzun vadeli
-> sürdürülebilirlik."*
+> *"Starting with OpenShift AI 2.23, the **ML Metadata (MLMD) server has been
+> removed from the model registry component**. The model registry now
+> interacts directly with the underlying database by using the existing model
+> registry API and database schema… This change **simplifies the overall
+> architecture** and ensures the long-term maintainability and efficiency of
+> the model registry by transitioning from the ml-metadata component to direct
+> database access."*
+> — [OpenShift AI 2.23 Release notes](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.23/html-single/release_notes/index)
 
 Yani MLMD'yi kurmamak, MLMD'yi en çok kullanan platformun gittiği yönle
 **aynı** yön. SQLite tercihi de öyle: Red Hat'in çizgisi PostgreSQL üretim /
