@@ -30,7 +30,8 @@ Bu doküman bu üç noktayı piyasa ve literatürle karşılaştırıyor.
 | [4](#4--güvenlik) | Güvenlik | Traceback'i geri vermenin riski |
 | [5](#5--bizim-için-pratik-sonuç) | Pratik sonuç | Ne yapmalıyız |
 | [6](#6--doğrulanamayanlar) | Doğrulanamayanlar | Kaynak bulunamadı |
-| [7](#7--kaynaklar) | Kaynaklar | Linkler |
+| [7](#7--büyük-ürünler-claude-code-codex-copilot) | **Büyük ürünler** | Claude Code · Codex · Copilot |
+| [8](#8--kaynaklar) | Kaynaklar | Linkler |
 
 ---
 
@@ -635,17 +636,264 @@ hatayı üç kez almak** bir tıkanma işareti. Bu bir *retry sınırı* değil,
 | **OpenAI Code Interpreter'ın hata yükü** | Resmî dokümanda kod hatasında modele tam olarak neyin döndüğünü (traceback var mı, kırpılıyor mu) belirten bir bölüm bulamadım. Anthropic'in `stdout`/`stderr`/`return_code` sözleşmesinin karşılığını OpenAI tarafında doğrulayamadım. |
 | **Reflexion iterasyon sayısı** | Özette belirtilmiyor; kaç deneme kullanıldığını doğrulayamadım. |
 | **Self-Debugging iterasyon sayısı** | Özette belirtilmiyor. |
-| **LangGraph / Aider / CrewAI** | Bu turda incelenmedi — zaman yetmedi. §1.5 tablosu bu üçünü kapsamıyor. |
+| **LangGraph / Aider / CrewAI** | Bu turda incelenmedi. §1.5 tablosu bu üçünü kapsamıyor. |
+| **Claude Code retry bütçesi** | Davranışta sabit bir deneme sınırı gözlenmedi; kaynak kod açık olmadığı için doğrulanamadı. "Sınır yok" iddiası DEĞİL — ölçemedim. |
+| **Claude Code kırpma eşiği** | 2,8 MB'ta dosyaya taşındı, 3,5 MB'ta (60k satır, `tail` ile) taşınmadı — eşiğin tam değerini ve neye göre (bayt/token/satır) hesaplandığını belirleyemedim. |
+| **GitHub Copilot coding agent** | Döngünün VARLIĞI resmî yayınlarda belgeli ("self-correct", "monitors test output, automatically attempts to fix and rerun"), ama MEKANİZMA hiç belgelenmemiş: geri bildirim yükü, kırpma, bütçe, sebep sınıflandırması bulunamadı. §7.4 tablosunda bu yüzden beş "belgelenmemiş" var. |
+| **Codex deneme bütçesi** | Kaynak kod açık ama kod-hatası döngüsü için bir üst sınır sabiti bulamadım. Bulduğum retry mantığı ALTYAPI içindi (429, kapasite, akış kopması) — farklı konu. |
+| **Cursor / Devin / Google Jules** | İncelenmedi. |
 
 ---
 
-## 7 — Kaynaklar
+## 7 — Büyük ürünler: Claude Code, Codex, Copilot
+
+§1–§2 çerçeveleri (smolagents, AutoGen, SWE-agent, OpenHands) inceliyordu.
+Bu bölüm **son kullanıcıya satılan ürünlere** bakıyor — çünkü orada verilen
+kararlar sahada milyonlarca kez sınanmış oluyor.
+
+### 8.1 — Claude Code — doğrudan gözlem
+
+Claude Code'un iç kaynağı açık değil, ama **davranışı doğrudan ölçülebilir**:
+araca bilerek hata verdirip modele ne döndüğüne bakmak yeterli. Aşağıdakiler
+2026-09-08'de bu oturumda ölçüldü.
+
+**Sonda 1 — üç kare derinliğinde bir istisna, öncesinde stdout:**
+
+```python
+def ic():
+    d = {"a": 1}
+    return d["yok"]
+def dis():
+    return ic()
+print("bu satır stdout'a yazıldı")
+dis()
+```
+
+Modele dönen şey:
+
+```
+Exit code 1
+bu satır stdout'a yazıldı
+Traceback (most recent call last):
+  File ".../hata_sondasi.py", line 7, in <module>
+    dis()
+  File ".../hata_sondasi.py", line 5, in dis
+    return ic()
+           ^^^^
+  File ".../hata_sondasi.py", line 3, in ic
+    return d["yok"]
+           ~^^^^^^^
+KeyError: 'yok'
+```
+
+Dört şey birden var ve dördü de bizde **yok**:
+
+| | Claude Code | BİZ |
+|---|---|---|
+| Çıkış kodu | `Exit code 1` | ✗ |
+| **Hata olmasına rağmen korunan stdout** | `bu satır stdout'a yazıldı` | ✗ |
+| Tam traceback, bütün kareler | 3 kare | ✗ |
+| **İstisna tipi** | `KeyError` | ✗ (`str(exc)` tipi taşımıyor) |
+
+Python 3.11'in ince konum işaretleri (`~^^^^^^^`) da korunuyor — yani model
+satırın **hangi ifadesinin** patladığını görüyor, sadece satır numarasını
+değil.
+
+**Sonda 2 — çok büyük çıktı.** 40 000 satır (2,8 MB) üreten bir komutta
+davranış **kırpmak değil, taşımak**:
+
+```
+Output too large (2.8MB). Full output saved to: <yol>
+Preview (first 2KB):
+satir-000000 yyyy…
+```
+
+Bu, §1.5'teki üç sistemden **farklı bir dördüncü strateji**:
+
+| Strateji | Kim | Ne oluyor |
+|---|---|---|
+| Ortadan kırp | smolagents, SWE-agent, Codex | Baş + son kalır, orta gider — **veri kaybolur** |
+| Uçtan kes + öğret | SWE-agent | "head/tail/grep kullan" diye modele akıl verilir |
+| Hiç kırpma | AutoGen | Bağlam patlayabilir |
+| **Dosyaya taşı + önizleme** | **Claude Code** | **Hiçbir şey kaybolmaz**; model gerekirse gidip seçerek okur |
+
+Dördüncüsü bizim için en ilginci: veri kaybı yok, bağlam da şişmiyor. Bedeli,
+modelin ikinci bir tur harcayıp dosyayı okuması.
+
+**Retry sayacı gözlenmedi.** Sabit bir "en fazla N deneme" sınırı davranışta
+görünmüyor; devam edip etmeme kararını model veriyor. Bunu kaynak koddan
+doğrulayamadım — bkz. §6.
+
+### 8.2 — OpenAI Codex — kaynak kodda doğrulandı
+
+Codex açık kaynak ([openai/codex](https://github.com/openai/codex), Apache-2.0),
+dolayısıyla tahmin gerekmiyor.
+
+**Modele giden biçim** — fonksiyonun adı bile niyetini söylüyor:
+`format_exec_output_for_model`
+([`codex-rs/core/src/tools/mod.rs:88`](https://github.com/openai/codex/blob/main/codex-rs/core/src/tools/mod.rs)):
+
+> "Format the combined exec output for sending back to the model.
+> **Includes exit code and duration metadata; truncates large bodies safely.**"
+
+Ürettiği bölümler:
+
+```
+Exit code: {exit_code}
+Wall time: {duration_seconds} seconds
+Total output lines: {total_lines}     ← yalnızca kırpma olduysa
+Output:
+{kırpılmış içerik}
+```
+
+Kullanıcının kendi çalıştırdığı komutlar da modele **etiketli** gidiyor
+([`user_shell_command.rs:44`](https://github.com/openai/codex/blob/main/codex-rs/core/src/context/user_shell_command.rs)):
+
+```
+<user_shell_command>
+<command>…</command>
+<result>
+Exit code: {}
+Duration: {:.4} seconds
+Output:
+{}
+</result>
+</user_shell_command>
+```
+
+Bu, §4.2'deki OWASP "context isolation" önerisinin uygulanmış hâli: araç
+çıktısı **sınırlandırılmış bir blokta**, talimat metniyle karışmıyor.
+
+**Kırpma yine ortadan.** `truncate_text` → `truncate_middle_chars`
+([`utils/output-truncation/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/utils/output-truncation/src/lib.rs)),
+ve işaret açıkça yazılıyor — testten alınan gerçek çıktı
+([`truncate_tests.rs`](https://github.com/openai/codex/blob/main/codex-rs/utils/output-truncation/src/truncate_tests.rs)):
+
+```
+Warning: truncated output (original token count: 4)
+Total output lines: 1
+
+…13 chars truncated…
+```
+
+Politika bayt **ya da token** cinsinden olabiliyor
+([`protocol.rs:3223`](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/protocol.rs)):
+
+```rust
+pub enum TruncationPolicy {
+    Bytes(usize),
+    Tokens(usize),
+}
+```
+
+**Ve asıl bulgu: Codex sandbox reddini kod hatasından AYIRIYOR.**
+
+Bizim `DENIED_ACTION` / `ERROR` sorunumuzun birebir karşılığı, üretimde
+çözülmüş hâliyle: [`codex-rs/sandboxing/src/denial.rs`](https://github.com/openai/codex/blob/main/codex-rs/sandboxing/src/denial.rs).
+Doküman yorumu dürüst:
+
+> "We don't have a **fully deterministic** way to tell if our command failed
+> because of the sandbox — a command in the user's zshrc file might hit an
+> error, but the command itself might fail or succeed for other reasons.
+> For now, we **conservatively** check for well known command failure exit
+> codes and also look for common sandbox denial keywords in the command output."
+
+`is_likely_sandbox_denied()` mantığı:
+
+| Adım | Kural |
+|---|---|
+| Erken çıkış | Sandbox yoksa ya da çıkış kodu 0 ise → `false` |
+| Hızlı eleme | Çıkış kodu **2, 126, 127** ise → `false` (bunlar sıradan komut hataları) |
+| Linux'a özel | `LinuxSeccomp`'ta çıkış kodu `128 + SIGSYS` ise → sinyal temelli ret |
+| Anahtar kelime | stdout/stderr'de: `operation not permitted`, `permission denied`, `read-only file system`, `seccomp`, `sandbox`, `landlock`, `failed to write file` |
+
+Ret ayrıca **tipli bir hata** olarak taşınıyor — ağ politikası kararını da
+yanında getiriyor ([`protocol/src/error.rs:35`](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/error.rs)):
+
+```rust
+pub enum SandboxErr {
+    #[error("sandbox denied exec error, exit code: {}, stdout: {}, stderr: {}", ...)]
+    Denied {
+        output: Box<ExecToolCallOutput>,
+        network_policy_decision: Option<NetworkPolicyDecisionPayload>,
+        ...
+```
+
+**Bizim için üç ders:**
+
+1. Ayrım **yapılıyor** — "sebep-farkında sayaç" bir icat değil, sahada var.
+2. Ayrım **sezgisel** ve bunu saklamıyorlar. Bizde ise daha kolay: reddi
+   *biz* veriyoruz, tahmin etmemize gerek yok — `DENIED_ACTION` zaten
+   kesin bir sinyal. Codex'in tahminle yaptığını biz **kesin bilgiyle**
+   yapabiliriz.
+3. Ret kaydı **ağ politikası kararını** taşıyor; yani modele "engellendin"
+   demekle kalmıyor, hangi kuralın engellediğini de tutuyor.
+
+**Bir uyarı — Codex'te "retry" iki ayrı şey.** GitHub'daki retry tartışmalarının
+çoğu ([#22390](https://github.com/openai/codex/issues/22390),
+[#4161](https://github.com/openai/codex/issues/4161),
+[PR #25147](https://github.com/openai/codex/pull/25147)) **altyapı** yeniden
+denemesi: model kapasitesi, 429, akış kopması. Üstel geri çekilme + jitter ile
+çözülüyor ve *kod hatası kurtarmayla ilgisi yok*. İkisi karıştırılmamalı —
+bizim konumuz ikincisi.
+
+### 8.3 — GitHub Copilot coding agent — davranış belgeli, mekanizma değil
+
+GitHub'ın kendi yayınları döngüyü açıkça anlatıyor:
+
+> "Agents break work into steps, edit files, run terminal commands, invoke
+> tools, and **self-correct when they hit errors or failing tests**."
+> — [GitHub Blog](https://github.blog/ai-and-ml/github-copilot/agent-mode-101-all-about-github-copilots-powerful-mode/)
+
+> "the agent **monitors the test output** when running tests, and
+> **automatically attempts to fix and rerun** failing tests"
+> — [VS Code docs](https://code.visualstudio.com/docs/agents/guides/test-with-copilot)
+
+> "After it runs commands and applies edits, agent mode works to detect syntax
+> errors, terminal output, test results, and build errors. Based on the
+> results, it then determines how to course-correct."
+> — [VS Code blog](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode)
+
+Ama **mekanizma belgelenmemiş**: modele tam olarak ne döndüğü, kırpma sınırı,
+deneme bütçesi, sebep sınıflandırması — hiçbiri resmî dokümanda yok. Bu
+bölümdeki iddialar ürün anlatımı düzeyinde kalıyor; §6'ya not düştüm.
+
+### 8.4 — Ürünler yan yana
+
+| | Çıkış kodu | Tam traceback | Hata anında stdout | Kırpma | Sebep ayrımı | Bütçe |
+|---|---|---|---|---|---|---|
+| **Claude Code** | ✓ | ✓ | ✓ | **dosyaya taşı** (~2 KB önizleme) | gözlenmedi | gözlenmedi |
+| **Codex** | ✓ (+ süre) | ✓ | ✓ | ortadan, işaretli, bayt/token | **✓ `is_likely_sandbox_denied`** | belgelenmemiş |
+| **Anthropic API** (code execution) | ✓ `return_code` | ✓ `stderr` | ✓ `stdout` | belgelenmemiş | **✓ tipli `error_code`** | 90 sn/hücre |
+| **Copilot agent** | belgelenmemiş | belgelenmemiş | belgelenmemiş | belgelenmemiş | belgelenmemiş | belgelenmemiş |
+| **BİZ** | ✗ | ✗ | ✗ | ✗ | ✗ (tek sayaç) | 2 |
+
+### 8.5 — Ürünlerin doğrulattığı üç şey
+
+**1. Çıkış kodu + tam traceback + stdout, üçü birlikte.** Claude Code, Codex ve
+Anthropic API'sinin üçü de bu üçlüyü veriyor. Bizde üçü de yok. §5.6'daki
+1–3 numaralı maddeler bu üç üründen bağımsız olarak doğrulanmış oluyor.
+
+**2. Kırpma bir tasarım kararı, ihmal değil.** Dört ürün dört farklı yol
+seçmiş ama hepsi **bilinçli** seçmiş ve modele **ne olduğunu söylüyor**. Bizde
+kırpma hiç yok — bugün için sorun değil (mesajlarımız kısa), ama traceback
+eklendiğinde olacak.
+
+**3. Sebep ayrımı üretimde var.** Codex bunu *tahminle* yapıyor ve zorluğunu
+kabul ediyor. Bizim avantajımız: reddi biz ürettiğimiz için tahmine gerek yok.
+Yani §5.4'teki öneri, sahadaki emsalinden **daha kolay** uygulanabilir bir
+konumdayız — sadece sayacı bölmek yeterli.
+
+---
+
+## 8 — Kaynaklar
 
 ### Kaynak kod
 
 * smolagents — [`local_python_executor.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/local_python_executor.py) · [`agents.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/agents.py) · [`memory.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/memory.py) · [`utils.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/utils.py) · [`tests/test_agents.py`](https://github.com/huggingface/smolagents/blob/main/tests/test_agents.py)
 * AutoGen / AG2 — [`local_commandline_code_executor.py`](https://github.com/microsoft/autogen/blob/0.2/autogen/coding/local_commandline_code_executor.py) · [`conversable_agent.py`](https://github.com/microsoft/autogen/blob/0.2/autogen/agentchat/conversable_agent.py) · [`code_utils.py`](https://github.com/microsoft/autogen/blob/0.2/autogen/code_utils.py)
 * SWE-agent — [`sweagent/agent/agents.py`](https://github.com/SWE-agent/SWE-agent/blob/main/sweagent/agent/agents.py) · [`config/bash_only.yaml`](https://github.com/SWE-agent/SWE-agent/blob/main/config/bash_only.yaml) · [`config/default_mm_no_images.yaml`](https://github.com/SWE-agent/SWE-agent/blob/main/config/default_mm_no_images.yaml)
+* OpenAI Codex — [`core/src/tools/mod.rs`](https://github.com/openai/codex/blob/main/codex-rs/core/src/tools/mod.rs) · [`sandboxing/src/denial.rs`](https://github.com/openai/codex/blob/main/codex-rs/sandboxing/src/denial.rs) · [`protocol/src/error.rs`](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/error.rs) · [`protocol/src/protocol.rs`](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/protocol.rs) · [`utils/output-truncation/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/utils/output-truncation/src/lib.rs) · [`core/src/context/user_shell_command.rs`](https://github.com/openai/codex/blob/main/codex-rs/core/src/context/user_shell_command.rs)
 * OpenHands — [`stuck_detector.py`](https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/stuck_detector.py) · [`types.py`](https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/types.py) · [`agent-server-adapter.ts`](https://github.com/OpenHands/OpenHands/blob/main/src/api/agent-server-adapter.ts) · [`agent_script.py`](https://github.com/OpenHands/extensions/blob/main/plugins/qa-changes/scripts/agent_script.py)
 
 ### Resmî dokümantasyon
@@ -665,3 +913,14 @@ hatayı üç kez almak** bir tıkanma işareti. Bu bir *retry sınırı* değil,
 * OWASP — [AI Agent Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html)
 * OWASP — [LLM Prompt Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html)
 * OWASP Gen AI — [LLM01: Prompt Injection](https://genai.owasp.org/llmrisk2023-24/llm01-24-prompt-injection/)
+
+---
+
+### Ürün dokümantasyonu
+
+* GitHub — [Agent mode 101](https://github.blog/ai-and-ml/github-copilot/agent-mode-101-all-about-github-copilots-powerful-mode/) · [Assigning and completing issues with coding agent](https://github.blog/ai-and-ml/github-copilot/assigning-and-completing-issues-with-coding-agent-in-github-copilot/)
+* VS Code — [Test with GitHub Copilot](https://code.visualstudio.com/docs/agents/guides/test-with-copilot) · [Introducing Copilot agent mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode)
+
+### Doğrudan gözlem
+
+* Claude Code — bu oturumda (2026-09-08) araca bilerek hata verdirilerek ölçüldü; §7.1'deki iki sonda ve çıktıları belgenin içinde birebir aktarılmıştır.
