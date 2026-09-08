@@ -660,6 +660,36 @@ async function ciz_depo() {
     S.acik[wf] = !suanAcik; ciz_depo();
   });
   $$("#depoCekmece .plaka").forEach(b => b.onclick = () => { S.art = b.dataset.art; ciz_depo(); ciz_artDetay(); });
+
+  // Tek artifact silme — plakanın sağ üstünde, hover'da beliriyor.
+  $$("#depoCekmece .plaka-sil").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    if (!confirm(`"${b.dataset.ad}" silinsin mi?\n${b.dataset.sil}\n\nGeri alınamaz.`)) return;
+    try {
+      const r = await getJSON(`/api/depo/${b.dataset.sil}`, { method: "DELETE" });
+      if (r.error) { alert(r.error); return; }
+      if (S.art === b.dataset.sil) S.art = null;
+      await ciz_depo(); yenileSayac();
+    } catch (err) { alert("Silinemedi: " + err.message); }
+  });
+
+  // Çalıştırmanın TAMAMI — `?workflow=` süzgeciyle, tek tek değil.
+  $$("#depoCekmece .cekmece-sil").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const wf = b.dataset.wf, n = (grup[wf] || []).length;
+    if (!confirm(`Bu çalıştırmanın ${n} artifact'i silinecek.\n\n${wf}\n\n`
+        + "Geri alınamaz. Devam edilsin mi?")) return;
+    b.disabled = true;
+    try {
+      const r = await getJSON(`/api/depo/topluca-sil?workflow=${encodeURIComponent(wf)}`,
+                              { method: "POST" });
+      if (r.error) { alert(r.error); return; }
+      if (r.hata_sayisi) alert(`${r.silinen}/${r.istenen} silindi.\n` + r.hata.join("\n"));
+      S.art = null; delete S.acik[wf];
+      await ciz_depo(); yenileSayac();
+    } catch (err) { alert("Silinemedi: " + err.message); }
+    finally { b.disabled = false; }
+  });
   ciz_artDetay();
 }
 
