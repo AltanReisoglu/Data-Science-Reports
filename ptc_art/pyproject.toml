@@ -21,6 +21,14 @@ dependencies = [
     "kubernetes",
     "fastapi",
     "uvicorn[standard]",
+    # Aşağıdakiler HOST tarafında da doğrudan import ediliyor; sandbox/sidecar
+    # imajlarında ayrıca kurulu olmaları burada bildirilmemeleri anlamına
+    # gelmiyordu — temiz bir kurulumda eksik kalıyorlardı (2026-09-09).
+    "requests",      # artifact_context, konsol, durum, artifact_bak
+    "minio",         # artifacts/store.py
+    "pandas",        # artifacts/serialize.py, konsol, artifact_bak
+    "pyarrow",       # artifacts/serialize.py — Parquet
+    "matplotlib",    # konsol demo kodu, kabul_testi
 ]
 
 [project.optional-dependencies]
