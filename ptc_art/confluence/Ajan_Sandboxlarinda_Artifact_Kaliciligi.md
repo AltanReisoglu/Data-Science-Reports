@@ -1,0 +1,444 @@
+# Ajan Sandbox'larında Artifact Kalıcılığı
+
+> Kod çalıştıran bir ajan sisteminde, üretilen dosyalar sandbox öldükten sonra
+> nasıl yaşar? Piyasada dört farklı cevap var ve aralarındaki fark bir
+> tercih değil, **mimari bir sonuç**.
+
+---
+
+## 1 · Problem
+
+Bir ajana kod çalıştırma yeteneği verdiğinizde iki şeyi aynı anda istersiniz:
+
+| İstek | Neden |
+|---|---|
+| **İzolasyon** | Bir çalıştırmanın ürettiği durum diğerine sızmasın |
+| **Kalıcılık** | Pahalı iş her turda baştan yapılmasın |
+
+Bu ikisi doğrudan çelişiyor:
+
+```
+Sandbox YAŞARSA    bir çalıştırma diğerine bulaşır — izolasyon yok
+Sandbox ÖLÜRSE     40 saniyelik iş her turda tekrarlanır
+```
+
+Çelişkiyi çözmenin yolu ortasını bulmak değil, **ortamın ömrü ile verinin
+ömrünü birbirinden ayırmak**: sandbox ölsün, ürettiği kalsın.
+
+Kod çalıştıran her sistem bu ayrımı bir şekilde kurmak zorunda kalmış. Aşağıda
+kimin nasıl kurduğu var.
+
+---
+
+## 2 · Herkesin cevaplamak zorunda olduğu beş soru
+
+Piyasadaki ürünlerin hepsine aynı beş soru sorulduğunda tablo netleşiyor:
+
+```
+S1  NEREDE     kod nerede koşuyor?          yönetilen container · pod · microVM
+S2  ÖMÜR       ne kadar yaşıyor?            20 dakika · 30 gün · pod ömrü · süresiz
+S3  VERİ       nasıl girip çıkıyor?         mount · SDK · dizin yakalama · beyan
+S4  ANAHTAR    depo anahtarı nerede?        sandbox'ın içinde mi, dışında mı
+S5  DEFTER     künye tutuluyor mu?          var · yok · tutulamaz
+```
+
+Ürünler farklı problemler çözdüklerini düşünüyor — biri sandbox satıyor, biri
+pipeline motoru, biri ajan framework'ü. Ama hepsi bu beş sorunun altına
+imza atmış durumda.
+
+---
+
+## 3 · Dört yerleşim ailesi
+
+> **Diyagram:** `dort-aile.excalidraw` — Confluence'ta Excalidraw makrosuyla
+> açılabilir (Insert → Excalidraw → Import → dosyayı seç).
+
+Belirleyici soru şu: **baytı kim taşıyor, ve o taşıyıcı kullanıcı koduna göre
+nerede duruyor?**
+
+### A · Mount
+
+```
+kod  →  write("/bucket/rapor.pdf")
+             ↓  FUSE / NFS sürücüsü
+        bucket
+```
+
+Bucket bir dosya sistemi gibi mount ediliyor. Kod sıradan bir `write()`
+yazıyor, sürücü bunu HTTP'ye çeviriyor.
+
+**Sonucu:** araya girecek bir yer yok. Kimse durup "bu dosya nedir, neyden
+türedi" diye kaydetmiyor — dolayısıyla künye de tutulamıyor.
+
+### B · Sarmalayıcı
+
+```
+main container
+├── launcher     ← depo anahtarı burada, PID 1
+└── kullanıcı kodu   ← launcher'ın alt süreci
+```
+
+Bir taşıyıcı program var ve işini düzgün yapıyor: girdileri kod başlamadan
+indiriyor, çıktıları kod bittikten sonra yüklüyor, künyeyi kayıt defterine
+yazıyor.
+
+Ama taşıyıcı **kullanıcı koduyla aynı container'da**. Alt süreç ebeveyninin
+ortamını devralır — aynı ortam değişkenleri, aynı dosya sistemi, aynı ağ.
+Yani kod, isterse taşıyıcıyı atlayıp doğrudan depoya konuşabilir.
+
+Bu, kodun **insan tarafından yazıldığı** sistemlerde makul bir karar:
+sarmalayıcının işi güvenlik değil kolaylık — bileşen yazarını depo kodu
+yazmaktan kurtarmak.
+
+### C · Sınır
+
+```
+kullanıcı kodu  →  /output (paylaşılan dizin)
+                        ↓
+                   AYRI container   ← anahtar burada
+                        ↓
+                     depo
+```
+
+Taşıyıcı ayrı bir güven alanında: ayrı container, ayrı imaj, ayrı ortam.
+Kullanıcı kodu dizine yazıyor, taşıyan taraf oradan alıyor.
+
+Kod anahtarı **göremiyor** — çünkü anahtar kodun ortamında hiç yok.
+
+### D · Denetimli mount
+
+```
+kod  →  /Volumes/<katalog>/<şema>/<volume>
+              ↓
+        sürücü katalog'a SORAR:  "bu kimlik bu yola yazabilir mi?"
+              ↓
+           volume
+```
+
+Mount ailesindeki tek istisna. Yol bir dosya yolu gibi görünüyor ama sürücü
+her erişimde bir yetkilendirme katmanına soruyor. Aracı kaldırılmamış,
+**sürücünün içine** taşınmış — bu yüzden künye de tutulabiliyor.
+
+---
+
+## 4 · Ortaya çıkan örüntü
+
+Kayıt defteri olan ve olmayan ürünler ayrıldığında tek bir ortak özellik
+kalıyor:
+
+| Kayıt defteri | Yerleşim |
+|---|---|
+| **VAR** | B · sarmalayıcı, C · sınır, D · denetimli mount |
+| **YOK** | A · mount — istisnasız |
+
+> **Kayıt defteri, yalnızca yazma yolu bir bileşenden geçtiğinde ayakta
+> kalıyor.**
+
+Bu bir **gerek şart** ifadesi, yeter şart değil:
+
+```
+Mount ederseniz          defter TUTAMAZSINIZ    — araya girecek yer yok
+Bileşen koyarsanız       defter TUTABİLİRSİNİZ  — ama zorunda değilsiniz
+```
+
+Örneğin bazı iş akışı motorlarında taşıyıcı bileşen var ama katalog
+tutulmuyor: orada her çalıştırma kendi klasörüne yazdığı için aynı adın iki
+sürümü hiç çakışmıyor, katalog ihtiyacı doğmuyor.
+
+---
+
+## 5 · Ürünlerin yaklaşımları
+
+### Container'ı sakla
+
+Sorunu kalıcılık değil, **ortamı yaşatmak** olarak tanımlıyor. Container
+günler boyunca duruyor, hareketsizlikte dondurulup sonra geri yükleniyor.
+
+Kod bir çıktı dizinine yazıyor; iş bitince **platform o dizine bakıyor**,
+dosyaları kendi dosya servisine kaydediyor ve konuşmaya bir **kimlik**
+dönüyor. Container ölse bile bayt o serviste kalıyor.
+
+```
+kod → $OUTPUT_DIR/rapor.pdf
+          ↓
+   PLATFORM DİZİNE BAKAR        ← kilit adım
+          ↓
+   dosya servisine kaydeder
+          ↓
+   konuşmaya kimlik döner:  file_abc123
+```
+
+Kilit adım ortadaki: kod bir "yükle" API'si çağırmıyor, sadece dosya yazıyor.
+Araya giren platform olduğu için künye mümkün oluyor.
+
+### Çalışma alanı ≠ kalıcı durum
+
+Container'ın diski bir **tezgâh**, depo değil. Belirli bir süre hareketsizlik
+sonrası container gidiyor. Üretilen dosyayı almak çağıranın işi.
+
+### Kod yaz, tool çağırma
+
+Bu ürünün tezi artifact'le ilgili bile değil: *modeller kod yazmayı tool
+çağırmaktan daha iyi biliyor.* Nesne deposunu sandbox'a mount ediyor —
+A ailesi.
+
+### İsim ucuz, içerik pahalı
+
+Baytı hiç taşımıyor. Üretilen dosyaların **isimlerini** her turda sistem
+talimatlarına yazıyor; içeriği model isteyince ve **yalnızca o isteğe**
+ekliyor. Sonraki turda içerik context'te yok.
+
+Üç kural:
+
+```
+isimler    her zaman talimatlarda      ucuz
+içerik     talep üzerine               pahalı
+geçmiş     içerik kalıcı yazılmaz      pencere şişmesin
+```
+
+### DAG yazılıdır
+
+Pipeline motorları farklı bir dünyada: hangi adımın hangi girdiyi alacağı
+**önceden yazılı**. Girdi bağlanmış geliyor, seçim yapan bir ajan yok.
+
+Buna karşılık kayıt defteri en zengin olan taraf burası: tip, soy, beyan
+edilen girdiler, sürüm — hepsi ayrı bir metadata servisinde.
+
+### Artifact = referans
+
+Bazı CI/CD motorları artifact'i bir **kap** değil **referans** sayıyor:
+`uri` + `digest` duyuruluyor, imzalı bir attestation üretiliyor, ama
+baytın kendisi saklanmıyor.
+
+### Sandbox'ı hiç öldürme
+
+microVM snapshot ile RAM, süreçler ve disk saklanıyor. Kalıcılık sorusu
+ortadan kalkıyor — bedeli süresiz yaşayan bir makine.
+
+---
+
+## 6 · İkinci sorun: bulmak
+
+Bayt taşındıktan sonra ikinci bir soru doğuyor: **ajan hangi dosyayı
+istediğini nasıl biliyor?**
+
+Bunu tek bir şey belirliyor — **sandbox yaşıyor mu**.
+
+```
+Sandbox YAŞIYOR     →  ls yeter, keşif bedava
+Sandbox ÖLÜYOR      →  ayrı bir kanal gerekiyor
+```
+
+Sahadaki desenler:
+
+| Desen | Nasıl |
+|---|---|
+| Referans context'e düşer | Üretilen dosyanın kimliği tool sonucunda döner |
+| Dosya sistemi + `ls` | Sandbox yaşıyorsa model diske bakar |
+| İsimler prompt'a enjekte | İsimler talimatlarda, içerik talep üzerine |
+| Kayıt defterine sorgu | Ada/tipe göre süzülmüş liste |
+| **Keşif YOK** | DAG statik, girdi bağlanmış — soru hiç doğmuyor |
+
+Son satır önemli: pipeline dünyasında keşif diye bir problem yok, çünkü
+seçimi insan yapmış.
+
+---
+
+## 7 · Üçüncü sorun: aynı adın on iki sürümü
+
+Depoda `rapor.pdf` adında on iki kayıt varken "rapor.pdf ver" ne demek?
+
+Varsayılan davranış genelde **en yeni kazanır** — ve bu **sessiz** bir
+kuraldır. Yarın bir çalıştırma daha olunca cevap kendiliğinden değişir.
+
+Sahadaki dört cevap:
+
+| Yaklaşım | Nasıl |
+|---|---|
+| **Alias** | Bir sürüme taşınabilir etiket: `<ad>@<alias>` |
+| **Yol izolasyonu** | Çakışma imkânsız — yol çalıştırma kimliği içeriyor |
+| **Sürüm numarası** | Ad + sürüm; varsayılan en yeniyi verir |
+| **İçerik hash'i** | İsim kimlik değil, içerik kimliktir |
+
+### Alias nasıl çalışıyor
+
+```
+① rapor.json                     →  en yeni sürüm (sessiz)
+② @onaylanmis etiketi bir sürüme takılır
+③ rapor.json                     →  hâlâ en yeni
+   rapor.json@onaylanmis         →  SABİTLENMİŞ sürüm
+④ etiket başka sürüme taşınır    →  eski sahipten kendiliğinden alınır
+⑤ sürümlerin KENDİSİ hiç değişmez
+```
+
+Git'teki ayrımın aynısı: **commit değişmez, tag taşınır.** Ve alias
+kendiliğinden kazanmaz — `<ad>@<alias>` diye **adıyla istenmesi** gerekir.
+
+---
+
+## 8 · Güvenilmeyen kod varsayımı
+
+Yukarıdaki dört ailenin hepsi, kodun **güvenilir** olduğunu varsayarak
+tasarlanmış. Bu makul bir varsayım: pipeline bileşenini bir insan yazdı,
+gözden geçirdi, versiyon kontrolünde duruyor.
+
+Kodu **bir LLM yazdığında** varsayım düşüyor. O zaman soru şu hâle geliyor:
+
+> Taşıyıcı, kodun **erişebileceği** bir yerde mi duruyor?
+
+```
+B · sarmalayıcı    aynı container   →  kod anahtara ulaşabilir
+C · sınır          ayrı container   →  ulaşamaz
+```
+
+Bu, bir güvenlik açığı değil bir **yerleşim tercihi** — ve tercihi belirleyen
+şey, kodu kimin yazdığı.
+
+### Neden aynı container'da sır saklanamıyor
+
+Alt süreç, ebeveyninin ortamını devralır. Ortam değişkeni container başına
+tanımlanır, süreç başına değil:
+
+```
+main container
+  PID 1   taşıyıcı        ← ortam BURAYA basıldı
+    └─ PID 7  kullanıcı kodu   ← ortamı DEVRALDI
+```
+
+Ortam temizlense bile aynı kullanıcı `/proc/1/environ` üzerinden okuyabilir.
+Mesele dikkatsizlik değil, işletim sisteminin süreç modeli.
+
+---
+
+## 9 · Sınır kurma deseni
+
+Güvenilmeyen kod için sahada işleyen desen **C ailesi**: taşıyıcıyı ayrı bir
+container'a almak.
+
+```
+POD
+┌──────────────────────┬──────────────────────┐
+│  taşıyıcı            │  sandbox             │
+│  depo anahtarı VAR   │  anahtar YOK         │
+│  ağ: depoya açık     │  ağ: kapalı          │
+└──────────┬───────────┴───────────┬──────────┘
+           └──── /output (paylaşılan) ────┘
+```
+
+İş bölümü:
+
+```
+① model kod yazar ve ne okuyacağını BEYAN eder
+② taşıyıcı beyan edilenleri /output'a koyar        (kod BAŞLAMADAN)
+③ sandbox çalışır — düz dosya okuma, ağ çağrısı yok
+④ taşıyıcı /output'u süpürür → bayt depoya, künye kayıt defterine
+⑤ pod silinir, dosyalar kalır
+```
+
+**Beyan, çağrı değildir.** Kod çalışırken bir şey indirmiyor; ne isteyeceğini
+önceden söylüyor, dosya kod başlamadan yerine konuyor. Kod yalnızca
+`open()` biliyor.
+
+Beyanın üç biçimi:
+
+```
+ad                    →  bu çalıştırmanın çıktısı
+<çalıştırma>/ad       →  BAŞKA bir çalıştırmanın çıktısı
+ad@alias              →  sabitlenmiş sürüm
+```
+
+### Beyanın ikinci faydası: soy
+
+Beyan yalnızca dosyayı getirmiyor, **soyu da tanımlıyor**. Beyan edilen girdi
+o çıktının ebeveyni sayılıyor.
+
+```
+beyan YOK   →  ne indiğini bilmediğin için hepsi ebeveyn sayılır
+beyan VAR   →  yalnızca istenen ebeveyn
+```
+
+Yüz dosyalık bir depoda kodun bir tanesini okuduğu bir çalıştırmada fark
+şudur: yüz ebeveynli bir soy hiçbir şey anlatmaz, iki ebeveynli soy anlatır.
+
+---
+
+## 10 · Kod patladığında ne dönüyor
+
+Ajan kod yazıyorsa hata alması normaldir; asıl soru **modele ne döndüğü**.
+
+İyi bir hata sinyalinin üç parçası var:
+
+```
+① NE OLDU        hata tipi + patlayan satır
+② NE YAPMIŞTI    hata anına kadar basılan çıktı
+③ NE YAPMALI     talimat
+```
+
+Sahadaki örüntü: olgun ürünlerin çoğunda ilk ikisi var (çıkış kodu, tam
+traceback, korunan stdout), üçüncüsü nadiren var.
+
+### Kırpma
+
+Büyük çıktılarda mesaj kırpılmak zorunda. İki ayrıntı önemli:
+
+**Kırpıldığı söylenmeli.** Sessiz kırpma modelin eksik veriyi tam sanmasına
+yol açıyor. Olgun uygulamalar kaç karakterin atıldığını yazıyor, bazıları
+ne yapılacağını da öğretiyor ("çıktıyı azalt ya da dosyaya yönlendir").
+
+**Nereden kırpıldığı belirleyici.** Bir traceback'te değerli olan iki uçtur:
+baş "nereden başladı", son "asıl hata". Baştan kesen bir kırpma, tam da
+modelin ihtiyacı olan satırı atabiliyor.
+
+```
+BAŞTAN kırpma    →  hata en sondaysa KAYBOLUR
+ORTADAN kırpma   →  iki uç da korunur
+```
+
+### Düzeltilebilir ve düzeltilemez hatalar
+
+Her hata aynı değil:
+
+```
+KeyError          →  düzeltilebilir, model yeniden denemeli
+ConnectionError   →  ağ kapalıysa DÜZELTİLEMEZ, denemek boşuna
+```
+
+Deneme bütçesini hatanın **sebebine** göre ayırmak, sabit bir sayıdan daha
+isabetli oluyor.
+
+---
+
+## 11 · Özet
+
+```
+① Sandbox'ın ömrü ile verinin ömrü AYRI katmanlar olmalı
+
+② Kayıt defteri, yazma yolu bir bileşenden geçtiğinde mümkün —
+   mount edilen yerde araya girecek yer yok
+
+③ Taşıyıcının kodla AYNI container'da olup olmaması, kodun kim
+   tarafından yazıldığına göre değişen bir yerleşim tercihi
+
+④ Beyan (çağrı değil) hem ağ yüzeyini kapatıyor hem soyu tanımlıyor
+
+⑤ Aynı adın çok sürümü olduğunda "en yeni kazanır" SESSİZ bir kural;
+   alias onu görünür ve kasıtlı hâle getiriyor
+
+⑥ Hata sinyali üç parçalı olmalı: ne oldu · ne yapmıştı · ne yapmalı
+```
+
+---
+
+## Terimler
+
+| Terim | Anlamı |
+|---|---|
+| **Sandbox** | Ajanın yazdığı kodun çalıştığı izole ortam |
+| **Artifact** | Bir çalıştırmanın ürettiği, sonradan kullanılabilen çıktı |
+| **Bucket** | Nesne deposundaki isim alanı — kavram, ürün değil |
+| **S3 API** | Nesne depolarının fiilî standart HTTP arayüzü; ürün değil, protokol |
+| **Künye / kayıt defteri** | Artifact'in kimliği, tipi, boyutu, kökeni |
+| **Soy (lineage)** | Bir artifact'in hangi girdilerden türediği |
+| **Beyan** | Kodun çalışmadan önce hangi girdileri istediğini bildirmesi |
+| **Alias** | Bir sürüme takılan, taşınabilir isim |
+| **Sidecar** | Aynı pod'da, ana container'a eşlik eden yardımcı container |
