@@ -100,6 +100,12 @@ td:first-child{color:var(--fg);font-weight:600}
 tr:last-child td{border-bottom:none}
 tr.us td{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--fg)}
 .wrap{overflow-x:auto}
+/* Hata kutularında kodun sağında "hangi sinyali taşıyor" şeridi */
+.kv{display:flex;gap:.55rem;align-items:flex-start}
+.kv>pre{flex:1 1 auto;min-width:0}
+.tik{flex:0 0 auto;font-family:"JetBrains Mono",monospace;font-size:.6em;
+  line-height:1.62;color:var(--dim);white-space:nowrap;padding-top:.15rem}
+.tik b{color:var(--green)}.tik i{color:var(--red);font-style:normal}
 
 #bar{position:fixed;left:0;bottom:0;height:3px;background:var(--amber);z-index:20;transition:width .25s}
 #hud{position:fixed;right:1rem;bottom:.8rem;display:flex;gap:.35rem;z-index:20}
@@ -151,20 +157,23 @@ tr.us td{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--
   <h2 class="sm">Herkes aynı beş soruyu cevaplamak zorunda</h2>
   <div class="body wrap"><table>
     <tr><th>Ürün</th><th>Tezi</th><th>Anahtar sandbox'ta</th><th>Kayıt defteri</th><th>Sandbox ömrü</th></tr>
-    <tr><td>Anthropic</td><td>container'ı sakla</td><td><span class="gr">hayır</span></td><td><span class="rd">file_id — soy yok</span></td><td>30 gün</td></tr>
-    <tr><td>OpenAI</td><td>çalışma alanı ≠ kalıcı durum</td><td><span class="gr">hayır</span></td><td><span class="rd">yok</span></td><td>20 dakika</td></tr>
-    <tr><td>Cloudflare</td><td>kod yaz, tool çağırma</td><td>proxy'de</td><td><span class="rd">olamaz</span></td><td>mount</td></tr>
-    <tr><td>Google ADK</td><td>isim ucuz, içerik pahalı</td><td><span class="gr">hayır</span></td><td><span class="gr">ad + sürüm</span></td><td>framework</td></tr>
-    <tr><td>Red Hat / KFP</td><td>DAG yazılıdır</td><td><span class="rd">EVET</span></td><td><span class="gr">MLMD</span></td><td>pod</td></tr>
-    <tr><td>Argo Workflows</td><td>aktarımı dışarı çıkar</td><td><span class="gr">hayır</span></td><td><span class="rd">yok</span></td><td>pod</td></tr>
-    <tr><td>Databricks</td><td>denetimli mount</td><td><span class="gr">hayır</span></td><td><span class="gr">UC + MLflow</span></td><td>100 GB</td></tr>
-    <tr><td>AWS · Microsoft</td><td>mount / havuzdan al</td><td><span class="rd">EVET</span> / —</td><td><span class="rd">yok</span></td><td>8 saat / oturum</td></tr>
-    <tr><td>E2B · Modal · Vercel</td><td>depoyu sen getir</td><td><span class="rd">EVET</span></td><td><span class="rd">yok</span></td><td>bucket</td></tr>
-    <tr><td>Devin</td><td>artifact git'tir</td><td>—</td><td>git commit</td><td>süresiz</td></tr>
+    <tr><td>Anthropic</td><td><b>container'ı sakla</b><br><span class="dim">ortamı yaşat — 30 gün, 5 dk'da dondur</span></td><td><span class="gr">hayır</span></td><td><span class="rd">file_id — soy yok</span></td><td>30 gün</td></tr>
+    <tr><td>OpenAI</td><td><b>çalışma alanı ≠ kalıcı durum</b><br><span class="dim">/mnt/data bir depo değil, tezgâh</span></td><td><span class="gr">hayır</span></td><td><span class="rd">yok</span></td><td>20 dakika</td></tr>
+    <tr><td>Cloudflare</td><td><b>kod yaz, tool çağırma</b><br><span class="dim">tezi artifact'le ilgili bile değil</span></td><td>proxy'de</td><td><span class="rd">olamaz</span></td><td>mount</td></tr>
+    <tr><td>Google ADK</td><td><b>isim ucuz, içerik pahalı</b><br><span class="dim">isimler her turda, içerik istenince</span></td><td><span class="gr">hayır</span></td><td><span class="gr">ad + sürüm</span></td><td>framework</td></tr>
+    <tr><td>Red Hat / KFP</td><td><b>DAG yazılıdır</b><br><span class="dim">girdi bağlanmış — keşif sorunu yok</span></td><td><span class="rd">EVET</span></td><td><span class="gr">MLMD</span></td><td>pod</td></tr>
+    <tr><td>Argo Workflows</td><td><b>aktarımı dışarı çıkar</b><br><span class="dim">argoexec ayrı imaj; katalog tutmuyor</span></td><td><span class="gr">hayır</span></td><td><span class="rd">yok</span></td><td>pod</td></tr>
+    <tr><td>Databricks</td><td><b>denetimli mount</b><br><span class="dim">aracı sürücünün İÇİNDE</span></td><td><span class="gr">hayır</span></td><td><span class="gr">UC + MLflow</span></td><td>100 GB</td></tr>
+    <tr><td>AWS · Microsoft</td><td><b>mount / havuzdan al</b><br><span class="dim">altyapı satıyor, mentalite değil</span></td><td><span class="rd">EVET</span> / —</td><td><span class="rd">yok</span></td><td>8 saat / oturum</td></tr>
+    <tr><td>E2B · Modal · Vercel</td><td><b>depoyu sen getir</b><br><span class="dim">kalıcılık senin problemin</span></td><td><span class="rd">EVET</span></td><td><span class="rd">yok</span></td><td>bucket</td></tr>
+    <tr><td>Devin</td><td><b>artifact git'tir</b><br><span class="dim">sandbox hiç ölmüyor — soru doğmuyor</span></td><td>—</td><td>git commit</td><td>süresiz</td></tr>
   </table></div>
   <p class="say"><b class="am">Araştırmanın en keskin bulgusu:</b> kayıt defteri yalnızca
     yazma yolu <b>bir bileşenden geçtiğinde</b> ayakta kalıyor. Dosya sistemine mount eden
-    hiçbir üründe artifact registry <b>yok</b> — çünkü mount'ta araya girecek yer yok.</p>
+    hiçbir üründe artifact registry <b>yok</b> — çünkü mount'ta araya girecek yer yok.
+    <b>Tek yöne okuyun:</b> araya giren katman defterin <b>ön koşulu</b>, garantisi değil —
+    Argo'nun bileşeni var ama katalog tutmuyor. <span class="dim">Mount ailesindeki tek
+    istisna Databricks: aracıyı kaldırmamış, sürücünün içine gömmüş.</span></p>
 </section>
 
 <!-- 03 ── DÖRT AİLE ───────────────────────────────────── -->
@@ -381,7 +390,7 @@ internet            ConnectionError</pre></div>
 </section>
 
 <!-- 10 ── HATA GERİ BİLDİRİMİ ─────────────────────────── -->
-<section class="s" data-t="Hata geri bildirimi">
+<section class="s sik" data-t="Hata geri bildirimi">
   <div class="kicker">Piyasa · 05 · aynı hata, altı cevap</div>
   <h2 class="sm">Kod patlıyor. Modele <span class="am">ne dönüyor?</span></h2>
   <div class="body grid g21">
@@ -392,54 +401,61 @@ internet            ConnectionError</pre></div>
 d = {"a": 1}
 d["yok"]                   # ← burada patladı</pre>
   </div>
+  <p class="say" style="margin:.35rem 0 0;font-size:.8em"><b class="am">Şerit:</b>
+    <code>çıkış</code> exit code · <code>stdout</code> print'ler ·
+    <code>stderr</code> traceback akışı · <code>tip</code> KeyError ·
+    <code>kaynak</code> patlayan satır · <code>talimat</code> ne yapılacağı —
+    <span class="dim">Anthropic ikisini <b>ayrı alanda</b> taşıyor, diğerleri
+    tek akışta birleştiriyor.</span></p>
   <div class="body grid g3">
     <div class="k gr"><h3>Claude Code</h3>
-      <pre style="border:none;padding:.3rem 0;background:none">Exit code 1
+      <div class="kv"><pre style="border:none;padding:.3rem 0;background:none">Exit code 1
 veri yuklendi          ← stdout KORUNDU
 Traceback (most recent call last):
   File "kod.py", line 3, in &lt;module&gt;
     d["yok"]
-KeyError: 'yok'</pre></div>
+KeyError: 'yok'</pre><div class="tik"><b>✓</b> çıkış<br><b>✓</b> stdout<br><b>✓</b> stderr<br><b>✓</b> tip<br><b>✓</b> kaynak<br><i>✗</i> talimat</div></div><p style="margin-top:.25rem;font-size:.82em" class="dim"><b class="am">kırpma</b> · 12 KB tam geldi · 39,5 KB dosyaya taşındı — eşik arada, <b>tam değer ölçülemedi</b></p></div>
     <div class="k gr"><h3>Codex <span class="dim">· kaynak kod</span></h3>
-      <pre style="border:none;padding:.3rem 0;background:none">Exit code: 1
+      <div class="kv"><pre style="border:none;padding:.3rem 0;background:none">Exit code: 1
 Wall time: 0.4 seconds
 Total output lines: 6
 Output:
 veri yuklendi
-… KeyError: 'yok'</pre></div>
+… KeyError: 'yok'</pre><div class="tik"><b>✓</b> çıkış<br><b>✓</b> stdout<br><b>✓</b> stderr<br><b>✓</b> tip<br><b>✓</b> kaynak<br><i>✗</i> talimat</div></div><p style="margin-top:.25rem;font-size:.82em" class="dim"><b class="am">kırpma</b> · <b>ORTADAN</b>, işaretli (<code>truncate_middle_chars</code>) — sabit belgelenmemiş</p></div>
     <div class="k gr"><h3>Anthropic API</h3>
-      <pre style="border:none;padding:.3rem 0;background:none">{"stdout": "veri yuklendi",
+      <div class="kv"><pre style="border:none;padding:.3rem 0;background:none">{"stdout": "veri yuklendi",
  "stderr": "Traceback …KeyError",
  "return_code": 1}
 + tipli error_code
-  execution_time_exceeded …</pre></div>
+  execution_time_exceeded …</pre><div class="tik"><b>✓</b> çıkış<br><b>✓</b> stdout<br><b>✓</b> stderr<br><b>✓</b> tip<br><b>✓</b> kaynak<br><i>✗</i> talimat</div></div><p style="margin-top:.25rem;font-size:.82em" class="dim"><b class="am">kırpma</b> · belgelenmemiş</p></div>
     <div class="k"><h3>smolagents</h3>
-      <pre style="border:none;padding:.3rem 0;background:none">Code execution failed at line
+      <div class="kv"><pre style="border:none;padding:.3rem 0;background:none">Code execution failed at line
 'd["yok"]' due to:
 KeyError: 'yok'
 Execution logs:
-veri yuklendi</pre>
+veri yuklendi</pre><div class="tik"><i>✗</i> çıkış<br><b>✓</b> stdout<br><i>✗</i> stderr<br><b>✓</b> tip<br><b>✓</b> kaynak<br><i>✗</i> talimat</div></div>
       <p style="margin-top:.25rem" class="dim">Satırın <b>kaynak metni</b> + tip + stdout.
-        Traceback yok.</p></div>
+        Traceback yok.</p><p style="margin-top:.25rem;font-size:.82em" class="dim"><b class="am">kırpma</b> · <b>20 000</b> karakter, <b>ORTADAN</b> (<code>MAX_LENGTH_TRUNCATE_CONTENT</code>)</p></div>
     <div class="k"><h3>AutoGen / AG2</h3>
-      <pre style="border:none;padding:.3rem 0;background:none">exitcode: 1 (execution failed)
+      <div class="kv"><pre style="border:none;padding:.3rem 0;background:none">exitcode: 1 (execution failed)
 Code output:
 Traceback (most recent call last):
   …
-KeyError: 'yok'</pre>
-      <p style="margin-top:.25rem" class="dim">Tam stderr, <b class="rd">kırpma yok</b>.
-        Timeout ayrı: kod <b>124</b>.</p></div>
+KeyError: 'yok'</pre><div class="tik"><b>✓</b> çıkış<br><b>✓</b> stdout<br><b>✓</b> stderr<br><b>✓</b> tip<br><b>✓</b> kaynak<br><i>✗</i> talimat</div></div>
+      <p style="margin-top:.25rem" class="dim">Tam stderr. Timeout ayrı: kod <b>124</b>.</p><p style="margin-top:.25rem;font-size:.82em" class="dim"><b class="am">kırpma</b> · <b class="rd">YOK</b> — sınır koymuyor</p></div>
     <div class="k rd"><h3>Eski hâlimiz</h3>
-      <pre style="border:none;padding:.3rem 0;background:none">Hata: 'yok'
-Tahmini bir değer üretme.</pre>
+      <div class="kv"><pre style="border:none;padding:.3rem 0;background:none">Hata: 'yok'
+Tahmini bir değer üretme.</pre><div class="tik"><i>✗</i> çıkış<br><i>✗</i> stdout<br><i>✗</i> stderr<br><i>✗</i> tip<br><i>✗</i> kaynak<br><i>✗</i> talimat</div></div>
       <p style="margin-top:.25rem" class="dim">Tip yok · satır yok · stdout yok.
-        Ve metin modele <b class="rd">DUR</b> diyor.</p></div>
+        Ve metin modele <b class="rd">DUR</b> diyor.</p><p style="margin-top:.25rem;font-size:.82em" class="dim"><b class="am">kırpma</b> · gereksiz — zaten hiçbir şey taşımıyor</p></div>
   </div>
   <p class="say"><b class="am">Üçünde aynı üçlü var:</b> çıkış kodu · tam traceback ·
-    hata anında korunan stdout. <b>SWE-agent</b> kırptığında bunu söylüyor
-    <i>ve ne yapacağını öğretiyor</i>; <b>OpenHands</b> aynı hatayı 3 kez alınca
-    öldürmüyor, <b>dürtüyor</b>; <b>Copilot</b>'ta döngünün varlığı belgeli ama
-    <b class="rd">mekanizma değil</b>.</p>
+    korunan stdout. Ve <b>talimat sütunu altısında da boş.</b>
+    <span class="dim"><b>SWE-agent</b> <code>max_observation_length</code>
+    100 000 / 10 000 — varsayılan <b class="rd">baştan</b>, <code>bash_only</code>
+    <b class="gr">ortadan</b>; <b>OpenHands</b> 3. tekrarda dürtüyor;
+    <b>Copilot</b> belgelenmemiş. <b class="am">Bizimki 20 000, ortadan,
+    her parça ayrı.</b></span></p>
 </section>
 
 <!-- 11 ── ÖLÇÜM ──────────────────────────────────────── -->

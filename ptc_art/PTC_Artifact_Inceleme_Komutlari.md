@@ -59,15 +59,32 @@ Depodaki baytların çoğu ikili: parquet, pdf, png, tar. `curl | json.tool`
 çalışmıyor, `cat` ekranı bozuyor. Bu betik içerik tipine bakıp doğru biçimde
 açıyor:
 
-```bash
-PY=/home/altan/Desktop/Data-Science-Reports/ptc_sec/.venv/bin/python
+### Kısayol — bir kere yapıştır, sonrası `bak`
 
-$PY scripts/artifact_bak.py --liste                     # depoda ne var
-$PY scripts/artifact_bak.py departman_ozet.parquet      # ada göre
-$PY scripts/artifact_bak.py art_79f0                    # kısaltılmış id yeter
-$PY scripts/artifact_bak.py rapor.pdf@onaylanmis        # alias'la sabit sürüm
-$PY scripts/artifact_bak.py art_79f0 --kunye            # yalnızca künye
-$PY scripts/artifact_bak.py art_79f0 --kaydet /tmp/x    # ham baytlar
+Betik kendi konumundan proje kökünü buluyor, yani **hangi dizinden çağırdığın
+fark etmiyor**. Uzun yolu her seferinde yazmamak için:
+
+```bash
+bak() { /home/altan/Desktop/Data-Science-Reports/ptc_sec/.venv/bin/python \
+        /home/altan/Desktop/Data-Science-Reports/ptc_art/scripts/artifact_bak.py "$@"; }
+```
+
+Kalıcı olsun istersen `~/.bashrc`'ye ekle. Sonra:
+
+```bash
+bak --liste                    # depoda ne var
+bak rapor.json                 # ada göre
+bak art_409b                   # kısaltılmış id yeter
+bak rapor.json@onaylanmis      # alias'la sabit sürüm
+bak art_409b --kunye           # yalnızca künye
+bak art_409b --kaydet /tmp/x   # ham baytlar
+```
+
+Kısayolsuz tam hâli (kopyala-yapıştır, herhangi bir dizinden):
+
+```bash
+/home/altan/Desktop/Data-Science-Reports/ptc_sec/.venv/bin/python \
+  /home/altan/Desktop/Data-Science-Reports/ptc_art/scripts/artifact_bak.py --liste
 ```
 
 Örnek çıktı:
@@ -196,6 +213,84 @@ curl -s -X PUT -H "X-Scope-Token: $(jeton)" \
 ```
 
 Alias biçimi: `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` — uymayan 400 alıyor.
+
+### Canlı yürüyüş — alias'ı anlatmanın en kısa yolu
+
+Aşağısı baştan sona koşuldu; çıktılar gerçek. Sunumda alias'ı göstermek için
+hazır prop.
+
+**① Aynı addan üç sürüm üret**
+
+```bash
+T=$(PYTHONPATH=src \
+    ../ptc_sec/.venv/bin/python -c "
+from dotenv import load_dotenv; load_dotenv()
+from grounded_assistant.agent.graph import _kapsam_jetonu
+print(_kapsam_jetonu('demo-alias'))")
+
+for s in 1 2 3; do
+  curl -s -X POST http://127.0.0.1:8080/artifacts \
+    -H "X-Scope-Token: $T" -H "X-Artifact-Name: rapor.json" \
+    -H "Content-Type: application/json" \
+    --data "{\"surum\": $s, \"deger\": $((s*10))}"; echo
+  sleep 1
+done
+```
+
+**② Alias YOKKEN — en yeni sessizce kazanıyor**
+
+```bash
+bak rapor.json          # → art_2ce5f42a84b3   {"surum": 3}
+```
+
+**③ Etiketi EN ESKİ sürüme koy**
+
+```bash
+curl -s -X PUT -H "X-Scope-Token: $T" \
+  "http://127.0.0.1:8080/artifacts/art_409b34e062da/alias?alias=onaylanmis"
+# → {"artifact_id":"art_409b34e062da","alias":"onaylanmis"}
+```
+
+**④ Artık aynı ad İKİ kapı**
+
+```bash
+bak rapor.json                 # → sürüm 3   (alias istemedin)
+bak rapor.json@onaylanmis      # → sürüm 1   (alias istedin)
+```
+
+**⑤ Etiketi taşı — eski sahipten kendiliğinden alınır**
+
+```bash
+curl -s -X PUT -H "X-Scope-Token: $T" \
+  "http://127.0.0.1:8080/artifacts/art_9fe494a9f7f2/alias?alias=onaylanmis"
+
+bak --liste     # alias yalnızca art_9fe…'de; diğer ikisinde yok
+```
+
+**⑥ Ama sürümün kendisi değişmedi**
+
+```bash
+bak art_409b                   # hâlâ {"surum": 1, "deger": 10}
+```
+
+Alias **taşınır**, artifact **değişmez**. Git'teki tag/commit ayrımının aynısı:
+`update` diye bir metot yok, değişen tek şey neye işaret ettiğin.
+
+**⑦ Kaldır**
+
+```bash
+curl -s -X PUT -H "X-Scope-Token: $T" \
+  "http://127.0.0.1:8080/artifacts/art_9fe494a9f7f2/alias"
+# → {"artifact_id":"art_9fe494a9f7f2","alias":null}
+```
+
+**Neden PL-C hattı EN ESKİYİ sabitliyor:** en yeniyi sabitleseydin, alias hiç
+çalışmasa da aynı sonuç çıkardı. En eskiyi seçince sonuç, alias'ın gerçekten
+devrede olduğunun tek kanıtı oluyor.
+
+**Ve alias kendiliğinden kazanmaz** — adıyla istenmesi gerekiyor
+(`ad@alias`). `query` düğümü sen istemediysen log'a düşüyor:
+`not: bu adda sabitlenmiş sürüm(ler) var (@onaylanmis) — bu adım hiçbirini istemedi`
 
 ---
 
