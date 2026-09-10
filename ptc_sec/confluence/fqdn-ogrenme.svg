@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1068" height="423" viewBox="16 0 1068 423">
+<rect x="16" y="0" width="1068" height="423" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">İsim kuralı aslında nasıl çalışıyor</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Motor ismi değil, isimden öğrendiği adresi kaydeder.</text>
+<rect x="40" y="124" width="260" height="66" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="170" y="153" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">1 · İsim sorulur</text>
+<text x="170" y="172" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">api.ornek.com</text>
+<polyline points="304,157 396,157" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="396.0,157.0 383.0,151.5 383.0,162.5" fill="#868e96"/>
+<rect x="400" y="124" width="260" height="66" rx="10" fill="#f1f3f5" stroke="#1e1e1e" stroke-width="2"/>
+<text x="530" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">2 · Cevap: bir IP</text>
+<polyline points="664,157 756,157" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="756.0,157.0 743.0,151.5 743.0,162.5" fill="#868e96"/>
+<rect x="760" y="124" width="300" height="66" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="910" y="153" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">3 · Motor O IP&#x27;yi</text>
+<text x="910" y="172" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">onaylı kaydeder</text>
+<polyline points="910,194 910,250" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="910.0,250.0 915.5,237.0 904.5,237.0" fill="#2f9e44"/>
+<rect x="760" y="252" width="300" height="60" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="910" y="287" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">O IP&#x27;ye TCP geçer</text>
+<text x="40" y="370" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#e03131" text-anchor="start" font-weight="400">Kaydın içinde HANGİ İSİM için olduğu bilgisi yoktur — yalnızca IP.</text>
+<text x="40" y="394" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#e03131" text-anchor="start" font-weight="400">Paylaşılan IP sorunu buradan doğar.</text>
+</svg>

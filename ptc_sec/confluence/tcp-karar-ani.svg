@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1013" height="463" viewBox="16 0 1013 463">
+<rect x="16" y="0" width="1013" height="463" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">Karar ne zaman veriliyor</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">TCP&#x27;de karar ilk pakette — el sıkışma hiç başlamadan.</text>
+<text x="40" y="120" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#2f9e44" text-anchor="start" font-weight="400">ONAYLI HEDEF</text>
+<rect x="40" y="130" width="180" height="60" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="130" y="165" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">İstemci</text>
+<polyline points="224,160 336,160" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="336.0,160.0 323.0,154.5 323.0,165.5" fill="#2f9e44"/>
+<text x="228" y="146" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#2f9e44" text-anchor="start" font-weight="400">SYN</text>
+<rect x="340" y="130" width="200" height="60" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="440" y="165" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">eBPF: ALLOW</text>
+<polyline points="544,160 656,160" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="656.0,160.0 643.0,154.5 643.0,165.5" fill="#2f9e44"/>
+<rect x="660" y="130" width="200" height="60" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="760" y="165" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Bağlantı kurulur</text>
+<text x="884" y="164" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">sonraki paketler</text>
+<text x="884" y="181" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">hızlı yoldan</text>
+<text x="40" y="248" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#e03131" text-anchor="start" font-weight="400">ONAYSIZ HEDEF</text>
+<rect x="40" y="258" width="180" height="60" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="130" y="293" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">İstemci</text>
+<polyline points="224,288 336,288" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="336.0,288.0 323.0,282.5 323.0,293.5" fill="#e03131"/>
+<text x="228" y="274" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#e03131" text-anchor="start" font-weight="400">SYN</text>
+<rect x="340" y="258" width="200" height="60" rx="10" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<text x="440" y="293" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">eBPF: DROP</text>
+<text x="560" y="282" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#e03131" text-anchor="start" font-weight="400">SYN-ACK hiç gelmez</text>
+<text x="560" y="305" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#868e96" text-anchor="start" font-weight="400">istemci: sessizlik, sonra zaman aşımı</text>
+<text x="40" y="386" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">UDP&#x27;de &quot;bağlantı&quot; kavramı yoktur — hızlı yol kısayolu oluşmaz, her paket</text>
+<text x="40" y="410" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">ayrı değerlendirilir. Bu yüzden tek bir deneme onlarca düşürülmüş paket</text>
+<text x="40" y="434" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">kaydı üretebilir. Kayıt sayısı, deneme sayısı demek değildir.</text>
+</svg>

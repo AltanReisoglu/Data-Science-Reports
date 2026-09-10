@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1028" height="393" viewBox="16 0 1028 393">
+<rect x="16" y="0" width="1028" height="393" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">Politika kernel&#x27;e nasıl iniyor</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Yazdığınız YAML, paketi durduran koda dönüşür.</text>
+<rect x="40" y="120" width="250" height="70" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="165" y="161" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle" font-weight="600">YAML politika</text>
+<polyline points="294,155 386,155" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="386.0,155.0 373.0,149.5 373.0,160.5" fill="#868e96"/>
+<text x="298" y="140" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">derlenir</text>
+<rect x="390" y="120" width="250" height="70" rx="10" fill="#e5dbff" stroke="#6741d9" stroke-width="2"/>
+<text x="515" y="161" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle" font-weight="600">eBPF bytecode</text>
+<polyline points="644,155 736,155" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="736.0,155.0 723.0,149.5 723.0,160.5" fill="#868e96"/>
+<text x="648" y="140" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">yüklenir</text>
+<rect x="740" y="120" width="280" height="70" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="880" y="151" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Ağ arayüzü</text>
+<text x="880" y="170" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">tc hook</text>
+<polyline points="880,194 880,244" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="880.0,244.0 885.5,231.0 874.5,231.0" fill="#868e96"/>
+<text x="892" y="218" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">paket gelince</text>
+<rect x="740" y="246" width="130" height="60" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="805" y="282" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle" font-weight="600">ALLOW</text>
+<rect x="890" y="246" width="130" height="60" rx="10" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<text x="955" y="282" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle" font-weight="600">DROP</text>
+<text x="40" y="364" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Karar mikrosaniyeler içinde, kernel&#x27;den hiç çıkmadan verilir.</text>
+</svg>

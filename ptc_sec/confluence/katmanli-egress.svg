@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1086" height="456" viewBox="16 0 1086 456">
+<rect x="16" y="0" width="1086" height="456" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">Katmanlı egress kontrolü</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Sandbox tek kapıdan çıkar — ve o kapının kendi çıkışı da kısıtlıdır.</text>
+<rect x="40" y="116" width="250" height="80" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="165" y="152" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Sandbox</text>
+<text x="165" y="171" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">üretilen kod burada</text>
+<polyline points="294,156 430,156" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="430.0,156.0 417.0,150.5 417.0,161.5" fill="#2f9e44"/>
+<text x="300" y="140" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#2f9e44" text-anchor="start" font-weight="400">tek izinli hedef</text>
+<rect x="434" y="116" width="250" height="80" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="559" y="152" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Çıkış vekili</text>
+<text x="559" y="171" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">sabit, denetimli işlevler</text>
+<polyline points="688,156 824,156" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="824.0,156.0 811.0,150.5 811.0,161.5" fill="#2f9e44"/>
+<text x="694" y="140" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#2f9e44" text-anchor="start" font-weight="400">onaylı isimler</text>
+<rect x="828" y="116" width="250" height="80" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="953" y="161" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Onaylı dış hedefler</text>
+<polyline points="164,200 164,268" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="164.0,268.0 169.5,255.0 158.5,255.0" fill="#e03131"/>
+<text x="46" y="289" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#e03131" text-anchor="start" font-weight="400">her yer — DNS bile yok</text>
+<polyline points="558,200 558,268" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="558.0,268.0 563.5,255.0 552.5,255.0" fill="#e03131"/>
+<text x="430" y="289" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#e03131" text-anchor="start" font-weight="400">onaylı olmayan her yer</text>
+<text x="40" y="360" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#1e1e1e" text-anchor="start" font-weight="400">Neden iki katman</text>
+<text x="40" y="390" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Sandbox&#x27;ın çıkışını kapatmak tek başına yetmez: ulaşabildiği bir servisin</text>
+<text x="40" y="409" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">çıkışı açıksa, o servis bir köprü olarak kullanılabilir (SSRF). Bu yüzden</text>
+<text x="40" y="428" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">kapının kendi egress&#x27;i de daraltılır — ele geçirilse bile yayılamaz.</text>
+</svg>
