@@ -7,13 +7,16 @@
 
 ### Bu sayfadaki diyagramlar
 
-İkisi de Excalidraw sahnesi olarak yanında duruyor; Confluence'ta
+Hepsi Excalidraw sahnesi olarak yanında duruyor; Confluence'ta
 **Insert → Excalidraw → Import** ile açılıyor ve sayfada düzenlenebiliyor.
 
 | Dosya | Bölüm | Ne gösteriyor |
 |---|---|---|
 | Hata kurtarma döngüsü | §2 | Döngü ve üç karar noktası |
 | Sebep-farkında bütçe | §6 | Üç arıza sınıfı, üç ayrı bütçe |
+| Çıktı büyüyünce: dört strateji | §8 | Kırpma yöntemleri |
+| Aynı sinyal, farklı bedel | §11 | Ölçülmüş sinyal ve bayt |
+| Sebep nasıl ayrılıyor | §13 | Piyasa: Anthropic, Codex, AutoGen |
 
 Her diyagram üç biçimde duruyor: sayfada görünen **`.png`**, baskı/ölçek için
 **`.svg`**, ve Confluence'ta düzenlemek için **`.excalidraw`** kaynağı.
@@ -248,6 +251,11 @@ ile bitiyor.
 
 ## 8 · Kırpma — dört farklı strateji
 
+![Çıktı büyüyünce: dört strateji](kirpma-stratejileri.png)
+
+> Düzenlemek için: `kirpma-stratejileri.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 Traceback + stdout birleşince mesaj büyüyor. Herkes bir sınır koymuş ama
 **dört farklı yol** seçilmiş:
 
@@ -402,6 +410,11 @@ Output:
 
 ## 11 · Biçimler yan yana — ölçülmüş
 
+![Aynı sinyal, farklı bedel](sinyal-bayt.png)
+
+> Düzenlemek için: `sinyal-bayt.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 Aynı beş arıza, on biçimlendiriciye **aynı ham malzemeyle** verildi (istisna
 nesnesi, o ana kadarki stdout, çıkış kodu, süre); üretilen metin yedi ölçütte
 tarandı.
@@ -444,20 +457,65 @@ stratejisi.
 
 ---
 
-## 13 · Kaynaklar
+## 13 · Piyasa analizi
+
+Ürünler sayfa boyunca geçti; burada her biri tek satırda, **kanıtın türüyle**
+birlikte. Yan yana iki "✓" aynı ağırlıkta değil.
+
+| Sistem | Kanıt | Modele ne dönüyor | Kırpma | Sebep ayrımı | Duruş |
+|---|---|---|---|---|---|
+| **Claude Code** | doğrudan gözlem | çıkış kodu + tam traceback + stdout | dosyaya taşı, ~2 KB önizleme | gözlenmedi | sabit sınır gözlenmedi |
+| **OpenAI Codex** | kaynak kod | çıkış kodu + süre + çıktı | ortadan, işaretli | sezgisel (`is_likely_sandbox_denied`) | kod hatası için sabit yok |
+| **Anthropic API** | resmî doküman | `return_code` + `stderr` + `stdout` | belgelenmemiş | tipli `error_code` | 90 sn / REPL hücresi |
+| **GitHub Copilot agent** | ürün anlatımı | belgelenmemiş | belgelenmemiş | belgelenmemiş | döngü var, sınırı belgelenmemiş |
+| **smolagents** | kaynak kod | hatalı satır + istisna tipi + stdout | ortadan, 20 000 | yok | `max_steps` 20, son cevap zorlanır |
+| **AutoGen / AG2** | kaynak kod | çıkış kodu + tam stderr + stdout | yok | yalnızca süre aşımı (124) | — |
+| **SWE-agent** | kaynak kod + makale | tam gözlem | 100 000 / 10 000, öğretici not | — | — |
+| **OpenHands** | kaynak kod | — | — | — | 500 iterasyon + 10 USD · aynı hata 3× → dürtme |
+
+![Sebep nasıl ayrılıyor](sebep-ayrimi.png)
+
+> Düzenlemek için: `sebep-ayrimi.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+### Ürün başına tek not
+
+* **Claude Code** — kaynak kapalı; 2026-09-08'de araca bilerek hata verdirilip
+  ölçüldü. Eşik **12,0 KB (tam geldi) ile 39,5 KB (dosyaya taşındı)** arasında;
+  birimi belirlenemedi. Harness parametresi, sürümle değişebilir.
+* **Codex** — kullanıcının komut çıktısı `<user_shell_command>` etiketli bir
+  blokta dönüyor: araç çıktısı talimattan ayrılmış. GitHub'daki "retry"
+  tartışmalarının çoğu **altyapı** yeniden denemesi (429, akış kopması) — kod
+  hatası kurtarmayla karıştırılmamalı.
+* **Anthropic API** — zaman aşımı iki katmanlı: REPL hücresi 90 sn'yi aşarsa
+  normal sonuç, bütün araç çağrısı aşarsa `execution_time_exceeded` hatası.
+* **Copilot** — *"self-correct when they hit errors or failing tests"*;
+  mekanizma (yük, kırpma, bütçe) resmî dokümanda yok.
+* **OpenAI Code Interpreter** — kod hatasında modele ne döndüğü resmî dokümanda
+  bulunamadı.
+
+> Doğrulanamayanlar: OpenHands varsayılan iterasyonu (kaynakta 500, şablonda
+> 250); Claude Code ve Codex'in deneme bütçesi; traceback'ten sır maskeleme
+> incelenen dört kaynak kodda bulunamadı. Cursor, Devin, Jules, LangGraph,
+> Aider, CrewAI incelenmedi.
+
+---
+
+## 14 · Kaynaklar
 
 ### Kaynak kod
 
 * smolagents — [`local_python_executor.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/local_python_executor.py) · [`agents.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/agents.py) · [`memory.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/memory.py) · [`utils.py`](https://github.com/huggingface/smolagents/blob/main/src/smolagents/utils.py)
 * AutoGen / AG2 — [`local_commandline_code_executor.py`](https://github.com/microsoft/autogen/blob/0.2/autogen/coding/local_commandline_code_executor.py) · [`conversable_agent.py`](https://github.com/microsoft/autogen/blob/0.2/autogen/agentchat/conversable_agent.py) · [`code_utils.py`](https://github.com/microsoft/autogen/blob/0.2/autogen/code_utils.py)
 * SWE-agent — [`sweagent/agent/agents.py`](https://github.com/SWE-agent/SWE-agent/blob/main/sweagent/agent/agents.py) · [`config/bash_only.yaml`](https://github.com/SWE-agent/SWE-agent/blob/main/config/bash_only.yaml)
-* OpenAI Codex — [`sandboxing/src/denial.rs`](https://github.com/openai/codex/blob/main/codex-rs/sandboxing/src/denial.rs) · [`core/src/tools/mod.rs`](https://github.com/openai/codex/blob/main/codex-rs/core/src/tools/mod.rs) · [`utils/output-truncation/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/utils/output-truncation/src/lib.rs)
+* OpenAI Codex — [`sandboxing/src/denial.rs`](https://github.com/openai/codex/blob/main/codex-rs/sandboxing/src/denial.rs) · [`core/src/tools/mod.rs`](https://github.com/openai/codex/blob/main/codex-rs/core/src/tools/mod.rs) · [`utils/output-truncation/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/utils/output-truncation/src/lib.rs) · [`context/user_shell_command.rs`](https://github.com/openai/codex/blob/main/codex-rs/core/src/context/user_shell_command.rs)
 * OpenHands — [`stuck_detector.py`](https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/stuck_detector.py) · [`types.py`](https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/types.py)
 
 ### Resmî dokümantasyon
 
 * Anthropic — [Code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool)
 * smolagents — [Secure code execution](https://github.com/huggingface/smolagents/blob/main/docs/source/en/tutorials/secure_code_execution.md)
+* GitHub Copilot — [Agent mode 101](https://github.blog/ai-and-ml/github-copilot/agent-mode-101-all-about-github-copilots-powerful-mode/) · [Test with Copilot](https://code.visualstudio.com/docs/agents/guides/test-with-copilot)
 
 ### Makaleler
 

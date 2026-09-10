@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1166" height="622" viewBox="-4 -12 1166 622">
+<rect x="-4" y="-12" width="1166" height="622" fill="#ffffff"/>
+<rect x="250" y="100" width="37" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<rect x="250" y="148" width="37" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<rect x="250" y="196" width="43" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<rect x="250" y="244" width="65" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<rect x="250" y="292" width="677" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<rect x="250" y="340" width="678" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<rect x="250" y="388" width="691" height="30" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="1"/>
+<polyline points="250,94 250,440" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<polyline points="250,440 950,440" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<polyline points="250,440 250,448" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<polyline points="409,440 409,448" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<polyline points="568,440 568,448" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<polyline points="727,440 727,448" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<polyline points="886,440 886,448" fill="none" stroke="#757575" stroke-width="1" stroke-linecap="round"/>
+<rect x="20" y="490" width="1100" height="96" rx="8" fill="none" stroke="#868e96" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="20" y="32" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Aynı sinyal, farklı bedel</text>
+<text x="22" y="64" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Beş senaryonun ortalaması — çubuk: modele giden bayt  ·  etiket: 35 üzerinden sinyal</text>
+<text x="20" y="118" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">SWE-agent (bash_only)</text>
+<text x="297" y="118" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">2 331 bayt · sinyal 26/35</text>
+<text x="20" y="166" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Codex</text>
+<text x="297" y="166" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">2 356 bayt · sinyal 30/35</text>
+<text x="20" y="214" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Claude Code</text>
+<text x="303" y="214" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">2 701 bayt · sinyal 30/35</text>
+<text x="20" y="262" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">smolagents</text>
+<text x="325" y="262" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">4 114 bayt · sinyal 22/35</text>
+<text x="20" y="310" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">OpenHands</text>
+<text x="937" y="310" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">42 555 bayt · sinyal 29/35</text>
+<text x="20" y="358" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">AutoGen / AG2</text>
+<text x="938" y="358" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">42 587 bayt · sinyal 29/35</text>
+<text x="20" y="406" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Anthropic API</text>
+<text x="951" y="406" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="start">43 437 bayt · sinyal 29/35</text>
+<text x="246" y="462" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">0</text>
+<text x="389" y="462" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">10 000</text>
+<text x="548" y="462" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">20 000</text>
+<text x="707" y="462" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">30 000</text>
+<text x="866" y="462" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">40 000</text>
+<text x="570" y="523" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Fark neredeyse tamamen 160 KB çıktılı senaryodan: Anthropic API 215 415 bayt · AutoGen 211 360 · Claude Code 12 056 · Codex 10 113</text>
+<text x="570" y="540" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Ölçüt listesi bu araştırmadan çıktı — sıralamada dairesellik var. Tablo düzeltme başarısını ölçmüyor.</text>
+<text x="570" y="558" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Biçimler belgelenmiş davranıştan yeniden kuruldu; ürünlerin kendi kodu çalıştırılmadı.</text>
+</svg>

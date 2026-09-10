@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1152" height="732" viewBox="-4 -12 1152 732">
+<rect x="-4" y="-12" width="1152" height="732" fill="#ffffff"/>
+<rect x="560" y="50" width="22" height="22" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1"/>
+<rect x="705" y="50" width="22" height="22" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="1"/>
+<rect x="850" y="50" width="22" height="22" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="1"/>
+<rect x="995" y="50" width="22" height="22" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1"/>
+<rect x="20" y="84" width="260" height="420" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="28" y="94" width="244" height="62" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="32" y="170" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="32" y="234" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="32" y="298" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="32" y="362" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="32" y="426" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="300" y="84" width="260" height="420" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="308" y="94" width="244" height="62" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="312" y="170" width="236" height="54" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="580" y="84" width="260" height="420" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="588" y="94" width="244" height="62" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="592" y="170" width="236" height="54" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="592" y="234" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="592" y="298" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="592" y="362" width="236" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="860" y="84" width="260" height="420" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="868" y="94" width="244" height="62" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="872" y="170" width="236" height="54" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="20" y="522" width="1100" height="116" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" stroke-dasharray="8 6"/>
+<rect x="36" y="566" width="344" height="56" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="392" y="566" width="344" height="56" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="748" y="566" width="344" height="56" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="2"/>
+<text x="20" y="32" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Ürünler dört aileye nasıl dağılıyor</text>
+<text x="22" y="64" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Sütun = baytı kim taşıyor  ·  kutunun rengi = kayıt defteri</text>
+<text x="590" y="63" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">defter var</text>
+<text x="735" y="63" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">yalnızca künye</text>
+<text x="880" y="63" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">defter yok</text>
+<text x="1025" y="63" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">soru doğmuyor</text>
+<text x="150" y="117" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">A · MOUNT</text>
+<text x="150" y="137" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">araya girecek yer yok</text>
+<text x="150" y="190" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Cloudflare Sandbox</text>
+<text x="150" y="208" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">R2 mount (s3fs)</text>
+<text x="150" y="254" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">E2B · Daytona · Vercel</text>
+<text x="150" y="272" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">sandbox içinde FUSE</text>
+<text x="150" y="318" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Modal</text>
+<text x="150" y="336" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">CloudBucketMount</text>
+<text x="150" y="382" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">AWS AgentCore</text>
+<text x="150" y="400" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">platform NFS mount</text>
+<text x="150" y="446" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Fly.io Sprites</text>
+<text x="150" y="464" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">blok cihaz + ext4</text>
+<text x="430" y="117" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">B · SARMALAYICI</text>
+<text x="430" y="137" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">taşıyıcı kodun yanında</text>
+<text x="430" y="190" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">KFP / OpenShift AI</text>
+<text x="430" y="208" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">launcher · MLMD</text>
+<text x="710" y="117" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">C · SINIR</text>
+<text x="710" y="137" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">kod taşıyıcıya erişemez</text>
+<text x="710" y="190" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Anthropic</text>
+<text x="710" y="208" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">$OUTPUT_DIR → file_id</text>
+<text x="710" y="254" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">OpenAI</text>
+<text x="710" y="272" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">/mnt/data · 20 dk</text>
+<text x="710" y="318" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Microsoft ACA</text>
+<text x="710" y="336" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">/mnt/data · oturumla ölür</text>
+<text x="710" y="382" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Argo Workflows</text>
+<text x="710" y="400" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">wait sidecar → S3</text>
+<text x="990" y="117" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">D · DENETİMLİ MOUNT</text>
+<text x="990" y="137" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">sürücü her erişimde sorar</text>
+<text x="990" y="190" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Databricks</text>
+<text x="990" y="208" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">/Volumes · Unity Catalog</text>
+<text x="36" y="544" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Aile dışı — soruyu başka yerden çözenler</text>
+<text x="208" y="587" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Google ADK</text>
+<text x="208" y="605" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">baytı taşımaz · isimler talimatta</text>
+<text x="564" y="587" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Tekton</text>
+<text x="564" y="605" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">artifact = uri + digest (referans)</text>
+<text x="920" y="587" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Devin</text>
+<text x="920" y="605" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">sandbox ölmez · çıktı git commit'i</text>
+<text x="20" y="668" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">A sütununda tek bir yeşil kutu yok: mount edenlerin hiçbiri defter tutamıyor.</text>
+<text x="20" y="688" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Diğer sütunlarda kırmızı da var: araya giren bileşen defterin ön koşulu, garantisi değil.</text>
+</svg>

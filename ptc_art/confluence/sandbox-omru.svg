@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1148" height="666" viewBox="-4 -12 1148 666">
+<rect x="-4" y="-12" width="1148" height="666" fill="#ffffff"/>
+<rect x="20" y="126" width="260" height="196" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="32" y="168" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="32" y="240" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="300" y="126" width="260" height="196" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="312" y="168" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="312" y="240" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="580" y="126" width="260" height="196" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="592" y="168" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="592" y="240" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="860" y="126" width="260" height="196" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="1" opacity="0.45"/>
+<rect x="872" y="168" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="872" y="240" width="236" height="60" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<polyline points="20,340 1120,340" fill="none" stroke="#757575" stroke-width="2" stroke-linecap="round"/>
+<polygon points="1120,340 1108.3,345.7 1108.3,334.3" fill="#757575"/>
+<rect x="20" y="428" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="300" y="428" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="580" y="428" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="860" y="428" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="20" y="498" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="300" y="498" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="580" y="498" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="860" y="498" width="260" height="58" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="20" y="578" width="1100" height="52" rx="8" fill="none" stroke="#e03131" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="20" y="32" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Kalıcılığın iki stratejisi</text>
+<text x="22" y="64" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Ortamı yaşat ya da baytı ortamdan ayır  ·  sıralı, ölçekli değil</text>
+<text x="20" y="106" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#1e1e1e" text-anchor="start">ORTAMI YAŞATANLAR — sandbox ne kadar yaşıyor</text>
+<text x="34" y="148" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">çağrı / oturum kadar</text>
+<text x="150" y="191" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Cloudflare Code Mode</text>
+<text x="150" y="209" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">tek kullanımlık isolate</text>
+<text x="150" y="263" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Microsoft ACA</text>
+<text x="150" y="281" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">cooldown'da yok edilir</text>
+<text x="314" y="148" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">dakikalar – saatler</text>
+<text x="430" y="191" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">OpenAI</text>
+<text x="430" y="209" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">20 dk hareketsizlik</text>
+<text x="430" y="263" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">AWS AgentCore</text>
+<text x="430" y="281" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">15 dk – 8 saat</text>
+<text x="594" y="148" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">günler</text>
+<text x="710" y="191" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Google Agent Engine</text>
+<text x="710" y="209" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">14 güne kadar (TTL)</text>
+<text x="710" y="263" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Anthropic</text>
+<text x="710" y="281" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">30 gün · 5 dk'da checkpoint</text>
+<text x="874" y="148" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">süresiz</text>
+<text x="990" y="191" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Devin</text>
+<text x="990" y="209" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">snapshot · RAM dahil</text>
+<text x="990" y="263" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">E2B (snapshot)</text>
+<text x="990" y="281" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">öldürülene kadar duruyor</text>
+<text x="912" y="359" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">sandbox daha uzun yaşar</text>
+<text x="20" y="406" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#1e1e1e" text-anchor="start">BAYTI ORTAMDAN AYIRANLAR — sandbox ölür, bayt başka yerde yaşar</text>
+<text x="150" y="450" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">KFP / OpenShift AI</text>
+<text x="150" y="468" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">pipeline_root'un ömrü</text>
+<text x="430" y="450" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Argo Workflows</text>
+<text x="430" y="468" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">artifact deposunun ömrü</text>
+<text x="710" y="450" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Databricks</text>
+<text x="710" y="468" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">volume'ün ömrü</text>
+<text x="990" y="450" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">E2B · Modal · Vercel</text>
+<text x="990" y="468" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">senin bucket'ının ömrü</text>
+<text x="150" y="520" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">AWS AgentCore</text>
+<text x="150" y="538" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">senin S3 Files / EFS'in</text>
+<text x="430" y="520" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Cloudflare Sandbox</text>
+<text x="430" y="538" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">R2 / S3 / GCS bucket'ı</text>
+<text x="710" y="520" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">MLflow</text>
+<text x="710" y="538" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">sunucunun arkasındaki depo</text>
+<text x="990" y="520" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Google ADK</text>
+<text x="990" y="538" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">GcsArtifactService → GCS</text>
+<text x="570" y="606" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">Microsoft'ta iki ömür aynı: oturum yok edilince /mnt/data da gidiyor — kalıcı depo yok.</text>
+</svg>
