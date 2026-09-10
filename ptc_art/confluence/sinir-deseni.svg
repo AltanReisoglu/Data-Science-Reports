@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="779" height="520" viewBox="1 -4 779 520">
+<rect x="1" y="-4" width="779" height="520" fill="#ffffff"/>
+<rect x="30" y="80" width="545" height="295" rx="8" fill="none" stroke="#757575" stroke-width="2" stroke-dasharray="8 6" opacity="0.60"/>
+<rect x="58" y="128" width="218" height="108" rx="8" fill="#b2f2bb" stroke="#22c55e" stroke-width="2"/>
+<polyline points="300,112 300,290" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+<rect x="325" y="128" width="218" height="108" rx="8" fill="#fff3bf" stroke="#f59e0b" stroke-width="2"/>
+<rect x="165" y="296" width="240" height="48" rx="8" fill="#e9ecef" stroke="#757575" stroke-width="2"/>
+<polyline points="180,238 225,292" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="225,292 213.2,286.6 221.9,279.4" fill="#22c55e"/>
+<polyline points="420,238 375,292" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+<polygon points="375,292 378.1,279.4 386.8,286.6" fill="#f59e0b"/>
+<polyline points="75,238 75,410" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="75,410 69.3,398.3 80.7,398.3" fill="#22c55e"/>
+<rect x="25" y="415" width="175" height="72" rx="8" fill="#c3fae8" stroke="#0891b2" stroke-width="2"/>
+<text x="215" y="39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" fill="#1e1e1e" text-anchor="start">Sınır deseni — taşıyıcı ayrı container'da</text>
+<text x="45" y="102" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#757575" text-anchor="start">POD</text>
+<text x="167" y="167" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">taşıyıcı</text>
+<text x="167" y="184" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">depo anahtarı VAR</text>
+<text x="167" y="202" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">ağ: depoya açık</text>
+<text x="434" y="167" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">sandbox</text>
+<text x="434" y="184" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">anahtar YOK</text>
+<text x="434" y="202" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">ağ: kapalı</text>
+<text x="285" y="322" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">/output</text>
+<text x="58" y="363" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">ayrı container — ortam paylaşılmıyor</text>
+<text x="75" y="326" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e1e1e" text-anchor="middle">süpür + yükle</text>
+<text x="112" y="453" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">kalıcı depo</text>
+<text x="230" y="437" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#15803d" text-anchor="start">① beyan edilenler kod BAŞLAMADAN /output'a konur</text>
+<text x="230" y="461" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#b45309" text-anchor="start">② sandbox çalışır — düz dosya, ağ çağrısı yok</text>
+<text x="230" y="485" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#15803d" text-anchor="start">③ /output süpürülür, künye kayıt defterine yazılır</text>
+</svg>

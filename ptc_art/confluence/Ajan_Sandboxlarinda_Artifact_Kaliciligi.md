@@ -4,6 +4,21 @@
 > nasıl yaşar? Piyasada dört farklı cevap var ve aralarındaki fark bir
 > tercih değil, **mimari bir sonuç**.
 
+### Bu sayfadaki diyagramlar
+
+| Diyagram | Bölüm | Ne gösteriyor |
+|---|---|---|
+| Sandbox ölür, ürettiği kalır | §1 | Çelişki ve çözümü |
+| Baytı kim taşıyor | §3 | Dört yerleşim ailesi |
+| Ajan istediğini nasıl buluyor | §6 | Sandbox ömrü ve keşif kanalları |
+| Alias — taşınabilir etiket | §7 | Sürüm sabitleme |
+| Sınır deseni | §9 | Taşıyıcının ayrı container'da olduğu yerleşim |
+| Beyan — çağrı değil | §9 | Üç beyan biçimi, üç yol |
+| Hata sinyalinin üç parçası | §10 | Kod patladığında ne dönüyor |
+
+Her diyagram üç biçimde duruyor: sayfada görünen **`.png`**, baskı/ölçek için
+**`.svg`**, ve Confluence'ta düzenlemek için **`.excalidraw`** kaynağı.
+
 ---
 
 ## 1 · Problem
@@ -24,6 +39,12 @@ Sandbox ÖLÜRSE     40 saniyelik iş her turda tekrarlanır
 
 Çelişkiyi çözmenin yolu ortasını bulmak değil, **ortamın ömrü ile verinin
 ömrünü birbirinden ayırmak**: sandbox ölsün, ürettiği kalsın.
+
+![Sandbox ölür, ürettiği kalır](celiski.png)
+
+> Düzenlemek için: `celiski.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 
 Kod çalıştıran her sistem bu ayrımı bir şekilde kurmak zorunda kalmış. Aşağıda
 kimin nasıl kurduğu var.
@@ -50,8 +71,10 @@ imza atmış durumda.
 
 ## 3 · Dört yerleşim ailesi
 
-> **Diyagram:** `dort-aile.excalidraw` — Confluence'ta Excalidraw makrosuyla
-> açılabilir (Insert → Excalidraw → Import → dosyayı seç).
+![Baytı kim taşıyor — dört yerleşim ailesi](dort-aile.png)
+
+> Düzenlemek için: `dort-aile.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
 
 Belirleyici soru şu: **baytı kim taşıyor, ve o taşıyıcı kullanıcı koduna göre
 nerede duruyor?**
@@ -229,6 +252,12 @@ Sandbox YAŞIYOR     →  ls yeter, keşif bedava
 Sandbox ÖLÜYOR      →  ayrı bir kanal gerekiyor
 ```
 
+![Ajan istediğini nasıl buluyor](kesif.png)
+
+> Düzenlemek için: `kesif.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+
 Sahadaki desenler:
 
 | Desen | Nasıl |
@@ -259,6 +288,11 @@ Sahadaki dört cevap:
 | **Yol izolasyonu** | Çakışma imkânsız — yol çalıştırma kimliği içeriyor |
 | **Sürüm numarası** | Ad + sürüm; varsayılan en yeniyi verir |
 | **İçerik hash'i** | İsim kimlik değil, içerik kimliktir |
+
+![Alias — taşınabilir etiket](alias.png)
+
+> Düzenlemek için: `alias.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
 
 ### Alias nasıl çalışıyor
 
@@ -315,6 +349,13 @@ Mesele dikkatsizlik değil, işletim sisteminin süreç modeli.
 Güvenilmeyen kod için sahada işleyen desen **C ailesi**: taşıyıcıyı ayrı bir
 container'a almak.
 
+![Sınır deseni — taşıyıcı ayrı container'da](sinir-deseni.png)
+
+> Düzenlemek için: `sinir-deseni.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+
+
 ```
 POD
 ┌──────────────────────┬──────────────────────┐
@@ -338,6 +379,12 @@ POD
 **Beyan, çağrı değildir.** Kod çalışırken bir şey indirmiyor; ne isteyeceğini
 önceden söylüyor, dosya kod başlamadan yerine konuyor. Kod yalnızca
 `open()` biliyor.
+
+![Beyan — çağrı değil](beyan.png)
+
+> Düzenlemek için: `beyan.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 
 Beyanın üç biçimi:
 
@@ -365,6 +412,11 @@ Yüz dosyalık bir depoda kodun bir tanesini okuduğu bir çalıştırmada fark
 ## 10 · Kod patladığında ne dönüyor
 
 Ajan kod yazıyorsa hata alması normaldir; asıl soru **modele ne döndüğü**.
+
+![Hata sinyalinin üç parçası](hata-sinyali.png)
+
+> Düzenlemek için: `hata-sinyali.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
 
 İyi bir hata sinyalinin üç parçası var:
 

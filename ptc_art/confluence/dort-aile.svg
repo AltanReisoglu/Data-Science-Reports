@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="798" height="560" viewBox="1 -6 798 560">
+<rect x="1" y="-6" width="798" height="560" fill="#ffffff"/>
+<rect x="25" y="85" width="365" height="215" rx="8" fill="#ffc9c9" stroke="#ef4444" stroke-width="1" opacity="0.25"/>
+<rect x="55" y="130" width="130" height="52" rx="8" fill="#ffc9c9" stroke="#ef4444" stroke-width="2"/>
+<polyline points="120,184 120,222" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+<polygon points="120,222 114.3,210.3 125.7,210.3" fill="#ef4444"/>
+<rect x="55" y="226" width="130" height="48" rx="8" fill="#ffc9c9" stroke="#ef4444" stroke-width="2"/>
+<rect x="410" y="85" width="365" height="215" rx="8" fill="#ffd8a8" stroke="#f59e0b" stroke-width="1" opacity="0.25"/>
+<rect x="435" y="132" width="210" height="50" rx="8" fill="#ffd8a8" stroke="#f59e0b" stroke-width="2"/>
+<rect x="435" y="192" width="210" height="50" rx="8" fill="#fff3bf" stroke="#f59e0b" stroke-width="2"/>
+<polyline points="650,217 730,217" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 6"/>
+<polygon points="730,217 718.3,222.7 718.3,211.3" fill="#ef4444"/>
+<rect x="25" y="315" width="365" height="215" rx="8" fill="#b2f2bb" stroke="#22c55e" stroke-width="1" opacity="0.25"/>
+<rect x="50" y="358" width="145" height="46" rx="8" fill="#fff3bf" stroke="#f59e0b" stroke-width="2"/>
+<polyline points="122,406 122,434" fill="none" stroke="#757575" stroke-width="2" stroke-linecap="round"/>
+<polygon points="122,434 116.3,422.3 127.7,422.3" fill="#757575"/>
+<rect x="50" y="436" width="145" height="42" rx="8" fill="#e9ecef" stroke="#757575" stroke-width="2"/>
+<polyline points="198,457 240,457" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="240,457 228.3,462.7 228.3,451.3" fill="#22c55e"/>
+<rect x="242" y="410" width="135" height="78" rx="8" fill="#b2f2bb" stroke="#22c55e" stroke-width="2"/>
+<rect x="410" y="315" width="365" height="215" rx="8" fill="#a5d8ff" stroke="#4a9eed" stroke-width="1" opacity="0.25"/>
+<rect x="435" y="355" width="185" height="44" rx="8" fill="#a5d8ff" stroke="#4a9eed" stroke-width="2"/>
+<polyline points="527,401 527,425" fill="none" stroke="#4a9eed" stroke-width="2" stroke-linecap="round"/>
+<polygon points="527,425 521.3,413.3 532.7,413.3" fill="#4a9eed"/>
+<polygon points="530.0,427 615,461.0 530.0,495 445,461.0" fill="#fff3bf" stroke="#4a9eed" stroke-width="2"/>
+<text x="292" y="38" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Baytı kim taşıyor?</text>
+<text x="300" y="68" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Dört yerleşim ailesi</text>
+<text x="40" y="109" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#b91c1c" text-anchor="start">A · MOUNT</text>
+<text x="120" y="159" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">kod</text>
+<text x="120" y="205" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">FUSE</text>
+<text x="120" y="253" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">bucket</text>
+<text x="205" y="164" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#b91c1c" text-anchor="start">araya girecek</text>
+<text x="205" y="188" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#b91c1c" text-anchor="start">yer YOK</text>
+<text x="205" y="243" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">künye tutulamaz</text>
+<text x="425" y="109" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#b45309" text-anchor="start">B · SARMALAYICI</text>
+<text x="540" y="159" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">launcher + anahtar</text>
+<text x="540" y="219" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">kullanıcı kodu</text>
+<text x="655" y="189" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#b91c1c" text-anchor="start">atlanabilir</text>
+<text x="435" y="266" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">aynı container — anahtar kodun yanında</text>
+<text x="40" y="339" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#15803d" text-anchor="start">C · SINIR</text>
+<text x="122" y="383" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">kullanıcı kodu</text>
+<text x="122" y="459" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">/output</text>
+<text x="310" y="442" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">AYRI container</text>
+<text x="310" y="460" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">anahtar burada</text>
+<text x="50" y="508" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#15803d" text-anchor="start">kod anahtarı GÖREMEZ</text>
+<text x="425" y="339" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#1d4ed8" text-anchor="start">D · DENETİMLİ MOUNT</text>
+<text x="528" y="379" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">kod → /Volumes</text>
+<text x="530" y="463" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">izin var mı?</text>
+<text x="630" y="443" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1d4ed8" text-anchor="start">sürücü her</text>
+<text x="630" y="465" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1d4ed8" text-anchor="start">erişimde SORAR</text>
+<text x="435" y="513" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#15803d" text-anchor="start">künye tutulabiliyor</text>
+</svg>
