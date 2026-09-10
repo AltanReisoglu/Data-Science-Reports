@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1068" height="387" viewBox="16 0 1068 387">
+<rect x="16" y="0" width="1068" height="387" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">Kural IP&#x27;ye değil, kimliğe yazılır</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Kimlik iş yükünün etiketlerinden türer — adresi değişse de kural bozulmaz.</text>
+<text x="60" y="119" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="#868e96" text-anchor="start" font-weight="400">ETİKET</text>
+<text x="420" y="119" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="#868e96" text-anchor="start" font-weight="400">KİMLİK</text>
+<rect x="60" y="128" width="300" height="60" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="210" y="163" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">app: sandbox</text>
+<polyline points="364,158 416,158" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="416.0,158.0 403.0,152.5 403.0,163.5" fill="#868e96"/>
+<rect x="420" y="128" width="190" height="60" rx="10" fill="#e5dbff" stroke="#6741d9" stroke-width="2"/>
+<text x="515" y="164" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" font-weight="600">#1234</text>
+<rect x="60" y="208" width="300" height="60" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="210" y="243" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">app: cikis-vekili</text>
+<polyline points="364,238 416,238" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="416.0,238.0 403.0,232.5 403.0,243.5" fill="#868e96"/>
+<rect x="420" y="208" width="190" height="60" rx="10" fill="#e5dbff" stroke="#6741d9" stroke-width="2"/>
+<text x="515" y="244" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" font-weight="600">#5678</text>
+<rect x="680" y="158" width="380" height="80" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="870" y="204" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle" font-weight="600">Kural:  #1234 → #5678  izin ver</text>
+<polyline points="614,198 676,198" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="676.0,198.0 663.0,192.5 663.0,203.5" fill="#2f9e44"/>
+<text x="60" y="334" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Aynı etiketli iki kopya aynı kimliği alır — biri ölüp yenisi doğduğunda</text>
+<text x="60" y="358" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">IP değişir ama kimlik, dolayısıyla kural aynı kalır.</text>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1008" height="439" viewBox="16 0 1008 439">
+<rect x="16" y="0" width="1008" height="439" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">SSRF — köprü nasıl kurulur</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Ajanın çıkışı kapalı olsa bile, ulaşabildiği servisin çıkışı açıksa…</text>
+<rect x="40" y="130" width="220" height="74" rx="10" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<text x="150" y="173" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" font-weight="600">Ajan</text>
+<polyline points="264,167 396,167" fill="none" stroke="#1971c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="396.0,167.0 383.0,161.5 383.0,172.5" fill="#1971c2"/>
+<text x="268" y="150" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">&quot;şu URL&#x27;ye git&quot;</text>
+<rect x="400" y="130" width="240" height="74" rx="10" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<text x="520" y="173" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" font-weight="600">Servis</text>
+<polyline points="644,167 776,167" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="776.0,167.0 763.0,161.5 763.0,172.5" fill="#e03131"/>
+<text x="648" y="150" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#868e96" text-anchor="start" font-weight="400">sunucu-taraflı istek</text>
+<rect x="780" y="130" width="220" height="74" rx="10" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<text x="890" y="173" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" font-weight="600">İnternet</text>
+<polyline points="150,214 150,292 880,292 880,222" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<text x="496" y="304" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="30" fill="#e03131" text-anchor="start" font-weight="400">X</text>
+<text x="330" y="330" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#e03131" text-anchor="start" font-weight="400">Ajan → İnternet  =  DENY   (doğrudan yol kapalı)</text>
+<text x="40" y="386" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Servis → İnternet = ALLOW olduğu için ajan, kendi çıkışı hiç açılmadan</text>
+<text x="40" y="410" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">dışarıya ulaşmış olur. Bu yüzden servisin de egress&#x27;i daraltılmalıdır.</text>
+</svg>

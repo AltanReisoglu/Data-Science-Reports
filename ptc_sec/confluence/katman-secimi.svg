@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="804" height="535" viewBox="16 0 804 535">
+<rect x="16" y="0" width="804" height="535" fill="#ffffff"/>
+<defs>
+</defs>
+<text x="40" y="49" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="400">Kısıtlama hangi katmana konur</text>
+<text x="40" y="74" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Kuralı hangi katmana koyduğunuz, atlatılabilirliğini belirler.</text>
+<text x="500" y="103" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="#868e96" text-anchor="start" font-weight="400">ATLATILABİLİR Mİ</text>
+<rect x="60" y="116" width="400" height="68" rx="10" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<text x="260" y="146" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Uygulama</text>
+<text x="260" y="165" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">kütüphane sarmalayıcı, allowlist</text>
+<text x="500" y="154" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#e03131" text-anchor="start" font-weight="400">Evet — başka kütüphane, ham socket</text>
+<polyline points="260,188 260,198" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="260.0,198.0 265.5,185.0 254.5,185.0" fill="#868e96"/>
+<rect x="60" y="202" width="400" height="68" rx="10" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<text x="260" y="232" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Süreç</text>
+<text x="260" y="251" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">seccomp, LSM</text>
+<text x="500" y="240" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#f08c00" text-anchor="start" font-weight="400">Kısmen</text>
+<polyline points="260,274 260,284" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="260.0,284.0 265.5,271.0 254.5,271.0" fill="#868e96"/>
+<rect x="60" y="288" width="400" height="68" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2"/>
+<text x="260" y="318" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Kernel ağ yolu</text>
+<text x="260" y="337" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">eBPF · tc hook</text>
+<text x="500" y="326" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="15" fill="#2f9e44" text-anchor="start" font-weight="400">HAYIR</text>
+<polyline points="260,360 260,370" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="260.0,370.0 265.5,357.0 254.5,357.0" fill="#868e96"/>
+<rect x="60" y="374" width="400" height="68" rx="10" fill="#f1f3f5" stroke="#868e96" stroke-width="2"/>
+<text x="260" y="413" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle" font-weight="600">Ağ kartı</text>
+<text x="60" y="482" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">Paket, ağ kartına ulaşmadan önce kernel ağ yolundan geçmek ZORUNDADIR —</text>
+<text x="60" y="506" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start" font-weight="400">hangi kütüphaneyle üretildiği fark etmez.</text>
+</svg>
