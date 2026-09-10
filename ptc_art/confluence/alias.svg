@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="699" height="523" viewBox="51 -4 699 523">
+<rect x="51" y="-4" width="699" height="523" fill="#ffffff"/>
+<rect x="430" y="100" width="230" height="58" rx="8" fill="#a5d8ff" stroke="#4a9eed" stroke-width="2"/>
+<rect x="430" y="180" width="230" height="58" rx="8" fill="#a5d8ff" stroke="#4a9eed" stroke-width="2"/>
+<rect x="430" y="260" width="230" height="58" rx="8" fill="#ffd8a8" stroke="#f59e0b" stroke-width="2"/>
+<rect x="75" y="100" width="265" height="58" rx="8" fill="#e9ecef" stroke="#757575" stroke-width="2"/>
+<polyline points="345,129 423,129" fill="none" stroke="#757575" stroke-width="2" stroke-linecap="round"/>
+<polygon points="423,129 411.3,134.7 411.3,123.3" fill="#757575"/>
+<rect x="75" y="260" width="265" height="58" rx="8" fill="#ffd8a8" stroke="#f59e0b" stroke-width="2"/>
+<polyline points="345,289 423,289" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+<polygon points="423,289 411.3,294.7 411.3,283.3" fill="#f59e0b"/>
+<polyline points="560,262 560,184" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 6"/>
+<polygon points="560,184 565.7,195.7 554.3,195.7" fill="#f59e0b"/>
+<text x="245" y="39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" fill="#1e1e1e" text-anchor="start">Alias — taşınabilir etiket</text>
+<text x="230" y="66" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#757575" text-anchor="start">sürüm değişmez, etiket taşınır</text>
+<text x="545" y="132" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">sürüm 3</text>
+<text x="672" y="129" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1d4ed8" text-anchor="start">en yeni</text>
+<text x="545" y="212" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">sürüm 2</text>
+<text x="545" y="292" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">sürüm 1</text>
+<text x="208" y="131" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">rapor.json</text>
+<text x="384" y="131" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e1e1e" text-anchor="middle">en yeni</text>
+<text x="208" y="291" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">rapor.json@onaylanmis</text>
+<text x="384" y="291" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e1e1e" text-anchor="middle">sabitlenmiş</text>
+<text x="560" y="303" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1e1e1e" text-anchor="middle">etiket taşınabilir</text>
+<text x="75" y="372" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#757575" text-anchor="start">① Alias YOKKEN en yeni sessizce kazanır</text>
+<text x="75" y="398" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#b45309" text-anchor="start">② Etiket bir sürüme takılır — aynı ad iki kapı olur</text>
+<text x="75" y="424" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#b45309" text-anchor="start">③ Etiket başka sürüme taşınınca eskisinden KENDİLİĞİNDEN alınır</text>
+<text x="75" y="450" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#15803d" text-anchor="start">④ Sürümlerin KENDİSİ hiç değişmez — git'te commit ve tag gibi</text>
+<text x="75" y="488" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="start">Alias kendiliğinden kazanmaz: &lt;ad&gt;@&lt;alias&gt; diye ADIYLA istenmeli.</text>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="899" height="656" viewBox="16 0 899 656">
+<rect x="16" y="0" width="899" height="656" fill="#ffffff"/>
+<rect x="60" y="120" width="230" height="74" rx="8" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<rect x="420" y="120" width="230" height="74" rx="8" fill="#d0ebff" stroke="#1971c2" stroke-width="2"/>
+<polyline points="295,157 415,157" fill="none" stroke="#1971c2" stroke-width="2" stroke-linecap="round"/>
+<polygon points="415,157 403.3,162.7 403.3,151.3" fill="#1971c2"/>
+<polyline points="535,198 535,258" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round"/>
+<polygon points="535,258 529.3,246.3 540.7,246.3" fill="#e03131"/>
+<rect x="420" y="260" width="230" height="84" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<polyline points="535,348 535,402" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round"/>
+<polygon points="535,402 529.3,390.3 540.7,390.3" fill="#e03131"/>
+<rect x="420" y="404" width="230" height="84" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<polyline points="535,492 535,546" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round"/>
+<polygon points="535,546 529.3,534.3 540.7,534.3" fill="#e03131"/>
+<rect x="420" y="548" width="230" height="84" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<polyline points="415,590 175,590 175,200" fill="none" stroke="#2f9e44" stroke-width="2" stroke-linecap="round"/>
+<polygon points="175,200 180.7,211.7 169.3,211.7" fill="#2f9e44"/>
+<text x="40" y="44" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Hata kurtarma döngüsü — üç karar noktası</text>
+<text x="40" y="72" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start">Kod patlayınca sistem üç soruyu sırayla cevaplamak zorunda.</text>
+<text x="175" y="160" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">Model kodu yazar</text>
+<text x="535" y="160" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle">Sandbox çalıştırır</text>
+<text x="548" y="226" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#e03131" text-anchor="start">✗ hata</text>
+<text x="535" y="294" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">1 · NE GERİ</text>
+<text x="535" y="314" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">VERİLİYOR</text>
+<text x="672" y="279" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">tip · satır · kaynak satırı</text>
+<text x="672" y="296" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">stdout · çıkış kodu</text>
+<text x="672" y="325" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#e03131" text-anchor="start">darboğaz burası</text>
+<text x="535" y="448" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">2 · KAÇ DENEME</text>
+<text x="672" y="423" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">sebebe göre ayrı bütçe</text>
+<text x="672" y="440" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">kod hatası ≠ politika reddi</text>
+<text x="535" y="592" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">3 · NE ZAMAN DUR</text>
+<text x="672" y="567" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">sayıya değil İLERLEMEYE bak</text>
+<text x="672" y="584" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">aynı hata 3 kez → tıkandı</text>
+<text x="196" y="612" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#2f9e44" text-anchor="start">düzeltilmiş kod</text>
+</svg>

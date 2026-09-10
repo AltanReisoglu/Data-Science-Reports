@@ -4,6 +4,24 @@
 > nasıl yaşar? Piyasada dört farklı cevap var ve aralarındaki fark bir
 > tercih değil, **mimari bir sonuç**.
 
+### Bu sayfadaki diyagramlar
+
+| Diyagram | Bölüm | Ne gösteriyor |
+|---|---|---|
+| Sandbox ölür, ürettiği kalır | §1 | Çelişki ve çözümü |
+| Baytı kim taşıyor | §3 | Dört yerleşim ailesi |
+| Ajan istediğini nasıl buluyor | §6 | Sandbox ömrü ve keşif kanalları |
+| Alias — taşınabilir etiket | §7 | Sürüm sabitleme |
+| Aracıyı nereye koymalı | §8 | Kodu kim yazdı → hangi aile |
+| Sınır deseni | §9 | Taşıyıcının ayrı container'da olduğu yerleşim |
+| Beyan — çağrı değil | §9 | Üç beyan biçimi, üç yol |
+| Hata sinyalinin üç parçası | §10 | Kod patladığında ne dönüyor |
+| Ürünler dört aileye nasıl dağılıyor | §12 | Piyasa: aile ve kayıt defteri, ürün ürün |
+| Kalıcılığın iki stratejisi | §12 | Piyasa: ortamı yaşatanlar, baytı ayıranlar |
+
+Her diyagram üç biçimde duruyor: sayfada görünen **`.png`**, baskı/ölçek için
+**`.svg`**, ve Confluence'ta düzenlemek için **`.excalidraw`** kaynağı.
+
 ---
 
 ## 1 · Problem
@@ -24,6 +42,12 @@ Sandbox ÖLÜRSE     40 saniyelik iş her turda tekrarlanır
 
 Çelişkiyi çözmenin yolu ortasını bulmak değil, **ortamın ömrü ile verinin
 ömrünü birbirinden ayırmak**: sandbox ölsün, ürettiği kalsın.
+
+![Sandbox ölür, ürettiği kalır](celiski.png)
+
+> Düzenlemek için: `celiski.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 
 Kod çalıştıran her sistem bu ayrımı bir şekilde kurmak zorunda kalmış. Aşağıda
 kimin nasıl kurduğu var.
@@ -50,8 +74,10 @@ imza atmış durumda.
 
 ## 3 · Dört yerleşim ailesi
 
-> **Diyagram:** `dort-aile.excalidraw` — Confluence'ta Excalidraw makrosuyla
-> açılabilir (Insert → Excalidraw → Import → dosyayı seç).
+![Baytı kim taşıyor — dört yerleşim ailesi](dort-aile.png)
+
+> Düzenlemek için: `dort-aile.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
 
 Belirleyici soru şu: **baytı kim taşıyor, ve o taşıyıcı kullanıcı koduna göre
 nerede duruyor?**
@@ -229,6 +255,12 @@ Sandbox YAŞIYOR     →  ls yeter, keşif bedava
 Sandbox ÖLÜYOR      →  ayrı bir kanal gerekiyor
 ```
 
+![Ajan istediğini nasıl buluyor](kesif.png)
+
+> Düzenlemek için: `kesif.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+
 Sahadaki desenler:
 
 | Desen | Nasıl |
@@ -259,6 +291,11 @@ Sahadaki dört cevap:
 | **Yol izolasyonu** | Çakışma imkânsız — yol çalıştırma kimliği içeriyor |
 | **Sürüm numarası** | Ad + sürüm; varsayılan en yeniyi verir |
 | **İçerik hash'i** | İsim kimlik değil, içerik kimliktir |
+
+![Alias — taşınabilir etiket](alias.png)
+
+> Düzenlemek için: `alias.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
 
 ### Alias nasıl çalışıyor
 
@@ -294,6 +331,11 @@ C · sınır          ayrı container   →  ulaşamaz
 Bu, bir güvenlik açığı değil bir **yerleşim tercihi** — ve tercihi belirleyen
 şey, kodu kimin yazdığı.
 
+![Aracıyı nereye koymalı](kodu-kim-yazdi.png)
+
+> Düzenlemek için: `kodu-kim-yazdi.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 ### Neden aynı container'da sır saklanamıyor
 
 Alt süreç, ebeveyninin ortamını devralır. Ortam değişkeni container başına
@@ -314,6 +356,13 @@ Mesele dikkatsizlik değil, işletim sisteminin süreç modeli.
 
 Güvenilmeyen kod için sahada işleyen desen **C ailesi**: taşıyıcıyı ayrı bir
 container'a almak.
+
+![Sınır deseni — taşıyıcı ayrı container'da](sinir-deseni.png)
+
+> Düzenlemek için: `sinir-deseni.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+
 
 ```
 POD
@@ -338,6 +387,12 @@ POD
 **Beyan, çağrı değildir.** Kod çalışırken bir şey indirmiyor; ne isteyeceğini
 önceden söylüyor, dosya kod başlamadan yerine konuyor. Kod yalnızca
 `open()` biliyor.
+
+![Beyan — çağrı değil](beyan.png)
+
+> Düzenlemek için: `beyan.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
 
 Beyanın üç biçimi:
 
@@ -365,6 +420,11 @@ Yüz dosyalık bir depoda kodun bir tanesini okuduğu bir çalıştırmada fark
 ## 10 · Kod patladığında ne dönüyor
 
 Ajan kod yazıyorsa hata alması normaldir; asıl soru **modele ne döndüğü**.
+
+![Hata sinyalinin üç parçası](hata-sinyali.png)
+
+> Düzenlemek için: `hata-sinyali.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
 
 İyi bir hata sinyalinin üç parçası var:
 
@@ -426,6 +486,91 @@ isabetli oluyor.
 
 ⑥ Hata sinyali üç parçalı olmalı: ne oldu · ne yapmıştı · ne yapmalı
 ```
+
+---
+
+## 12 · Piyasa analizi
+
+Yukarıdaki çerçevenin ürün adlarıyla hâli. Her satır ürünün kendi dokümanına
+dayanıyor — yaygınlık ölçümü değil.
+
+![Ürünler dört aileye nasıl dağılıyor](piyasa-haritasi.png)
+
+> Düzenlemek için: `piyasa-haritasi.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+| Ürün | Nasıl | Aile | Anahtar sandbox'ta | Kayıt defteri | Ömür |
+|---|---|---|---|---|---|
+| **Anthropic** code execution | `$OUTPUT_DIR` yakalanır → Files API | C | Hayır | `file_id`, soy yok | id ile 30 gün |
+| **OpenAI** Code Interpreter | `/mnt/data`, container file uçları | C | Hayır | Yok | 20 dk hareketsizlik |
+| **Microsoft** ACA sessions | `/mnt/data`, havuzdan session | C | Platform | Yok | cooldown'a kadar |
+| **Cloudflare** Sandbox | R2 / S3 / GCS mount | A | Moda bağlı | Yok | bucket |
+| **AWS** AgentCore | S3 Files / EFS NFS mount, IAM rolü | A | IAM rolüyle dar | Yok (CloudTrail) | 15 dk – 8 saat |
+| **E2B · Daytona · Vercel · Modal** | Sandbox içinde FUSE | A | Çoğunda evet | Yok | bucket |
+| **Google ADK** | İsimler talimatta, içerik istenince | — | Hayır | Ad + sürüm | oturum |
+| **Red Hat** OpenShift AI (KFP) | driver + launcher, S3 SDK | B | **Evet** | **MLMD** | pod |
+| **Argo Workflows** | init + wait sidecar | C | Hayır | Yok | pod |
+| **MLflow** (proxied) | İstemci → HTTP → sunucu → depo | — | Hayır | Tracking DB + Registry | — |
+| **Databricks** | `/Volumes` + Unity Catalog | D | Hayır | **UC + MLflow** | volume |
+| **Devin** | microVM snapshot, çıktı git'te | — | — | git commit | süresiz |
+
+### Ürün başına tek not
+
+* **Anthropic** — yakalayan platform, kod değil: *"Files written anywhere else
+  stay in the container and aren't returned."* Container ~5 dk'da checkpoint,
+  30 gün geri çağrılabilir; internet kapalı.
+* **OpenAI** — kalıcılığı açıkça reddediyor: *"treat containers as ephemeral
+  and store all data related to the use of this tool on your own systems."*
+* **Google ADK** — `LoadArtifactsTool` isimleri her turda talimata yazıyor,
+  içeriği yalnızca o isteğe ekliyor; içerik geçmişe kalıcı yazılmıyor.
+* **AWS** — yönetilen depo yok: *"does not offer a managed session-storage
+  option"*. Inline 100 MB, terminalden S3'e 5 GB.
+* **Red Hat** — KFP'de launcher kullanıcı kodunu alt süreç olarak çalıştırıyor;
+  S3 kurulumun ön koşulu. Agent Sandbox (Technology Preview) izolasyonu
+  çözüyor, kalıcılığı PVC — artifact kaydı yok.
+* **Argo** — dört executor'ı v3.4'te kaldırıp tek yerleşimde kaldı; `docker`
+  için gerekçe *"breaks security completely"*. Katalog tutmuyor.
+* **MLflow** — *"When not proxying, clients need their own credentials and
+  direct access to the artifact store."* Sürüm için alias:
+  `models:/MyModel@champion`.
+* **Databricks** — mount ailesinde defteri olan tek ürün; ama *"Customers are
+  responsible for running only trusted code."*
+* **Cloudflare · Vercel** — kimliksiz mount + imzalayan proxy: anahtar
+  sandbox'tan çıkıyor, ama proxy içeriğe bakmıyor, defter doğmuyor.
+* **Devin** — sandbox hiç ölmüyor; çıktı bir PR. Parquet ya da PDF için değil.
+
+![Kalıcılığın iki stratejisi](sandbox-omru.png)
+
+> Düzenlemek için: `sandbox-omru.excalidraw` — Confluence'ta
+> **Insert → Excalidraw → Import**.
+
+### Piyasadan çıkan
+
+```
+① "Artifact storage" diye ayrı bir ürün yok — herkes nesne deposu ya da container diski
+② Defter tutanların hepsi yazma yolunda bir bileşen taşıyor; mount edenlerin hiçbiri tutmuyor
+③ Defteri en olgun iki ürün (KFP, Databricks) kodu güvenilir varsayıyor
+④ OpenShift'te güvenilmeyen kod için hazır bir artifact cevabı yok
+```
+
+> Doğrulanamayanlar: Anthropic ve OpenAI'ın depo arka ucu belgelenmemiş;
+> Databricks, Devin ve Argo executor alıntılarının birincil linkleri bu depoda
+> kayıtlı değil.
+
+**Kaynaklar:**
+[Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) ·
+[OpenAI](https://developers.openai.com/api/docs/guides/tools-code-interpreter) ·
+[Microsoft](https://learn.microsoft.com/en-us/azure/container-apps/sessions-code-interpreter) ·
+[Cloudflare](https://developers.cloudflare.com/sandbox/api/storage/) ·
+[AWS](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/code-interpreter-filesystem-configurations.html) ·
+[Google ADK](https://adk.dev/artifacts/) ·
+[OpenShift AI](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25/html/working_with_data_science_pipelines/managing-data-science-pipelines_ds-pipelines) ·
+[Agent Sandbox](https://github.com/kubernetes-sigs/agent-sandbox) ·
+[Argo](https://argo-workflows.readthedocs.io/en/latest/walk-through/artifacts/) ·
+[MLflow](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/) ·
+[Vercel](https://vercel.com/docs/sandbox/mount-remote-storage) ·
+[E2B](https://e2b.dev/docs/sandbox/connect-bucket) ·
+[Modal](https://modal.com/docs/guide/cloud-bucket-mounts)
 
 ---
 

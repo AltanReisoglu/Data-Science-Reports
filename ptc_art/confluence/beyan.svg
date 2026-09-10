@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="791" height="515" viewBox="16 -4 791 515">
+<rect x="16" y="-4" width="791" height="515" fill="#ffffff"/>
+<rect x="40" y="104" width="290" height="56" rx="8" fill="#b2f2bb" stroke="#22c55e" stroke-width="2"/>
+<rect x="40" y="232" width="270" height="48" rx="8" fill="#ffffff" stroke="#868e96" stroke-width="2"/>
+<polyline points="316,256 370,256" fill="none" stroke="#868e96" stroke-width="2" stroke-linecap="round"/>
+<polygon points="370,256 358.3,261.7 358.3,250.3" fill="#868e96"/>
+<rect x="40" y="300" width="270" height="48" rx="8" fill="#ffffff" stroke="#f59e0b" stroke-width="2"/>
+<polyline points="316,324 370,324" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+<polygon points="370,324 358.3,329.7 358.3,318.3" fill="#f59e0b"/>
+<rect x="40" y="368" width="270" height="48" rx="8" fill="#ffffff" stroke="#4a9eed" stroke-width="2"/>
+<polyline points="316,392 370,392" fill="none" stroke="#4a9eed" stroke-width="2" stroke-linecap="round"/>
+<polygon points="370,392 358.3,397.7 358.3,386.3" fill="#4a9eed"/>
+<text x="215" y="40" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Beyan — çağrı değil</text>
+<text x="150" y="68" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start">Kod çalışırken indirmiyor; ne isteyeceğini ÖNCEDEN söylüyor</text>
+<text x="185" y="134" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle">inputs = ["ozet.json"]</text>
+<text x="350" y="124" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#15803d" text-anchor="start">kod BAŞLAMADAN</text>
+<text x="350" y="148" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#15803d" text-anchor="start">dosya yerine konur</text>
+<text x="40" y="208" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Biçim, yolu belirliyor:</text>
+<text x="175" y="258" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">ozet.json</text>
+<text x="378" y="257" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#1e1e1e" text-anchor="start">/output/ozet.json</text>
+<text x="660" y="257" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#868e96" text-anchor="start">kendi çıktısı</text>
+<text x="175" y="326" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">wf-abc123/ozet.json</text>
+<text x="378" y="325" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#1e1e1e" text-anchor="start">/artifacts/wf-abc123/…</text>
+<text x="660" y="325" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#f59e0b" text-anchor="start">BAŞKA çalıştırma</text>
+<text x="175" y="394" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">rapor.pdf@onaylanmis</text>
+<text x="378" y="393" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#1e1e1e" text-anchor="start">/artifacts/_alias/rapor.pdf</text>
+<text x="660" y="393" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#4a9eed" text-anchor="start">SABİT sürüm</text>
+<text x="40" y="452" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#15803d" text-anchor="start">Kod yalnızca open() biliyor — hiçbir ağ çağrısı yapmıyor.</text>
+<text x="40" y="480" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#868e96" text-anchor="start">Beyan aynı zamanda SOYU tanımlıyor: beyan edilen girdi, çıktının ebeveyni.</text>
+</svg>

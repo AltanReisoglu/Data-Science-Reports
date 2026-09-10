@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1218" height="688" viewBox="-4 -12 1218 688">
+<rect x="-4" y="-12" width="1218" height="688" fill="#ffffff"/>
+<rect x="30" y="150" width="360" height="50" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<polyline points="210,202 210,228" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="210,228 204.3,216.3 215.7,216.3" fill="#1e1e1e"/>
+<polygon points="210.0,230 320,285.0 210.0,340 100,285.0" fill="#fff3bf" stroke="#1971c2" stroke-width="2"/>
+<polyline points="210,340 118,380" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="118,380 126.5,370.1 131.0,380.5" fill="#1e1e1e"/>
+<polyline points="210,340 302,380" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="302,380 289.0,380.5 293.5,370.1" fill="#1e1e1e"/>
+<rect x="30" y="382" width="175" height="76" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="215" y="382" width="175" height="76" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="430" y="150" width="360" height="54" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="2"/>
+<polyline points="610,206 610,224" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="610,224 604.3,212.3 615.7,212.3" fill="#1e1e1e"/>
+<rect x="430" y="226" width="360" height="54" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="2"/>
+<polyline points="610,282 610,300" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="610,300 604.3,288.3 615.7,288.3" fill="#1e1e1e"/>
+<rect x="430" y="302" width="360" height="54" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<polyline points="610,358 610,376" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="610,376 604.3,364.3 615.7,364.3" fill="#1e1e1e"/>
+<rect x="430" y="378" width="360" height="72" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<polyline points="610,452 610,470" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="610,470 604.3,458.3 615.7,458.3" fill="#1e1e1e"/>
+<rect x="430" y="472" width="360" height="54" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<rect x="830" y="150" width="360" height="50" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<polyline points="1010,202 1010,228" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="1010,228 1004.3,216.3 1015.7,216.3" fill="#1e1e1e"/>
+<polygon points="1010.0,230 1120,285.0 1010.0,340 900,285.0" fill="#fff3bf" stroke="#1971c2" stroke-width="2"/>
+<polyline points="1010,340 918,380" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="918,380 926.5,370.1 931.0,380.5" fill="#1e1e1e"/>
+<polyline points="1010,340 1102,380" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
+<polygon points="1102,380 1089.0,380.5 1093.5,370.1" fill="#1e1e1e"/>
+<rect x="830" y="382" width="175" height="76" rx="8" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+<rect x="1015" y="382" width="175" height="76" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="20" y="32" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Sebep nasıl ayrılıyor: sahada üç yöntem</text>
+<text x="22" y="64" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Üçü de aynı ayrımı yapıyor — düzeltilebilir hata ≠ düzeltilemez hata</text>
+<text x="30" y="108" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="start">Anthropic API — tipli</text>
+<text x="30" y="130" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">resmî doküman</text>
+<text x="430" y="108" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="start">Codex — sezgisel</text>
+<text x="430" y="130" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">kaynak kod · sandboxing/src/denial.rs</text>
+<text x="830" y="108" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="start">AutoGen — çıkış kodu</text>
+<text x="830" y="130" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">kaynak kod · code_utils.py</text>
+<text x="210" y="177" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">kod çalıştırma aracı çağrıldı</text>
+<text x="210" y="278" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">aracın kendisi</text>
+<text x="210" y="297" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">mi başarısız?</text>
+<text x="118" y="413" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">EVET</text>
+<text x="118" y="431" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">tipli error_code</text>
+<text x="302" y="413" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">HAYIR</text>
+<text x="302" y="431" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">normal sonuç</text>
+<text x="32" y="478" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">unavailable</text>
+<text x="32" y="494" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">execution_time_exceeded</text>
+<text x="32" y="511" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">invalid_tool_input</text>
+<text x="32" y="527" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">too_many_requests</text>
+<text x="217" y="478" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">return_code ≠ 0</text>
+<text x="217" y="494" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">+ stderr</text>
+<text x="217" y="511" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">= kodun hatası,</text>
+<text x="217" y="527" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">düzeltilebilir</text>
+<text x="610" y="170" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">çıkış kodu 0 ya da sandbox yok</text>
+<text x="610" y="188" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">→ ret değil</text>
+<text x="610" y="246" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">çıkış kodu 2 · 126 · 127</text>
+<text x="610" y="264" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">→ sıradan komut hatası</text>
+<text x="610" y="322" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Linux seccomp: 128 + SIGSYS</text>
+<text x="610" y="340" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">→ sandbox reddi</text>
+<text x="610" y="399" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">çıktıda anahtar kelime:</text>
+<text x="610" y="416" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">"permission denied" · "seccomp"</text>
+<text x="610" y="434" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">"landlock" … → sandbox reddi</text>
+<text x="610" y="492" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">SandboxErr::Denied</text>
+<text x="610" y="510" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">+ ağ politikası kararı</text>
+<text x="432" y="546" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">"We don't have a fully deterministic way to tell</text>
+<text x="432" y="562" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">if our command failed because of the sandbox"</text>
+<text x="1010" y="177" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">kod dosyaya yazılır, alt süreçte çalışır</text>
+<text x="1010" y="278" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">süre</text>
+<text x="1010" y="297" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#1e1e1e" text-anchor="middle">aştı mı?</text>
+<text x="918" y="413" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">EVET</text>
+<text x="918" y="431" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">exitcode 124</text>
+<text x="1102" y="413" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">HAYIR</text>
+<text x="1102" y="431" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">exitcode N</text>
+<text x="832" y="478" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">mesaja "Timeout"</text>
+<text x="832" y="494" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">eklenir</text>
+<text x="1017" y="478" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">stderr + stdout</text>
+<text x="1017" y="494" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#757575" text-anchor="start">olduğu gibi</text>
+<text x="20" y="624" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Anthropic'te kodun kendi hatası hata listesinde yok — normal sonuç olarak dönüyor.</text>
+<text x="20" y="644" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">Codex yöntemin sezgisel olduğunu kendisi yazıyor; AutoGen yalnızca süre aşımını ayırıyor.</text>
+</svg>

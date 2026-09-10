@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="978" height="608" viewBox="-4 -12 978 608">
+<rect x="-4" y="-12" width="978" height="608" fill="#ffffff"/>
+<rect x="20" y="96" width="310" height="80" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="350" y="100" width="150" height="42" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="500" y="100" width="300" height="42" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="800" y="100" width="150" height="42" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="20" y="208" width="310" height="80" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="350" y="212" width="300" height="42" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="650" y="212" width="300" height="42" rx="8" fill="#e9ecef" stroke="#868e96" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="20" y="320" width="310" height="80" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="350" y="324" width="600" height="42" rx="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+<rect x="20" y="432" width="310" height="80" rx="8" fill="#f8f9fa" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="350" y="436" width="70" height="42" rx="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<rect x="420" y="436" width="530" height="42" rx="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="20" y="32" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#1e1e1e" text-anchor="start">Çıktı büyüyünce: dört strateji</text>
+<text x="22" y="64" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#757575" text-anchor="start">Şematik, ölçekli değil  ·  yeşil = modele ulaşan kısım</text>
+<text x="175" y="121" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Ortadan kırp</text>
+<text x="175" y="138" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">smolagents · Codex</text>
+<text x="175" y="156" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">SWE-agent (bash_only)</text>
+<text x="425" y="123" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">baş yarı</text>
+<text x="650" y="123" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">orta atıldı · işaret bırakılır</text>
+<text x="875" y="123" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">son yarı</text>
+<text x="350" y="163" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">Hatanın başı da en içteki kare de kalır.  Codex: "…13 chars truncated…"</text>
+<text x="175" y="241" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Baştan al, sonu kes + öğret</text>
+<text x="175" y="259" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">SWE-agent (varsayılan)</text>
+<text x="500" y="235" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">ilk N karakter</text>
+<text x="800" y="235" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">atıldı · en içteki kare dahil</text>
+<text x="350" y="275" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">Not düşülür: "… characters were elided … use head/tail/grep"</text>
+<text x="175" y="353" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Hiç kırpma</text>
+<text x="175" y="371" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">AutoGen / AG2</text>
+<text x="650" y="347" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">tamamı modele gider</text>
+<text x="350" y="387" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">Uzunluk sınırı yok — bağlam şişebilir</text>
+<text x="175" y="465" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Dosyaya taşı + önizleme</text>
+<text x="175" y="483" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">Claude Code</text>
+<text x="385" y="459" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">2 KB</text>
+<text x="685" y="459" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#1e1e1e" text-anchor="middle">dosyada — model isterse okur</text>
+<text x="350" y="499" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#757575" text-anchor="start">"Output too large (2.8MB). Full output saved to: &lt;yol&gt;" — hiçbir şey kaybolmaz</text>
+<text x="20" y="564" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start">SWE-agent ve Codex kırptığını modele açıkça yazıyor; Claude Code tam çıktının yolunu veriyor.</text>
+</svg>
